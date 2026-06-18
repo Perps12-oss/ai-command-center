@@ -9,14 +9,10 @@ Formal classification of open architectural debt. Update when status changes.
 | Field | Value |
 |-------|--------|
 | **Severity** | S2 |
-| **Status** | **ACCEPTED DEBT** (defer fix to Phase 4A) |
-| **Location** | `ObsidianService._index_vault_incremental()` — synchronous `rglob` + file read on `command.routed` handler thread |
-| **Impact** | Large vaults can stall EventBus briefly; UI remains responsive via `UIQueue` for display |
-| **Mitigation (now)** | On-demand indexing only; mtime skip on re-index; `audit_note_integration` baseline (~43 ms / 40 files) |
-| **Resolution target** | Phase 4A — background index worker thread + `note.index_progress` events |
-| **Escalation** | If user-visible freeze on real vault → bump to S3, prioritize 4A |
-
-**Classification rationale:** Architectural boundary is correct (Obsidian owns vault I/O). Failure mode is performance, not pipeline bypass. Accept until Phase 4.
+| **Status** | **CLOSED** (Phase 4A async indexer) |
+| **Location** | Was: `ObsidianService._index_vault_incremental()` on EventBus thread |
+| **Resolution** | Background `obsidian-index` worker; `note.index_progress` / `note.index_complete` events |
+| **Gate** | `scripts/verify_phase4a.py` |
 
 ---
 
@@ -37,7 +33,7 @@ Formal classification of open architectural debt. Update when status changes.
 | Field | Value |
 |-------|--------|
 | **Severity** | S3 (governance / reproducibility) |
-| **Status** | **PROCESS DEBT** (open) |
+| **Status** | **CLOSED** (commit `592c0e9`) |
 | **Impact** | No versioned artifact for Phases 1–3D; regression baseline tied to working tree only |
 | **Resolution** | Git commit (single or split PRs) before Phase 4 feature work |
 | **Owner** | Maintainer — explicit `git commit` when ready |

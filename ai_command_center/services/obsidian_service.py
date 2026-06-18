@@ -1,7 +1,9 @@
-"""Obsidian vault integration — FTS search, read, write (Phase 3C)."""
+"""Obsidian vault integration — FTS search, read, write (Phase 3C + 4A async index)."""
 
 from __future__ import annotations
 
+import queue
+import threading
 import time
 from pathlib import Path
 from typing import Callable
@@ -16,6 +18,7 @@ from ai_command_center.services.command_router_service import (
 
 _SKIP_DIRS = {".obsidian", ".trash", ".git"}
 _MAX_NOTE_BYTES = 512_000
+_PROGRESS_EVERY = 25
 
 
 def _title_from_markdown(path: Path, body: str) -> str:
@@ -30,7 +33,8 @@ class ObsidianService(BaseService):
     """
     Keyword search over vault markdown via SQLite FTS5.
 
-    No semantic vectors. No startup full-vault scan — indexes on first search/write.
+    Phase 4A: vault scan/index I/O runs on a background worker — EventBus handlers
+    only perform SQLite FTS reads and enqueue index jobs.
     """
 
     name = "obsidian"
@@ -38,12 +42,26 @@ class ObsidianService(BaseService):
     def __init__(self, bus, repo: NoteRepository) -> None:
         super().__init__(bus)
         self._repo = repo
+        self._repo_lock = threading.Lock()
         self._vault_path: Path | None = None
         self._selected_path: str | None = None
         self._selected_body: str | None = None
         self._unsubscribers: list[Callable[[], None]] = []
+        self._index_queue: queue.SimpleQueue[Path | None] = queue.SimpleQueue()
+        self._index_stop = threading.Event()
+        self._index_thread: threading.Thread | None = None
+        self._index_in_progress = False
+        self._pending_search_query: str | None = None
+        self._last_vault_stats: tuple[int, int] = (0, 0)
 
     def _on_load(self) -> None:
+        self._index_stop.clear()
+        self._index_thread = threading.Thread(
+            target=self._index_worker,
+            name="obsidian-index",
+            daemon=True,
+        )
+        self._index_thread.start()
         self._unsubscribers.append(
             self._bus.subscribe("settings.snapshot", self._on_settings_snapshot)
         )
@@ -55,6 +73,11 @@ class ObsidianService(BaseService):
         )
 
     def _on_unload(self) -> None:
+        self._index_stop.set()
+        self._index_queue.put(None)
+        if self._index_thread is not None:
+            self._index_thread.join(timeout=3.0)
+            self._index_thread = None
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
@@ -119,6 +142,11 @@ class ObsidianService(BaseService):
             return None
         return self._vault_path
 
+    def _schedule_index(self, vault: Path) -> None:
+        if self._index_in_progress:
+            return
+        self._index_queue.put(vault)
+
     def _handle_search(self, query: str) -> None:
         if not query:
             self._bus.publish(
@@ -131,15 +159,30 @@ class ObsidianService(BaseService):
         if vault is None:
             return
 
-        vault_files, vault_bytes = self._vault_stats(vault)
-        index_start = time.perf_counter()
-        indexed = self._index_vault_incremental(vault)
-        index_ms = (time.perf_counter() - index_start) * 1000.0
+        self._pending_search_query = query
+        self._schedule_index(vault)
 
         search_start = time.perf_counter()
-        hits = self._repo.search(query)
+        with self._repo_lock:
+            hits = self._repo.search(query)
         search_ms = (time.perf_counter() - search_start) * 1000.0
 
+        indexing = self._index_in_progress
+        self._publish_search_results(query, hits, search_ms=search_ms, indexing=indexing)
+        if hits or not indexing:
+            self._pending_search_query = None
+
+    def _publish_search_results(
+        self,
+        query: str,
+        hits,
+        *,
+        search_ms: float,
+        indexing: bool,
+    ) -> None:
+        vault_files, vault_bytes = self._last_vault_stats
+        with self._repo_lock:
+            indexed_count = self._repo.count_indexed()
         self._bus.publish(
             "note.search_results",
             {
@@ -148,11 +191,12 @@ class ObsidianService(BaseService):
                     {"path": h.path, "title": h.title, "snippet": h.snippet}
                     for h in hits
                 ],
-                "indexed_files": indexed,
+                "indexed_files": indexed_count,
                 "vault_files": vault_files,
                 "vault_bytes": vault_bytes,
-                "index_ms": round(index_ms, 2),
+                "index_ms": 0.0,
                 "search_ms": round(search_ms, 2),
+                "indexing": indexing,
             },
             source=self.name,
         )
@@ -199,14 +243,75 @@ class ObsidianService(BaseService):
         except OSError:
             return None
 
-    def _index_vault_incremental(self, vault: Path) -> int:
-        count = 0
-        for path in vault.rglob("*.md"):
-            if any(part in _SKIP_DIRS for part in path.parts):
+    def _index_worker(self) -> None:
+        while not self._index_stop.is_set():
+            try:
+                vault = self._index_queue.get(timeout=0.25)
+            except queue.Empty:
                 continue
-            if self._index_file(vault, path):
-                count += 1
-        return count
+            if vault is None or self._index_stop.is_set():
+                break
+            self._run_incremental_index(vault)
+
+    def _run_incremental_index(self, vault: Path) -> None:
+        self._index_in_progress = True
+        index_start = time.perf_counter()
+        indexed = 0
+        scanned = 0
+        vault_files = 0
+        vault_bytes = 0
+        try:
+            for path in vault.rglob("*.md"):
+                if self._index_stop.is_set():
+                    return
+                if any(part in _SKIP_DIRS for part in path.parts):
+                    continue
+                scanned += 1
+                try:
+                    vault_bytes += path.stat().st_size
+                except OSError:
+                    pass
+                vault_files += 1
+                if self._index_file(vault, path):
+                    indexed += 1
+                if scanned % _PROGRESS_EVERY == 0:
+                    self._bus.publish(
+                        "note.index_progress",
+                        {
+                            "scanned_files": scanned,
+                            "indexed_files": indexed,
+                            "vault_files": vault_files,
+                        },
+                        source=self.name,
+                    )
+        finally:
+            elapsed_ms = (time.perf_counter() - index_start) * 1000.0
+            self._last_vault_stats = (vault_files, vault_bytes)
+            self._index_in_progress = False
+            with self._repo_lock:
+                total_indexed = self._repo.count_indexed()
+            self._bus.publish(
+                "note.index_complete",
+                {
+                    "scanned_files": scanned,
+                    "indexed_files": total_indexed,
+                    "new_or_updated": indexed,
+                    "vault_files": vault_files,
+                    "vault_bytes": vault_bytes,
+                    "index_ms": round(elapsed_ms, 2),
+                },
+                source=self.name,
+            )
+            pending = self._pending_search_query
+            if pending:
+                search_start = time.perf_counter()
+                with self._repo_lock:
+                    hits = self._repo.search(pending)
+                search_ms = (time.perf_counter() - search_start) * 1000.0
+                self._publish_search_results(
+                    pending, hits, search_ms=search_ms, indexing=False
+                )
+                self._pending_search_query = None
 
     def _index_file(self, vault: Path, path: Path) -> bool:
         try:
@@ -214,8 +319,9 @@ class ObsidianService(BaseService):
         except OSError:
             return False
         rel = str(path.relative_to(vault)).replace("\\", "/")
-        if self._repo.indexed_mtime(rel) == stat.st_mtime:
-            return False
+        with self._repo_lock:
+            if self._repo.indexed_mtime(rel) == stat.st_mtime:
+                return False
         if stat.st_size > _MAX_NOTE_BYTES:
             return False
         try:
@@ -223,18 +329,5 @@ class ObsidianService(BaseService):
         except OSError:
             return False
         title = _title_from_markdown(path, body)
-        return self._repo.upsert(rel, title, body, stat.st_mtime)
-
-    @staticmethod
-    def _vault_stats(vault: Path) -> tuple[int, int]:
-        files = 0
-        total_bytes = 0
-        for path in vault.rglob("*.md"):
-            if any(part in _SKIP_DIRS for part in path.parts):
-                continue
-            files += 1
-            try:
-                total_bytes += path.stat().st_size
-            except OSError:
-                continue
-        return files, total_bytes
+        with self._repo_lock:
+            return self._repo.upsert(rel, title, body, stat.st_mtime)

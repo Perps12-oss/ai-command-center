@@ -7,10 +7,10 @@ Update the **Current** block at every phase boundary (before starting the next p
 ## Current
 
 ```
-Current Phase: Phase 3D — COMPLETE (contracts locked; manual daily-driver sign-off pending)
+Current Phase: Phase 4A — COMPLETE (4B+ not started)
 Mode: Gate-by-gate
-Previous Phase Snapshot: Phase 3C PASS — ObsidianService FTS5, NotesView, opt-in note injection; audit_note_integration PASS; NoteRepository mtime/body fix applied
-Pre-Commit Diff: Phases 1–3D uncommitted on master (1 commit: Phase 0 only). Contract lock added: core/contracts.py, verify_contracts.py, docs/CONTRACTS.md, VIOLATIONS.md, DAILY_DRIVER.md
+Previous Phase Snapshot: Phase 3D PASS + contracts v1.0 locked; commit 592c0e9 (V-006 closed)
+Pre-Commit Diff: Phase 4A async Obsidian indexer — uncommitted
 Historical Ledger: See table below
 ```
 
@@ -27,6 +27,7 @@ Historical Ledger: See table below
 | Note audits | `audit_note_integration.py` | PASS |
 | Phase 3D | `verify_phase3d.py` | PASS |
 | Contracts v1.0 | `verify_contracts.py` | PASS |
+| Phase 4A | `verify_phase4a.py` | PASS |
 
 ### Phase 3D deliverables (this phase)
 
@@ -37,11 +38,17 @@ Historical Ledger: See table below
 - `ChatView` — history load, code-fence markdown display
 - `UIQueue` — thread-safe `SimpleQueue` main-thread poll
 
+### Phase 4A deliverables
+
+- Background `obsidian-index` worker — vault `rglob` off EventBus thread (V-001 closed)
+- Events: `note.index_progress`, `note.index_complete`
+- `note.search_results.indexing` + auto-refresh after index
+
 ### Next
 
-- **Manual daily-driver** — follow `docs/DAILY_DRIVER.md`; record sign-off below
-- **Git commit** — close V-006 (Phases 1–3D + contract lock)
-- Phase 4+ (out of scope until daily driver passes): semantic search, multi-chat, agents; V-001 async indexing in 4A
+- **Manual daily-driver** — `docs/DAILY_DRIVER.md` (still pending sign-off)
+- Phase 4B: plugin registry skeleton (see `docs/PHASE4.md`)
+- Phase 4C+: settings UI, shell handler
 
 ---
 
@@ -58,6 +65,7 @@ Historical Ledger: See table below
 | 3B | `Phase 3B` | Gate-by-gate | `verify_phase3b.py` PASS | OllamaHttpService streaming, cancel, offline errors, ChatView |
 | 3C | `Phase 3C` | Gate-by-gate | `verify_phase3c.py` PASS | ObsidianService FTS5, NotesView, note injection via ContextManager |
 | 3D | `Phase 3D` | Gate-by-gate | `verify_phase3d.py` PASS | Session persistence, history in context, clipboard path, UIQueue fix |
+| 4A | `Phase 4A` | Gate-by-gate | `verify_phase4a.py` PASS | Async Obsidian vault indexer, index progress events, V-001 closed |
 
 ---
 
@@ -90,7 +98,8 @@ Record a short diff summary when closing each phase (before git commit).
 | Closed | Branch / state | Diff summary |
 |--------|----------------|--------------|
 | Phase 0 | `c7642e9` on master | Phase 0 ARM64 preflight scaffold committed |
-| Phases 1–3D | uncommitted | Full app: core, services (ollama, obsidian, session, chat), ui, db, verify scripts, docs |
+| Phases 1–3D | `592c0e9` on master | Full app + contracts v1.0 |
+| Phase 4A | uncommitted | Async Obsidian indexer |
 
 ---
 
@@ -98,9 +107,9 @@ Record a short diff summary when closing each phase (before git commit).
 
 Update this section after each phase gate and before Phase 4+ work.
 
-**Audit:** STRICT | **Phase:** 3D → 4 transition | **Verdict:** `CONDITIONAL_APPROVE`
+**Audit:** STRICT | **Phase:** 4A | **Verdict:** `CONDITIONAL_APPROVE`
 
-Contract lock complete (V-002 closed). Remaining conditions: manual daily-driver, git commit (V-006), V-001 deferred to 4A.
+V-001 and V-006 closed. Remaining: manual daily-driver sign-off.
 
 ### Input context (frozen at audit)
 
@@ -138,12 +147,12 @@ Gate: `scripts/verify_contracts.py` PASS | Docs: `docs/CONTRACTS.md`
 
 | ID | Category | Severity | Status |
 |----|----------|----------|--------|
-| V-001 | Sync I/O on EventBus (Obsidian vault `rglob`) | S2 | **ACCEPTED DEBT** → Phase 4A |
+| V-001 | Sync I/O on EventBus (Obsidian vault `rglob`) | S2 | **Closed** (4A async indexer) |
 | V-002 | Contract schemas without version field | S2 | **Closed** (contract lock) |
 | V-003 | NoteRepository mtime/body swap | S3 | **Closed** (3C fix) |
 | V-004 | ChatHandler `command.routed` loop | S3 | **Closed** (3A fix) |
 | V-005 | Tk `after()` from worker thread | S2 | **Closed** (3D UIQueue) |
-| V-006 | Large uncommitted diff | S3 | **PROCESS DEBT** (open) |
+| V-006 | Large uncommitted diff | S3 | **Closed** (`592c0e9`) |
 
 Detail: `docs/VIOLATIONS.md`
 
@@ -178,25 +187,23 @@ Detail: `docs/VIOLATIONS.md`
 ### Conditions for full APPROVE
 
 1. Record manual daily-driver in § Current (`docs/DAILY_DRIVER.md`)
-2. Commit Phases 1–3D + contract lock (close V-006)
-3. ~~Add contract version fields~~ **done**
-4. Plan async Obsidian indexing in 4A (close V-001)
+2. ~~Commit Phases 1–3D~~ **done** (`592c0e9`)
+3. ~~Contract version fields~~ **done**
+4. ~~Async Obsidian indexing~~ **done** (4A)
 
 ### Machine-readable
 
 ```yaml
 ucgs_v3:
-  phase: "3D"
+  phase: "4A"
   verdict: CONDITIONAL_APPROVE
   architecture_trend: improving
-  debt_growth_rate: stable_slight_increase
+  debt_growth_rate: stable
   s3_violations: 0
-  open_violations: [V-001, V-006]
-  accepted_debt: [V-001]
-  process_debt: [V-006]
+  open_violations: []
   plugin_ready: partial
   contracts_version: "1.0"
-  next_gates: [manual_daily_driver, git_commit]
+  next_gates: [manual_daily_driver]
 ```
 
 ---
@@ -213,4 +220,4 @@ Blockers:
 
 ---
 
-*Last updated: Contract lock v1.0 PASS (verify_contracts); V-002 closed; manual daily-driver not yet recorded.*
+*Last updated: Phase 4A gate PASS; V-001/V-006 closed; manual daily-driver pending.*

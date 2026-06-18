@@ -97,3 +97,7 @@ class NoteRepository:
         if row is None:
             return None
         return float(row["mtime"])
+
+    def count_indexed(self) -> int:
+        row = self._conn.execute("SELECT COUNT(*) AS n FROM note_index").fetchone()
+        return int(row["n"]) if row else 0

@@ -94,15 +94,20 @@ def main() -> int:
             source="test",
         )
 
-        # Search
+        # Search — Phase 4A may return empty first, then refresh after index_complete
         events.clear()
         bus.publish("ui.command", {"text": "note:roadmap"}, source="test")
-        if not _wait_for(events, "note.search_results"):
-            failures.append("note: query did not produce note.search_results")
+        end = time.time() + 15.0
+        results = []
+        while time.time() < end:
+            if "note.search_results" in events:
+                results = payloads.get("note.search_results", {}).get("results", [])
+                if results:
+                    break
+            time.sleep(0.02)
+        if not results:
+            failures.append("note: query did not produce note.search_results with hits")
         else:
-            results = payloads.get("note.search_results", {}).get("results", [])
-            if not results:
-                failures.append("FTS search returned no hits for 'roadmap'")
             paths = [r.get("path") for r in results]
             if "meeting.md" not in paths:
                 failures.append(f"expected meeting.md in results, got {paths}")

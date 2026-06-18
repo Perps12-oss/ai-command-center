@@ -78,23 +78,41 @@ def test_first_search_latency() -> dict:
 
             search_start = time.perf_counter()
             bus.publish("ui.command", {"text": "note:token5"}, source="audit")
-            ok = _wait_for(events, "note.search_results", timeout=15.0)
-            search_total_ms = (time.perf_counter() - search_start) * 1000.0
+            ok = _wait_for(events, "note.search_results", timeout=5.0)
+            search_first_ms = (time.perf_counter() - search_start) * 1000.0
+
+            index_ok = _wait_for(events, "note.index_complete", timeout=15.0)
+            search_total_ms = search_first_ms
+            if index_ok:
+                # Phase 4A: refreshed results may arrive after index_complete
+                end = time.time() + 5.0
+                while time.time() < end:
+                    result = payloads.get("note.search_results", {})
+                    if result.get("results"):
+                        break
+                    time.sleep(0.02)
 
             router.unload()
             obsidian.unload()
 
             if not ok:
                 return {"pass": False, "error": "note.search_results timeout"}
+            if not index_ok:
+                return {"pass": False, "error": "note.index_complete timeout"}
 
             result = payloads.get("note.search_results", {})
+            complete = payloads.get("note.index_complete", {})
+            if not result.get("results"):
+                return {"pass": False, "error": "no hits after async index"}
+
             return {
                 "pass": True,
-                "vault_files": result.get("vault_files", expected_files),
-                "vault_bytes": result.get("vault_bytes", expected_bytes),
-                "indexed_files": result.get("indexed_files"),
-                "index_ms": result.get("index_ms"),
+                "vault_files": complete.get("vault_files", result.get("vault_files")),
+                "vault_bytes": complete.get("vault_bytes", result.get("vault_bytes")),
+                "indexed_files": complete.get("indexed_files", result.get("indexed_files")),
+                "index_ms": complete.get("index_ms"),
                 "search_ms": result.get("search_ms"),
+                "search_first_ms": round(search_first_ms, 2),
                 "search_total_ms": round(search_total_ms, 2),
             }
         finally:
@@ -159,7 +177,14 @@ def test_context_pollution() -> dict:
 
             events.clear()
             bus.publish("ui.command", {"text": "note:ALPHA"}, source="audit")
-            if not _wait_for(events, "note.search_results"):
+            end = time.time() + 15.0
+            while time.time() < end:
+                if "note.search_results" in events:
+                    r = payloads.get("note.search_results", {}).get("results", [])
+                    if r:
+                        break
+                time.sleep(0.02)
+            else:
                 return {"pass": False, "error": "search A failed"}
             bus.publish("note.select", {"path": "alpha.md"}, source="audit")
             if not _wait_for(events, "note.selected"):
@@ -167,7 +192,14 @@ def test_context_pollution() -> dict:
 
             events.clear()
             bus.publish("ui.command", {"text": "note:BETA"}, source="audit")
-            if not _wait_for(events, "note.search_results"):
+            end = time.time() + 15.0
+            while time.time() < end:
+                if "note.search_results" in events:
+                    r = payloads.get("note.search_results", {}).get("results", [])
+                    if r:
+                        break
+                time.sleep(0.02)
+            else:
                 return {"pass": False, "error": "search B failed"}
 
             events.clear()
@@ -221,6 +253,7 @@ def main() -> int:
         print(f"  Indexed:      {latency['indexed_files']} file(s)")
         print(f"  Index time:   {latency['index_ms']} ms")
         print(f"  Search time:  {latency['search_ms']} ms")
+        print(f"  First reply:  {latency.get('search_first_ms', latency['search_total_ms'])} ms")
         print(f"  Total (cmd):  {latency['search_total_ms']} ms")
 
     print("\n--- Context Pollution ---")
