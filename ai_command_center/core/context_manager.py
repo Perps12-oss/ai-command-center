@@ -1,0 +1,120 @@
+"""Context budget manager — every AI request must pass through here first.
+
+NO Ollama calls in this module. NO embeddings. NO vectors.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from ai_command_center.core.contracts import CONTEXT_BUNDLE_VERSION
+
+# Reserve 30% of context window for model response (per architecture policy).
+MAX_CONTEXT_FILL_RATIO = 0.70
+
+
+@dataclass(frozen=True, slots=True)
+class ContextBundle:
+    """Assembled prompt ready for OllamaService (contract v1.0)."""
+
+    prompt: str
+    sources: tuple[str, ...]
+    token_estimate: int
+    version: str = CONTEXT_BUNDLE_VERSION
+
+
+def estimate_tokens(text: str) -> int:
+    """Fast heuristic — ~4 characters per token."""
+    if not text:
+        return 0
+    return max(1, len(text) // 4)
+
+
+class ContextManager:
+    """
+    Builds prompts from explicit, caller-supplied context only.
+    Phase 3 V1: clipboard + notes + query. No scraping, no auto-memory.
+    """
+
+    def __init__(
+        self,
+        max_context_tokens: int = 4096,
+        fill_ratio: float = MAX_CONTEXT_FILL_RATIO,
+    ) -> None:
+        self._max_context_tokens = max_context_tokens
+        self._fill_ratio = fill_ratio
+
+    @property
+    def context_budget_tokens(self) -> int:
+        return int(self._max_context_tokens * self._fill_ratio)
+
+    def build_context(
+        self,
+        query: str,
+        *,
+        clipboard: str | None = None,
+        notes: list[str] | None = None,
+        conversation_history: list[tuple[str, str]] | None = None,
+    ) -> ContextBundle:
+        """
+        Assemble a single prompt string with source attribution.
+        Drops lowest-priority sections when over budget (notes before clipboard).
+        """
+        query = query.strip()
+        if not query:
+            return ContextBundle(prompt="", sources=(), token_estimate=0)
+
+        budget = self.context_budget_tokens
+        sources: list[str] = []
+        sections: list[tuple[str, str, int]] = []  # priority, label, body
+
+        if conversation_history:
+            lines: list[str] = []
+            for role, content in conversation_history[-6:]:
+                lines.append(f"{role}: {content}")
+            body = "\n".join(lines)
+            if body.strip():
+                sections.append((1, "conversation_history", body))
+
+        if notes:
+            for i, note in enumerate(notes):
+                body = note.strip()
+                if body:
+                    sections.append((2, f"note_{i}", body))
+
+        if clipboard:
+            body = clipboard.strip()
+            if body:
+                sections.append((3, "clipboard", body))
+
+        sections.append((4, "user_query", query))
+
+        included: list[tuple[str, str]] = []
+        total_tokens = 0
+
+        for _prio, label, body in sorted(sections, key=lambda s: s[0]):
+            block = f"[{label}]\n{body}"
+            block_tokens = estimate_tokens(block)
+            if total_tokens + block_tokens > budget and label != "user_query":
+                continue
+            if total_tokens + block_tokens > budget and label == "user_query":
+                remaining = budget - total_tokens
+                if remaining > 50:
+                    char_limit = remaining * 4
+                    body = body[:char_limit] + "…"
+                    block = f"[{label}]\n{body}"
+                    block_tokens = estimate_tokens(block)
+                else:
+                    block = f"[{label}]\n{body[:200]}"
+                    block_tokens = estimate_tokens(block)
+            included.append((label, block))
+            sources.append(label)
+            total_tokens += block_tokens
+
+        prompt = "\n\n".join(block for _, block in included)
+        return ContextBundle(
+            prompt=prompt,
+            sources=tuple(sources),
+            token_estimate=total_tokens,
+            version=CONTEXT_BUNDLE_VERSION,
+        )

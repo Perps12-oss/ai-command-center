@@ -1,0 +1,42 @@
+"""Glassmorphism-lite design tokens (ARM64-friendly — no blur shaders)."""
+
+# Backgrounds
+BG_DEEP = "#0D0D1A"
+BG_PANEL = "#16162A"
+BG_GLASS = "#1A1A2E"
+BG_GLASS_BORDER = "#2A2A4A"
+BG_INPUT = "#12121F"
+
+# Accent (overridden from AppState.settings.accent in runtime)
+ACCENT_DEFAULT = "#3B82F6"
+ACCENT_HOVER = "#2563EB"
+
+# Text
+TEXT_PRIMARY = "#F0F0F5"
+TEXT_SECONDARY = "#A0A0B8"
+TEXT_MUTED = "#6B6B80"
+
+# Semantic
+STATUS_READY = "#22C55E"
+STATUS_BUSY = "#EAB308"
+STATUS_ERROR = "#EF4444"
+
+# Typography
+FONT_FAMILY = "Segoe UI"
+FONT_TITLE = (FONT_FAMILY, 18, "bold")
+FONT_HEADER = (FONT_FAMILY, 13, "bold")
+FONT_BODY = (FONT_FAMILY, 12)
+FONT_SMALL = (FONT_FAMILY, 11)
+FONT_MONO = ("Consolas", 11)
+
+# Layout
+WINDOW_WIDTH = 1100
+WINDOW_HEIGHT = 700
+SIDEBAR_WIDTH = 180
+TOP_BAR_HEIGHT = 52
+CORNER_RADIUS = 10
+PAD = 16
+
+# Animation
+FADE_IN_MS = 150
+FADE_STEPS = 10

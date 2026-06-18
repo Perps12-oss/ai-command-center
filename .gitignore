@@ -44,3 +44,6 @@ AppData/
 *.log
 tmp/
 temp/
+
+# Local gate / audit databases
+scripts/*.db

@@ -1,0 +1,54 @@
+"""Service registry and lifecycle orchestration."""
+
+from __future__ import annotations
+
+from typing import Iterable
+
+from ai_command_center.core.event_bus import EventBus
+from ai_command_center.services.base import BaseService
+from ai_command_center.services.states import ServiceState
+
+
+class ServiceManager:
+    """Registers services and coordinates load / hibernate / unload."""
+
+    def __init__(self, bus: EventBus) -> None:
+        self._bus = bus
+        self._services: dict[str, BaseService] = {}
+
+    def register(self, service: BaseService) -> None:
+        if service.name in self._services:
+            raise ValueError(f"service already registered: {service.name}")
+        self._services[service.name] = service
+
+    def get(self, name: str) -> BaseService | None:
+        return self._services.get(name)
+
+    def names(self) -> tuple[str, ...]:
+        return tuple(sorted(self._services))
+
+    def load_all(self) -> None:
+        for service in self._ordered():
+            service.load()
+
+    def hibernate_all(self) -> None:
+        for service in reversed(self._ordered()):
+            service.hibernate()
+
+    def unload_all(self) -> None:
+        for service in reversed(self._ordered()):
+            service.unload()
+
+    def shutdown(self) -> None:
+        """Unload everything — no background services remain."""
+        self.unload_all()
+        self._bus.publish("app.phase", {"phase": "shutdown"}, source="service_manager")
+
+    def _ordered(self) -> Iterable[BaseService]:
+        return self._services.values()
+
+    def any_active(self) -> bool:
+        return any(s.state == ServiceState.ACTIVE for s in self._services.values())
+
+    def any_loaded(self) -> bool:
+        return any(s.state != ServiceState.OFF for s in self._services.values())
