@@ -1,0 +1,19 @@
+# Generic UCGS profile — safe defaults for any project
+
+rules:
+  large_commit:
+    max_files: 25
+    max_added_lines: 500
+    severity: S2
+
+  layer_boundaries: []
+
+  forbidden_patterns:
+    - id: secrets_in_diff
+      pattern: '(?i)(api[_-]?key|secret[_-]?key|password\s*=|token\s*=)\s*["''][^"'']+["'']'
+      severity: S4
+      classification: CRITICAL
+      message: "Possible secret committed in diff"
+      remediation: "Remove secret and use environment variables or a secret manager."
+
+  contract_lock: {}

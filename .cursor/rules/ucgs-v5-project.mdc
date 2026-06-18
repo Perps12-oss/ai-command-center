@@ -1,0 +1,47 @@
+---
+description: UCGS v5 project governance — enforcement layers and escalation
+alwaysApply: true
+---
+
+# UCGS v5 — Project Governance
+
+This project uses **UCGS v5** executable architecture governance.
+
+## Layers
+
+| Layer | Location | Phase 1 behavior |
+|-------|----------|------------------|
+| CI | `.github/workflows/ucgs.yml` | Runs, warns only |
+| Git | `tools/install_git_hooks.py` | Pre-commit warns only |
+| Cursor | `.cursor/hooks.json` | Surfaces verdict on `git commit` |
+| LLM fallback | `.cursor/rules/ucgs-v4-analysis.mdc` | When report incomplete |
+
+## Commands
+
+```bash
+python tools/ucgs_runner.py
+python tools/ucgs_ci_gate.py .ucgs_last.yaml
+python tools/install_git_hooks.py
+```
+
+## Configuration
+
+- Project config: `ucgs.config.yaml`
+- Profile rules: `ucgs.profiles/<profile>.yaml`
+- Change profile: set `profile:` in `ucgs.config.yaml`
+
+## Escalation
+
+| Phase | Setting |
+|-------|---------|
+| 1 (default) | `enforcement_mode: warn` |
+| 2 | `enforcement_mode: block` locally |
+| 3 | `UCGS_ENFORCEMENT=block` in CI workflow |
+
+## Agent behavior
+
+Before architecture-sensitive changes:
+
+1. Run `python tools/ucgs_runner.py`
+2. If `report_complete: false` → apply UCGS v4 analysis rule
+3. Do not treat UCGS as infallible — use judgment on WARN verdicts

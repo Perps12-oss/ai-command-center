@@ -1,0 +1,23 @@
+# UCGS v5 project configuration
+# Copy/adapt per project. Run: python tools/ucgs_init.py --profile default
+
+ucgs_version: v5
+profile: default
+phase: "bootstrap"
+enforcement_mode: warn  # warn (Phase 1) | block (Phase 2/3)
+
+rules:
+  large_commit:
+    max_files: 25
+    max_added_lines: 500
+    severity: S2
+
+  forbidden_patterns:
+    - id: secrets_in_diff
+      pattern: '(?i)(api[_-]?key|secret[_-]?key|password\s*=|token\s*=)\s*["''][^"'']+["'']'
+      severity: S4
+      classification: CRITICAL
+      message: "Possible secret committed in diff"
+      remediation: "Remove secret and use environment variables or a secret manager."
+
+  contract_lock: {}

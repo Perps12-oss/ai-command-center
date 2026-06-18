@@ -1,0 +1,107 @@
+# AI Command Center — UCGS v4 immutable rules encoded as data
+
+phase: "Phase 3D"
+
+rules:
+  layer_boundaries:
+    - id: ui_no_services
+      name: ui_no_direct_service_access
+      paths:
+        - "**/ui/**"
+        - "**/ui/**/*.py"
+      forbidden_imports:
+        - "*OllamaService*"
+        - "*ObsidianService*"
+        - "*Repository*"
+        - "*repository*"
+        - "*database*"
+        - "*db*"
+      severity: S4
+      classification: CRITICAL
+      remediation: "UI must route through EventBus / UIController only."
+
+    - id: command_router_classify_only
+      name: command_router_no_execution
+      paths:
+        - "**/command_router*.py"
+        - "**/services/command_router*.py"
+      forbidden_imports:
+        - "*ollama*"
+        - "*openai*"
+        - "*agent*"
+        - "*plan*"
+        - "*execute*"
+      severity: S4
+      classification: CRITICAL
+      remediation: "CommandRouter must classify and emit events only."
+
+    - id: context_manager_boundary
+      name: context_manager_no_reasoning
+      paths:
+        - "**/context_manager*.py"
+        - "**/core/context_manager*.py"
+      forbidden_imports:
+        - "*semantic*"
+        - "*embedding*"
+        - "*plan*"
+        - "*agent*"
+        - "*memory_orchestr*"
+      severity: S4
+      classification: DANGEROUS
+      remediation: "ContextManager builds context bundles; no reasoning or retrieval."
+
+  forbidden_patterns:
+    - id: scope_embeddings
+      pattern: '(?i)\b(embedding|vector[_-]?db|sqlite-vec|chromadb|pinecone|faiss)\b'
+      severity: S5
+      classification: CRITICAL
+      message: "Scope creep: embeddings/vector DB without phase enablement"
+      remediation: "Defer to an approved phase or remove from diff."
+
+    - id: scope_agents
+      pattern: '(?i)\b(agent framework|autogen|crewai|langgraph|planning loop|background cognition)\b'
+      severity: S5
+      classification: CRITICAL
+      message: "Scope creep: agent/planning systems"
+      remediation: "Keep CommandRouter classify-only; defer agents to future phase."
+
+    - id: scope_auto_ingestion
+      pattern: '(?i)\b(OCR|clipboard monitor|window tracking|auto-context ingestion)\b'
+      severity: S5
+      classification: CRITICAL
+      message: "Scope creep: auto-context ingestion"
+      remediation: "Remove or gate behind explicit phase approval."
+
+    - id: scope_multi_chat
+      pattern: '(?i)\b(multi-chat workspace|workspace tabs)\b'
+      severity: S4
+      classification: DANGEROUS
+      message: "Scope creep: multi-chat workspace"
+      remediation: "Defer until architecture supports workspace isolation."
+
+    - id: eventbus_bypass
+      pattern: '(?i)(UIController|views/).*(OllamaService|ObsidianService|Repository)'
+      severity: S4
+      classification: CRITICAL
+      message: "Possible EventBus / pipeline bypass"
+      remediation: "Restore canonical UI → CommandRouter → Service flow."
+
+  contract_lock:
+    files:
+      - "ai_command_center/core/contracts.py"
+      - "ai_command_center/core/context_manager.py"
+    required_fields:
+      - "CONTEXT_BUNDLE_VERSION"
+      - "COMMAND_ROUTED_VERSION"
+      - "OLLAMA_SERVICE_API_VERSION"
+      - "SUPPORTED_VERSIONS"
+
+  large_commit:
+    max_files: 20
+    max_added_lines: 400
+    severity: S2
+
+pipeline:
+  canonical:
+    - "UI → CommandRouter → ContextManager → OllamaService → Response"
+    - "UI → CommandRouter → ObsidianService → NoteRepository"

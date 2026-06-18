@@ -32,7 +32,14 @@ credentials.json
 
 data/
 
-.cursor/
+# Cursor — UCGS kit is tracked under .cursor/rules and .cursor/hooks
+.cursor/*
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
+!.cursor/rules/
+!.cursor/rules/**
+
 .vscode/
 .idea/
 
@@ -47,3 +54,7 @@ temp/
 
 # Local gate / audit databases
 scripts/*.db
+
+# UCGS generated reports (local)
+.ucgs_last.yaml
+ucgs_report.yaml

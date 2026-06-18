@@ -1,0 +1,37 @@
+name: UCGS Architecture Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  ucgs-check:
+    runs-on: ubuntu-latest
+    env:
+      UCGS_ENFORCEMENT: warn
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pyyaml gitpython
+
+      - name: Run UCGS v5 Gate
+        run: python tools/ucgs_runner.py > ucgs_report.yaml
+
+      - name: Evaluate Verdict
+        run: python tools/ucgs_ci_gate.py ucgs_report.yaml
+
+      - name: Upload UCGS report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ucgs-report
+          path: ucgs_report.yaml

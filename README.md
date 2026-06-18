@@ -96,3 +96,14 @@ Authenticated `gh` users can publish with:
 ```powershell
 gh repo create ai-command-center --private --source=. --remote=origin --push
 ```
+
+## UCGS v5 governance
+
+Architecture governance kit (warn mode by default).
+
+```powershell
+python tools/ucgs_runner.py
+python tools/ucgs_ci_gate.py .ucgs_last.yaml
+```
+
+Pre-commit hook installed via `ucgs-init.py`. Config: `ucgs.config.yaml`. See `docs/PHASE_LEDGER.md` for phase verdicts.

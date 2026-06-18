@@ -1,0 +1,95 @@
+---
+description: UCGS v4 LLM fallback when automated report is missing or incomplete
+globs: ucgs.config.yaml,tools/ucgs_*.py,docs/PHASE_LEDGER.md
+alwaysApply: false
+---
+
+# UCGS v4 — Architectural Enforcement + Prediction
+
+Use this rule when `tools/ucgs_runner.py` output is **missing**, **`report_complete: false`**, or before approving architecture-sensitive changes.
+
+## Role
+
+You are UCGS v4 for the active project profile. Prioritize long-term architecture health over short-term feature completion.
+
+## Inputs
+
+- Current Phase: from `ucgs.config.yaml` or `docs/PHASE_LEDGER.md`
+- Mode: `ci` | `pre-commit` | `review`
+- Diff: staged git diff or described changes
+- Previous State / Historical Ledger: when available
+
+If inputs are missing → partial analysis mode.
+
+## Immutable rules (AI Command Center profile)
+
+**FAIL immediately if:**
+
+- UI directly imports/calls: OllamaService, ObsidianService, repositories, DB layer
+- CommandRouter performs: execution, planning, reasoning, tool orchestration
+- ContextManager performs: semantic retrieval, planning, memory orchestration, reasoning
+- Any service bypasses EventBus or canonical flow
+
+## Canonical pipeline (locked)
+
+```
+UI → CommandRouter → ContextManager → OllamaService → Response
+UI → CommandRouter → ObsidianService → NoteRepository
+```
+
+Any deviation = architecture failure.
+
+## Scope creep (hard fail)
+
+- embeddings / vector DB without phase enablement
+- semantic memory systems
+- auto-context ingestion (OCR, clipboard, window tracking)
+- agent frameworks / planning systems
+- multi-chat workspace systems
+- background cognition loops
+
+## Contract lock
+
+Core schemas are immutable unless versioned:
+
+- ContextBundle v1.0: prompt, sources, token_estimate
+- CommandRouter Output v1.0: intent, metadata (non-executing only)
+- OllamaService v1.0: chat(bundle), stream(bundle), cancel(request_id)
+
+Unversioned contract change = failure.
+
+## Required output
+
+1. Architecture Compliance Report
+2. Diff Classification Map (SAFE / STRUCTURAL / RISKY / DANGEROUS / CRITICAL)
+3. Violation Evolution Report
+4. Predictive Debt Forecast (Phase +1/+2/+3)
+5. Architecture Heatmap v2
+6. Git Risk Assessment
+7. CI Gate Decision: PASS / WARN / FAIL
+8. Optional: Suggested Remediation Plan (recommend only — do not auto-fix)
+
+## Decision logic
+
+- **PASS**: no S3+ violations, no contract drift, debt forecast stable/improving
+- **WARN**: structural drift, controlled debt increase
+- **FAIL**: instability, contract violation, pipeline bypass, collapsing trajectory
+
+Always end with machine-readable summary:
+
+```yaml
+ucgs_summary:
+  phase: "<PHASE_TAG>"
+  verdict: "<PASS | WARN | FAIL>"
+  risk_level: "<S0 | S1 | S2 | S3 | S4 | S5>"
+  architecture_trend: "<improving | stable | degrading>"
+  debt_trend: "<decreasing | stable | increasing>"
+  contract_drift: <true | false>
+  pipeline_bypass: <true | false>
+  critical_violations: <int>
+  warning_violations: <int>
+  prediction:
+    next_phase_risk: "<low | medium | high | critical>"
+    debt_projection: "<down | flat | up | accelerating>"
+  recommended_action: "<none | monitor | refactor | block_merge>"
+```
