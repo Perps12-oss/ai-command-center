@@ -29,6 +29,7 @@ def init_database(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
     script = _SCHEMA_PATH.read_text(encoding="utf-8")
     connection.executescript(script)
     _migrate_note_fts(connection)
+    _migrate_memory_graph(connection)
     connection.commit()
     if own:
         return connection
@@ -52,5 +53,36 @@ def _migrate_note_fts(conn: sqlite3.Connection) -> None:
             title,
             body
         );
+        """
+    )
+
+
+def _migrate_memory_graph(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='memory_nodes'"
+    ).fetchone()
+    if row is not None:
+        return
+    conn.executescript(
+        """
+        CREATE TABLE memory_nodes (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'entity',
+            content TEXT NOT NULL DEFAULT '',
+            tier TEXT NOT NULL DEFAULT 'mid',
+            created_at REAL NOT NULL
+        );
+        CREATE TABLE memory_edges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            relation TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            FOREIGN KEY (source_id) REFERENCES memory_nodes(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_id) REFERENCES memory_nodes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX idx_memory_edges_source ON memory_edges(source_id);
+        CREATE INDEX idx_memory_edges_target ON memory_edges(target_id);
         """
     )

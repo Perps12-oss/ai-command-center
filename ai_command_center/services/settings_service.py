@@ -14,11 +14,14 @@ _DEFAULTS: dict[str, str] = {
     "ollama_url": "http://localhost:11434",
     "ollama_keep_alive": "10m",
     "default_model": "llama3.2:3b",
+    "summarize_model": "llama3.2:3b",
     "hotkey": "alt+space",
     "low_memory_mode": "false",
     "window_width": "1100",
     "window_height": "700",
     "obsidian_vault_path": "",
+    "overlay_mode": "palette",
+    "summarize_model": "llama3.2:3b",
 }
 
 

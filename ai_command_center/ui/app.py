@@ -15,6 +15,7 @@ from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.placeholder import PlaceholderView
+from ai_command_center.ui.views.settings_view import SettingsView
 
 VIEW_IDS: tuple[str, ...] = (
     "home",
@@ -39,6 +40,7 @@ class CommandPaletteApp(ctk.CTk):
         self._current_view = "home"
         self._active_request_id: str | None = None
         self._pending_user_text: str | None = None
+        self._overlay_mode = "palette"
         self._bus_unsubs: list = []
 
         ctk.set_appearance_mode("dark")
@@ -53,6 +55,7 @@ class CommandPaletteApp(ctk.CTk):
         self._build_layout()
         self._wire_chat_events()
         self._wire_note_events()
+        self._wire_overlay_events()
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
         self._apply_state()
@@ -86,7 +89,7 @@ class CommandPaletteApp(ctk.CTk):
 
         self._show_view("home")
 
-    def _ensure_view(self, view_id: str) -> PlaceholderView | ChatView | NotesView:
+    def _ensure_view(self, view_id: str) -> PlaceholderView | ChatView | NotesView | SettingsView:
         if view_id not in self._views:
             if view_id == "chat":
                 self._views[view_id] = ChatView(
@@ -97,6 +100,11 @@ class CommandPaletteApp(ctk.CTk):
                 self._views[view_id] = NotesView(
                     self._content,
                     on_select=self._controller.publish_note_select,
+                )
+            elif view_id == "settings":
+                self._views[view_id] = SettingsView(
+                    self._content,
+                    on_save=self._controller.request_settings_change,
                 )
             else:
                 self._views[view_id] = PlaceholderView(self._content, view_id)
@@ -226,6 +234,60 @@ class CommandPaletteApp(ctk.CTk):
             self._bus.subscribe("note.error", self._on_note_error)
         )
 
+    def _wire_overlay_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe("overlay.show", self._on_overlay_show)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe("overlay.anchor", self._on_overlay_anchor)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe("overlay.hide", self._on_overlay_hide)
+        )
+
+    def _on_overlay_show(self, event: Event) -> None:
+        mode = str(event.payload.get("mode", "palette"))
+        x = int(event.payload.get("x", 0) or 0)
+        y = int(event.payload.get("y", 0) or 0)
+
+        def update() -> None:
+            self._overlay_mode = mode
+            self._apply_overlay_geometry(mode, x, y)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_overlay_anchor(self, event: Event) -> None:
+        x = int(event.payload.get("x", 0) or 0)
+        y = int(event.payload.get("y", 0) or 0)
+
+        def update() -> None:
+            if self._overlay_mode == "compact" and x > 0 and y > 0:
+                self.geometry(f"640x420+{x}+{y}")
+
+        self._ui_queue.enqueue(update)
+
+    def _on_overlay_hide(self, _event: Event) -> None:
+        def update() -> None:
+            self.attributes("-topmost", False)
+
+        self._ui_queue.enqueue(update)
+
+    def _apply_overlay_geometry(self, mode: str, x: int, y: int) -> None:
+        if mode == "compact":
+            self.attributes("-topmost", True)
+            if x > 0 and y > 0:
+                self.geometry(f"640x420+{x}+{y}")
+            else:
+                self.geometry("640x420")
+            self.minsize(480, 320)
+        else:
+            self.attributes("-topmost", False)
+            snap = self._controller.snapshot()
+            w = int(snap.settings.window_width)
+            h = int(snap.settings.window_height)
+            self.geometry(f"{w}x{h}")
+            self.minsize(900, 560)
+
     def _on_note_search_results(self, event: Event) -> None:
         query = str(event.payload.get("query", ""))
         results = event.payload.get("results") or []
@@ -313,13 +375,20 @@ class CommandPaletteApp(ctk.CTk):
     def _apply_state(self) -> None:
         snap = self._controller.snapshot()
         self._top.update_status(snap.phase, snap.settings.default_model)
+        self._overlay_mode = snap.settings.overlay_mode
         try:
-            w = int(snap.settings.window_width)
-            h = int(snap.settings.window_height)
-            if w >= 900 and h >= 560:
-                self.geometry(f"{w}x{h}")
+            if self._overlay_mode == "compact":
+                self._apply_overlay_geometry("compact", 0, 0)
+            else:
+                w = int(snap.settings.window_width)
+                h = int(snap.settings.window_height)
+                if w >= 900 and h >= 560:
+                    self.geometry(f"{w}x{h}")
         except ValueError:
             pass
+        settings_view = self._views.get("settings")
+        if isinstance(settings_view, SettingsView):
+            settings_view.load_from_snapshot(snap.settings)
         if snap.last_command and "home" in self._views:
             self._views["home"].set_extra(
                 f'Last: "{snap.last_command}" → {snap.last_command_intent or "pending"}'

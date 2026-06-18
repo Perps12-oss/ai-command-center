@@ -33,11 +33,14 @@ class SettingsSnapshot:
     theme: str = "dark"
     accent: str = "#3B82F6"
     default_model: str = "llama3.2:3b"
+    summarize_model: str = "llama3.2:3b"
     ollama_url: str = "http://localhost:11434"
     hotkey: str = "alt+space"
     low_memory_mode: str = "false"
     window_width: str = "1100"
     window_height: str = "700"
+    obsidian_vault_path: str = ""
+    overlay_mode: str = "palette"
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,11 +66,14 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         theme=str(payload.get("theme", "dark")),
         accent=str(payload.get("accent", "#3B82F6")),
         default_model=str(payload.get("default_model", "llama3.2:3b")),
+        summarize_model=str(payload.get("summarize_model", "llama3.2:3b")),
         ollama_url=str(payload.get("ollama_url", "http://localhost:11434")),
         hotkey=str(payload.get("hotkey", "alt+space")),
         low_memory_mode=str(payload.get("low_memory_mode", "false")),
         window_width=str(payload.get("window_width", "1100")),
         window_height=str(payload.get("window_height", "700")),
+        obsidian_vault_path=str(payload.get("obsidian_vault_path", "")),
+        overlay_mode=str(payload.get("overlay_mode", "palette")),
     )
 
 

@@ -1,4 +1,4 @@
-# Architecture Contracts v1.0
+# Architecture Contracts
 
 Locked at Phase 3D → 4 transition. **Bump version only via governance review.**
 
@@ -8,16 +8,18 @@ Constants: `ai_command_center/core/contracts.py`
 
 ---
 
-## ContextBundle v1.0
+## ContextBundle v1.1 (current)
 
 ```python
 @dataclass
 class ContextBundle:
     prompt: str
-    sources: tuple[str, ...]
+    sources: tuple[str, ...]  # may include conversation_summary, memory_graph_*
     token_estimate: int
-    version: str = "1.0"
+    version: str = "1.1"
 ```
+
+v1.0 remains in `SUPPORTED_VERSIONS` for backward compatibility.
 
 **Producer:** `ContextManager.build_context()` only  
 **Consumer:** `OllamaService.stream_chat()` / `.stream()` / `.chat()`
@@ -26,33 +28,29 @@ class ContextBundle:
 
 ## command.routed v1.0
 
+Unchanged — see prior spec. `contract_version: "1.0"`.
+
+---
+
+## tool.invoke / tool.result v1.0 (Phase 4B)
+
 ```json
 {
   "contract_version": "1.0",
-  "text": "user input",
-  "intent": "chat | note_search | ...",
-  "args": {},
-  "status": "pending | processing",
-  "metadata": { "executing": false, "source_router": "command_router" }
+  "invoke_id": "uuid",
+  "tool": "shell",
+  "args": {}
 }
 ```
 
-**Producer:** `CommandRouterService` only  
-**Rule:** `metadata.executing` must remain `false` (router never executes)
+**Producer:** `ShellToolService` (and future tool bridges)  
+**Consumer:** `ToolExecutorService` — one invocation per event, no loops
 
 ---
 
 ## OllamaService API v1.0
 
-| Contract method | Implementation | Notes |
-|-----------------|----------------|-------|
-| `chat(bundle, model=, request_id=)` | alias | Entry point |
-| `stream(bundle, model=, request_id=)` | alias → `stream_chat` | Streaming |
-| `stream_chat(bundle, ...)` | primary | Phase 3 impl name |
-| `cancel(request_id=)` | required | |
-| `api_version` | `"1.0"` | class attribute |
-
-**Input:** `ContextBundle` with `version == "1.0"` only (until 1.1 bump)
+Unchanged.
 
 ---
 
@@ -61,4 +59,4 @@ class ContextBundle:
 1. Update `core/contracts.py` + `SUPPORTED_VERSIONS`
 2. Update this document
 3. Add migration note in `PHASE_LEDGER.md`
-4. Run `verify_contracts.py` + full phase regression suite
+4. Run full phase regression suite

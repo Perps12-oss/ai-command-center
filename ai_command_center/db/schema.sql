@@ -58,3 +58,26 @@ CREATE TABLE IF NOT EXISTS context_events (
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_context_events_created ON context_events(created_at);
+
+-- Phase 4E memory graph (explicit opt-in, not vectors)
+CREATE TABLE IF NOT EXISTS memory_nodes (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'entity',
+    content TEXT NOT NULL DEFAULT '',
+    tier TEXT NOT NULL DEFAULT 'mid',
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS memory_edges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    FOREIGN KEY (source_id) REFERENCES memory_nodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_id) REFERENCES memory_nodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_edges_source ON memory_edges(source_id);
+CREATE INDEX IF NOT EXISTS idx_memory_edges_target ON memory_edges(target_id);

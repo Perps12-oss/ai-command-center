@@ -65,10 +65,12 @@ Record results in `docs/PHASE_LEDGER.md` § Current (manual daily-driver field).
 $py = "C:\Users\S8633\AppData\Local\Python\bin\python.exe"
 & $py scripts/verify_contracts.py
 & $py scripts/verify_phase3d.py
+& $py scripts/verify_phase4a.py
 & $py scripts/audit_note_integration.py
+& $py scripts/run_daily_driver.py
 ```
 
-All must PASS before manual sign-off counts.
+All must PASS before manual sign-off counts. `run_daily_driver.py` covers Test A + C headlessly against live Ollama.
 
 ---
 

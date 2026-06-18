@@ -97,7 +97,39 @@ bundle = context_manager.build_context(
 # OllamaService receives bundle.prompt only
 ```
 
-See [PHASE3.md](PHASE3.md) for scope bans and review gates.
+See [PHASE3.md](PHASE3.md) for scope bans and [PHASE4.md](PHASE4.md) for Phase 4 modules.
+
+Phase 4D adds `conversation_summary` compression and `graph_snippets` opt-in.
+
+---
+
+## Phase 4 event flows
+
+### Tool execution (4B)
+
+```text
+command.routed (shell) → ShellToolService → tool.invoke → ToolExecutorService → tool.result
+```
+
+### Model routing (4F)
+
+```text
+command.routed (chat) → ChatHandler → ModelRouterService.resolve() → model.selected → OllamaHttpService
+```
+
+### Memory graph (4E)
+
+```text
+memory.remember → MemoryGraphService → memory.stored
+memory.select → MemoryGraphService → memory.selected → ContextManager (opt-in)
+```
+
+### Overlay (4C)
+
+```text
+ui.palette_open → overlay.show → UI (compact | palette geometry)
+settings.set_request → settings.snapshot → AppState → SettingsView
+```
 
 ---
 

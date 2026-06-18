@@ -46,9 +46,21 @@ class UIController:
 
     def publish_palette_open(self) -> None:
         self._bus.publish("ui.palette_open", {}, source="ui")
+        self._bus.publish("overlay.show", {"mode": "palette", "x": 0, "y": 0}, source="ui")
 
     def publish_palette_close(self) -> None:
         self._bus.publish("ui.palette_close", {}, source="ui")
+        self._bus.publish("overlay.hide", {}, source="ui")
+
+    def publish_overlay_show(self, *, mode: str = "compact", x: int = 0, y: int = 0) -> None:
+        self._bus.publish(
+            "overlay.show",
+            {"mode": mode, "x": x, "y": y},
+            source="ui",
+        )
+
+    def publish_overlay_anchor(self, x: int, y: int) -> None:
+        self._bus.publish("overlay.anchor", {"x": x, "y": y}, source="ui")
 
     def request_settings_change(self, key: str, value: str) -> None:
         self._bus.publish(

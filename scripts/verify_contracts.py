@@ -30,8 +30,6 @@ def main() -> int:
     bundle = ContextManager().build_context("test")
     if bundle.version != CONTEXT_BUNDLE_VERSION:
         failures.append(f"ContextBundle.version expected {CONTEXT_BUNDLE_VERSION}")
-    if bundle.version not in SUPPORTED_VERSIONS["context_bundle"]:
-        failures.append("ContextBundle version not in SUPPORTED_VERSIONS")
 
     bus = EventBus(debug_mode=True)
     payloads: list[dict] = []

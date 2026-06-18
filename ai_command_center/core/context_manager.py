@@ -9,13 +9,12 @@ from dataclasses import dataclass
 
 from ai_command_center.core.contracts import CONTEXT_BUNDLE_VERSION
 
-# Reserve 30% of context window for model response (per architecture policy).
 MAX_CONTEXT_FILL_RATIO = 0.70
 
 
 @dataclass(frozen=True, slots=True)
 class ContextBundle:
-    """Assembled prompt ready for OllamaService (contract v1.0)."""
+    """Assembled prompt ready for OllamaService (contract v1.1)."""
 
     prompt: str
     sources: tuple[str, ...]
@@ -24,17 +23,32 @@ class ContextBundle:
 
 
 def estimate_tokens(text: str) -> int:
-    """Fast heuristic — ~4 characters per token."""
     if not text:
         return 0
     return max(1, len(text) // 4)
 
 
+def _compress_history(
+    history: list[tuple[str, str]], budget_tokens: int
+) -> tuple[list[tuple[str, str]], str | None]:
+    if not history:
+        return history, None
+    lines = [f"{role}: {content}" for role, content in history]
+    full = "\n".join(lines)
+    if estimate_tokens(full) <= budget_tokens:
+        return history, None
+
+    keep = history[-4:] if len(history) > 4 else history[-2:]
+    dropped = history[: -len(keep)]
+    parts = [f"{r}: {c[:60]}" for r, c in dropped[-10:]]
+    summary = "Earlier conversation summary: " + " | ".join(parts)
+    if len(dropped) > 10:
+        summary += f" … (+{len(dropped) - 10} earlier turns)"
+    return keep, summary[:800]
+
+
 class ContextManager:
-    """
-    Builds prompts from explicit, caller-supplied context only.
-    Phase 3 V1: clipboard + notes + query. No scraping, no auto-memory.
-    """
+    """Builds prompts from explicit, caller-supplied context only."""
 
     def __init__(
         self,
@@ -54,40 +68,50 @@ class ContextManager:
         *,
         clipboard: str | None = None,
         notes: list[str] | None = None,
+        graph_snippets: list[str] | None = None,
         conversation_history: list[tuple[str, str]] | None = None,
     ) -> ContextBundle:
-        """
-        Assemble a single prompt string with source attribution.
-        Drops lowest-priority sections when over budget (notes before clipboard).
-        """
         query = query.strip()
         if not query:
             return ContextBundle(prompt="", sources=(), token_estimate=0)
 
         budget = self.context_budget_tokens
         sources: list[str] = []
-        sections: list[tuple[str, str, int]] = []  # priority, label, body
+        sections: list[tuple[int, str, str]] = []
 
-        if conversation_history:
-            lines: list[str] = []
-            for role, content in conversation_history[-6:]:
-                lines.append(f"{role}: {content}")
+        history_budget = max(200, budget // 3)
+        working_history = list(conversation_history or [])
+        summary: str | None = None
+        if working_history:
+            working_history, summary = _compress_history(working_history, history_budget)
+
+        if summary:
+            sections.append((0, "conversation_summary", summary))
+
+        if working_history:
+            lines = [f"{role}: {content}" for role, content in working_history]
             body = "\n".join(lines)
             if body.strip():
                 sections.append((1, "conversation_history", body))
+
+        if graph_snippets:
+            for i, snippet in enumerate(graph_snippets):
+                body = snippet.strip()
+                if body:
+                    sections.append((2, f"memory_graph_{i}", body))
 
         if notes:
             for i, note in enumerate(notes):
                 body = note.strip()
                 if body:
-                    sections.append((2, f"note_{i}", body))
+                    sections.append((3, f"note_{i}", body))
 
         if clipboard:
             body = clipboard.strip()
             if body:
-                sections.append((3, "clipboard", body))
+                sections.append((4, "clipboard", body))
 
-        sections.append((4, "user_query", query))
+        sections.append((5, "user_query", query))
 
         included: list[tuple[str, str]] = []
         total_tokens = 0
