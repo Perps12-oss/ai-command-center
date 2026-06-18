@@ -124,6 +124,13 @@ memory.remember → MemoryGraphService → memory.stored
 memory.select → MemoryGraphService → memory.selected → ContextManager (opt-in)
 ```
 
+### Plugin registry (5B)
+
+```text
+plugins/manifests/*.yaml → PluginRegistryService → plugin.catalog → PluginsView
+plugin.enable_request / plugin.disable_request (extension only; core protected)
+```
+
 ### Overlay (4C)
 
 ```text

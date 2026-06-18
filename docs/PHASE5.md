@@ -13,6 +13,16 @@ Phase 5 wires Phase 4 backend capabilities into the command palette UX.
 
 **Gate:** `python scripts/verify_phase5a.py`
 
+## Phase 5B — Plugin registry skeleton
+
+| Piece | Role |
+|-------|------|
+| `plugins/manifests/*.yaml` | Declarative plugin definitions (no dynamic imports) |
+| `PluginRegistryService` | Loads manifests, publishes `plugin.catalog` |
+| `PluginsView` | Sidebar panel — catalog from EventBus |
+
+**Gate:** `python scripts/verify_phase5b.py`
+
 ## Still out of scope
 
 Semantic search, multi-chat, agents, autonomous loops.

@@ -7,10 +7,10 @@ Update the **Current** block at every phase boundary (before starting the next p
 ## Current
 
 ```
-Current Phase: Phase 5A — COMPLETE
+Current Phase: Phase 5B — COMPLETE
 Mode: Gate-by-gate
-Previous Phase Snapshot: Phase 4F Borrow Map v2 committed (168ac1a)
-Pre-Commit Diff: Phase 5A UI integration — uncommitted
+Previous Phase Snapshot: Phase 5A UI integration (500036c); UCGS kit (c81b0f6)
+Pre-Commit Diff: Phase 5B plugin registry — uncommitted
 Historical Ledger: See table below
 ```
 
@@ -27,6 +27,7 @@ Historical Ledger: See table below
 | Phase 4E | `verify_phase4e.py` | PASS |
 | Phase 4F | `verify_phase4f.py` | PASS |
 | Phase 5A | `verify_phase5a.py` | PASS |
+| Phase 5B | `verify_phase5b.py` | PASS |
 | Note audits | `audit_note_integration.py` | PASS |
 | Daily driver | `run_daily_driver.py` | PASS |
 
@@ -43,9 +44,8 @@ Historical Ledger: See table below
 
 ### Next
 
-- Optional: push to `origin/master` (3 commits ahead)
-- Optional: UI manual friction scores (`docs/DAILY_DRIVER.md`)
-- Phase 5B+ (TBD): plugin panel, packaged release
+- Optional: push UCGS + 5B commits to origin
+- Phase 5C (TBD): extension plugin load policy, packaged release
 
 ---
 
@@ -62,16 +62,17 @@ Historical Ledger: See table below
 | 4E | `Phase 4E` | `verify_phase4e.py` | SQLite memory graph, opt-in injection |
 | 4F | `Phase 4F` | `verify_phase4f.py` | Model router, model.selected |
 | 5A | `Phase 5A` | `verify_phase5a.py` | UI wiring: tools, memory commands, model label |
+| 5B | `Phase 5B` | `verify_phase5b.py` | Plugin manifests, catalog service, PluginsView |
 
 ---
 
 ## UCGS v3 Governance Snapshot
 
-**Audit:** STRICT | **Phase:** 5A | **Verdict:** `APPROVE`
+**Audit:** STRICT | **Phase:** 5B | **Verdict:** `APPROVE`
 
 ```yaml
 ucgs_v3:
-  phase: "5A"
+  phase: "5B"
   verdict: APPROVE
 ```
 

@@ -15,6 +15,7 @@ from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.placeholder import PlaceholderView
+from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.settings_view import SettingsView
 
 VIEW_IDS: tuple[str, ...] = (
@@ -58,6 +59,7 @@ class CommandPaletteApp(ctk.CTk):
         self._wire_overlay_events()
         self._wire_tool_events()
         self._wire_memory_events()
+        self._wire_plugin_events()
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
         self._apply_state()
@@ -91,7 +93,7 @@ class CommandPaletteApp(ctk.CTk):
 
         self._show_view("home")
 
-    def _ensure_view(self, view_id: str) -> PlaceholderView | ChatView | NotesView | SettingsView:
+    def _ensure_view(self, view_id: str) -> PlaceholderView | ChatView | NotesView | SettingsView | PluginsView:
         if view_id not in self._views:
             if view_id == "chat":
                 self._views[view_id] = ChatView(
@@ -107,6 +109,11 @@ class CommandPaletteApp(ctk.CTk):
                 self._views[view_id] = SettingsView(
                     self._content,
                     on_save=self._controller.request_settings_change,
+                )
+            elif view_id == "plugins":
+                self._views[view_id] = PluginsView(
+                    self._content,
+                    on_toggle=self._controller.publish_plugin_toggle,
                 )
             else:
                 self._views[view_id] = PlaceholderView(self._content, view_id)
@@ -308,6 +315,34 @@ class CommandPaletteApp(ctk.CTk):
             chat = self._chat_view()
             if chat:
                 chat.show_system_message(message)
+
+        self._ui_queue.enqueue(update)
+
+    def _wire_plugin_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe("plugin.catalog", self._on_plugin_catalog)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe("plugin.error", self._on_plugin_error)
+        )
+
+    def _on_plugin_catalog(self, event: Event) -> None:
+        plugins = event.payload.get("plugins") or []
+
+        def update() -> None:
+            view = self._ensure_view("plugins")
+            if isinstance(view, PluginsView):
+                view.show_catalog(list(plugins))
+
+        self._ui_queue.enqueue(update)
+
+    def _on_plugin_error(self, event: Event) -> None:
+        message = str(event.payload.get("message", "Plugin error"))
+
+        def update() -> None:
+            view = self._views.get("plugins")
+            if isinstance(view, PluginsView):
+                view.show_error(message)
 
         self._ui_queue.enqueue(update)
 

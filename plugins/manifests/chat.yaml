@@ -1,0 +1,10 @@
+id: chat
+name: Ollama Chat
+version: "1.0"
+description: Streaming chat through ContextManager and OllamaHttpService
+kind: core
+bus_topics:
+  - chat.started
+  - chat.complete
+  - model.selected
+enabled: true

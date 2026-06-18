@@ -1,0 +1,9 @@
+id: notes
+name: Obsidian Notes
+version: "1.0"
+description: Vault FTS search and opt-in note injection
+kind: core
+bus_topics:
+  - note.search_results
+  - note.selected
+enabled: true

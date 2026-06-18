@@ -82,3 +82,7 @@ class UIController:
             {"path": path},
             source="ui",
         )
+
+    def publish_plugin_toggle(self, plugin_id: str, enabled: bool) -> None:
+        topic = "plugin.enable_request" if enabled else "plugin.disable_request"
+        self._bus.publish(topic, {"id": plugin_id}, source="ui")

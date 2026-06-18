@@ -1,0 +1,9 @@
+id: memory
+name: Memory Graph
+version: "1.0"
+description: Opt-in remember and memory selection for chat context
+kind: core
+bus_topics:
+  - memory.remember
+  - memory.selected
+enabled: true
