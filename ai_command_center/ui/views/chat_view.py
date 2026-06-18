@@ -114,6 +114,16 @@ class ChatView(ctk.CTkFrame):
         self._append_block(f"Error\n{message}\n\n")
         self._end_stream("Error", error=True)
 
+    def show_tool_output(self, tool: str, output: str, *, success: bool = True) -> None:
+        label = "Tool" if success else "Tool error"
+        self._append_block(f"{label} ({tool})\n{output}\n\n")
+        color = T.TEXT_MUTED if success else T.STATUS_ERROR
+        self._status.configure(text="Tool complete" if success else "Tool failed", text_color=color)
+
+    def show_system_message(self, message: str) -> None:
+        self._append_block(f"System\n{message}\n\n")
+        self._status.configure(text="Ready", text_color=T.TEXT_MUTED)
+
     def _end_stream(self, label: str, *, error: bool = False) -> None:
         self._streaming = False
         self._request_id = None

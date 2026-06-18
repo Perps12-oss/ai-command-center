@@ -14,6 +14,8 @@ INTENT_SHELL = "shell"
 INTENT_NOTE_SEARCH = "note_search"
 INTENT_NOTE_NEW = "note_new"
 INTENT_NAVIGATE = "navigate"
+INTENT_MEMORY_REMEMBER = "memory_remember"
+INTENT_MEMORY_SELECT = "memory_select"
 INTENT_UNKNOWN = "unknown"
 
 
@@ -71,4 +73,8 @@ class CommandRouterService(BaseService):
             return INTENT_NOTE_NEW, {"body": text[9:].strip()}
         if lower.startswith("go "):
             return INTENT_NAVIGATE, {"view": text[3:].strip().lower()}
+        if lower.startswith("remember:"):
+            return INTENT_MEMORY_REMEMBER, {"body": text[9:].strip()}
+        if lower.startswith("memory:"):
+            return INTENT_MEMORY_SELECT, {"query": text[7:].strip()}
         return INTENT_CHAT, {"prompt": text}

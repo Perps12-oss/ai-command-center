@@ -7,10 +7,10 @@ Update the **Current** block at every phase boundary (before starting the next p
 ## Current
 
 ```
-Current Phase: Phase 4F — COMPLETE (Borrow Map v2 integrated)
+Current Phase: Phase 5A — COMPLETE
 Mode: Gate-by-gate
-Previous Phase Snapshot: Phase 4A async indexer + daily-driver PASS
-Pre-Commit Diff: Phase 4B–4F implementation — uncommitted
+Previous Phase Snapshot: Phase 4F Borrow Map v2 committed (168ac1a)
+Pre-Commit Diff: Phase 5A UI integration — uncommitted
 Historical Ledger: See table below
 ```
 
@@ -26,6 +26,7 @@ Historical Ledger: See table below
 | Phase 4D | `verify_phase4d_compression.py` | PASS |
 | Phase 4E | `verify_phase4e.py` | PASS |
 | Phase 4F | `verify_phase4f.py` | PASS |
+| Phase 5A | `verify_phase5a.py` | PASS |
 | Note audits | `audit_note_integration.py` | PASS |
 | Daily driver | `run_daily_driver.py` | PASS |
 
@@ -42,8 +43,9 @@ Historical Ledger: See table below
 
 ### Next
 
+- Optional: push to `origin/master` (3 commits ahead)
 - Optional: UI manual friction scores (`docs/DAILY_DRIVER.md`)
-- Phase 5+ (out of scope): semantic search, multi-chat, agents
+- Phase 5B+ (TBD): plugin panel, packaged release
 
 ---
 
@@ -59,20 +61,18 @@ Historical Ledger: See table below
 | 4D | `Phase 4D` | `verify_phase4d_compression.py` | History compression, ContextBundle v1.1 |
 | 4E | `Phase 4E` | `verify_phase4e.py` | SQLite memory graph, opt-in injection |
 | 4F | `Phase 4F` | `verify_phase4f.py` | Model router, model.selected |
+| 5A | `Phase 5A` | `verify_phase5a.py` | UI wiring: tools, memory commands, model label |
 
 ---
 
 ## UCGS v3 Governance Snapshot
 
-**Audit:** STRICT | **Phase:** 4F | **Verdict:** `APPROVE`
+**Audit:** STRICT | **Phase:** 5A | **Verdict:** `APPROVE`
 
 ```yaml
 ucgs_v3:
-  phase: "4F"
+  phase: "5A"
   verdict: APPROVE
-  contracts_version: "1.1"
-  plugin_ready: true
-  open_violations: []
 ```
 
 ---

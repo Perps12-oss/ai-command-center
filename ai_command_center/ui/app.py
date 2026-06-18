@@ -56,6 +56,8 @@ class CommandPaletteApp(ctk.CTk):
         self._wire_chat_events()
         self._wire_note_events()
         self._wire_overlay_events()
+        self._wire_tool_events()
+        self._wire_memory_events()
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
         self._apply_state()
@@ -140,6 +142,9 @@ class CommandPaletteApp(ctk.CTk):
         self._bus_unsubs.append(
             self._bus.subscribe("chat.history_loaded", self._on_chat_history_loaded)
         )
+        self._bus_unsubs.append(
+            self._bus.subscribe("model.selected", self._on_model_selected)
+        )
 
     def _on_chat_history_loaded(self, event: Event) -> None:
         messages = event.payload.get("messages") or []
@@ -217,6 +222,92 @@ class CommandPaletteApp(ctk.CTk):
         def update() -> None:
             phase = "ready" if online else "error"
             self._top.update_status(phase, self._controller.snapshot().settings.default_model)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_model_selected(self, event: Event) -> None:
+        model = str(event.payload.get("model", ""))
+
+        def update() -> None:
+            if model:
+                self._top.update_status(self._controller.snapshot().phase, model)
+
+        self._ui_queue.enqueue(update)
+
+    def _wire_tool_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe("tool.result", self._on_tool_result)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe("tool.error", self._on_tool_error)
+        )
+
+    def _on_tool_result(self, event: Event) -> None:
+        tool = str(event.payload.get("tool", "tool"))
+        output = str(event.payload.get("output", ""))
+
+        def update() -> None:
+            self._navigate("chat")
+            chat = self._chat_view()
+            if chat:
+                chat.show_tool_output(tool, output, success=True)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_tool_error(self, event: Event) -> None:
+        tool = str(event.payload.get("tool", "tool"))
+        message = str(event.payload.get("message", event.payload.get("error", "Tool failed")))
+
+        def update() -> None:
+            self._navigate("chat")
+            chat = self._chat_view()
+            if chat:
+                chat.show_tool_output(tool, message, success=False)
+
+        self._ui_queue.enqueue(update)
+
+    def _wire_memory_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe("memory.stored", self._on_memory_stored)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe("memory.selected", self._on_memory_selected)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe("memory.error", self._on_memory_error)
+        )
+
+    def _on_memory_stored(self, event: Event) -> None:
+        label = str(event.payload.get("label", ""))
+
+        def update() -> None:
+            self._navigate("chat")
+            chat = self._chat_view()
+            if chat:
+                chat.show_system_message(f"Remembered: {label}")
+
+        self._ui_queue.enqueue(update)
+
+    def _on_memory_selected(self, event: Event) -> None:
+        labels = event.payload.get("labels") or []
+
+        def update() -> None:
+            self._navigate("chat")
+            chat = self._chat_view()
+            if chat:
+                names = ", ".join(str(x) for x in labels)
+                chat.show_system_message(f"Memory selected for chat: {names}")
+
+        self._ui_queue.enqueue(update)
+
+    def _on_memory_error(self, event: Event) -> None:
+        message = str(event.payload.get("message", "Memory error"))
+
+        def update() -> None:
+            self._navigate("chat")
+            chat = self._chat_view()
+            if chat:
+                chat.show_system_message(message)
 
         self._ui_queue.enqueue(update)
 
@@ -356,6 +447,8 @@ class CommandPaletteApp(ctk.CTk):
         if not (
             lower.startswith("note:")
             or lower.startswith("new note:")
+            or lower.startswith("remember:")
+            or lower.startswith("memory:")
             or lower.startswith(">")
             or lower.startswith("go ")
         ):

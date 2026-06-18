@@ -14,7 +14,7 @@ class CommandBox(ctk.CTkFrame):
 
         self._entry = ctk.CTkEntry(
             self,
-            placeholder_text="Ask anything, search notes, or type > for commands…",
+            placeholder_text="Ask anything, note:, remember:, memory:, or > shell…",
             height=40,
             font=T.FONT_BODY,
             fg_color=T.BG_INPUT,
