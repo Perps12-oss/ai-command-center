@@ -7,10 +7,10 @@ Update the **Current** block at every phase boundary (before starting the next p
 ## Current
 
 ```
-Current Phase: Phase 5C — PASS (gold-standard scorecard)
-Mode: phase5_closeout
-Previous Phase Snapshot: Telemetry session 20260618T132909Z — friction HIGH, 65% command success
-Pre-Commit Diff: phase5_closeout remediation (uncommitted)
+Current Phase: Phase 6 - IN PROGRESS (kickoff)
+Mode: phase6_kickoff
+Previous Phase Snapshot: Phase 5 complete at commit 3970aa5 and tag phase-5-complete-20260620
+Pre-Commit Diff: phase6 kickoff planning (uncommitted)
 Historical Ledger: See table below
 ```
 
@@ -91,9 +91,9 @@ Re-run Phase 5C stress test after manual validation.
 
 ### Next
 
-- Start **Phase 5D** packaged release hardening
-- Convert automated scorecard capture into repeatable CI artifact
-- Prepare release checklist and tagged build
+- Execute [PHASE6.md](PHASE6.md) kickoff tasks
+- Add CI artifact flow for scorecard and preflight evidence
+- Prepare first Phase 6 checkpoint review
 
 ---
 
@@ -117,14 +117,14 @@ Re-run Phase 5C stress test after manual validation.
 
 ## UCGS v3 Governance Snapshot
 
-**Audit:** STRICT | **Phase:** 5C | **Verdict:** `PASS`
+**Audit:** STRICT | **Phase:** 6 | **Verdict:** `IN_PROGRESS`
 
 ```yaml
 ucgs_v3:
-  phase: "5C"
-  verdict: PASS
+  phase: "6"
+  verdict: IN_PROGRESS
 ```
 
 ---
 
-*Last updated: Phase 5C gate PASS with scorecard and preflight bundle passing.*
+*Last updated: Phase 6 kickoff started after Phase 5 completion tag.*
