@@ -45,6 +45,7 @@ class CommandPaletteApp(ctk.CTk):
         self._pending_user_text: str | None = None
         self._overlay_mode = "palette"
         self._bus_unsubs: list = []
+        self._memory_count = 0
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -62,6 +63,7 @@ class CommandPaletteApp(ctk.CTk):
         self._wire_tool_events()
         self._wire_memory_events()
         self._wire_plugin_events()
+        self._wire_home_events()
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
         self._apply_state()
@@ -242,8 +244,13 @@ class CommandPaletteApp(ctk.CTk):
         online = bool(event.payload.get("online"))
 
         def update() -> None:
+            snap = self._controller.snapshot()
             phase = "ready" if online else "error"
-            self._top.update_status(phase, self._controller.snapshot().settings.default_model)
+            model = snap.settings.default_model
+            self._top.update_status(phase, model)
+            home = self._home_view()
+            if home:
+                home.update_ollama(online, model)
 
         self._ui_queue.enqueue(update)
 
@@ -305,12 +312,17 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_memory_stored(self, event: Event) -> None:
         label = str(event.payload.get("label", ""))
+        self._memory_count += 1
+        count = self._memory_count
 
         def update() -> None:
             self._navigate("chat")
             chat = self._chat_view()
             if chat:
                 chat.show_system_message(f"Remembered: {label}")
+            home = self._home_view()
+            if home:
+                home.update_memory(count)
 
         self._ui_queue.enqueue(update)
 
@@ -364,6 +376,46 @@ class CommandPaletteApp(ctk.CTk):
             view = self._views.get("plugins")
             if isinstance(view, PluginsView):
                 view.show_error(message)
+
+        self._ui_queue.enqueue(update)
+
+    # ── home status event wiring ──────────────────────────────────────────────
+
+    def _wire_home_events(self) -> None:
+        """Subscribe to events that power the HomeView live-status strip.
+
+        Events handled:
+          ollama.status        → Ollama pill (online / offline)
+          note.index_progress  → Vault pill (indexing…)
+          note.index_complete  → Vault pill (N notes indexed)
+          memory.stored        → already handled in _on_memory_stored above;
+                                 home.update_memory() is called there.
+        """
+        self._bus_unsubs.append(
+            self._bus.subscribe("note.index_progress", self._on_home_index_progress)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe("note.index_complete", self._on_home_index_complete)
+        )
+
+    def _on_home_index_progress(self, event: Event) -> None:
+        indexed = int(event.payload.get("indexed", 0) or 0)
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.update_vault(indexing=True, files=indexed)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_home_index_complete(self, event: Event) -> None:
+        files = int(event.payload.get("files", 0) or 0)
+        ms = int(event.payload.get("ms", 0) or 0)
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.update_vault(indexing=False, files=files, ms=ms)
 
         self._ui_queue.enqueue(update)
 

@@ -256,6 +256,41 @@ HTML = """<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Live status strip demo -->
+  <h2 class="section">Home Dashboard &mdash; Live Status Strip</h2>
+  <div class="card" style="margin-bottom:28px">
+    <h3 style="color:#6B6B80;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px">LIVE STATUS</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div style="background:#1A1A2E;border:1px solid #2A2A4A;border-radius:8px;padding:14px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <span style="color:#22C55E;font-size:13px">&#9679;</span>
+          <span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6B6B80">OLLAMA</span>
+        </div>
+        <div style="font-size:13px;color:#22C55E;margin-bottom:3px">Online</div>
+        <div style="font-size:10px;color:#6B6B80">model: llama3.2:3b</div>
+      </div>
+      <div style="background:#1A1A2E;border:1px solid #2A2A4A;border-radius:8px;padding:14px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <span style="color:#EAB308;font-size:13px">&#9684;</span>
+          <span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6B6B80">VAULT</span>
+        </div>
+        <div style="font-size:13px;color:#EAB308;margin-bottom:3px">Indexing&hellip;</div>
+        <div style="font-size:10px;color:#6B6B80">142 files so far</div>
+      </div>
+      <div style="background:#1A1A2E;border:1px solid #2A2A4A;border-radius:8px;padding:14px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <span style="color:#22C55E;font-size:13px">&#9679;</span>
+          <span style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6B6B80">MEMORY</span>
+        </div>
+        <div style="font-size:13px;color:#22C55E;margin-bottom:3px">3 memories stored</div>
+        <div style="font-size:10px;color:#6B6B80">&nbsp;</div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#6B6B80;margin-top:14px">
+      Pills update in real-time via EventBus &rarr; UIQueue &rarr; HomeView.update_*() &mdash; no direct service imports in UI.
+    </p>
+  </div>
+
   <!-- Changed files -->
   <h2 class="section">Files Changed</h2>
   <div class="files">
@@ -266,8 +301,8 @@ HTML = """<!DOCTYPE html>
     </div>
     <div class="file-row">
       <span class="file-name">ui/views/home_view.py</span>
-      <span class="file-badge badge-new">New</span>
-      <span class="file-desc">Home dashboard with quick-action grid (6 cards) + recent activity strip</span>
+      <span class="file-badge badge-update">Update</span>
+      <span class="file-desc">Live status strip with <code>_StatusPill</code> widgets: update_ollama(), update_vault(), update_memory()</span>
     </div>
     <div class="file-row">
       <span class="file-name">ui/views/system_view.py</span>
