@@ -1,4 +1,19 @@
-# AI Command Center — Implementation Directives for Coding Agents
+# GOVERNANCE
+
+PROJECT_CONSTITUTION_V4.md is the supreme authority.
+
+Before any implementation:
+
+1. Read Constitution.
+2. Read Architecture.
+3. Read Contracts.
+4. Produce Constitutional Pre-Flight.
+
+Implementation may not begin before pre-flight completion.
+
+---
+
+# AI Command Center ï¿½ Implementation Directives for Coding Agents
 
 ## Objective
 
@@ -26,7 +41,7 @@ Do not redesign the UI during this task. Keep UI behavior intact while moving bu
 
 ## Non-Negotiable Rules
 
-### Rule 1 — UI isolation
+### Rule 1 ï¿½ UI isolation
 
 UI components may never:
 
@@ -43,7 +58,7 @@ UI must only interact through:
 - `SettingsService`
 - repositories (via services only)
 
-### Rule 2 — No global state
+### Rule 2 ï¿½ No global state
 
 Forbidden:
 
@@ -58,7 +73,7 @@ State must flow through:
 - `AppState`
 - `SettingsSnapshot`
 
-### Rule 3 — No direct service-to-service calls
+### Rule 3 ï¿½ No direct service-to-service calls
 
 Forbidden:
 

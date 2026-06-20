@@ -1,0 +1,8 @@
+repos:
+- repo: local
+  hooks:
+  - id: constitution
+    name: Constitution Check
+    entry: python scripts/verify_constitution.py
+    language: system
+    pass_filenames: false

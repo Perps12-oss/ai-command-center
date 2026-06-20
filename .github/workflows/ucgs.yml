@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: pip install pyyaml gitpython
 
+      - name: Run Constitution Gate
+        run: python scripts/verify_constitution.py
+
       - name: Run UCGS v5 Gate
         run: python tools/ucgs_runner.py > ucgs_report.yaml
 
