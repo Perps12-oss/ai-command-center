@@ -10,7 +10,7 @@ HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Command Center — Phase 3 UI</title>
+<title>AI Command Center — Full Feature Build</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -41,6 +41,22 @@ HTML = """<!DOCTYPE html>
     font-size: 12px;
     font-weight: 600;
   }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .feat {
+    background: #16162A;
+    border: 1px solid #2A2A4A;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .feat-icon { font-size: 18px; margin-bottom: 6px; }
+  .feat-title { font-size: 13px; font-weight: 600; color: #F0F0F5; margin-bottom: 4px; }
+  .feat-desc  { font-size: 12px; color: #6B6B80; line-height: 1.6; }
+  .feat.new   { border-color: #0078D444; }
 
   .container { max-width: 1100px; margin: 0 auto; padding: 36px 40px; }
 

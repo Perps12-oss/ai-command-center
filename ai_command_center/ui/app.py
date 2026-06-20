@@ -1,5 +1,4 @@
-"""Command palette main window."""
-
+"""Command palette main window — wires all UI features together."""
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -7,13 +6,18 @@ import customtkinter as ctk
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import Event, EventBus
 from ai_command_center.ui.components.command_box import CommandBox
+from ai_command_center.ui.components.command_palette import CommandPalette
+from ai_command_center.ui.components.shortcut_overlay import ShortcutOverlay
 from ai_command_center.ui.components.sidebar import Sidebar
+from ai_command_center.ui.components.toast import ToastManager
 from ai_command_center.ui.components.top_bar import TopBar
 from ai_command_center.ui.controller import UIController
+from ai_command_center.ui.theme import theme_manager
 from ai_command_center.ui.theme import tokens as T
 from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.home_view import HomeView
+from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
@@ -21,31 +25,28 @@ from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
 
 VIEW_IDS: tuple[str, ...] = (
-    "home",
-    "chat",
-    "notes",
-    "system",
-    "plugins",
-    "settings",
+    "home", "chat", "notes", "memory", "system", "plugins", "settings",
 )
 
 
 class CommandPaletteApp(ctk.CTk):
-    """1100×700 command palette — fade-in, deferred render, glass shell."""
+    """1100×700 command palette — glass shell, theme, toasts, command palette."""
 
     def __init__(self, bus: EventBus, state_store: AppStateStore) -> None:
         super().__init__()
-        self._bus = bus
-        self._controller = UIController(bus, state_store, self._queue_state_refresh)
-        self._ui_queue = UIQueue(self)
-        self._visible = False
-        self._views: dict[str, PlaceholderView | ChatView | NotesView | HomeView | SystemView] = {}
-        self._current_view = "home"
+        self._bus              = bus
+        self._controller       = UIController(bus, state_store, self._queue_state_refresh)
+        self._ui_queue         = UIQueue(self)
+        self._visible          = False
+        self._views: dict[str, PlaceholderView | ChatView | NotesView | HomeView | SystemView | MemoryView] = {}
+        self._current_view     = "home"
         self._active_request_id: str | None = None
         self._pending_user_text: str | None = None
-        self._overlay_mode = "palette"
+        self._overlay_mode     = "palette"
         self._bus_unsubs: list = []
-        self._memory_count = 0
+        self._memory_count     = 0
+        self._msg_count        = 0
+        self._note_count       = 0
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -64,10 +65,13 @@ class CommandPaletteApp(ctk.CTk):
         self._wire_memory_events()
         self._wire_plugin_events()
         self._wire_home_events()
+        self._setup_keybindings()
         self.update_idletasks()
-        self.attributes("-alpha", 0.0)
+        theme_manager.apply(self)
         self._apply_state()
         self._visible = False
+
+    # ── layout ────────────────────────────────────────────────────────────────
 
     def _build_layout(self) -> None:
         self._top = TopBar(
@@ -98,9 +102,45 @@ class CommandPaletteApp(ctk.CTk):
 
         self._show_view("home")
 
+        # Overlay widgets (attached to root window for correct placement)
+        self._toast            = ToastManager(self)
+        self._command_palette  = CommandPalette(self)
+        self._shortcut_overlay = ShortcutOverlay(self)
+
+    # ── keyboard bindings ─────────────────────────────────────────────────────
+
+    def _setup_keybindings(self) -> None:
+        self.bind("<Control-k>", lambda _: self._show_command_palette())
+        self.bind("<Control-K>", lambda _: self._show_command_palette())
+        self.bind("?",           self._maybe_show_shortcuts)
+
+    def _show_command_palette(self) -> None:
+        commands = [
+            ("⌂  Home",           "Navigate to Home",              lambda: self._navigate("home")),
+            ("💬  Chat",           "Navigate to Chat",              lambda: self._navigate("chat")),
+            ("📝  Notes",          "Search vault notes",            lambda: self._navigate("notes")),
+            ("🧠  Memory",         "Browse stored memories",        lambda: self._navigate("memory")),
+            ("⚙  System",          "System monitor",               lambda: self._navigate("system")),
+            ("🧩  Plugins",        "Manage plugins",                lambda: self._navigate("plugins")),
+            ("◈  Settings",        "Open settings & themes",        lambda: self._navigate("settings")),
+            ("⬇  Export Chat",    "Save conversation to markdown",  self._on_chat_export_request),
+            ("↺  Regenerate",      "Re-run the last AI prompt",     self._on_chat_regenerate),
+            ("⟨  Toggle Sidebar",  "Collapse or expand sidebar",    self._sidebar.toggle_collapse),
+            ("?  Shortcuts",       "Show keyboard shortcut overlay", self._shortcut_overlay.show),
+        ]
+        self._command_palette.show(commands)
+
+    def _maybe_show_shortcuts(self, event) -> None:
+        focused = self.focus_get()
+        if isinstance(focused, (ctk.CTkEntry, ctk.CTkTextbox)):
+            return
+        self._shortcut_overlay.show()
+
+    # ── view management ───────────────────────────────────────────────────────
+
     def _ensure_view(
         self, view_id: str
-    ) -> PlaceholderView | ChatView | NotesView | HomeView | SystemView | SettingsView | PluginsView:
+    ) -> PlaceholderView | ChatView | NotesView | HomeView | SystemView | SettingsView | PluginsView | MemoryView:
         if view_id not in self._views:
             if view_id == "home":
                 self._views[view_id] = HomeView(self._content)
@@ -108,18 +148,25 @@ class CommandPaletteApp(ctk.CTk):
                 self._views[view_id] = ChatView(
                     self._content,
                     on_cancel=self._controller.publish_chat_cancel,
+                    on_export=self._on_chat_export,
+                    on_regenerate=self._on_chat_regenerate,
                 )
             elif view_id == "notes":
                 self._views[view_id] = NotesView(
                     self._content,
                     on_select=self._controller.publish_note_select,
                 )
+            elif view_id == "memory":
+                self._views[view_id] = MemoryView(
+                    self._content,
+                    on_delete=self._on_memory_delete,
+                )
             elif view_id == "system":
                 self._views[view_id] = SystemView(self._content)
             elif view_id == "settings":
                 self._views[view_id] = SettingsView(
                     self._content,
-                    on_save=self._controller.request_settings_change,
+                    on_save=self._on_settings_save,
                 )
             elif view_id == "plugins":
                 self._views[view_id] = PluginsView(
@@ -131,44 +178,103 @@ class CommandPaletteApp(ctk.CTk):
         return self._views[view_id]
 
     def _notes_view(self) -> NotesView | None:
-        view = self._views.get("notes")
-        return view if isinstance(view, NotesView) else None
+        v = self._views.get("notes")
+        return v if isinstance(v, NotesView) else None
 
     def _chat_view(self) -> ChatView | None:
-        view = self._views.get("chat")
-        return view if isinstance(view, ChatView) else None
+        v = self._views.get("chat")
+        return v if isinstance(v, ChatView) else None
 
     def _home_view(self) -> HomeView | None:
-        view = self._views.get("home")
-        return view if isinstance(view, HomeView) else None
+        v = self._views.get("home")
+        return v if isinstance(v, HomeView) else None
 
-    # ── chat event wiring ──────────────────────────────────────────────────────
+    def _memory_view(self) -> MemoryView | None:
+        v = self._views.get("memory")
+        return v if isinstance(v, MemoryView) else None
+
+    # ── settings callback ─────────────────────────────────────────────────────
+
+    def _on_settings_save(self, key: str, value: str) -> None:
+        self._controller.request_settings_change(key, value)
+        if key == "theme":
+            theme_manager.apply(self, theme_name=value)
+            self._toast.show(f'Theme "{value}" applied', kind="success")
+        elif key == "window_alpha":
+            try:
+                theme_manager.apply(self, alpha=float(value))
+            except ValueError:
+                pass
+
+    # ── chat export / regenerate callbacks ────────────────────────────────────
+
+    def _on_chat_export(self, history: list[dict]) -> None:
+        import datetime
+        import pathlib
+        ts   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = pathlib.Path.home() / f"chat_export_{ts}.md"
+        lines = [f"# Chat Export — {ts}\n"]
+        for msg in history:
+            role    = msg.get("role", "unknown").upper()
+            content = msg.get("content", "")
+            lines.append(f"## {role}\n{content}\n")
+        try:
+            path.write_text("\n".join(lines), encoding="utf-8")
+            self._toast.show(f"Saved to {path.name}", kind="success")
+        except Exception as exc:
+            self._toast.show(f"Export failed: {exc}", kind="error")
+
+    def _on_chat_export_request(self) -> None:
+        chat = self._chat_view()
+        if chat and chat._history:
+            self._on_chat_export(list(chat._history))
+        else:
+            self._toast.show("No chat history to export", kind="warning")
+
+    def _on_chat_regenerate(self) -> None:
+        chat = self._chat_view()
+        if chat and chat._history:
+            for msg in reversed(chat._history):
+                if msg.get("role") == "user":
+                    text = msg["content"]
+                    self._pending_user_text = text
+                    self._controller.publish_command(text, clipboard=None)
+                    self._toast.show("Regenerating last response…", kind="info")
+                    return
+        self._toast.show("No message to regenerate", kind="warning")
+
+    # ── memory delete callback ────────────────────────────────────────────────
+
+    def _on_memory_delete(self, item_id, text: str) -> None:
+        self._memory_count = max(0, self._memory_count - 1)
+        self._toast.show("Memory removed", kind="info")
+        self._update_home_stats()
+
+    # ── stats helper ──────────────────────────────────────────────────────────
+
+    def _update_home_stats(self) -> None:
+        home = self._home_view()
+        if home:
+            home.update_stats(
+                messages=self._msg_count,
+                memories=self._memory_count,
+                notes=self._note_count,
+            )
+
+    # ── chat event wiring ─────────────────────────────────────────────────────
 
     def _wire_chat_events(self) -> None:
-        self._bus_unsubs.append(
-            self._bus.subscribe("chat.started", self._on_chat_started)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("chat.chunk", self._on_chat_chunk)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("chat.complete", self._on_chat_complete)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("chat.cancelled", self._on_chat_cancelled)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("chat.error", self._on_chat_error)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("ollama.status", self._on_ollama_status)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("chat.history_loaded", self._on_chat_history_loaded)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("model.selected", self._on_model_selected)
-        )
+        for event, handler in (
+            ("chat.started",       self._on_chat_started),
+            ("chat.chunk",         self._on_chat_chunk),
+            ("chat.complete",      self._on_chat_complete),
+            ("chat.cancelled",     self._on_chat_cancelled),
+            ("chat.error",         self._on_chat_error),
+            ("ollama.status",      self._on_ollama_status),
+            ("chat.history_loaded", self._on_chat_history_loaded),
+            ("model.selected",     self._on_model_selected),
+        ):
+            self._bus_unsubs.append(self._bus.subscribe(event, handler))
 
     def _on_chat_history_loaded(self, event: Event) -> None:
         messages = event.payload.get("messages") or []
@@ -192,6 +298,7 @@ class CommandPaletteApp(ctk.CTk):
                 self._pending_user_text = None
             if chat and rid:
                 chat.begin_assistant(rid)
+            self._top.update_status("busy", self._controller.snapshot().settings.default_model)
 
         self._ui_queue.enqueue(update)
 
@@ -209,13 +316,21 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_chat_complete(self, event: Event) -> None:
         text = str(event.payload.get("text", ""))
+        self._msg_count += 1
+        count = self._msg_count
 
         def update() -> None:
             chat = self._chat_view()
             if chat:
                 chat.finish_assistant(text)
             self._active_request_id = None
-            self._top.update_status("ready", self._controller.snapshot().settings.default_model)
+            snap  = self._controller.snapshot()
+            model = snap.settings.default_model
+            self._top.update_status("ready", model)
+            home = self._home_view()
+            if home:
+                home.add_activity(f"AI responded ({len(text.split())} words)", "chat")
+                home.update_stats(messages=count, memories=self._memory_count, notes=self._note_count)
 
         self._ui_queue.enqueue(update)
 
@@ -237,6 +352,7 @@ class CommandPaletteApp(ctk.CTk):
                 chat.show_error(message)
             self._active_request_id = None
             self._top.update_status("error", self._controller.snapshot().settings.default_model)
+            self._toast.show(f"Chat error: {message[:60]}", kind="error")
 
         self._ui_queue.enqueue(update)
 
@@ -244,7 +360,7 @@ class CommandPaletteApp(ctk.CTk):
         online = bool(event.payload.get("online"))
 
         def update() -> None:
-            snap = self._controller.snapshot()
+            snap  = self._controller.snapshot()
             phase = "ready" if online else "error"
             model = snap.settings.default_model
             self._top.update_status(phase, model)
@@ -266,15 +382,11 @@ class CommandPaletteApp(ctk.CTk):
     # ── tool event wiring ─────────────────────────────────────────────────────
 
     def _wire_tool_events(self) -> None:
-        self._bus_unsubs.append(
-            self._bus.subscribe("tool.result", self._on_tool_result)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("tool.error", self._on_tool_error)
-        )
+        self._bus_unsubs.append(self._bus.subscribe("tool.result", self._on_tool_result))
+        self._bus_unsubs.append(self._bus.subscribe("tool.error",  self._on_tool_error))
 
     def _on_tool_result(self, event: Event) -> None:
-        tool = str(event.payload.get("tool", "tool"))
+        tool   = str(event.payload.get("tool", "tool"))
         output = str(event.payload.get("output", ""))
 
         def update() -> None:
@@ -282,11 +394,14 @@ class CommandPaletteApp(ctk.CTk):
             chat = self._chat_view()
             if chat:
                 chat.show_tool_output(tool, output, success=True)
+            home = self._home_view()
+            if home:
+                home.add_activity(f"Tool: {tool} → OK", "tool")
 
         self._ui_queue.enqueue(update)
 
     def _on_tool_error(self, event: Event) -> None:
-        tool = str(event.payload.get("tool", "tool"))
+        tool    = str(event.payload.get("tool", "tool"))
         message = str(event.payload.get("message", event.payload.get("error", "Tool failed")))
 
         def update() -> None:
@@ -294,21 +409,19 @@ class CommandPaletteApp(ctk.CTk):
             chat = self._chat_view()
             if chat:
                 chat.show_tool_output(tool, message, success=False)
+            self._toast.show(f"Tool failed: {tool}", kind="error")
 
         self._ui_queue.enqueue(update)
 
     # ── memory event wiring ───────────────────────────────────────────────────
 
     def _wire_memory_events(self) -> None:
-        self._bus_unsubs.append(
-            self._bus.subscribe("memory.stored", self._on_memory_stored)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("memory.selected", self._on_memory_selected)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("memory.error", self._on_memory_error)
-        )
+        for event, handler in (
+            ("memory.stored",   self._on_memory_stored),
+            ("memory.selected", self._on_memory_selected),
+            ("memory.error",    self._on_memory_error),
+        ):
+            self._bus_unsubs.append(self._bus.subscribe(event, handler))
 
     def _on_memory_stored(self, event: Event) -> None:
         label = str(event.payload.get("label", ""))
@@ -323,6 +436,12 @@ class CommandPaletteApp(ctk.CTk):
             home = self._home_view()
             if home:
                 home.update_memory(count)
+                home.add_activity(f"Remembered: {label}", "memory")
+                home.update_stats(messages=self._msg_count, memories=count, notes=self._note_count)
+            mem = self._memory_view()
+            if mem:
+                mem.prepend_memory(label)
+            self._toast.show(f"Memory stored: {label}", kind="success")
 
         self._ui_queue.enqueue(update)
 
@@ -346,18 +465,15 @@ class CommandPaletteApp(ctk.CTk):
             chat = self._chat_view()
             if chat:
                 chat.show_system_message(message)
+            self._toast.show(f"Memory error: {message[:60]}", kind="error")
 
         self._ui_queue.enqueue(update)
 
     # ── plugin event wiring ───────────────────────────────────────────────────
 
     def _wire_plugin_events(self) -> None:
-        self._bus_unsubs.append(
-            self._bus.subscribe("plugin.catalog", self._on_plugin_catalog)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("plugin.error", self._on_plugin_error)
-        )
+        self._bus_unsubs.append(self._bus.subscribe("plugin.catalog", self._on_plugin_catalog))
+        self._bus_unsubs.append(self._bus.subscribe("plugin.error",   self._on_plugin_error))
 
     def _on_plugin_catalog(self, event: Event) -> None:
         plugins = event.payload.get("plugins") or []
@@ -382,15 +498,6 @@ class CommandPaletteApp(ctk.CTk):
     # ── home status event wiring ──────────────────────────────────────────────
 
     def _wire_home_events(self) -> None:
-        """Subscribe to events that power the HomeView live-status strip.
-
-        Events handled:
-          ollama.status        → Ollama pill (online / offline)
-          note.index_progress  → Vault pill (indexing…)
-          note.index_complete  → Vault pill (N notes indexed)
-          memory.stored        → already handled in _on_memory_stored above;
-                                 home.update_memory() is called there.
-        """
         self._bus_unsubs.append(
             self._bus.subscribe("note.index_progress", self._on_home_index_progress)
         )
@@ -410,35 +517,34 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_home_index_complete(self, event: Event) -> None:
         files = int(event.payload.get("files", 0) or 0)
-        ms = int(event.payload.get("ms", 0) or 0)
+        ms    = int(event.payload.get("ms",    0) or 0)
+        self._note_count = files
 
         def update() -> None:
             home = self._home_view()
             if home:
                 home.update_vault(indexing=False, files=files, ms=ms)
+                home.add_activity(f"Vault indexed: {files} notes in {ms} ms", "note")
+                home.update_stats(messages=self._msg_count, memories=self._memory_count, notes=files)
+            self._toast.show(f"Vault ready — {files} notes indexed", kind="success")
 
         self._ui_queue.enqueue(update)
 
     # ── note event wiring ─────────────────────────────────────────────────────
 
     def _wire_note_events(self) -> None:
-        self._bus_unsubs.append(
-            self._bus.subscribe("note.search_results", self._on_note_search_results)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("note.selected", self._on_note_selected)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("note.created", self._on_note_created)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("note.error", self._on_note_error)
-        )
+        for event, handler in (
+            ("note.search_results", self._on_note_search_results),
+            ("note.selected",       self._on_note_selected),
+            ("note.created",        self._on_note_created),
+            ("note.error",          self._on_note_error),
+        ):
+            self._bus_unsubs.append(self._bus.subscribe(event, handler))
 
     def _on_note_search_results(self, event: Event) -> None:
-        query = str(event.payload.get("query", ""))
+        query   = str(event.payload.get("query", ""))
         results = event.payload.get("results") or []
-        count = len(results)
+        count   = len(results)
 
         def update() -> None:
             self._navigate("notes")
@@ -448,11 +554,12 @@ class CommandPaletteApp(ctk.CTk):
             home = self._home_view()
             if home:
                 home.update_vault_search(query, count)
+                home.add_activity(f"Note search: {count} result{'s' if count != 1 else ''} for \"{query}\"", "note")
 
         self._ui_queue.enqueue(update)
 
     def _on_note_selected(self, event: Event) -> None:
-        path = str(event.payload.get("path", ""))
+        path  = str(event.payload.get("path",  ""))
         title = str(event.payload.get("title", path))
 
         def update() -> None:
@@ -463,7 +570,7 @@ class CommandPaletteApp(ctk.CTk):
         self._ui_queue.enqueue(update)
 
     def _on_note_created(self, event: Event) -> None:
-        path = str(event.payload.get("path", ""))
+        path  = str(event.payload.get("path",  ""))
         title = str(event.payload.get("title", ""))
 
         def update() -> None:
@@ -488,20 +595,17 @@ class CommandPaletteApp(ctk.CTk):
     # ── overlay event wiring ──────────────────────────────────────────────────
 
     def _wire_overlay_events(self) -> None:
-        self._bus_unsubs.append(
-            self._bus.subscribe("overlay.show", self._on_overlay_show)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("overlay.anchor", self._on_overlay_anchor)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe("overlay.hide", self._on_overlay_hide)
-        )
+        for event, handler in (
+            ("overlay.show",   self._on_overlay_show),
+            ("overlay.anchor", self._on_overlay_anchor),
+            ("overlay.hide",   self._on_overlay_hide),
+        ):
+            self._bus_unsubs.append(self._bus.subscribe(event, handler))
 
     def _on_overlay_show(self, event: Event) -> None:
         mode = str(event.payload.get("mode", "palette"))
-        x = int(event.payload.get("x", 0) or 0)
-        y = int(event.payload.get("y", 0) or 0)
+        x    = int(event.payload.get("x", 0) or 0)
+        y    = int(event.payload.get("y", 0) or 0)
 
         def update() -> None:
             self._overlay_mode = mode
@@ -546,7 +650,7 @@ class CommandPaletteApp(ctk.CTk):
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:
             view_id = "home"
-        # Notify system view when hidden/shown
+
         old_view = self._views.get(self._current_view)
         if isinstance(old_view, SystemView) and view_id != self._current_view:
             old_view.on_hide()
@@ -583,6 +687,10 @@ class CommandPaletteApp(ctk.CTk):
             or lower.startswith("go ")
         ):
             self._pending_user_text = text
+        home = self._home_view()
+        if home:
+            short = text[:60] + ("…" if len(text) > 60 else "")
+            home.add_activity(f"Command: {short}", "chat")
         self._controller.publish_command(text, clipboard=clipboard)
 
     def _read_clipboard(self) -> str | None:
@@ -601,6 +709,18 @@ class CommandPaletteApp(ctk.CTk):
         snap = self._controller.snapshot()
         self._top.update_status(snap.phase, snap.settings.default_model)
         self._overlay_mode = snap.settings.overlay_mode
+
+        # Theme from saved settings
+        saved_theme = getattr(snap.settings, "theme", None)
+        if saved_theme:
+            theme_manager.apply(self, theme_name=saved_theme)
+        saved_alpha = getattr(snap.settings, "window_alpha", None)
+        if saved_alpha:
+            try:
+                theme_manager.apply(self, alpha=float(saved_alpha))
+            except (ValueError, TypeError):
+                pass
+
         try:
             if self._overlay_mode == "compact":
                 self._apply_overlay_geometry("compact", 0, 0)
@@ -611,33 +731,33 @@ class CommandPaletteApp(ctk.CTk):
                     self.geometry(f"{w}x{h}")
         except ValueError:
             pass
+
         settings_view = self._views.get("settings")
         if isinstance(settings_view, SettingsView):
             settings_view.load_from_snapshot(snap.settings)
+
         if snap.last_command:
             home = self._home_view()
             if home:
                 home.set_last_command(
                     f'Last: "{snap.last_command}" → {snap.last_command_intent or "pending"}'
                 )
-            # Legacy support for PlaceholderView if present
-            if "home" in self._views and isinstance(self._views["home"], PlaceholderView):
-                self._views["home"].set_extra(
-                    f'Last: "{snap.last_command}" → {snap.last_command_intent or "pending"}'
-                )
 
     # ── show / hide / toggle ───────────────────────────────────────────────────
 
     def _fade_in(self, step: int = 0) -> None:
-        alpha = min(1.0, (step + 1) / T.FADE_STEPS)
+        target = theme_manager.active_alpha()
+        alpha  = min(target, (step + 1) / T.FADE_STEPS * target)
         self.attributes("-alpha", alpha)
         if step + 1 < T.FADE_STEPS:
             delay = max(1, T.FADE_IN_MS // T.FADE_STEPS)
             self.after(delay, lambda: self._fade_in(step + 1))
 
     def _fade_out(self, on_done) -> None:
+        start = theme_manager.active_alpha()
+
         def step(n: int) -> None:
-            alpha = max(0.0, 1.0 - (n + 1) / T.FADE_STEPS)
+            alpha = max(0.0, start - (n + 1) / T.FADE_STEPS * start)
             self.attributes("-alpha", alpha)
             if n + 1 < T.FADE_STEPS:
                 delay = max(1, T.FADE_IN_MS // T.FADE_STEPS)

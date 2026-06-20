@@ -71,3 +71,45 @@ FADE_STEPS = 10
 
 # Streaming
 CHUNK_FLUSH_MS = 50
+
+# Window transparency (< 1.0 lets the desktop wallpaper show through)
+WINDOW_ALPHA: float = 0.95
+
+# VS Code-style theme presets
+THEMES: dict[str, dict] = {
+    "VS Dark": {
+        "accent": "#0078D4",
+        "bg_deep": "#0D0D1A",
+        "bg_panel": "#16162A",
+        "alpha": 0.95,
+        "desc": "Classic VS Code blue",
+    },
+    "Midnight": {
+        "accent": "#9B59B6",
+        "bg_deep": "#0A0A14",
+        "bg_panel": "#12121E",
+        "alpha": 0.92,
+        "desc": "Purple dusk",
+    },
+    "Crimson": {
+        "accent": "#E74C3C",
+        "bg_deep": "#0D0808",
+        "bg_panel": "#1A1010",
+        "alpha": 0.91,
+        "desc": "Bold red",
+    },
+    "Forest": {
+        "accent": "#27AE60",
+        "bg_deep": "#080D08",
+        "bg_panel": "#101A10",
+        "alpha": 0.91,
+        "desc": "Deep green",
+    },
+    "Ocean": {
+        "accent": "#2980B9",
+        "bg_deep": "#050D14",
+        "bg_panel": "#0A1420",
+        "alpha": 0.93,
+        "desc": "Deep sea",
+    },
+}
