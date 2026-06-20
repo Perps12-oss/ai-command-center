@@ -265,6 +265,20 @@ class HomeView(ctk.CTkFrame):
         else:
             self._pill_vault.set_unknown("Not configured", "Set vault path in Settings")
 
+    def update_vault_search(self, query: str, count: int) -> None:
+        """Reflect note.search_results — shows last search outcome on the Vault pill."""
+        short_q = (query[:28] + "\u2026") if len(query) > 28 else query
+        if count > 0:
+            self._pill_vault.set_ok(
+                f"{count} result{'s' if count != 1 else ''}",
+                f"note: {short_q}",
+            )
+        else:
+            self._pill_vault.set_busy(
+                "No results",
+                f"note: {short_q}",
+            )
+
     def update_memory(self, count: int) -> None:
         """Reflect memory.stored — increments displayed count."""
         self._memory_count = count

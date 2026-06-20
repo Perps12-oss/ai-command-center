@@ -438,12 +438,16 @@ class CommandPaletteApp(ctk.CTk):
     def _on_note_search_results(self, event: Event) -> None:
         query = str(event.payload.get("query", ""))
         results = event.payload.get("results") or []
+        count = len(results)
 
         def update() -> None:
             self._navigate("notes")
             notes = self._notes_view()
             if notes:
                 notes.show_results(query, list(results))
+            home = self._home_view()
+            if home:
+                home.update_vault_search(query, count)
 
         self._ui_queue.enqueue(update)
 
