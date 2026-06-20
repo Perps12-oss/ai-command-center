@@ -1,19 +1,38 @@
-"""Runs one tool per tool.invoke — no loops (Phase 4B)."""
+﻿"""Runs one tool per tool.invoke - no loops (Phase 4B)."""
 
 from __future__ import annotations
 
 import subprocess
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.topics import TOOL_COMPLETED, TOOL_ERROR, TOOL_FAILED, TOOL_INVOKE, TOOL_RESULT, TOOL_STARTED
+from ai_command_center.core.events.topics import TOOL_COMPLETED, TOOL_FAILED, TOOL_INVOKE, TOOL_RESULT, TOOL_STARTED
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.services.base import BaseService
 from ai_command_center.tools.tool_executor import ToolExecutor
+from ai_command_center.tools.tool_registry import ToolRegistry
 
-if TYPE_CHECKING:
-    from ai_command_center.services.tool_registry_service import ToolRegistryService
+
+def _registry_get(registry, name: str):
+    if hasattr(registry, "get_spec"):
+        return registry.get_spec(name)
+    if hasattr(registry, "get"):
+        return registry.get(name)
+    return None
+
+
+def _registry_register_shell(registry) -> None:
+    spec = ToolSpec(
+        name="shell",
+        description="Run a single shell command",
+        handler=_run_shell_command,
+    )
+    if hasattr(registry, "register_tool"):
+        registry.register_tool(spec)
+        return
+    if hasattr(registry, "register"):
+        registry.register(spec)
 
 
 def _run_shell_command(args: dict) -> ToolResult:
@@ -48,21 +67,15 @@ def _run_shell_command(args: dict) -> ToolResult:
 class ToolExecutorService(BaseService):
     name = "tool_executor"
 
-    def __init__(self, bus, registry: ToolRegistryService) -> None:
+    def __init__(self, bus, registry: ToolRegistry) -> None:
         super().__init__(bus)
         self._registry = registry
         self._unsubscribers: list[Callable[[], None]] = []
         self._executor = ToolExecutor()
 
     def _on_load(self) -> None:
-        if self._registry.get("shell") is None:
-            self._registry.register(
-                ToolSpec(
-                    name="shell",
-                    description="Run a single shell command",
-                    handler=_run_shell_command,
-                )
-            )
+        if _registry_get(self._registry, "shell") is None:
+            _registry_register_shell(self._registry)
         self._unsubscribers.append(
             self._bus.subscribe(TOOL_INVOKE, self._on_tool_invoke)
         )
@@ -90,7 +103,7 @@ class ToolExecutorService(BaseService):
             args = {}
         invoke_id = str(payload.get("invoke_id", ""))
 
-        spec = self._registry.get(tool_name)
+        spec = _registry_get(self._registry, tool_name)
         if spec is None:
             self._bus.publish(
                 TOOL_FAILED,

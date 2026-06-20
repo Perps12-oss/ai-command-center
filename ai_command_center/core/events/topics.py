@@ -91,6 +91,7 @@ NOTE_CONTEXT_RESULT = "note.context.result"
 PLUGIN_ENABLE_REQUEST = "plugin.enable_request"
 PLUGIN_DISABLE_REQUEST = "plugin.disable_request"
 PLUGIN_CATALOG = "plugin.catalog"
+PLUGIN_STATE_CHANGED = "plugin.state_changed"
 PLUGIN_ERROR = "plugin.error"
 
 LLM_REQUEST = "llm.request"

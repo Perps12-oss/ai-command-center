@@ -1,4 +1,4 @@
-"""Read-only derived metrics from telemetry_events (offline intelligence only)."""
+﻿"""Read-only derived metrics from telemetry_events (offline intelligence only)."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import Any
 from ai_command_center.core.events.topics import (
     CHAT_CANCELLED,
     CHAT_COMPLETE,
+    CHAT_ERROR,
     CHAT_STARTED,
     COMMAND_ROUTED,
     MEMORY_STORED,
@@ -21,6 +22,7 @@ from ai_command_center.core.events.topics import (
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
 )
+from ai_command_center.domain.telemetry_event import TelemetryEvent
 
 _HESITATION_WINDOW_S = 2.0
 _RETRY_WINDOW_S = 30.0
@@ -36,11 +38,21 @@ _INTENT_OUTCOMES: dict[str, tuple[frozenset[str], frozenset[str]]] = {
 }
 
 
-def _payload(row: dict[str, Any]) -> dict[str, Any]:
+def _event_name(row: TelemetryEvent | dict[str, Any]) -> str:
+    if isinstance(row, TelemetryEvent):
+        return row.event_type
+    return str(row.get("event", ""))
+
+
+def _payload(row: TelemetryEvent | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(row, TelemetryEvent):
+        return row.payload_dict()
     return row.get("payload") or {}
 
 
-def _parse_ts(row: dict[str, Any]) -> float:
+def _parse_ts(row: TelemetryEvent | dict[str, Any]) -> float:
+    if isinstance(row, TelemetryEvent):
+        return row.emitted_at.timestamp()
     raw = str(row.get("timestamp", ""))
     try:
         return datetime.fromisoformat(raw).timestamp()
@@ -48,11 +60,11 @@ def _parse_ts(row: dict[str, Any]) -> float:
         return 0.0
 
 
-def _sorted_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _sorted_rows(rows: list[TelemetryEvent | dict[str, Any]]) -> list[TelemetryEvent | dict[str, Any]]:
     return sorted(rows, key=_parse_ts)
 
 
-def _derive_commands(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _derive_commands(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str, Any]:
     """Offline command correlation from raw bus events."""
     total = 0
     success = 0
@@ -66,7 +78,7 @@ def _derive_commands(rows: list[dict[str, Any]]) -> dict[str, Any]:
     index = 0
     while index < len(ordered):
         row = ordered[index]
-        if row.get("event") != UI_COMMAND:
+        if _event_name(row) != UI_COMMAND:
             index += 1
             continue
 
@@ -87,7 +99,7 @@ def _derive_commands(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
         while j < len(ordered):
             nxt = ordered[j]
-            topic = nxt.get("event", "")
+            topic = _event_name(nxt)
             pl = _payload(nxt)
 
             if topic == UI_COMMAND:
@@ -144,8 +156,8 @@ def _derive_commands(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _derive_hesitation(rows: list[dict[str, Any]]) -> tuple[int, int, float]:
-    """Palette open → close within window without ui.command."""
+def _derive_hesitation(rows: list[TelemetryEvent | dict[str, Any]]) -> tuple[int, int, float]:
+    """Palette open -> close within window without ui.command."""
     palette_opens = 0
     cancellations = 0
     hesitations = 0
@@ -155,10 +167,10 @@ def _derive_hesitation(rows: list[dict[str, Any]]) -> tuple[int, int, float]:
     saw_command = False
 
     for row in ordered:
-        topic = row.get("event", "")
+        topic = _event_name(row)
         ts = _parse_ts(row)
 
-            if topic == UI_PALETTE_OPEN:
+        if topic == UI_PALETTE_OPEN:
             palette_opens += 1
             open_at = ts
             saw_command = False
@@ -176,11 +188,11 @@ def _derive_hesitation(rows: list[dict[str, Any]]) -> tuple[int, int, float]:
     return palette_opens, cancellations, rate
 
 
-def _derive_ollama_latencies(rows: list[dict[str, Any]]) -> list[float]:
+def _derive_ollama_latencies(rows: list[TelemetryEvent | dict[str, Any]]) -> list[float]:
     started: dict[str, float] = {}
     latencies: list[float] = []
     for row in _sorted_rows(rows):
-        topic = row.get("event", "")
+        topic = _event_name(row)
         pl = _payload(row)
         rid = str(pl.get("request_id", ""))
         if not rid:
@@ -192,15 +204,15 @@ def _derive_ollama_latencies(rows: list[dict[str, Any]]) -> list[float]:
     return latencies
 
 
-def compute_session_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def compute_session_summary(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str, Any]:
     """Aggregate raw telemetry rows into a daily-driver session summary."""
     commands = _derive_commands(rows)
     palette_opens, cancellations, hesitation_rate = _derive_hesitation(rows)
 
-    over_budget = sum(1 for r in rows if r.get("event") == "context.over_budget")
+    over_budget = sum(1 for r in rows if _event_name(r) == "context.over_budget")
     token_samples: list[int] = []
     for row in rows:
-        if row.get("event") != "context.snapshot_created":
+        if _event_name(row) != "context.snapshot_created":
             continue
         tokens = _payload(row).get("context_size_tokens")
         if isinstance(tokens, int):

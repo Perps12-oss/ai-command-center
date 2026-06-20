@@ -27,7 +27,6 @@ from ai_command_center.core.events.topics import (
     NOTE_ERROR,
     NOTE_SEARCH_RESULTS,
     OLLAMA_STATUS,
-    TELEMETRY_EVENT,
     TOOL_ERROR,
     TOOL_RESULT,
     UI_COMMAND,
@@ -111,11 +110,6 @@ class TelemetryService(BaseService):
             emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
         )
         self._core_telemetry.capture(normalized)
-        self._bus.publish(
-            TELEMETRY_EVENT,
-            {"event": event.topic, "bus_source": event.source, "payload": normalized.payload},
-            source=self.name,
-        )
         handler_ms = (time.perf_counter() - started) * 1000.0
         if handler_ms >= _HANDLER_SLOW_MS:
             self._record(

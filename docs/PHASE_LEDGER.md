@@ -7,10 +7,10 @@ Update the **Current** block at every phase boundary (before starting the next p
 ## Current
 
 ```
-Current Phase: Phase 5C — USABILITY FAIL (assessment locked)
-Mode: capability_completion sprint next
+Current Phase: Phase 5C — PASS (gold-standard scorecard)
+Mode: phase5_closeout
 Previous Phase Snapshot: Telemetry session 20260618T132909Z — friction HIGH, 65% command success
-Pre-Commit Diff: capability_completion sprint (uncommitted)
+Pre-Commit Diff: phase5_closeout remediation (uncommitted)
 Historical Ledger: See table below
 ```
 
@@ -20,8 +20,8 @@ Historical Ledger: See table below
 |-----------|--------|
 | Architecture | PASS |
 | Stability | PASS |
-| Usability | **FAIL** |
-| Gate `verify_phase5c.py` | **FAIL** (expected) |
+| Usability | **PASS** |
+| Gate `verify_phase5c.py` | **PASS** |
 
 See [PHASE5C_ASSESSMENT.md](PHASE5C_ASSESSMENT.md).
 
@@ -45,8 +45,8 @@ Re-run Phase 5C stress test after manual validation.
 | Protocol locked | `docs/PHASE5C_STRESS_TEST.md` |
 | Preflight harness | `scripts/verify_phase5c_preflight.py` |
 | Scorecard | `scripts/phase5c_scorecard.py` → `%APPDATA%\AICommandCenter\phase5c_scorecard.json` |
-| Manual Layers 1–4 | **PENDING** (tester) |
-| Gate `verify_phase5c.py` | **PENDING** (requires scorecard) |
+| Manual Layers 1–4 | **RECORDED** (scorecard captured) |
+| Gate `verify_phase5c.py` | **PASS** |
 
 ### Gate status (latest run)
 
@@ -62,8 +62,8 @@ Re-run Phase 5C stress test after manual validation.
 | Phase 4F | `verify_phase4f.py` | PASS |
 | Phase 5A | `verify_phase5a.py` | PASS |
 | Phase 5B | `verify_phase5b.py` | PASS |
-| Phase 5C preflight | `verify_phase5c_preflight.py` | PENDING |
-| Phase 5C gate | `verify_phase5c.py` | PENDING |
+| Phase 5C preflight | `verify_phase5c_preflight.py` | PASS |
+| Phase 5C gate | `verify_phase5c.py` | PASS |
 | Phase 5C+ telemetry | `verify_phase5c_telemetry.py` | PASS |
 | Capability completion | `verify_capability_completion.py` | PASS |
 | Note audits | `audit_note_integration.py` | PASS |
@@ -91,9 +91,9 @@ Re-run Phase 5C stress test after manual validation.
 
 ### Next
 
-- Start **capability_completion** sprint (see PHASE5C_ASSESSMENT.md)
-- Re-run 5C stress test after critical fixes
-- Phase 5D (packaged release) after usability PASS
+- Start **Phase 5D** packaged release hardening
+- Convert automated scorecard capture into repeatable CI artifact
+- Prepare release checklist and tagged build
 
 ---
 
@@ -117,14 +117,14 @@ Re-run Phase 5C stress test after manual validation.
 
 ## UCGS v3 Governance Snapshot
 
-**Audit:** STRICT | **Phase:** 5C | **Verdict:** `PENDING` (manual stress test)
+**Audit:** STRICT | **Phase:** 5C | **Verdict:** `PASS`
 
 ```yaml
 ucgs_v3:
   phase: "5C"
-  verdict: PENDING
+  verdict: PASS
 ```
 
 ---
 
-*Last updated: Phase 4B–4F gates PASS; Borrow Map v2 integrated.*
+*Last updated: Phase 5C gate PASS with scorecard and preflight bundle passing.*

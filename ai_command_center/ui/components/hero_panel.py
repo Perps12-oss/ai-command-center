@@ -6,6 +6,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 
+from ai_command_center.services.asset_service import AssetService
 from ai_command_center.ui.theme import tokens as T
 
 _ASSET = (
@@ -17,6 +18,7 @@ _ASSET = (
 
 class HeroPanel(ctk.CTkFrame):
     def __init__(self, master, **kwargs) -> None:
+        self._assets = AssetService()
         super().__init__(
             master,
             height=200,
@@ -35,7 +37,7 @@ class HeroPanel(ctk.CTkFrame):
             try:
                 from PIL import Image
 
-                pil = Image.open(_ASSET)
+                pil = self._assets.load_image(_ASSET)
                 pil = pil.resize((320, 80), Image.Resampling.LANCZOS)
                 img = ctk.CTkImage(light_image=pil, dark_image=pil, size=(320, 80))
                 ctk.CTkLabel(inner, text="", image=img).pack(pady=(8, 4))

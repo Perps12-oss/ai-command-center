@@ -10,6 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ai_command_center.platform.runtime_paths import get_runtime_data_dir
+from ai_command_center.repositories.baseline_repository import BaselineRepository
+
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 OLLAMA_TIMEOUT_SEC = 5
 
@@ -28,18 +31,9 @@ def is_arm64() -> bool:
     return get_architecture() == "ARM64"
 
 
-def get_runtime_data_dir() -> Path:
-    """Application data directory (not in repo)."""
-    appdata = os.environ.get("APPDATA")
-    if not appdata:
-        raise OSError("APPDATA environment variable is not set")
-    path = Path(appdata) / "AICommandCenter"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def get_baseline_log_path() -> Path:
-    return get_runtime_data_dir() / "baseline.json"
+    repo = BaselineRepository(get_runtime_data_dir())
+    return repo.path
 
 
 def get_ram_mb() -> dict[str, float]:
@@ -181,16 +175,10 @@ def write_baseline_log(
     if extra:
         payload.update(extra)
 
-    path = get_baseline_log_path()
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return path
+    repo = BaselineRepository(get_runtime_data_dir())
+    return repo.write(payload)
 
 
 def read_baseline_log() -> dict[str, Any] | None:
-    path = get_baseline_log_path()
-    if not path.is_file():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
+    repo = BaselineRepository(get_runtime_data_dir())
+    return repo.read()

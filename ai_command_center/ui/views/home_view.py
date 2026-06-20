@@ -1,4 +1,4 @@
-"""Home — Hybrid spatial grid (ribbon / metrics / activity feed)."""
+﻿"""Home - Hybrid spatial grid (ribbon / metrics / activity feed)."""
 
 
 
@@ -214,7 +214,7 @@ class HomeView(PageLayerStack):
 
 
 
-    def apply_telemetry_event(self, payload: dict) -> None:
+    def apply_activity_event(self, payload: dict) -> None:
 
         event = str(payload.get("event", payload.get("kind", "event")))
 
@@ -237,4 +237,5 @@ class HomeView(PageLayerStack):
             cpu = float(payload.get("cpu_percent", 30))
 
             self._ribbon.set_live(cpu, cpu * 0.8, cpu * 0.5, glow=glow)
+
 

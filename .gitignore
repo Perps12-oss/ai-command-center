@@ -32,7 +32,7 @@ credentials.json
 
 data/
 
-# Cursor — UCGS kit is tracked under .cursor/rules and .cursor/hooks
+# Cursor - UCGS kit is tracked under .cursor/rules and .cursor/hooks
 .cursor/*
 !.cursor/hooks.json
 !.cursor/hooks/
@@ -42,6 +42,7 @@ data/
 
 .vscode/
 .idea/
+.vs/
 
 Thumbs.db
 Desktop.ini

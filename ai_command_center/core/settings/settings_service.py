@@ -1,4 +1,4 @@
-"""Settings service placeholder for the architecture enforcement spec."""
+﻿"""Settings service placeholder for the architecture enforcement spec."""
 
 from __future__ import annotations
 
@@ -50,7 +50,12 @@ class SettingsService:
         )
 
     def set(self, key: str, value: Any) -> None:
-        validated = self._schema.validate(key, value)
+        validated = value
+        if key in self._schema.fields:
+            try:
+                validated = self._schema.validate(key, value)
+            except (TypeError, ValueError):
+                validated = self._schema.fields[key].default
         self._repo.set(key, validated)
         if self._bus is not None:
             self._bus.publish(SETTINGS_UPDATED, {"key": key, "value": validated}, source="settings")
@@ -59,3 +64,4 @@ class SettingsService:
     def update(self, **values: Any) -> None:
         for key, value in values.items():
             self.set(key, value)
+

@@ -8,6 +8,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
+from ai_command_center.domain.telemetry_event import TelemetryEvent
+
 
 def _utc_iso(ts: float | None = None) -> str:
     when = datetime.fromtimestamp(ts or datetime.now(timezone.utc).timestamp(), tz=timezone.utc)
@@ -29,7 +31,7 @@ class TelemetryRepository:
             )
             self._conn.commit()
 
-    def fetch_since(self, since_iso: str) -> list[dict[str, Any]]:
+    def fetch_since(self, since_iso: str) -> list[TelemetryEvent]:
         with self._lock:
             rows = self._conn.execute(
                 """
@@ -40,19 +42,13 @@ class TelemetryRepository:
                 """,
                 (since_iso,),
             ).fetchall()
-        out: list[dict[str, Any]] = []
+        out: list[TelemetryEvent] = []
         for row in rows:
             payload = json.loads(row["payload"])
-            out.append(
-                {
-                    "event": row["event"],
-                    "timestamp": row["timestamp"],
-                    "payload": payload,
-                }
-            )
+            out.append(TelemetryEvent.from_row(str(row["event"]), str(row["timestamp"]), payload))
         return out
 
-    def fetch_session(self, session_id: str) -> list[dict[str, Any]]:
+    def fetch_session(self, session_id: str) -> list[TelemetryEvent]:
         with self._lock:
             rows = self._conn.execute(
                 """
@@ -63,16 +59,10 @@ class TelemetryRepository:
                 """,
                 (session_id,),
             ).fetchall()
-        out: list[dict[str, Any]] = []
+        out: list[TelemetryEvent] = []
         for row in rows:
             payload = json.loads(row["payload"])
-            out.append(
-                {
-                    "event": row["event"],
-                    "timestamp": row["timestamp"],
-                    "payload": payload,
-                }
-            )
+            out.append(TelemetryEvent.from_row(str(row["event"]), str(row["timestamp"]), payload))
         return out
 
     def count(self) -> int:

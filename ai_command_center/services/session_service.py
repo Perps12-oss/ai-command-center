@@ -12,6 +12,7 @@ from ai_command_center.core.events.topics import (
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
     SESSION_UPDATE_REQUEST,
+    SESSION_UPDATE_RESULT,
 )
 from ai_command_center.db.conversation_repository import (
     CONTEXT_HISTORY_LIMIT,
@@ -94,7 +95,10 @@ class SessionService(BaseService):
         self._publish_history()
 
     def _publish_history(self) -> None:
-        messages = self._repo.list_messages()
+        messages = [
+            {"role": m.role, "content": m.content, "created_at": m.created_at}
+            for m in self._repo.list_messages()
+        ]
         self._bus.publish(
             CHAT_HISTORY_LOADED,
             {"messages": messages},

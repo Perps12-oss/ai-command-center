@@ -1,4 +1,4 @@
-"""Layout compiler — validates design JSON and resolves page trees."""
+﻿"""Layout compiler - validates design JSON and resolves page trees."""
 
 from __future__ import annotations
 
@@ -106,7 +106,7 @@ class LayoutCompiler:
                         if topic not in (
                             NOTE_INDEX_COMPLETE,
                             "plugin.catalog",
-                            "telemetry_events.rate",
+                            "activity_events.rate",
                         ):
                             pass
             if "fallback" not in spec:
@@ -242,3 +242,4 @@ class LayoutCompiler:
             children = node.get("children", [])
             if children:
                 self._walk_tree(children, errors, path=f"{path}.{comp}", spatial=spatial)
+

@@ -1,4 +1,4 @@
-"""Background modulation from EventBus — global state only."""
+﻿"""Background modulation from EventBus - global state only."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from ai_command_center.core.event_bus import Event, EventBus
-from ai_command_center.core.events.topics import OLLAMA_STATUS, SYSTEM_SNAPSHOT, TELEMETRY_EVENT
+from ai_command_center.core.events.topics import OLLAMA_STATUS, SYSTEM_EVENTS, SYSTEM_SNAPSHOT
 from ai_command_center.ui.layer.background_spec import load_background_layer
 
 if TYPE_CHECKING:
@@ -17,7 +17,7 @@ _FLICKER_MAX_HZ = 0.5
 
 
 class BackgroundController:
-    """Maps system state to background tint — never per-component."""
+    """Maps system state to background tint - never per-component."""
 
     def __init__(self, bus: EventBus) -> None:
         self._bus = bus
@@ -38,7 +38,7 @@ class BackgroundController:
             self._apply_defaults()
 
     def start(self) -> None:
-        for topic in (SYSTEM_SNAPSHOT, OLLAMA_STATUS, TELEMETRY_EVENT):
+        for topic in (SYSTEM_SNAPSHOT, OLLAMA_STATUS, SYSTEM_EVENTS):
             self._unsubs.append(self._bus.subscribe(topic, self._on_event))
 
     def stop(self) -> None:
@@ -63,9 +63,10 @@ class BackgroundController:
         elif event.topic == OLLAMA_STATUS:
             online = bool(event.payload.get("online"))
             self._canvas.set_modulation(desaturate=not online, dim=0.0 if online else 0.25)
-        elif event.topic == TELEMETRY_EVENT:
+        elif event.topic == SYSTEM_EVENTS:
             now = time.monotonic()
             if now - self._last_flicker < 1.0 / _FLICKER_MAX_HZ:
                 return
             self._last_flicker = now
             self._canvas.set_modulation(flicker=0.03)
+

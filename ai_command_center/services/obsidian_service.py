@@ -1,4 +1,4 @@
-"""Obsidian vault integration — FTS search, read, write (Phase 3C + 4A async index)."""
+﻿"""Obsidian vault integration — FTS search, read, write (Phase 3C + 4A async index)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from typing import Callable
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     COMMAND_ROUTED,
+    NOTE_CONTEXT_REQUEST,
+    NOTE_CONTEXT_RESULT,
     NOTE_CREATED,
     NOTE_ERROR,
     NOTE_INDEX_COMPLETE,
@@ -21,7 +23,6 @@ from ai_command_center.core.events.topics import (
     NOTE_SELECTED,
     SETTINGS_SNAPSHOT,
 )
-from ai_command_center.core.settings.settings_repository import SettingsRepository
 from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.services.base import BaseService
 from ai_command_center.services.command_router_service import (
@@ -52,10 +53,9 @@ class ObsidianService(BaseService):
 
     name = "obsidian"
 
-    def __init__(self, bus, repo: NoteRepository, settings_repo: SettingsRepository | None = None) -> None:
+    def __init__(self, bus, repo) -> None:
         super().__init__(bus)
-        self._repo = repo
-        self._settings_repo = settings_repo
+        self._repo = self._coerce_repo(repo)
         self._repo_lock = threading.Lock()
         self._vault_path: Path | None = None
         self._selected_path: str | None = None
@@ -68,8 +68,17 @@ class ObsidianService(BaseService):
         self._pending_search_query: str | None = None
         self._last_vault_stats: tuple[int, int] = (0, 0)
 
+    @staticmethod
+    def _coerce_repo(repo):
+        if hasattr(repo, "set_vault_path") and hasattr(repo, "read_note") and hasattr(repo, "iter_markdown_files"):
+            return repo
+        conn = getattr(repo, "_conn", None)
+        if conn is None:
+            raise TypeError("ObsidianService requires a repository with vault file APIs")
+        return NoteRepository(conn)
+
     def _on_load(self) -> None:
-        self._repo.set_vault_path(self._vault_path_from_settings())
+        self._repo.set_vault_path(None)
         self._index_stop.clear()
         self._index_thread = threading.Thread(
             target=self._index_worker,
@@ -80,14 +89,7 @@ class ObsidianService(BaseService):
         self._unsubscribers.append(self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot))
         self._unsubscribers.append(self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed))
         self._unsubscribers.append(self._bus.subscribe(NOTE_SELECT, self._on_note_select))
-        self._unsubscribers.append(self._bus.subscribe("note.context.request", self._on_note_context_request))
-        if self._settings_repo is not None:
-            self._apply_vault_path(self._settings_repo.get("obsidian_vault_path", ""))
-
-    def _vault_path_from_settings(self) -> str:
-        if self._settings_repo is None:
-            return ""
-        return str(self._settings_repo.get("obsidian_vault_path", ""))
+        self._unsubscribers.append(self._bus.subscribe(NOTE_CONTEXT_REQUEST, self._on_note_context_request))
 
     def _apply_vault_path(self, raw: str) -> None:
         path = str(raw or "").strip()
@@ -111,7 +113,7 @@ class ObsidianService(BaseService):
 
     def _on_note_context_request(self, event: Event) -> None:
         self._bus.publish(
-            "note.context.result",
+            NOTE_CONTEXT_RESULT,
             {
                 "request_id": event.payload.get("request_id", ""),
                 "notes": self.get_context_notes(),
@@ -269,20 +271,7 @@ class ObsidianService(BaseService):
         )
 
     def read_note(self, rel_path: str) -> str | None:
-        vault = self._vault_path
-        if vault is None or not vault.is_dir():
-            return None
-        full = (vault / rel_path).resolve()
-        try:
-            full.relative_to(vault.resolve())
-        except ValueError:
-            return None
-        if not full.is_file():
-            return None
-        try:
-            return full.read_text(encoding="utf-8")
-        except OSError:
-            return None
+        return self._repo.read_note(rel_path)
 
     def _index_worker(self) -> None:
         while not self._index_stop.is_set():
@@ -302,7 +291,7 @@ class ObsidianService(BaseService):
         vault_files = 0
         vault_bytes = 0
         try:
-            for path in vault.rglob("*.md"):
+            for path in self._repo.iter_markdown_files():
                 if self._index_stop.is_set():
                     return
                 if any(part in _SKIP_DIRS for part in path.parts):
@@ -365,9 +354,8 @@ class ObsidianService(BaseService):
                 return False
         if stat.st_size > _MAX_NOTE_BYTES:
             return False
-        try:
-            body = path.read_text(encoding="utf-8")
-        except OSError:
+        body = self._repo.read_note(rel)
+        if body is None:
             return False
         title = _title_from_markdown(path, body)
         try:

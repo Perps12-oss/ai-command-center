@@ -16,17 +16,18 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageTk
 
+from ai_command_center.services.asset_service import AssetService
+
 
 
 _log = logging.getLogger(__name__)
-
-
+_asset_service = AssetService()
 
 
 
 def resize_image(path: Path, size: tuple[int, int]) -> Image.Image:
 
-    image = Image.open(path)
+    image = _asset_service.load_image(path)
 
     if image.size != size:
 

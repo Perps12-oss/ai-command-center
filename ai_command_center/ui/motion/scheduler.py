@@ -1,4 +1,4 @@
-"""EventBus-driven motion signals for live UI primitives."""
+﻿"""EventBus-driven motion signals for live UI primitives."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ai_command_center.core.event_bus import Event, EventBus
-from ai_command_center.core.events.topics import CHAT_COMPLETE, CHAT_STARTED, COMMAND_HISTORY, OLLAMA_STATUS, SYSTEM_EVENTS, SYSTEM_SNAPSHOT, TELEMETRY_EVENTS, UI_COMMAND, NOTE_INDEX_PROGRESS
+from ai_command_center.core.events.topics import CHAT_COMPLETE, CHAT_STARTED, COMMAND_HISTORY, NOTE_INDEX_PROGRESS, OLLAMA_STATUS, SYSTEM_EVENTS, SYSTEM_SNAPSHOT, UI_COMMAND
 
 _MAX_UPDATES_PER_SEC = 30
 
@@ -22,7 +22,7 @@ class MotionSignal:
 
 
 class MotionScheduler:
-    """Maps EventBus topics to normalized motion signals — no decorative loops."""
+    """Maps EventBus topics to normalized motion signals - no decorative loops."""
 
     def __init__(self, bus: EventBus) -> None:
         self._bus = bus
@@ -41,7 +41,7 @@ class MotionScheduler:
     def start(self) -> None:
         topics = (
             SYSTEM_SNAPSHOT,
-            TELEMETRY_EVENTS,
+            SYSTEM_EVENTS,
             COMMAND_HISTORY,
             UI_COMMAND,
             CHAT_STARTED,
@@ -71,9 +71,8 @@ class MotionScheduler:
             self._emit("HeroPanel", self._cpu / 100.0, rate, event.payload)
             self._emit("StatusFluxBarGrid", self._ram / 100.0, rate, event.payload)
 
-        elif event.topic in (TELEMETRY_EVENTS, SYSTEM_EVENTS):
+        elif event.topic == SYSTEM_EVENTS:
             self._event_count += 1
-            elapsed = max(0.1, now - self._last_event_ts) if self._last_event_ts else 1.0
             self._last_event_ts = now
             glow = min(1.0, self._event_count / 20.0)
             self._emit("EventStreamRibbon", glow, 1.0, event.payload)

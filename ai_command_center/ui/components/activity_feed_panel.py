@@ -1,30 +1,4 @@
-"""Scrolling terminal activity feed — deque-backed, TelemetryEvent bus."""
-
-
-
-from __future__ import annotations
-
-
-
-import collections
-
-
-
-import customtkinter as ctk
-
-
-
-from ai_command_center.core.event_bus import Event, EventBus
-
-from ai_command_center.ui.components.glass_card import GlassCard
-
-from ai_command_center.ui.theme import tokens as T
-
-
-
-
-
-"""Scrolling terminal activity feed — deque-backed, TelemetryEvent bus."""
+﻿"""Scrolling terminal activity feed — deque-backed activity bus."""
 
 from __future__ import annotations
 
@@ -33,7 +7,7 @@ import collections
 import customtkinter as ctk
 
 from ai_command_center.core.event_bus import Event, EventBus
-from ai_command_center.core.events.topics import TELEMETRY_EVENT
+from ai_command_center.core.events.topics import SYSTEM_EVENTS
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.theme import tokens as T
 
@@ -83,9 +57,9 @@ class ActivityFeedPanel(GlassCard):
         if self._unsub is not None:
             self._unsub()
         self._bus = bus
-        self._unsub = bus.subscribe(TELEMETRY_EVENT, self._on_telemetry)
+        self._unsub = bus.subscribe(SYSTEM_EVENTS, self._on_activity)
 
-    def _on_telemetry(self, event: Event) -> None:
+    def _on_activity(self, event: Event) -> None:
         kind = str(event.payload.get("event", event.payload.get("kind", "event")))
         tag = "success"
         if "warn" in kind.lower() or "error" in kind.lower():
@@ -116,8 +90,3 @@ class ActivityFeedPanel(GlassCard):
             self._unsub()
             self._unsub = None
         super().destroy()
-        if "warn" in kind.lower() or "error" in kind.lower():
-
-
-
-            tag = "warning"

@@ -1,4 +1,4 @@
-"""Routes chat intents through ContextManager before Ollama (Phase 3A skeleton)."""
+﻿"""Routes chat intents through ContextManager before Ollama (Phase 3A skeleton)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ from ai_command_center.core.events.topics import (
     CONTEXT_OVER_BUDGET,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_TRIMMED,
-    LLM_REQUEST,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
     MODEL_RESOLVE_REQUEST,
@@ -29,6 +28,7 @@ from ai_command_center.core.events.topics import (
     NOTE_CONTEXT_RESULT,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
+    SESSION_UPDATE_REQUEST,
     SETTINGS_SNAPSHOT,
 )
 from ai_command_center.platform.model_registry import model_warning
@@ -53,10 +53,14 @@ class ChatHandlerService(BaseService):
         bus,
         context_manager: ContextManager,
         ollama: OllamaServiceBase,
+        obsidian=None,
+        session=None,
     ) -> None:
         super().__init__(bus)
         self._context_manager = context_manager
         self._ollama = ollama
+        self._obsidian = obsidian
+        self._session = session
         self._default_model = "llama3.2:3b"
         self._unsubscribers: list[Callable[[], None]] = []
         self._pending: dict[str, dict[str, object]] = {}
@@ -182,7 +186,7 @@ class ChatHandlerService(BaseService):
                 {"reason": "history_compression", "sources": list(bundle.sources)},
                 source=self.name,
             )
-        elif bundle.prompt.rstrip().endswith("…"):
+        elif bundle.prompt.rstrip().endswith("..."):
             self._bus.publish(
                 CONTEXT_TRIMMED,
                 {"reason": "query_truncated", "sources": list(bundle.sources)},
@@ -223,10 +227,10 @@ class ChatHandlerService(BaseService):
         )
 
         try:
-            self._bus.publish(
-                LLM_REQUEST,
-                {"bundle": bundle, "model": model, "request_id": request_id},
-                source=self.name,
+            self._ollama.stream_chat(
+                bundle,
+                model=model,
+                request_id=request_id,
             )
         except Exception as exc:
             self._bus.publish(
@@ -244,4 +248,5 @@ class ChatHandlerService(BaseService):
             )
         finally:
             self._pending.pop(request_id, None)
+
 

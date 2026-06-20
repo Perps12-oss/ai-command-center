@@ -5,11 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-import yaml
-
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.topics import PLUGIN_CATALOG, PLUGIN_DISABLE_REQUEST, PLUGIN_ENABLE_REQUEST, PLUGIN_ERROR
+from ai_command_center.core.events.topics import (
+    PLUGIN_CATALOG,
+    PLUGIN_DISABLE_REQUEST,
+    PLUGIN_ENABLE_REQUEST,
+    PLUGIN_ERROR,
+    PLUGIN_STATE_CHANGED,
+)
 from ai_command_center.core.plugin_manifest import PluginManifest
+from ai_command_center.repositories.plugin_manifest_repository import PluginManifestRepository
 from ai_command_center.services.base import BaseService
 
 _MANIFESTS_DIR = (
@@ -17,28 +22,18 @@ _MANIFESTS_DIR = (
 )
 
 
-def _parse_manifest(data: dict) -> PluginManifest | None:
-    plugin_id = str(data.get("id", "")).strip()
-    if not plugin_id:
-        return None
-    topics = data.get("bus_topics") or []
-    return PluginManifest(
-        id=plugin_id,
-        name=str(data.get("name", plugin_id)),
-        version=str(data.get("version", "1.0")),
-        description=str(data.get("description", "")),
-        kind=str(data.get("kind", "extension")),
-        bus_topics=tuple(str(t) for t in topics),
-        enabled=bool(data.get("enabled", True)),
-    )
-
-
 class PluginRegistryService(BaseService):
     name = "plugin_registry"
 
-    def __init__(self, bus, manifests_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        bus,
+        manifests_dir: Path | None = None,
+        repo: PluginManifestRepository | None = None,
+    ) -> None:
         super().__init__(bus)
         self._manifests_dir = manifests_dir or _MANIFESTS_DIR
+        self._repo = repo or PluginManifestRepository()
         self._plugins: dict[str, PluginManifest] = {}
         self._unsubscribers: list[Callable[[], None]] = []
 
@@ -58,17 +53,10 @@ class PluginRegistryService(BaseService):
         self._unsubscribers.clear()
 
     def _load_manifests(self) -> None:
-        self._plugins.clear()
-        if not self._manifests_dir.is_dir():
-            return
-        for path in sorted(self._manifests_dir.glob("*.yaml")):
-            try:
-                raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            except OSError:
-                continue
-            manifest = _parse_manifest(raw)
-            if manifest is not None:
-                self._plugins[manifest.id] = manifest
+        self._plugins = {
+            manifest.id: manifest
+            for manifest in self._repo.list_manifests(self._manifests_dir)
+        }
 
     def list_plugins(self) -> list[PluginManifest]:
         return sorted(self._plugins.values(), key=lambda p: p.id)
@@ -107,7 +95,7 @@ class PluginRegistryService(BaseService):
         )
         self._plugins[plugin_id] = updated
         self._bus.publish(
-            "plugin.state_changed",
+            PLUGIN_STATE_CHANGED,
             {"id": plugin_id, "enabled": enabled},
             source=self.name,
         )

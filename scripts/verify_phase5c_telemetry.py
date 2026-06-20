@@ -106,7 +106,7 @@ def main() -> int:
             failures.append(f"expected >=5 telemetry rows, got {repo2.count()}")
 
         rows = repo2.fetch_session(session_id)
-        events = {r["event"] for r in rows}
+        events = {r.event_type for r in rows}
         for required in (
             "ui.command",
             "chat.complete",

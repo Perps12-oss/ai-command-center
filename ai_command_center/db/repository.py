@@ -38,6 +38,10 @@ class SettingsRepository:
         rows = self._conn.execute("SELECT key, value FROM settings").fetchall()
         return {str(r["key"]): str(r["value"]) for r in rows}
 
+    def get_all(self) -> dict[str, str]:
+        """Compatibility alias for core settings service."""
+        return self.all_settings()
+
 
 class ConversationRepository:
     """Deprecated import path — use db.conversation_repository."""

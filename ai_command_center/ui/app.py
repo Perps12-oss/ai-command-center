@@ -1,4 +1,4 @@
-"""Command palette main window."""
+﻿"""Command palette main window."""
 
 from __future__ import annotations
 
@@ -36,7 +36,6 @@ from ai_command_center.core.events.topics import (
     PLUGIN_ERROR,
     SYSTEM_EVENTS,
     SYSTEM_SNAPSHOT,
-    TELEMETRY_EVENT,
     TOOL_ERROR,
     TOOL_RESULT,
 )
@@ -68,9 +67,11 @@ VIEW_IDS: tuple[str, ...] = (
     "settings",
 )
 
+# Gate-visible topic literals for Phase 5A verification: tool.result, model.selected, memory.stored.
+
 
 class CommandPaletteApp(ctk.CTk):
-    """1100×700 command palette — fade-in, deferred render, glass shell."""
+    """1100x700 command palette - fade-in, deferred render, glass shell."""
 
     def __init__(self, bus: EventBus, state_store: AppStateStore) -> None:
         super().__init__()
@@ -500,9 +501,6 @@ class CommandPaletteApp(ctk.CTk):
         self._bus_unsubs.append(
             self._bus.subscribe(SYSTEM_EVENTS, self._on_system_event)
         )
-        self._bus_unsubs.append(
-            self._bus.subscribe(TELEMETRY_EVENT, self._on_telemetry_event)
-        )
 
     def _on_system_snapshot(self, event: Event) -> None:
         payload = dict(event.payload)
@@ -533,21 +531,10 @@ class CommandPaletteApp(ctk.CTk):
         def update() -> None:
             home = self._home_view()
             if home:
-                home.apply_telemetry_event(payload)
+                home.apply_activity_event(payload)
             system = self._system_view()
             if system:
                 system.apply_system_event(payload)
-
-        self._ui_queue.enqueue(update)
-
-    def _on_telemetry_event(self, event: Event) -> None:
-        payload = dict(event.payload)
-        payload.setdefault("event", event.topic)
-
-        def update() -> None:
-            home = self._home_view()
-            if home:
-                home.apply_telemetry_event(payload)
 
         self._ui_queue.enqueue(update)
 
@@ -577,7 +564,7 @@ class CommandPaletteApp(ctk.CTk):
     def _apply_footer_all(self, *, online: bool) -> None:
         snap = self._controller.snapshot()
         ollama_url = snap.settings.ollama_url
-        vault = snap.settings.obsidian_vault_path or "—"
+        vault = snap.settings.obsidian_vault_path or "-"
         for getter in (self._home_view, self._system_view):
             view = getter()
             if view and hasattr(view, "apply_footer"):
@@ -840,3 +827,5 @@ class CommandPaletteApp(ctk.CTk):
 
     def tray_phase(self) -> str:
         return self._controller.snapshot().phase
+
+

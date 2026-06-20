@@ -1,4 +1,4 @@
-"""Application bootstrap — wires core layer without UI."""
+﻿"""Application bootstrap - wires core layer without UI."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ai_command_center.core.state.system_snapshot_builder import SystemSnapshotB
 from ai_command_center.db.connection import init_database
 from ai_command_center.repositories.conversation_repository import ConversationRepository
 from ai_command_center.repositories.memory_repository import MemoryRepository
-from ai_command_center.repositories.notes_repository import NotesRepository
+from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
 from ai_command_center.services.chat_handler_service import ChatHandlerService
@@ -29,13 +29,14 @@ from ai_command_center.services.system_monitor_service import SystemMonitorServi
 from ai_command_center.services.telemetry_service import TelemetryService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
+from ai_command_center.tools.tool_registry import ToolRegistry
 
 
 @dataclass
 class ApplicationCore:
     """
     Composition root. Only this module constructs repositories.
-    Public surface: bus, state_store, services — not repositories.
+    Public surface: bus, state_store, services - not repositories.
     """
 
     bus: EventBus
@@ -64,12 +65,13 @@ def create_application(*, debug_mode: bool = False) -> ApplicationCore:
     settings_repo = SettingsRepository(db)
     context_manager = ContextManager()
     ollama = OllamaHttpService(bus)
-    note_repo = NotesRepository(db)
+    note_repo = NoteRepository(db)
     memory_repo = MemoryRepository(db)
     conv_repo = ConversationRepository(db)
-    tool_registry = ToolRegistryService(bus)
-    tool_executor = ToolExecutorService(bus, tool_registry)
-    obsidian = ObsidianService(bus, note_repo, settings_repo)
+    shared_tool_registry = ToolRegistry()
+    tool_registry = ToolRegistryService(bus, registry=shared_tool_registry)
+    tool_executor = ToolExecutorService(bus, shared_tool_registry)
+    obsidian = ObsidianService(bus, note_repo)
     memory_graph = MemoryGraphService(bus, memory_repo)
     session = SessionService(bus, conv_repo)
     plugins = PluginRegistryService(bus)
@@ -100,3 +102,4 @@ def create_application(*, debug_mode: bool = False) -> ApplicationCore:
         services=services,
         db=db,
     )
+
