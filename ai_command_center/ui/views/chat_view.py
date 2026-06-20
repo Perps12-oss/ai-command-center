@@ -1,34 +1,186 @@
-"""Minimal streaming chat view — Phase 3B (full markdown in Phase 3D)."""
+"""Streaming chat view — Phase 3D: message bubbles, 50ms batching, typing indicator."""
 
 from __future__ import annotations
 
 import customtkinter as ctk
 
-from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.markdown_plain import format_assistant_markdown
+from ai_command_center.ui.markdown_plain import extract_segments, format_assistant_markdown
 from ai_command_center.ui.theme import tokens as T
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+#  Message bubble widgets
+# ──────────────────────────────────────────────────────────────────────────────
+
+class _RoleLabel(ctk.CTkFrame):
+    """Compact role badge shown above each bubble."""
+
+    def __init__(self, master, role: str, color: str) -> None:
+        super().__init__(master, fg_color="transparent")
+        ctk.CTkLabel(
+            self,
+            text=role,
+            font=T.FONT_ROLE,
+            text_color=color,
+        ).pack(side="left")
+
+
+class UserBubble(ctk.CTkFrame):
+    """User message — blue-tinted, full-width."""
+
+    def __init__(self, master, text: str) -> None:
+        super().__init__(
+            master,
+            fg_color=T.MSG_USER_BG,
+            border_color=T.MSG_USER_BORDER,
+            border_width=1,
+            corner_radius=8,
+        )
+        _RoleLabel(self, "YOU", T.ACCENT_DEFAULT).pack(anchor="w", padx=10, pady=(8, 0))
+        ctk.CTkLabel(
+            self,
+            text=text,
+            font=T.FONT_BODY,
+            text_color=T.MSG_USER_TEXT,
+            wraplength=680,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=10, pady=(2, 10))
+
+
+class AssistantBubble(ctk.CTkFrame):
+    """Assistant message — supports streaming + final markdown render."""
+
+    def __init__(self, master) -> None:
+        super().__init__(
+            master,
+            fg_color=T.MSG_ASSISTANT_BG,
+            border_color=T.MSG_ASSISTANT_BORDER,
+            border_width=1,
+            corner_radius=8,
+        )
+        _RoleLabel(self, "ASSISTANT", T.TEXT_SECONDARY).pack(anchor="w", padx=10, pady=(8, 0))
+
+        self._textbox = ctk.CTkTextbox(
+            self,
+            font=T.FONT_BODY,
+            fg_color="transparent",
+            text_color=T.MSG_ASSISTANT_TEXT,
+            wrap="word",
+            activate_scrollbars=False,
+            height=80,
+        )
+        self._textbox.pack(fill="x", padx=6, pady=(2, 8))
+        self._textbox.configure(state="disabled")
+
+        self._raw = ""
+        self._set_text("●   ●   ●")
+
+    def _set_text(self, text: str) -> None:
+        self._textbox.configure(state="normal")
+        self._textbox.delete("1.0", "end")
+        self._textbox.insert("1.0", text)
+        self._textbox.configure(state="disabled")
+        self._auto_height()
+
+    def _auto_height(self) -> None:
+        lines = int(self._textbox.index("end-1c").split(".")[0])
+        h = max(40, min(lines * 20 + 24, 500))
+        self._textbox.configure(height=h)
+
+    def append_raw(self, chunk: str) -> None:
+        self._raw += chunk
+        self._set_text(self._raw)
+
+    def finalize(self, full_text: str) -> None:
+        self._raw = full_text
+        formatted = format_assistant_markdown(full_text)
+        self._set_text(formatted)
+
+
+class SystemBubble(ctk.CTkFrame):
+    """System / memory / tool / error notification strip."""
+
+    KIND_COLORS = {
+        "system": (T.MSG_SYSTEM_BG, "#444444", T.MSG_SYSTEM_TEXT, "SYSTEM"),
+        "error":  (T.MSG_ERROR_BG,  T.MSG_ERROR_BORDER,  T.MSG_ERROR_TEXT,  "ERROR"),
+        "tool":   (T.MSG_TOOL_BG,   T.MSG_TOOL_BORDER,   T.MSG_TOOL_TEXT,   "TOOL"),
+        "cancelled": (T.MSG_SYSTEM_BG, "#333333", T.MSG_CANCELLED_TEXT, "CANCELLED"),
+    }
+
+    def __init__(self, master, kind: str, label: str, text: str) -> None:
+        colors = self.KIND_COLORS.get(kind, self.KIND_COLORS["system"])
+        bg, border, fg, default_label = colors
+        super().__init__(
+            master,
+            fg_color=bg,
+            border_color=border,
+            border_width=1,
+            corner_radius=6,
+        )
+        header_row = ctk.CTkFrame(self, fg_color="transparent")
+        header_row.pack(fill="x", padx=10, pady=(6, 0))
+        ctk.CTkLabel(
+            header_row,
+            text=label or default_label,
+            font=T.FONT_ROLE,
+            text_color=fg,
+        ).pack(side="left")
+
+        if text:
+            ctk.CTkLabel(
+                self,
+                text=text,
+                font=T.FONT_SMALL,
+                text_color=fg,
+                wraplength=660,
+                justify="left",
+                anchor="w",
+            ).pack(fill="x", padx=10, pady=(2, 8))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Chat view
+# ──────────────────────────────────────────────────────────────────────────────
+
 class ChatView(ctk.CTkFrame):
+    """Single-session streaming chat.
+
+    Architecture contract:
+      - Receives data only via public methods called from UIQueue (main thread).
+      - No EventBus or service imports.
+    """
+
     def __init__(self, master, on_cancel, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_cancel = on_cancel
         self._request_id: str | None = None
         self._streaming = False
-        self._assistant_start: str | None = None
+        self._streaming_bubble: AssistantBubble | None = None
+        self._chunk_buffer = ""
+        self._flush_pending = False
 
-        card = GlassCard(self)
-        card.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
+        self._build_header()
+        self._build_messages()
 
-        header = ctk.CTkFrame(card, fg_color="transparent")
-        header.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
+    # ── layout ────────────────────────────────────────────────────────────────
+
+    def _build_header(self) -> None:
+        header = ctk.CTkFrame(
+            self,
+            fg_color=T.BG_PANEL,
+            corner_radius=0,
+            height=44,
+        )
+        header.pack(fill="x", side="top")
+        header.pack_propagate(False)
 
         ctk.CTkLabel(
             header,
             text="Chat",
-            font=T.FONT_TITLE,
+            font=T.FONT_HEADER,
             text_color=T.TEXT_PRIMARY,
-        ).pack(side="left")
+        ).pack(side="left", padx=T.PAD, pady=10)
 
         self._status = ctk.CTkLabel(
             header,
@@ -36,117 +188,147 @@ class ChatView(ctk.CTkFrame):
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
         )
-        self._status.pack(side="left", padx=(12, 0))
+        self._status.pack(side="left", padx=(0, 0), pady=10)
 
         self._cancel_btn = ctk.CTkButton(
             header,
-            text="Cancel",
+            text="■ Stop",
             width=80,
             height=28,
             font=T.FONT_SMALL,
             fg_color=T.BG_GLASS,
             hover_color=T.STATUS_ERROR,
+            text_color=T.STATUS_ERROR,
             state="disabled",
             command=self._handle_cancel,
         )
-        self._cancel_btn.pack(side="right")
+        self._cancel_btn.pack(side="right", padx=T.PAD, pady=8)
 
-        self._text = ctk.CTkTextbox(
-            card,
-            font=T.FONT_BODY,
+    def _build_messages(self) -> None:
+        self._scroll = ctk.CTkScrollableFrame(
+            self,
             fg_color=T.BG_DEEP,
-            text_color=T.TEXT_PRIMARY,
-            wrap="word",
-            activate_scrollbars=True,
+            corner_radius=0,
         )
-        self._text.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
-        self._text.configure(state="disabled")
+        self._scroll.pack(fill="both", expand=True)
+        self._scroll.columnconfigure(0, weight=1)
+
+    # ── public API ─────────────────────────────────────────────────────────────
 
     def load_history(self, messages: list[dict]) -> None:
-        self._text.configure(state="normal")
-        self._text.delete("1.0", "end")
+        self._clear()
         for item in messages:
             role = str(item.get("role", ""))
             content = str(item.get("content", ""))
-            if role == "assistant":
-                content = format_assistant_markdown(content)
-                self._text.insert("end", f"Assistant\n{content}\n\n")
-            elif role == "user":
-                self._text.insert("end", f"You\n{content}\n\n")
-        self._text.see("end")
-        self._text.configure(state="disabled")
-        if messages:
-            self._status.configure(text="History loaded", text_color=T.TEXT_MUTED)
+            if role == "user":
+                self._add_user(content)
+            elif role == "assistant":
+                b = AssistantBubble(self._scroll)
+                b.pack(fill="x", padx=T.PAD, pady=(0, 8))
+                b.finalize(content)
+        self._scroll_to_bottom()
+        self._status.configure(text=f"{len(messages)} messages", text_color=T.TEXT_MUTED)
+
+    def show_user_message(self, text: str) -> None:
+        self._add_user(text)
+        self._scroll_to_bottom()
+
+    def begin_assistant(self, request_id: str) -> None:
+        self._request_id = request_id
+        self._streaming = True
+        self._chunk_buffer = ""
+        self._streaming_bubble = AssistantBubble(self._scroll)
+        self._streaming_bubble.pack(fill="x", padx=T.PAD, pady=(0, 8))
+        self._status.configure(text="Streaming…", text_color=T.STATUS_BUSY)
+        self._cancel_btn.configure(state="normal")
+        self._scroll_to_bottom()
+
+    def append_chunk(self, text: str) -> None:
+        if not self._streaming:
+            return
+        self._chunk_buffer += text
+        if not self._flush_pending:
+            self._flush_pending = True
+            self.after(T.CHUNK_FLUSH_MS, self._flush_chunks)
+
+    def finish_assistant(self, text: str) -> None:
+        self._flush_pending = False
+        self._chunk_buffer = ""
+        if self._streaming_bubble:
+            self._streaming_bubble.finalize(text)
+        self._end_stream("Ready")
+        self._scroll_to_bottom()
+
+    def show_cancelled(self) -> None:
+        self._flush_pending = False
+        self._chunk_buffer = ""
+        if self._streaming_bubble:
+            current = self._streaming_bubble._raw or "…"
+            self._streaming_bubble.finalize(current)
+        self._add_system("cancelled", "", "[Generation stopped]")
+        self._end_stream("Cancelled")
+        self._scroll_to_bottom()
+
+    def show_error(self, message: str) -> None:
+        self._flush_pending = False
+        self._chunk_buffer = ""
+        if self._streaming_bubble:
+            self._streaming_bubble.pack_forget()
+            self._streaming_bubble = None
+        self._add_system("error", "ERROR", message)
+        self._end_stream("Error", error=True)
+        self._scroll_to_bottom()
+
+    def show_tool_output(self, tool: str, output: str, *, success: bool = True) -> None:
+        kind = "tool" if success else "error"
+        label = f"TOOL › {tool}" if success else f"TOOL ERROR › {tool}"
+        self._add_system(kind, label, output)
+        self._scroll_to_bottom()
+        color = T.MSG_TOOL_TEXT if success else T.MSG_ERROR_TEXT
+        self._status.configure(
+            text="Tool complete" if success else "Tool failed",
+            text_color=color,
+        )
+
+    def show_system_message(self, message: str) -> None:
+        self._add_system("system", "SYSTEM", message)
+        self._scroll_to_bottom()
+        self._status.configure(text="Ready", text_color=T.TEXT_MUTED)
+
+    # ── internal helpers ───────────────────────────────────────────────────────
+
+    def _flush_chunks(self) -> None:
+        self._flush_pending = False
+        if self._chunk_buffer and self._streaming_bubble:
+            self._streaming_bubble.append_raw(self._chunk_buffer)
+            self._chunk_buffer = ""
+            self._scroll_to_bottom()
+
+    def _add_user(self, text: str) -> None:
+        UserBubble(self._scroll, text).pack(fill="x", padx=T.PAD, pady=(0, 8))
+
+    def _add_system(self, kind: str, label: str, text: str) -> None:
+        SystemBubble(self._scroll, kind, label, text).pack(
+            fill="x", padx=T.PAD, pady=(0, 4)
+        )
+
+    def _clear(self) -> None:
+        for child in self._scroll.winfo_children():
+            child.destroy()
+        self._streaming_bubble = None
+        self._streaming = False
 
     def _handle_cancel(self) -> None:
         if self._request_id:
             self._on_cancel(self._request_id)
 
-    def show_user_message(self, text: str) -> None:
-        self._append_block(f"You\n{text}\n\n")
-
-    def begin_assistant(self, request_id: str) -> None:
-        self._request_id = request_id
-        self._streaming = True
-        self._assistant_start = self._text.index("end-1c")
-        self._append_block("Assistant\n")
-        self._status.configure(text="Streaming…", text_color=T.STATUS_BUSY)
-        self._cancel_btn.configure(state="normal")
-
-    def append_chunk(self, text: str) -> None:
-        if not self._streaming:
-            return
-        self._append_inline(text)
-
-    def finish_assistant(self, text: str) -> None:
-        display = format_assistant_markdown(text)
-        if self._streaming and self._assistant_start:
-            self._replace_from(self._assistant_start, f"Assistant\n{display}\n\n")
-        else:
-            self._append_block(f"Assistant\n{display}\n\n")
-        self._end_stream("Complete")
-
-    def show_cancelled(self) -> None:
-        self._append_inline("\n[cancelled]\n\n")
-        self._end_stream("Cancelled")
-
-    def show_error(self, message: str) -> None:
-        self._append_block(f"Error\n{message}\n\n")
-        self._end_stream("Error", error=True)
-
-    def show_tool_output(self, tool: str, output: str, *, success: bool = True) -> None:
-        label = "Tool" if success else "Tool error"
-        self._append_block(f"{label} ({tool})\n{output}\n\n")
-        color = T.TEXT_MUTED if success else T.STATUS_ERROR
-        self._status.configure(text="Tool complete" if success else "Tool failed", text_color=color)
-
-    def show_system_message(self, message: str) -> None:
-        self._append_block(f"System\n{message}\n\n")
-        self._status.configure(text="Ready", text_color=T.TEXT_MUTED)
-
     def _end_stream(self, label: str, *, error: bool = False) -> None:
         self._streaming = False
         self._request_id = None
-        self._assistant_start = None
+        self._streaming_bubble = None
         color = T.STATUS_ERROR if error else T.TEXT_MUTED
         self._status.configure(text=label, text_color=color)
         self._cancel_btn.configure(state="disabled")
 
-    def _append_block(self, text: str) -> None:
-        self._text.configure(state="normal")
-        self._text.insert("end", text)
-        self._text.see("end")
-        self._text.configure(state="disabled")
-
-    def _append_inline(self, text: str) -> None:
-        self._text.configure(state="normal")
-        self._text.insert("end", text)
-        self._text.see("end")
-        self._text.configure(state="disabled")
-
-    def _replace_from(self, start_index: str, text: str) -> None:
-        self._text.configure(state="normal")
-        self._text.delete(start_index, "end")
-        self._text.insert(start_index, text)
-        self._text.see("end")
-        self._text.configure(state="disabled")
+    def _scroll_to_bottom(self) -> None:
+        self.after(10, lambda: self._scroll._parent_canvas.yview_moveto(1.0))

@@ -13,10 +13,12 @@ from ai_command_center.ui.controller import UIController
 from ai_command_center.ui.theme import tokens as T
 from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.views.chat_view import ChatView
+from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.settings_view import SettingsView
+from ai_command_center.ui.views.system_view import SystemView
 
 VIEW_IDS: tuple[str, ...] = (
     "home",
@@ -37,7 +39,7 @@ class CommandPaletteApp(ctk.CTk):
         self._controller = UIController(bus, state_store, self._queue_state_refresh)
         self._ui_queue = UIQueue(self)
         self._visible = False
-        self._views: dict[str, PlaceholderView | ChatView | NotesView] = {}
+        self._views: dict[str, PlaceholderView | ChatView | NotesView | HomeView | SystemView] = {}
         self._current_view = "home"
         self._active_request_id: str | None = None
         self._pending_user_text: str | None = None
@@ -82,20 +84,25 @@ class CommandPaletteApp(ctk.CTk):
         right = ctk.CTkFrame(body, fg_color="transparent")
         right.pack(fill="both", expand=True, side="left")
 
-        self._command_host = ctk.CTkFrame(right, fg_color="transparent")
-        self._command_host.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
+        self._command_host = ctk.CTkFrame(right, fg_color=T.BG_PANEL, corner_radius=0, height=80)
+        self._command_host.pack(fill="x")
+        self._command_host.pack_propagate(False)
 
         self._command_box = CommandBox(self._command_host, on_submit=self._on_command)
-        self._command_box.pack(fill="x")
+        self._command_box.pack(fill="x", padx=T.PAD, pady=10)
 
         self._content = ctk.CTkFrame(right, fg_color="transparent")
         self._content.pack(fill="both", expand=True)
 
         self._show_view("home")
 
-    def _ensure_view(self, view_id: str) -> PlaceholderView | ChatView | NotesView | SettingsView | PluginsView:
+    def _ensure_view(
+        self, view_id: str
+    ) -> PlaceholderView | ChatView | NotesView | HomeView | SystemView | SettingsView | PluginsView:
         if view_id not in self._views:
-            if view_id == "chat":
+            if view_id == "home":
+                self._views[view_id] = HomeView(self._content)
+            elif view_id == "chat":
                 self._views[view_id] = ChatView(
                     self._content,
                     on_cancel=self._controller.publish_chat_cancel,
@@ -105,6 +112,8 @@ class CommandPaletteApp(ctk.CTk):
                     self._content,
                     on_select=self._controller.publish_note_select,
                 )
+            elif view_id == "system":
+                self._views[view_id] = SystemView(self._content)
             elif view_id == "settings":
                 self._views[view_id] = SettingsView(
                     self._content,
@@ -126,6 +135,12 @@ class CommandPaletteApp(ctk.CTk):
     def _chat_view(self) -> ChatView | None:
         view = self._views.get("chat")
         return view if isinstance(view, ChatView) else None
+
+    def _home_view(self) -> HomeView | None:
+        view = self._views.get("home")
+        return view if isinstance(view, HomeView) else None
+
+    # ── chat event wiring ──────────────────────────────────────────────────────
 
     def _wire_chat_events(self) -> None:
         self._bus_unsubs.append(
@@ -241,6 +256,8 @@ class CommandPaletteApp(ctk.CTk):
 
         self._ui_queue.enqueue(update)
 
+    # ── tool event wiring ─────────────────────────────────────────────────────
+
     def _wire_tool_events(self) -> None:
         self._bus_unsubs.append(
             self._bus.subscribe("tool.result", self._on_tool_result)
@@ -272,6 +289,8 @@ class CommandPaletteApp(ctk.CTk):
                 chat.show_tool_output(tool, message, success=False)
 
         self._ui_queue.enqueue(update)
+
+    # ── memory event wiring ───────────────────────────────────────────────────
 
     def _wire_memory_events(self) -> None:
         self._bus_unsubs.append(
@@ -318,6 +337,8 @@ class CommandPaletteApp(ctk.CTk):
 
         self._ui_queue.enqueue(update)
 
+    # ── plugin event wiring ───────────────────────────────────────────────────
+
     def _wire_plugin_events(self) -> None:
         self._bus_unsubs.append(
             self._bus.subscribe("plugin.catalog", self._on_plugin_catalog)
@@ -346,6 +367,8 @@ class CommandPaletteApp(ctk.CTk):
 
         self._ui_queue.enqueue(update)
 
+    # ── note event wiring ─────────────────────────────────────────────────────
+
     def _wire_note_events(self) -> None:
         self._bus_unsubs.append(
             self._bus.subscribe("note.search_results", self._on_note_search_results)
@@ -359,6 +382,54 @@ class CommandPaletteApp(ctk.CTk):
         self._bus_unsubs.append(
             self._bus.subscribe("note.error", self._on_note_error)
         )
+
+    def _on_note_search_results(self, event: Event) -> None:
+        query = str(event.payload.get("query", ""))
+        results = event.payload.get("results") or []
+
+        def update() -> None:
+            self._navigate("notes")
+            notes = self._notes_view()
+            if notes:
+                notes.show_results(query, list(results))
+
+        self._ui_queue.enqueue(update)
+
+    def _on_note_selected(self, event: Event) -> None:
+        path = str(event.payload.get("path", ""))
+        title = str(event.payload.get("title", path))
+
+        def update() -> None:
+            notes = self._notes_view()
+            if notes:
+                notes.show_selected(path, title)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_note_created(self, event: Event) -> None:
+        path = str(event.payload.get("path", ""))
+        title = str(event.payload.get("title", ""))
+
+        def update() -> None:
+            self._navigate("notes")
+            notes = self._notes_view()
+            if notes:
+                notes.show_created(path, title)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_note_error(self, event: Event) -> None:
+        message = str(event.payload.get("message", "Note error"))
+
+        def update() -> None:
+            self._navigate("notes")
+            notes = self._notes_view()
+            if notes:
+                notes.show_error(message)
+
+        self._ui_queue.enqueue(update)
+
+    # ── overlay event wiring ──────────────────────────────────────────────────
 
     def _wire_overlay_events(self) -> None:
         self._bus_unsubs.append(
@@ -414,65 +485,33 @@ class CommandPaletteApp(ctk.CTk):
             self.geometry(f"{w}x{h}")
             self.minsize(900, 560)
 
-    def _on_note_search_results(self, event: Event) -> None:
-        query = str(event.payload.get("query", ""))
-        results = event.payload.get("results") or []
-
-        def update() -> None:
-            self._navigate("notes")
-            notes = self._notes_view()
-            if notes:
-                notes.show_results(query, list(results))
-
-        self._ui_queue.enqueue(update)
-
-    def _on_note_selected(self, event: Event) -> None:
-        path = str(event.payload.get("path", ""))
-        title = str(event.payload.get("title", path))
-
-        def update() -> None:
-            notes = self._notes_view()
-            if notes:
-                notes.show_selected(path, title)
-
-        self._ui_queue.enqueue(update)
-
-    def _on_note_created(self, event: Event) -> None:
-        path = str(event.payload.get("path", ""))
-        title = str(event.payload.get("title", ""))
-
-        def update() -> None:
-            self._navigate("notes")
-            notes = self._notes_view()
-            if notes:
-                notes.show_created(path, title)
-
-        self._ui_queue.enqueue(update)
-
-    def _on_note_error(self, event: Event) -> None:
-        message = str(event.payload.get("message", "Note error"))
-
-        def update() -> None:
-            self._navigate("notes")
-            notes = self._notes_view()
-            if notes:
-                notes.show_error(message)
-
-        self._ui_queue.enqueue(update)
+    # ── view routing ───────────────────────────────────────────────────────────
 
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:
             view_id = "home"
+        # Notify system view when hidden/shown
+        old_view = self._views.get(self._current_view)
+        if isinstance(old_view, SystemView) and view_id != self._current_view:
+            old_view.on_hide()
+
         self._current_view = view_id
         for vid, view in self._views.items():
             if vid != view_id:
                 view.pack_forget()
-        self._ensure_view(view_id).pack(fill="both", expand=True)
+
+        new_view = self._ensure_view(view_id)
+        new_view.pack(fill="both", expand=True)
+        if isinstance(new_view, SystemView):
+            new_view.on_show()
+
         self._sidebar.set_active(view_id)
 
     def _navigate(self, view_id: str) -> None:
         self._show_view(view_id)
         self._controller.publish_navigate(view_id)
+
+    # ── command handling ───────────────────────────────────────────────────────
 
     def _on_command(self, text: str) -> None:
         lower = text.strip().lower()
@@ -497,6 +536,8 @@ class CommandPaletteApp(ctk.CTk):
         except Exception:
             return None
 
+    # ── state refresh ──────────────────────────────────────────────────────────
+
     def _queue_state_refresh(self) -> None:
         self._ui_queue.enqueue(self._apply_state)
 
@@ -517,10 +558,19 @@ class CommandPaletteApp(ctk.CTk):
         settings_view = self._views.get("settings")
         if isinstance(settings_view, SettingsView):
             settings_view.load_from_snapshot(snap.settings)
-        if snap.last_command and "home" in self._views:
-            self._views["home"].set_extra(
-                f'Last: "{snap.last_command}" → {snap.last_command_intent or "pending"}'
-            )
+        if snap.last_command:
+            home = self._home_view()
+            if home:
+                home.set_last_command(
+                    f'Last: "{snap.last_command}" → {snap.last_command_intent or "pending"}'
+                )
+            # Legacy support for PlaceholderView if present
+            if "home" in self._views and isinstance(self._views["home"], PlaceholderView):
+                self._views["home"].set_extra(
+                    f'Last: "{snap.last_command}" → {snap.last_command_intent or "pending"}'
+                )
+
+    # ── show / hide / toggle ───────────────────────────────────────────────────
 
     def _fade_in(self, step: int = 0) -> None:
         alpha = min(1.0, (step + 1) / T.FADE_STEPS)
