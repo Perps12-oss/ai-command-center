@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from ai_command_center.ui.components.floating_ui import pack_floating
 from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.ui.layer.layer_stack import PageLayerStack
 from ai_command_center.ui.theme import tokens as T
 
 VIEW_LABELS: dict[str, str] = {
@@ -26,11 +28,12 @@ VIEW_HINTS: dict[str, str] = {
 }
 
 
-class PlaceholderView(ctk.CTkFrame):
+class PlaceholderView(PageLayerStack):
     def __init__(self, master, view_id: str, **kwargs) -> None:
-        super().__init__(master, fg_color="transparent", **kwargs)
-        card = GlassCard(self)
-        card.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
+        page = view_id if view_id in ("home", "system", "chat", "notes", "plugins", "settings") else "settings"
+        super().__init__(master, page, **kwargs)
+        card = GlassCard(self.ui_layer)
+        pack_floating(card, fill="both", expand=True, first=True)
 
         ctk.CTkLabel(
             card,

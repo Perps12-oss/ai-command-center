@@ -5,6 +5,12 @@ from __future__ import annotations
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import (
+    MODEL_RESOLVE_REQUEST,
+    MODEL_RESOLVE_RESULT,
+    MODEL_SELECTED,
+    SETTINGS_SNAPSHOT,
+)
 from ai_command_center.platform.model_registry import classify_model
 from ai_command_center.services.base import BaseService
 
@@ -20,7 +26,10 @@ class ModelRouterService(BaseService):
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
-            self._bus.subscribe("settings.snapshot", self._on_settings_snapshot)
+            self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(MODEL_RESOLVE_REQUEST, self._on_resolve_request)
         )
 
     def _on_unload(self) -> None:
@@ -36,6 +45,16 @@ class ModelRouterService(BaseService):
         if summarize:
             self._summarize_model = summarize
 
+    def _on_resolve_request(self, event: Event) -> None:
+        intent = str(event.payload.get("intent", "chat"))
+        query = str(event.payload.get("query", ""))
+        model = self.resolve(intent=intent, query=query)
+        self._bus.publish(
+            MODEL_RESOLVE_RESULT,
+            {"request_id": event.payload.get("request_id", ""), "model": model},
+            source=self.name,
+        )
+
     def resolve(self, *, intent: str, query: str) -> str:
         """Pick model for a chat request; settings default_model always wins as base."""
         lower = query.lower()
@@ -48,7 +67,7 @@ class ModelRouterService(BaseService):
             model = self._default_model
             reason = "default"
         self._bus.publish(
-            "model.selected",
+            MODEL_SELECTED,
             {
                 "model": model,
                 "intent": intent,

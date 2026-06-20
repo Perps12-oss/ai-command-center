@@ -4,18 +4,30 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ai_command_center.core.event_bus import Event, EventBus
+from ai_command_center.core.events.topics import (
+    APP_ERROR,
+    APP_PHASE,
+    COMMAND_ROUTED,
+    SERVICE_STATE_CHANGED,
+    SETTINGS_CHANGED,
+    SETTINGS_SNAPSHOT,
+    SYSTEM_SNAPSHOT,
+)
+from ai_command_center.domain.settings_snapshot import SettingsSnapshot
+from ai_command_center.domain.system_snapshot import SystemSnapshot
 
 APP_STATE_TOPICS: tuple[str, ...] = (
-    "service.state_changed",
-    "settings.changed",
-    "settings.snapshot",
-    "command.routed",
-    "app.error",
-    "app.phase",
+    SERVICE_STATE_CHANGED,
+    SETTINGS_CHANGED,
+    SETTINGS_SNAPSHOT,
+    COMMAND_ROUTED,
+    APP_ERROR,
+    APP_PHASE,
+    SYSTEM_SNAPSHOT,
 )
 
 
@@ -27,29 +39,13 @@ class ServiceSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
-class SettingsSnapshot:
-    """UI-consumable settings projection from settings.snapshot events."""
-
-    theme: str = "dark"
-    accent: str = "#3B82F6"
-    default_model: str = "llama3.2:3b"
-    summarize_model: str = "llama3.2:3b"
-    ollama_url: str = "http://localhost:11434"
-    hotkey: str = "alt+space"
-    low_memory_mode: str = "false"
-    window_width: str = "1100"
-    window_height: str = "700"
-    obsidian_vault_path: str = ""
-    overlay_mode: str = "palette"
-
-
-@dataclass(frozen=True, slots=True)
 class AppState:
     """Immutable snapshot of application state."""
 
     phase: str = "idle"
     services: tuple[ServiceSnapshot, ...] = ()
-    settings: SettingsSnapshot = SettingsSnapshot()
+    settings: SettingsSnapshot = field(default_factory=SettingsSnapshot)
+    system_snapshot: SystemSnapshot = field(default_factory=SystemSnapshot)
     last_event_topic: str = ""
     last_event_source: str = ""
     settings_version: int = 0
@@ -61,6 +57,35 @@ class AppState:
 Reducer = Callable[[AppState, Event], AppState]
 
 
+def _coerce_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off", ""}:
+        return False
+    return default
+
+
+def _coerce_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    text = str(value).strip()
+    if not text:
+        return default
+    try:
+        return int(text)
+    except ValueError:
+        return default
+
+
 def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
     return SettingsSnapshot(
         theme=str(payload.get("theme", "dark")),
@@ -69,16 +94,22 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         summarize_model=str(payload.get("summarize_model", "llama3.2:3b")),
         ollama_url=str(payload.get("ollama_url", "http://localhost:11434")),
         hotkey=str(payload.get("hotkey", "alt+space")),
-        low_memory_mode=str(payload.get("low_memory_mode", "false")),
-        window_width=str(payload.get("window_width", "1100")),
-        window_height=str(payload.get("window_height", "700")),
+        low_memory_mode=_coerce_bool(payload.get("low_memory_mode", False)),
+        window_width=_coerce_int(payload.get("window_width", 1100), 1100),
+        window_height=_coerce_int(payload.get("window_height", 700), 700),
         obsidian_vault_path=str(payload.get("obsidian_vault_path", "")),
         overlay_mode=str(payload.get("overlay_mode", "palette")),
+        model_name=str(payload.get("model_name", "llama3.2:3b")),
+        provider=str(payload.get("provider", "ollama")),
+        vault_path=str(payload.get("vault_path", "")),
+        overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
+        telemetry_enabled=_coerce_bool(payload.get("telemetry_enabled", True)),
+        schema_version=_coerce_int(payload.get("schema_version", 1), 1),
     )
 
 
 def _reduce_service_state(state: AppState, event: Event) -> AppState:
-    if event.topic != "service.state_changed":
+    if event.topic != SERVICE_STATE_CHANGED:
         return state
     name = str(event.payload.get("name", ""))
     new_state = str(event.payload.get("state", "off"))
@@ -95,7 +126,7 @@ def _reduce_service_state(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_settings_changed(state: AppState, event: Event) -> AppState:
-    if event.topic != "settings.changed":
+    if event.topic != SETTINGS_CHANGED:
         return state
     return replace(
         state,
@@ -106,7 +137,7 @@ def _reduce_settings_changed(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_settings_snapshot(state: AppState, event: Event) -> AppState:
-    if event.topic != "settings.snapshot":
+    if event.topic != SETTINGS_SNAPSHOT:
         return state
     return replace(
         state,
@@ -117,7 +148,7 @@ def _reduce_settings_snapshot(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_command_routed(state: AppState, event: Event) -> AppState:
-    if event.topic != "command.routed":
+    if event.topic != COMMAND_ROUTED:
         return state
     return replace(
         state,
@@ -129,7 +160,7 @@ def _reduce_command_routed(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_error(state: AppState, event: Event) -> AppState:
-    if event.topic != "app.error":
+    if event.topic != APP_ERROR:
         return state
     message = str(event.payload.get("message", "unknown error"))
     errors = state.errors + (message,)
@@ -144,12 +175,36 @@ def _reduce_error(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_phase(state: AppState, event: Event) -> AppState:
-    if event.topic != "app.phase":
+    if event.topic != APP_PHASE:
         return state
     phase = str(event.payload.get("phase", state.phase))
     return replace(
         state,
         phase=phase,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_system_snapshot(state: AppState, event: Event) -> AppState:
+    if event.topic != SYSTEM_SNAPSHOT:
+        return state
+    payload = dict(event.payload)
+    snapshot = SystemSnapshot(
+        phase=str(payload.get("phase", state.system_snapshot.phase)),
+        cpu_percent=float(payload.get("cpu_percent", state.system_snapshot.cpu_percent)),
+        ram_percent=float(payload.get("ram_percent", state.system_snapshot.ram_percent)),
+        ollama_online=bool(payload.get("ollama_online", state.system_snapshot.ollama_online)),
+        service_states=tuple(payload.get("service_states", state.system_snapshot.service_states)),
+        tool_count=int(payload.get("tool_count", state.system_snapshot.tool_count)),
+        recent_commands=tuple(payload.get("recent_commands", state.system_snapshot.recent_commands)),
+        event_rate=float(payload.get("event_rate", state.system_snapshot.event_rate)),
+        uptime=float(payload.get("uptime", state.system_snapshot.uptime)),
+        extra=dict(payload.get("extra", state.system_snapshot.extra)),
+    )
+    return replace(
+        state,
+        system_snapshot=snapshot,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -162,6 +217,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_command_routed,
     _reduce_error,
     _reduce_phase,
+    _reduce_system_snapshot,
 )
 
 

@@ -1,0 +1,44 @@
+{
+  "phase": "5C",
+  "date": "",
+  "tester": "",
+  "git_sha": "",
+  "freeze_confirmed": true,
+  "preflight_pass": false,
+  "natural_reuse": false,
+  "scores": {
+    "core_loop": 0,
+    "context_handling": 0,
+    "ui_experience": 0,
+    "failure_recovery": 0,
+    "overall_trust": 0
+  },
+  "layer_notes": {
+    "layer1_core_loop": "",
+    "layer2_context_stress": "",
+    "layer3_ui_usability": "",
+    "layer4_failure_modes": ""
+  },
+  "metrics": {
+    "layer1": {
+      "time_to_first_response_s": [],
+      "keystrokes_per_task": [],
+      "hesitation_count": 0,
+      "retry_count": 0
+    },
+    "layer2": {
+      "hallucinated_context_incidents": 0,
+      "missing_context_incidents": 0,
+      "reexplain_count": 0
+    },
+    "layer3": {
+      "visual_fatigue": "",
+      "readability_issues": ""
+    },
+    "layer4": {
+      "silent_failures": 0,
+      "crash_count": 0
+    }
+  },
+  "blockers": []
+}

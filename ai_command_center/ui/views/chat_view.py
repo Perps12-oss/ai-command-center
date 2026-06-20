@@ -5,30 +5,29 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.ui.components.floating_ui import FLOAT_PAD, pack_floating
+from ai_command_center.ui.components.shadow_label import ShadowLabel
+from ai_command_center.ui.layer.layer_stack import PageLayerStack
 from ai_command_center.ui.markdown_plain import format_assistant_markdown
 from ai_command_center.ui.theme import tokens as T
 
 
-class ChatView(ctk.CTkFrame):
+class ChatView(PageLayerStack):
     def __init__(self, master, on_cancel, **kwargs) -> None:
-        super().__init__(master, fg_color="transparent", **kwargs)
+        super().__init__(master, "chat", **kwargs)
         self._on_cancel = on_cancel
         self._request_id: str | None = None
         self._streaming = False
         self._assistant_start: str | None = None
 
-        card = GlassCard(self)
-        card.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
+        card = GlassCard(self.ui_layer)
+        pack_floating(card, fill="x", expand=False, first=True)
 
         header = ctk.CTkFrame(card, fg_color="transparent")
         header.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
 
-        ctk.CTkLabel(
-            header,
-            text="Chat",
-            font=T.FONT_TITLE,
-            text_color=T.TEXT_PRIMARY,
-        ).pack(side="left")
+        title = ShadowLabel(header, text="Chat", anchor="w", height=26)
+        title.pack(side="left", fill="x", expand=True)
 
         self._status = ctk.CTkLabel(
             header,
@@ -54,13 +53,23 @@ class ChatView(ctk.CTkFrame):
         self._text = ctk.CTkTextbox(
             card,
             font=T.FONT_BODY,
-            fg_color=T.BG_DEEP,
+            fg_color=T.LIGHT_GLASS,
             text_color=T.TEXT_PRIMARY,
             wrap="word",
             activate_scrollbars=True,
+            height=380,
         )
-        self._text.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
+        self._text.pack(fill="x", expand=False, padx=T.PAD, pady=(0, 8))
         self._text.configure(state="disabled")
+
+        self._status_bar = ctk.CTkLabel(
+            card,
+            text="Sources: — · Tokens: —",
+            font=T.FONT_MONO,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        )
+        self._status_bar.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
     def load_history(self, messages: list[dict]) -> None:
         self._text.configure(state="normal")
@@ -123,6 +132,10 @@ class ChatView(ctk.CTkFrame):
     def show_system_message(self, message: str) -> None:
         self._append_block(f"System\n{message}\n\n")
         self._status.configure(text="Ready", text_color=T.TEXT_MUTED)
+
+    def update_context_bar(self, sources: list[str], tokens: int) -> None:
+        names = ", ".join(sources) if sources else "—"
+        self._status_bar.configure(text=f"Sources: {names} · Tokens: ~{tokens}")
 
     def _end_stream(self, label: str, *, error: bool = False) -> None:
         self._streaming = False

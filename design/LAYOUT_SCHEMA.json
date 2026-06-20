@@ -1,0 +1,422 @@
+{
+
+  "version": "1.4",
+
+  "approved_layouts": [
+
+    "SPATIAL_MAP",
+
+    "HYBRID_SPATIAL_GRID",
+
+    "HERO_STACK",
+
+    "GRID_2x2",
+
+    "SPLIT_2PANE",
+
+    "SPLIT_3PANE",
+
+    "STACKED_LIST"
+
+  ],
+
+  "shell": {
+
+    "header_h": 56,
+
+    "sidebar_w": 220,
+
+    "pad": 24,
+
+    "gap": 16,
+
+    "footer_h": 32
+
+  },
+
+  "pages": {
+
+    "home": {
+
+      "layout": "HYBRID_SPATIAL_GRID",
+
+      "spatial_map": "home",
+
+      "background": {
+
+        "component": "ShellBackdrop",
+
+        "mode": "ABSTRACT_SYSTEM_FLOW",
+
+        "image": "backgrounds/command_center_bg.jpg",
+
+        "image_mode": "exact",
+
+        "z_index": 0,
+
+        "inherit": "global_wallpaper"
+
+      },
+
+      "children": [
+
+        {
+
+          "component": "ActionRibbon",
+
+          "props": { "mode": "LIVE_CORE", "zone_id": "action_ribbon", "static": false }
+
+        },
+
+        {
+
+          "component": "MetricCard",
+
+          "id": "SystemStatus",
+
+          "props": { "zone_id": "metric_system", "live": true, "grid_column": 0 }
+
+        },
+
+        {
+
+          "component": "MetricCard",
+
+          "id": "Knowledge",
+
+          "props": { "zone_id": "metric_knowledge", "live": true, "grid_column": 1 }
+
+        },
+
+        {
+
+          "component": "MetricCard",
+
+          "id": "UsageOverview",
+
+          "props": { "zone_id": "metric_usage", "live": true, "grid_column": 2 }
+
+        },
+
+        {
+
+          "component": "MetricCard",
+
+          "id": "Plugins",
+
+          "props": { "zone_id": "metric_plugins", "live": true, "grid_column": 3 }
+
+        },
+
+        {
+
+          "component": "ActivityFeedPanel",
+
+          "props": { "source": "telemetry_events", "zone_id": "activity_feed", "static": false }
+
+        }
+
+      ]
+
+    },
+
+    "system": {
+
+      "layout": "STACKED_LIST",
+
+      "background": {
+
+        "component": "ShellBackdrop",
+
+        "mode": "ABSTRACT_SYSTEM_FLOW",
+
+        "image": "backgrounds/command_center_bg.jpg",
+
+        "z_index": 0,
+
+        "inherit": "global_wallpaper"
+
+      },
+
+      "children": [
+
+        {
+
+          "component": "PageHeader",
+
+          "props": {
+
+            "title": "System",
+
+            "subtitle": "Reality feed — live operational state",
+
+            "static": true
+
+          }
+
+        },
+
+        {
+
+          "component": "SystemHeartbeat",
+
+          "props": { "static": false }
+
+        },
+
+        {
+
+          "component": "StatusFluxBarGrid",
+
+          "props": {
+
+            "metrics": ["CPU", "RAM", "MODEL_LOAD", "NETWORK"],
+
+            "static": false
+
+          }
+
+        },
+
+        {
+
+          "component": "EventStreamRibbon",
+
+          "props": { "source": "system.events", "static": false }
+
+        },
+
+        {
+
+          "component": "ActivityPulseField",
+
+          "props": { "density": "medium", "static": false }
+
+        },
+
+        {
+
+          "component": "FooterBar",
+
+          "props": { "static": true }
+
+        }
+
+      ]
+
+    },
+
+    "chat": {
+
+      "layout": "SPLIT_2PANE",
+
+      "background": {
+
+        "component": "ShellBackdrop",
+
+        "mode": "ABSTRACT_SYSTEM_FLOW",
+
+        "image": "backgrounds/command_center_bg.jpg",
+
+        "z_index": 0,
+
+        "inherit": "global_wallpaper"
+
+      },
+
+      "children": [
+
+        {
+
+          "component": "PageHeader",
+
+          "props": { "title": "Chat", "subtitle": "Local LLM conversation", "static": true }
+
+        },
+
+        { "component": "ConversationStream", "props": { "static": false } },
+
+        { "component": "ChatStatusBar", "props": { "static": false } }
+
+      ]
+
+    },
+
+    "notes": {
+
+      "layout": "SPLIT_3PANE",
+
+      "background": {
+
+        "component": "ShellBackdrop",
+
+        "mode": "ABSTRACT_SYSTEM_FLOW",
+
+        "image": "backgrounds/command_center_bg.jpg",
+
+        "z_index": 0,
+
+        "inherit": "global_wallpaper"
+
+      },
+
+      "children": [
+
+        {
+
+          "component": "PageHeader",
+
+          "props": { "title": "Notes", "subtitle": "Vault search and preview", "static": true }
+
+        },
+
+        { "component": "NotesSearchPane", "props": { "width": 240, "static": true } },
+
+        { "component": "NotesResultsPane", "props": { "width": 320, "static": false } },
+
+        { "component": "NotesPreviewPane", "props": { "static": false } }
+
+      ]
+
+    },
+
+    "plugins": {
+
+      "layout": "GRID_2x2",
+
+      "background": {
+
+        "component": "ShellBackdrop",
+
+        "mode": "ABSTRACT_SYSTEM_FLOW",
+
+        "image": "backgrounds/command_center_bg.jpg",
+
+        "z_index": 0,
+
+        "inherit": "global_wallpaper"
+
+      },
+
+      "children": [
+
+        {
+
+          "component": "PageHeader",
+
+          "props": { "title": "Plugins", "subtitle": "Extension catalog", "static": true }
+
+        },
+
+        { "component": "PluginGrid", "props": { "static": true } }
+
+      ]
+
+    },
+
+    "settings": {
+
+      "layout": "SPLIT_2PANE",
+
+      "background": {
+
+        "component": "ShellBackdrop",
+
+        "mode": "ABSTRACT_SYSTEM_FLOW",
+
+        "image": "backgrounds/command_center_bg.jpg",
+
+        "z_index": 0,
+
+        "inherit": "global_wallpaper"
+
+      },
+
+      "children": [
+
+        {
+
+          "component": "PageHeader",
+
+          "props": { "title": "Settings", "subtitle": "Configuration", "static": true }
+
+        },
+
+        { "component": "SettingsForm", "props": { "static": true } }
+
+      ]
+
+    }
+
+  },
+
+  "registry": [
+
+    "ShellBackdrop",
+
+    "BackgroundCanvas",
+
+    "DepthLayer",
+
+    "LayerStack",
+
+    "HeroPanel",
+
+    "ActionRibbon",
+
+    "ActivityFeedPanel",
+
+    "LiveSurfaceLayer",
+
+    "PageHeader",
+
+    "MetricCard",
+
+    "MetricCardV2",
+
+    "RingGauge",
+
+    "Sparkline",
+
+    "ShadowLabel",
+
+    "FooterBar",
+
+    "EventStreamRibbon",
+
+    "CommandFlowTrail",
+
+    "SystemHeartbeat",
+
+    "StatusFluxBarGrid",
+
+    "ActivityPulseField",
+
+    "ActivityPulse",
+
+    "StatusFluxBar",
+
+    "StatusPill",
+
+    "GlassCard",
+
+    "LayoutNode",
+
+    "ConversationStream",
+
+    "ChatStatusBar",
+
+    "NotesSearchPane",
+
+    "NotesResultsPane",
+
+    "NotesPreviewPane",
+
+    "PluginGrid",
+
+    "SettingsForm"
+
+  ]
+
+}
+

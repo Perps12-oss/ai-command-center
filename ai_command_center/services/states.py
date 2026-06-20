@@ -6,7 +6,14 @@ from enum import Enum
 
 
 class ServiceState(str, Enum):
-    OFF = "off"
+    STOPPED = "stopped"
+    STARTING = "starting"
+    READY = "ready"
+    DEGRADED = "degraded"
+    ERROR = "error"
+    STOPPING = "stopping"
+
+    OFF = "stopped"
     IDLE = "idle"
     ACTIVE = "active"
-    HIBERNATED = "hibernated"
+    HIBERNATED = "stopped"

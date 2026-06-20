@@ -1,4 +1,4 @@
-"""Navigation sidebar."""
+"""Navigation sidebar — translucent glass + cyan pill active state."""
 
 from __future__ import annotations
 
@@ -21,35 +21,58 @@ class Sidebar(ctk.CTkFrame):
         super().__init__(
             master,
             width=T.SIDEBAR_WIDTH,
-            fg_color=T.BG_PANEL,
+            fg_color="transparent",
+            border_width=0,
             corner_radius=0,
             **kwargs,
         )
         self.pack_propagate(False)
+        self._rows: dict[str, ctk.CTkFrame] = {}
         self._buttons: dict[str, ctk.CTkButton] = {}
         self._active = "home"
 
         ctk.CTkLabel(
             self,
-            text="Command Center",
+            text="AI Assistant",
             font=T.FONT_HEADER,
             text_color=T.TEXT_SECONDARY,
         ).pack(anchor="w", padx=T.PAD, pady=(T.PAD, 8))
 
         for view_id, label in NAV_ITEMS:
+            row = ctk.CTkFrame(self, fg_color="transparent", height=40)
+            row.pack(fill="x", padx=8, pady=2)
+            row.pack_propagate(False)
+
             btn = ctk.CTkButton(
-                self,
+                row,
                 text=label,
                 anchor="w",
                 font=T.FONT_BODY,
                 fg_color="transparent",
                 text_color=T.TEXT_SECONDARY,
-                hover_color=T.BG_GLASS,
+                hover_color=T.LIGHT_GLASS,
                 height=36,
+                corner_radius=18,
                 command=lambda v=view_id: self._select(v, on_navigate),
             )
-            btn.pack(fill="x", padx=8, pady=2)
+            btn.pack(fill="both", expand=True, padx=4)
+            self._rows[view_id] = row
             self._buttons[view_id] = btn
+
+        user = ctk.CTkFrame(
+            self,
+            fg_color=T.GLASS_BG,
+            corner_radius=12,
+            border_width=1,
+            border_color=T.GLASS_BORDER,
+        )
+        user.pack(side="bottom", fill="x", padx=T.PAD, pady=T.PAD)
+        ctk.CTkLabel(
+            user,
+            text="Local User",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+        ).pack(anchor="w", padx=12, pady=10)
 
         self._highlight()
 
@@ -61,9 +84,17 @@ class Sidebar(ctk.CTkFrame):
     def _highlight(self) -> None:
         for vid, btn in self._buttons.items():
             if vid == self._active:
-                btn.configure(fg_color=T.BG_GLASS, text_color=T.TEXT_PRIMARY)
+                btn.configure(
+                    fg_color=T.HERO_CYAN_DIM,
+                    text_color=T.HERO_CYAN,
+                    border_width=0,
+                )
             else:
-                btn.configure(fg_color="transparent", text_color=T.TEXT_SECONDARY)
+                btn.configure(
+                    fg_color="transparent",
+                    text_color=T.TEXT_SECONDARY,
+                    border_width=0,
+                )
 
     def set_active(self, view_id: str) -> None:
         self._active = view_id

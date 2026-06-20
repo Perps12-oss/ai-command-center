@@ -8,6 +8,7 @@ from typing import Callable
 import yaml
 
 from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import PLUGIN_CATALOG, PLUGIN_DISABLE_REQUEST, PLUGIN_ENABLE_REQUEST, PLUGIN_ERROR
 from ai_command_center.core.plugin_manifest import PluginManifest
 from ai_command_center.services.base import BaseService
 
@@ -45,10 +46,10 @@ class PluginRegistryService(BaseService):
         self._load_manifests()
         self._publish_catalog()
         self._unsubscribers.append(
-            self._bus.subscribe("plugin.enable_request", self._on_enable_request)
+            self._bus.subscribe(PLUGIN_ENABLE_REQUEST, self._on_enable_request)
         )
         self._unsubscribers.append(
-            self._bus.subscribe("plugin.disable_request", self._on_disable_request)
+            self._bus.subscribe(PLUGIN_DISABLE_REQUEST, self._on_disable_request)
         )
 
     def _on_unload(self) -> None:
@@ -74,7 +75,7 @@ class PluginRegistryService(BaseService):
 
     def _publish_catalog(self) -> None:
         self._bus.publish(
-            "plugin.catalog",
+            PLUGIN_CATALOG,
             {"plugins": [p.to_dict() for p in self.list_plugins()]},
             source=self.name,
         )
@@ -83,14 +84,14 @@ class PluginRegistryService(BaseService):
         current = self._plugins.get(plugin_id)
         if current is None:
             self._bus.publish(
-                "plugin.error",
+                PLUGIN_ERROR,
                 {"message": f"unknown plugin: {plugin_id}"},
                 source=self.name,
             )
             return
         if current.kind == "core" and not enabled:
             self._bus.publish(
-                "plugin.error",
+                PLUGIN_ERROR,
                 {"message": f"core plugin cannot be disabled: {plugin_id}"},
                 source=self.name,
             )

@@ -12,6 +12,18 @@ import aiohttp
 
 from ai_command_center.core.context_manager import ContextBundle
 from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import (
+    APP_ERROR,
+    CHAT_CANCELLED,
+    CHAT_COMPLETE,
+    CHAT_CHUNK,
+    CHAT_ERROR,
+    CHAT_STARTED,
+    LLM_REQUEST,
+    OLLAMA_STATUS,
+    SETTINGS_SNAPSHOT,
+    UI_CHAT_CANCEL,
+)
 from ai_command_center.services.ollama_service import OllamaServiceBase
 
 _DEFAULT_URL = "http://localhost:11434"
@@ -19,6 +31,11 @@ _DEFAULT_KEEP_ALIVE = "10m"
 _LOW_MEMORY_KEEP_ALIVE = "2m"
 _CONNECT_TIMEOUT_S = 5.0
 _REQUEST_TIMEOUT_S = 300.0
+_LOCAL_ASSISTANT_SYSTEM = (
+    "You are a local desktop command assistant. Answer directly using only the "
+    "context provided. Do not tell the user to open a web browser, search Google, "
+    "or visit external websites."
+)
 
 
 class OllamaHttpService(OllamaServiceBase):
@@ -39,10 +56,13 @@ class OllamaHttpService(OllamaServiceBase):
     def _on_load(self) -> None:
         self._start_loop()
         self._unsubscribers.append(
-            self._bus.subscribe("settings.snapshot", self._on_settings_snapshot)
+            self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
         )
         self._unsubscribers.append(
-            self._bus.subscribe("ui.chat_cancel", self._on_cancel_request)
+            self._bus.subscribe(UI_CHAT_CANCEL, self._on_cancel_request)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(LLM_REQUEST, self._on_llm_request)
         )
         asyncio.run_coroutine_threadsafe(self._health_check(), self._loop)
 
@@ -70,6 +90,16 @@ class OllamaHttpService(OllamaServiceBase):
     def _on_cancel_request(self, event: Event) -> None:
         rid = event.payload.get("request_id")
         self.cancel(str(rid) if rid else None)
+
+    def _on_llm_request(self, event: Event) -> None:
+        bundle = event.payload.get("bundle")
+        if not isinstance(bundle, ContextBundle):
+            return
+        self.stream_chat(
+            bundle,
+            model=str(event.payload.get("model", "llama3.2:3b")),
+            request_id=str(event.payload.get("request_id", uuid.uuid4().hex)),
+        )
 
     def _effective_keep_alive(self) -> str:
         if self._low_memory:
@@ -159,7 +189,7 @@ class OllamaHttpService(OllamaServiceBase):
             detail = str(exc)
 
         self._bus.publish(
-            "ollama.status",
+            OLLAMA_STATUS,
             {"online": online, "detail": detail, "url": self._base_url},
             source=self.name,
         )
@@ -219,7 +249,7 @@ class OllamaHttpService(OllamaServiceBase):
         request_id: str,
     ) -> None:
         self._bus.publish(
-            "chat.started",
+            CHAT_STARTED,
             {
                 "request_id": request_id,
                 "model": model,
@@ -233,7 +263,10 @@ class OllamaHttpService(OllamaServiceBase):
         try:
             payload = {
                 "model": model,
-                "messages": [{"role": "user", "content": bundle.prompt}],
+                "messages": [
+                    {"role": "system", "content": _LOCAL_ASSISTANT_SYSTEM},
+                    {"role": "user", "content": bundle.prompt},
+                ],
                 "stream": True,
                 "options": {"keep_alive": self._effective_keep_alive()},
             }
@@ -258,7 +291,7 @@ class OllamaHttpService(OllamaServiceBase):
                         if chunk:
                             full_text.append(chunk)
                             self._bus.publish(
-                                "chat.chunk",
+                                CHAT_CHUNK,
                                 {
                                     "request_id": request_id,
                                     "text": chunk,
@@ -270,7 +303,7 @@ class OllamaHttpService(OllamaServiceBase):
 
             text = "".join(full_text)
             self._bus.publish(
-                "chat.complete",
+                CHAT_COMPLETE,
                 {
                     "request_id": request_id,
                     "text": text,
@@ -280,7 +313,7 @@ class OllamaHttpService(OllamaServiceBase):
             )
         except asyncio.CancelledError:
             self._bus.publish(
-                "chat.cancelled",
+                CHAT_CANCELLED,
                 {"request_id": request_id},
                 source=self.name,
             )
@@ -302,7 +335,7 @@ class OllamaHttpService(OllamaServiceBase):
         )
         self._publish_error(request_id, message)
         self._bus.publish(
-            "ollama.status",
+            OLLAMA_STATUS,
             {"online": False, "detail": "connection refused", "url": self._base_url},
             source=self.name,
         )
@@ -311,5 +344,5 @@ class OllamaHttpService(OllamaServiceBase):
         payload: dict[str, Any] = {"message": message}
         if request_id:
             payload["request_id"] = request_id
-        self._bus.publish("chat.error", payload, source=self.name)
-        self._bus.publish("app.error", {"message": message}, source=self.name)
+        self._bus.publish(CHAT_ERROR, payload, source=self.name)
+        self._bus.publish(APP_ERROR, {"message": message}, source=self.name)

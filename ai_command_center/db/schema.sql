@@ -81,3 +81,14 @@ CREATE TABLE IF NOT EXISTS memory_edges (
 
 CREATE INDEX IF NOT EXISTS idx_memory_edges_source ON memory_edges(source_id);
 CREATE INDEX IF NOT EXISTS idx_memory_edges_target ON memory_edges(target_id);
+
+-- Phase 5C+ passive telemetry (observation only)
+CREATE TABLE IF NOT EXISTS telemetry_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_event ON telemetry_events(event);
+CREATE INDEX IF NOT EXISTS idx_telemetry_events_timestamp ON telemetry_events(timestamp);

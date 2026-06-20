@@ -5,6 +5,14 @@ from __future__ import annotations
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import (
+    CHAT_COMPLETE,
+    CHAT_HISTORY_LOADED,
+    SETTINGS_SNAPSHOT,
+    SESSION_HISTORY_REQUEST,
+    SESSION_HISTORY_RESULT,
+    SESSION_UPDATE_REQUEST,
+)
 from ai_command_center.db.conversation_repository import (
     CONTEXT_HISTORY_LIMIT,
     ConversationRepository,
@@ -27,10 +35,16 @@ class SessionService(BaseService):
         self._repo.ensure_default(model=self._default_model)
         self._publish_history()
         self._unsubscribers.append(
-            self._bus.subscribe("settings.snapshot", self._on_settings_snapshot)
+            self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
         )
         self._unsubscribers.append(
-            self._bus.subscribe("chat.complete", self._on_chat_complete)
+            self._bus.subscribe(CHAT_COMPLETE, self._on_chat_complete)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(SESSION_HISTORY_REQUEST, self._on_history_request)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(SESSION_UPDATE_REQUEST, self._on_update_request)
         )
 
     def _on_unload(self) -> None:
@@ -51,15 +65,38 @@ class SessionService(BaseService):
         if content.strip():
             self._repo.append_message("user", content)
 
+    def _on_history_request(self, event: Event) -> None:
+        self._bus.publish(
+            SESSION_HISTORY_RESULT,
+            {
+                "request_id": event.payload.get("request_id", ""),
+                "history": self.get_context_history(),
+            },
+            source=self.name,
+        )
+
+    def _on_update_request(self, event: Event) -> None:
+        role = str(event.payload.get("role", "user")).strip() or "user"
+        content = str(event.payload.get("content", "")).strip()
+        if content:
+            self._repo.append_message(role, content)
+            self._bus.publish(
+                SESSION_UPDATE_RESULT,
+                {"request_id": event.payload.get("request_id", ""), "role": role, "content": content},
+                source=self.name,
+            )
+
     def _on_chat_complete(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
             return
         self._repo.append_message("assistant", text)
+        self._publish_history()
 
     def _publish_history(self) -> None:
+        messages = self._repo.list_messages()
         self._bus.publish(
-            "chat.history_loaded",
-            {"messages": self._repo.list_messages()},
+            CHAT_HISTORY_LOADED,
+            {"messages": messages},
             source=self.name,
         )

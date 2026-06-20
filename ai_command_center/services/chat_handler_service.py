@@ -1,162 +1,247 @@
-"""Routes chat intents through ContextManager before Ollama (Phase 3A skeleton)."""
-
-from __future__ import annotations
-
-import uuid
-from typing import TYPE_CHECKING, Callable
-
-from ai_command_center.core.context_manager import ContextManager
-from ai_command_center.core.event_bus import Event
-from ai_command_center.platform.model_registry import model_warning
-from ai_command_center.services.base import BaseService
-from ai_command_center.services.command_router_service import INTENT_CHAT
-from ai_command_center.services.ollama_service import OllamaServiceBase
-
-if TYPE_CHECKING:
-    from ai_command_center.services.memory_graph_service import MemoryGraphService
-    from ai_command_center.services.model_router_service import ModelRouterService
-    from ai_command_center.services.obsidian_service import ObsidianService
-    from ai_command_center.services.session_service import SessionService
-
-
-class ChatHandlerService(BaseService):
-    """
-    Handles command.routed intents for chat.
-
-    Every AI request MUST pass through ContextManager.build_context() first.
-    """
-
-    name = "chat_handler"
-
-    def __init__(
-        self,
-        bus,
-        context_manager: ContextManager,
-        ollama: OllamaServiceBase,
-        obsidian: ObsidianService | None = None,
-        session: SessionService | None = None,
-        *,
-        model_router: ModelRouterService | None = None,
-        memory_graph: MemoryGraphService | None = None,
-    ) -> None:
-        super().__init__(bus)
-        self._context_manager = context_manager
-        self._ollama = ollama
-        self._obsidian = obsidian
-        self._session = session
-        self._model_router = model_router
-        self._memory_graph = memory_graph
-        self._default_model = "llama3.2:3b"
-        self._unsubscribers: list[Callable[[], None]] = []
-
-    def _on_load(self) -> None:
-        self._unsubscribers.append(
-            self._bus.subscribe("command.routed", self._on_command_routed)
-        )
-        self._unsubscribers.append(
-            self._bus.subscribe("settings.snapshot", self._on_settings_snapshot)
-        )
-
-    def _on_unload(self) -> None:
-        for unsub in self._unsubscribers:
-            unsub()
-        self._unsubscribers.clear()
-
-    def _on_settings_snapshot(self, event: Event) -> None:
-        self._default_model = str(
-            event.payload.get("default_model", self._default_model)
-        )
-
-    def _on_command_routed(self, event: Event) -> None:
-        if event.payload.get("intent") != INTENT_CHAT:
-            return
-        if event.source != "command_router":
-            return
-
-        args = event.payload.get("args") or {}
-        query = str(args.get("prompt", "")).strip()
-        if not query:
-            return
-
-        clipboard = args.get("clipboard")
-        clipboard_text = str(clipboard).strip() if clipboard else None
-        if clipboard_text == "":
-            clipboard_text = None
-
-        notes_raw = args.get("notes")
-        notes: list[str] = []
-        if isinstance(notes_raw, list):
-            notes = [str(n) for n in notes_raw if str(n).strip()]
-        if self._obsidian is not None:
-            notes.extend(self._obsidian.get_context_notes())
-
-        graph_snippets: list[str] | None = None
-        if self._memory_graph is not None:
-            selected = self._memory_graph.get_context_snippets()
-            if selected:
-                graph_snippets = selected
-
-        history: list[tuple[str, str]] | None = None
-        if self._session is not None:
-            history = self._session.get_context_history()
-
-        bundle = self._context_manager.build_context(
-            query,
-            clipboard=clipboard_text,
-            notes=notes or None,
-            graph_snippets=graph_snippets,
-            conversation_history=history,
-        )
-        if not bundle.prompt:
-            self._bus.publish(
-                "chat.error",
-                {"message": "Empty prompt after context assembly"},
-                source=self.name,
-            )
-            return
-
-        if self._model_router is not None:
-            model = self._model_router.resolve(intent=INTENT_CHAT, query=query)
-        else:
-            model = self._default_model
-        warning = model_warning(model)
-        if warning:
-            self._bus.publish(
-                "app.warning",
-                {"message": warning, "model": model},
-                source=self.name,
-            )
-
-        request_id = uuid.uuid4().hex
-        self._bus.publish(
-            "command.routed",
-            {
-                **event.payload,
-                "status": "processing",
-                "request_id": request_id,
-                "context_sources": list(bundle.sources),
-                "token_estimate": bundle.token_estimate,
-            },
-            source=self.name,
-        )
-
-        if self._session is not None:
-            self._session.append_user_message(query)
-
-        try:
-            self._ollama.stream_chat(bundle, model=model, request_id=request_id)
-        except Exception as exc:
-            self._bus.publish(
-                "chat.error",
-                {
-                    "request_id": request_id,
-                    "message": str(exc),
-                },
-                source=self.name,
-            )
-            self._bus.publish(
-                "app.error",
-                {"message": f"Chat failed: {exc}"},
-                source=self.name,
-            )
-
+"""Routes chat intents through ContextManager before Ollama (Phase 3A skeleton)."""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+from ai_command_center.core.clipboard_intent import (
+    empty_clipboard_message,
+    wants_clipboard,
+)
+from ai_command_center.core.context_manager import ContextManager
+from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import (
+    APP_ERROR,
+    APP_WARNING,
+    CHAT_ERROR,
+    COMMAND_ROUTED,
+    CONTEXT_OVER_BUDGET,
+    CONTEXT_SNAPSHOT_CREATED,
+    CONTEXT_TRIMMED,
+    LLM_REQUEST,
+    MEMORY_LOOKUP_REQUEST,
+    MEMORY_LOOKUP_RESULT,
+    MODEL_RESOLVE_REQUEST,
+    MODEL_RESOLVE_RESULT,
+    NOTE_CONTEXT_REQUEST,
+    NOTE_CONTEXT_RESULT,
+    SESSION_HISTORY_REQUEST,
+    SESSION_HISTORY_RESULT,
+    SETTINGS_SNAPSHOT,
+)
+from ai_command_center.platform.model_registry import model_warning
+from ai_command_center.services.base import BaseService
+from ai_command_center.services.command_router_service import INTENT_CHAT
+
+if TYPE_CHECKING:
+    from ai_command_center.services.ollama_service import OllamaServiceBase
+
+
+class ChatHandlerService(BaseService):
+    """
+    Handles command.routed intents for chat.
+
+    Every AI request MUST pass through ContextManager.build_context() first.
+    """
+
+    name = "chat_handler"
+
+    def __init__(
+        self,
+        bus,
+        context_manager: ContextManager,
+        ollama: OllamaServiceBase,
+    ) -> None:
+        super().__init__(bus)
+        self._context_manager = context_manager
+        self._ollama = ollama
+        self._default_model = "llama3.2:3b"
+        self._unsubscribers: list[Callable[[], None]] = []
+        self._pending: dict[str, dict[str, object]] = {}
+
+    def _on_load(self) -> None:
+        self._unsubscribers.append(self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed))
+        self._unsubscribers.append(self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot))
+        self._unsubscribers.append(self._bus.subscribe(NOTE_CONTEXT_RESULT, self._on_note_context_result))
+        self._unsubscribers.append(self._bus.subscribe(MEMORY_LOOKUP_RESULT, self._on_memory_lookup_result))
+        self._unsubscribers.append(self._bus.subscribe(SESSION_HISTORY_RESULT, self._on_session_history_result))
+        self._unsubscribers.append(self._bus.subscribe(MODEL_RESOLVE_RESULT, self._on_model_resolve_result))
+
+    def _on_unload(self) -> None:
+        for unsub in self._unsubscribers:
+            unsub()
+        self._unsubscribers.clear()
+
+    def _on_settings_snapshot(self, event: Event) -> None:
+        self._default_model = str(
+            event.payload.get("default_model", self._default_model)
+        )
+
+    def _request_result(self, request_id: str) -> dict[str, object]:
+        entry = self._pending.setdefault(request_id, {})
+        return entry
+
+    def _publish_request(self, topic: str, request_id: str, payload: dict[str, object]) -> None:
+        self._bus.publish(topic, {"request_id": request_id, **payload}, source=self.name)
+
+    def _on_note_context_result(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id", ""))
+        if request_id:
+            self._request_result(request_id)["notes"] = list(event.payload.get("notes", []))
+
+    def _on_memory_lookup_result(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id", ""))
+        if request_id:
+            self._request_result(request_id)["graph_snippets"] = list(event.payload.get("snippets", []))
+
+    def _on_session_history_result(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id", ""))
+        if request_id:
+            self._request_result(request_id)["history"] = list(event.payload.get("history", []))
+
+    def _on_model_resolve_result(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id", ""))
+        if request_id:
+            self._request_result(request_id)["model"] = str(event.payload.get("model", self._default_model))
+
+    def _on_command_routed(self, event: Event) -> None:
+        if event.payload.get("intent") != INTENT_CHAT:
+            return
+        if event.source != "command_router":
+            return
+
+        args = event.payload.get("args") or {}
+        query = str(args.get("prompt", "")).strip()
+        if not query:
+            return
+
+        clipboard = args.get("clipboard")
+        clipboard_text = str(clipboard).strip() if clipboard else None
+        if clipboard_text == "":
+            clipboard_text = None
+
+        clip_intent = wants_clipboard(query)
+        if clip_intent and not clipboard_text:
+            self._bus.publish(
+                CHAT_ERROR,
+                {"message": empty_clipboard_message()},
+                source=self.name,
+            )
+            return
+
+        request_id = uuid.uuid4().hex
+        self._pending[request_id] = {}
+
+        notes_raw = args.get("notes")
+        notes: list[str] = []
+        if isinstance(notes_raw, list):
+            notes = [str(n) for n in notes_raw if str(n).strip()]
+        self._publish_request(NOTE_CONTEXT_REQUEST, request_id, {})
+        self._publish_request(MEMORY_LOOKUP_REQUEST, request_id, {"query": query})
+        self._publish_request(SESSION_HISTORY_REQUEST, request_id, {})
+        self._publish_request(MODEL_RESOLVE_REQUEST, request_id, {"intent": INTENT_CHAT, "query": query})
+
+        pending = self._pending.get(request_id, {})
+        notes.extend(str(n) for n in pending.get("notes", []) if str(n).strip())
+        graph_snippets = [str(n) for n in pending.get("graph_snippets", []) if str(n).strip()]
+        history = pending.get("history")
+        model = str(pending.get("model", self._default_model))
+
+        bundle = self._context_manager.build_context(
+            query,
+            clipboard=clipboard_text,
+            notes=notes or None,
+            graph_snippets=graph_snippets or None,
+            conversation_history=history if isinstance(history, list) else None,
+            clipboard_intent=clip_intent,
+        )
+        budget = self._context_manager.context_budget_tokens
+        self._bus.publish(
+            CONTEXT_SNAPSHOT_CREATED,
+            {
+                "context_size_tokens": bundle.token_estimate,
+                "sources": list(bundle.sources),
+                "budget_tokens": budget,
+            },
+            source=self.name,
+        )
+        if bundle.token_estimate >= budget:
+            self._bus.publish(
+                CONTEXT_OVER_BUDGET,
+                {
+                    "context_size_tokens": bundle.token_estimate,
+                    "budget_tokens": budget,
+                },
+                source=self.name,
+            )
+        if "conversation_summary" in bundle.sources:
+            self._bus.publish(
+                CONTEXT_TRIMMED,
+                {"reason": "history_compression", "sources": list(bundle.sources)},
+                source=self.name,
+            )
+        elif bundle.prompt.rstrip().endswith("…"):
+            self._bus.publish(
+                CONTEXT_TRIMMED,
+                {"reason": "query_truncated", "sources": list(bundle.sources)},
+                source=self.name,
+            )
+        if not bundle.prompt:
+            self._bus.publish(
+                CHAT_ERROR,
+                {"message": "Empty prompt after context assembly"},
+                source=self.name,
+            )
+            return
+
+        warning = model_warning(model)
+        if warning:
+            self._bus.publish(
+                APP_WARNING,
+                {"message": warning, "model": model},
+                source=self.name,
+            )
+
+        self._bus.publish(
+            COMMAND_ROUTED,
+            {
+                **event.payload,
+                "status": "processing",
+                "request_id": request_id,
+                "context_sources": list(bundle.sources),
+                "token_estimate": bundle.token_estimate,
+            },
+            source=self.name,
+        )
+
+        self._bus.publish(
+            SESSION_UPDATE_REQUEST,
+            {"request_id": request_id, "role": "user", "content": query},
+            source=self.name,
+        )
+
+        try:
+            self._bus.publish(
+                LLM_REQUEST,
+                {"bundle": bundle, "model": model, "request_id": request_id},
+                source=self.name,
+            )
+        except Exception as exc:
+            self._bus.publish(
+                CHAT_ERROR,
+                {
+                    "request_id": request_id,
+                    "message": str(exc),
+                },
+                source=self.name,
+            )
+            self._bus.publish(
+                APP_ERROR,
+                {"message": f"Chat failed: {exc}"},
+                source=self.name,
+            )
+        finally:
+            self._pending.pop(request_id, None)
+

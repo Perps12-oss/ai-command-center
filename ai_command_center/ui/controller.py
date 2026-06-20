@@ -6,6 +6,20 @@ from collections.abc import Callable
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.events.topics import (
+    NOTE_SELECT,
+    OVERLAY_ANCHOR,
+    OVERLAY_HIDE,
+    OVERLAY_SHOW,
+    PLUGIN_DISABLE_REQUEST,
+    PLUGIN_ENABLE_REQUEST,
+    SETTINGS_SET_REQUEST,
+    UI_CHAT_CANCEL,
+    UI_COMMAND,
+    UI_NAVIGATE,
+    UI_PALETTE_CLOSE,
+    UI_PALETTE_OPEN,
+)
 
 
 class UIController:
@@ -32,57 +46,57 @@ class UIController:
         if clipboard:
             payload["clipboard"] = clipboard
         self._bus.publish(
-            "ui.command",
+            UI_COMMAND,
             payload,
             source="ui",
         )
 
     def publish_navigate(self, view_id: str) -> None:
         self._bus.publish(
-            "ui.navigate",
+            UI_NAVIGATE,
             {"view": view_id},
             source="ui",
         )
 
     def publish_palette_open(self) -> None:
-        self._bus.publish("ui.palette_open", {}, source="ui")
-        self._bus.publish("overlay.show", {"mode": "palette", "x": 0, "y": 0}, source="ui")
+        self._bus.publish(UI_PALETTE_OPEN, {}, source="ui")
+        self._bus.publish(OVERLAY_SHOW, {"mode": "palette", "x": 0, "y": 0}, source="ui")
 
     def publish_palette_close(self) -> None:
-        self._bus.publish("ui.palette_close", {}, source="ui")
-        self._bus.publish("overlay.hide", {}, source="ui")
+        self._bus.publish(UI_PALETTE_CLOSE, {}, source="ui")
+        self._bus.publish(OVERLAY_HIDE, {}, source="ui")
 
     def publish_overlay_show(self, *, mode: str = "compact", x: int = 0, y: int = 0) -> None:
         self._bus.publish(
-            "overlay.show",
+            OVERLAY_SHOW,
             {"mode": mode, "x": x, "y": y},
             source="ui",
         )
 
     def publish_overlay_anchor(self, x: int, y: int) -> None:
-        self._bus.publish("overlay.anchor", {"x": x, "y": y}, source="ui")
+        self._bus.publish(OVERLAY_ANCHOR, {"x": x, "y": y}, source="ui")
 
     def request_settings_change(self, key: str, value: str) -> None:
         self._bus.publish(
-            "settings.set_request",
+            SETTINGS_SET_REQUEST,
             {"key": key, "value": value},
             source="ui",
         )
 
     def publish_chat_cancel(self, request_id: str) -> None:
         self._bus.publish(
-            "ui.chat_cancel",
+            UI_CHAT_CANCEL,
             {"request_id": request_id},
             source="ui",
         )
 
     def publish_note_select(self, path: str) -> None:
         self._bus.publish(
-            "note.select",
+            NOTE_SELECT,
             {"path": path},
             source="ui",
         )
 
     def publish_plugin_toggle(self, plugin_id: str, enabled: bool) -> None:
-        topic = "plugin.enable_request" if enabled else "plugin.disable_request"
+        topic = PLUGIN_ENABLE_REQUEST if enabled else PLUGIN_DISABLE_REQUEST
         self._bus.publish(topic, {"id": plugin_id}, source="ui")

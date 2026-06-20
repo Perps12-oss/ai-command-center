@@ -5,18 +5,59 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
+from ai_command_center.core.clipboard_intent import (
+    empty_clipboard_message,
+    wants_clipboard,
+)
 from ai_command_center.core.event_bus import Event, EventBus
+from ai_command_center.core.events.topics import (
+    CHAT_CANCELLED,
+    CHAT_CHUNK,
+    CHAT_COMPLETE,
+    CHAT_ERROR,
+    CHAT_HISTORY_LOADED,
+    CHAT_STARTED,
+    COMMAND_HISTORY,
+    COMMAND_ROUTED,
+    MEMORY_ERROR,
+    MEMORY_SELECTED,
+    MEMORY_STORED,
+    MODEL_SELECTED,
+    NOTE_CREATED,
+    NOTE_ERROR,
+    NOTE_INDEX_COMPLETE,
+    NOTE_SEARCH_RESULTS,
+    NOTE_SELECTED,
+    OLLAMA_STATUS,
+    OVERLAY_ANCHOR,
+    OVERLAY_HIDE,
+    OVERLAY_SHOW,
+    PLUGIN_CATALOG,
+    PLUGIN_ERROR,
+    SYSTEM_EVENTS,
+    SYSTEM_SNAPSHOT,
+    TELEMETRY_EVENT,
+    TOOL_ERROR,
+    TOOL_RESULT,
+)
+from ai_command_center.ui.capability_help import show_capability_help
 from ai_command_center.ui.components.command_box import CommandBox
 from ai_command_center.ui.components.sidebar import Sidebar
 from ai_command_center.ui.components.top_bar import TopBar
 from ai_command_center.ui.controller import UIController
 from ai_command_center.ui.theme import tokens as T
 from ai_command_center.ui.ui_queue import UIQueue
+from ai_command_center.ui.layer.background_controller import BackgroundController
+from ai_command_center.ui.layer.content_backdrop import ShellBackdrop
+from ai_command_center.ui.layer.layer_stack import PageLayerStack
+from ai_command_center.ui.motion.scheduler import MotionScheduler, MotionSignal
 from ai_command_center.ui.views.chat_view import ChatView
+from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.settings_view import SettingsView
+from ai_command_center.ui.views.system_view import SystemView
 
 VIEW_IDS: tuple[str, ...] = (
     "home",
@@ -43,12 +84,17 @@ class CommandPaletteApp(ctk.CTk):
         self._pending_user_text: str | None = None
         self._overlay_mode = "palette"
         self._bus_unsubs: list = []
+        self._motion = MotionScheduler(bus)
+        self._motion.subscribe(self._on_motion_signal)
+        self._motion.start()
+        self._background_ctrl = BackgroundController(bus)
+        self._background_ctrl.start()
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
         self.title("AI Command Center")
-        self.configure(fg_color=T.BG_DEEP)
+        self.configure(fg_color=T.CANVAS_FALLBACK)
         self.geometry(f"{T.WINDOW_WIDTH}x{T.WINDOW_HEIGHT}")
         self.minsize(900, 560)
 
@@ -60,6 +106,8 @@ class CommandPaletteApp(ctk.CTk):
         self._wire_tool_events()
         self._wire_memory_events()
         self._wire_plugin_events()
+        self._wire_navigation_events()
+        self._wire_live_events()
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
         self._apply_state()
@@ -85,39 +133,71 @@ class CommandPaletteApp(ctk.CTk):
         self._command_host = ctk.CTkFrame(right, fg_color="transparent")
         self._command_host.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
 
-        self._command_box = CommandBox(self._command_host, on_submit=self._on_command)
+        self._command_box = CommandBox(
+            self._command_host,
+            on_submit=self._on_command,
+            on_help=self._show_capability_help,
+        )
         self._command_box.pack(fill="x")
 
-        self._content = ctk.CTkFrame(right, fg_color="transparent")
-        self._content.pack(fill="both", expand=True)
+        self._shell_backdrop = ShellBackdrop(right, "home")
+        self._shell_backdrop.show()
+        self._content = self._shell_backdrop
 
         self._show_view("home")
 
-    def _ensure_view(self, view_id: str) -> PlaceholderView | ChatView | NotesView | SettingsView | PluginsView:
+    def _ensure_view(
+        self,
+        view_id: str,
+    ) -> (
+        PlaceholderView
+        | ChatView
+        | NotesView
+        | SettingsView
+        | PluginsView
+        | HomeView
+        | SystemView
+    ):
         if view_id not in self._views:
-            if view_id == "chat":
+            shell = self._shell_backdrop
+            page_host = shell.page_host
+            if view_id == "home":
+                home = HomeView(shell, shell=self._shell_backdrop, bus=self._bus)
+                home.mount_bus(self._bus)
+                self._views[view_id] = home
+            elif view_id == "system":
+                self._views[view_id] = SystemView(page_host)
+            elif view_id == "chat":
                 self._views[view_id] = ChatView(
-                    self._content,
+                    page_host,
                     on_cancel=self._controller.publish_chat_cancel,
                 )
             elif view_id == "notes":
                 self._views[view_id] = NotesView(
-                    self._content,
+                    page_host,
                     on_select=self._controller.publish_note_select,
                 )
             elif view_id == "settings":
                 self._views[view_id] = SettingsView(
-                    self._content,
+                    page_host,
                     on_save=self._controller.request_settings_change,
                 )
             elif view_id == "plugins":
                 self._views[view_id] = PluginsView(
-                    self._content,
+                    page_host,
                     on_toggle=self._controller.publish_plugin_toggle,
                 )
             else:
-                self._views[view_id] = PlaceholderView(self._content, view_id)
+                self._views[view_id] = PlaceholderView(page_host, view_id)
         return self._views[view_id]
+
+    def _home_view(self) -> HomeView | None:
+        view = self._views.get("home")
+        return view if isinstance(view, HomeView) else None
+
+    def _system_view(self) -> SystemView | None:
+        view = self._views.get("system")
+        return view if isinstance(view, SystemView) else None
 
     def _notes_view(self) -> NotesView | None:
         view = self._views.get("notes")
@@ -127,31 +207,71 @@ class CommandPaletteApp(ctk.CTk):
         view = self._views.get("chat")
         return view if isinstance(view, ChatView) else None
 
+    def _show_capability_help(self) -> None:
+        show_capability_help(self)
+
+    def _wire_navigation_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed_navigate)
+        )
+
+    def _on_command_routed_navigate(self, event: Event) -> None:
+        if event.source != "command_router":
+            return
+        if event.payload.get("intent") != "navigate":
+            return
+        view = str((event.payload.get("args") or {}).get("view", "home")).lower()
+        if view not in VIEW_IDS:
+            view = "home"
+
+        def update() -> None:
+            self._navigate(view)
+
+        self._ui_queue.enqueue(update)
+
     def _wire_chat_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe("chat.started", self._on_chat_started)
+            self._bus.subscribe(CHAT_STARTED, self._on_chat_started)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("chat.chunk", self._on_chat_chunk)
+            self._bus.subscribe(CHAT_CHUNK, self._on_chat_chunk)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("chat.complete", self._on_chat_complete)
+            self._bus.subscribe(CHAT_COMPLETE, self._on_chat_complete)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("chat.cancelled", self._on_chat_cancelled)
+            self._bus.subscribe(CHAT_CANCELLED, self._on_chat_cancelled)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("chat.error", self._on_chat_error)
+            self._bus.subscribe(CHAT_ERROR, self._on_chat_error)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("ollama.status", self._on_ollama_status)
+            self._bus.subscribe(OLLAMA_STATUS, self._on_ollama_status)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("chat.history_loaded", self._on_chat_history_loaded)
+            self._bus.subscribe(CHAT_HISTORY_LOADED, self._on_chat_history_loaded)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("model.selected", self._on_model_selected)
+            self._bus.subscribe(MODEL_SELECTED, self._on_model_selected)
         )
+        self._bus_unsubs.append(
+            self._bus.subscribe(COMMAND_ROUTED, self._on_chat_context_routed)
+        )
+
+    def _on_chat_context_routed(self, event: Event) -> None:
+        if event.source != "chat_handler":
+            return
+        if event.payload.get("status") != "processing":
+            return
+        sources = event.payload.get("context_sources") or []
+        tokens = int(event.payload.get("token_estimate", 0))
+
+        def update() -> None:
+            chat = self._chat_view()
+            if chat:
+                chat.update_context_bar(list(sources), tokens)
+
+        self._ui_queue.enqueue(update)
 
     def _on_chat_history_loaded(self, event: Event) -> None:
         messages = event.payload.get("messages") or []
@@ -215,6 +335,7 @@ class CommandPaletteApp(ctk.CTk):
         message = str(event.payload.get("message", "Unknown error"))
 
         def update() -> None:
+            self._navigate("chat")
             chat = self._chat_view()
             if chat:
                 chat.show_error(message)
@@ -228,7 +349,10 @@ class CommandPaletteApp(ctk.CTk):
 
         def update() -> None:
             phase = "ready" if online else "error"
-            self._top.update_status(phase, self._controller.snapshot().settings.default_model)
+            snap = self._controller.snapshot()
+            self._top.update_status(phase, snap.settings.default_model)
+            self._top.set_ollama_online(online)
+            self._apply_footer_all(online=online)
 
         self._ui_queue.enqueue(update)
 
@@ -243,10 +367,10 @@ class CommandPaletteApp(ctk.CTk):
 
     def _wire_tool_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe("tool.result", self._on_tool_result)
+            self._bus.subscribe(TOOL_RESULT, self._on_tool_result)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("tool.error", self._on_tool_error)
+            self._bus.subscribe(TOOL_ERROR, self._on_tool_error)
         )
 
     def _on_tool_result(self, event: Event) -> None:
@@ -275,13 +399,13 @@ class CommandPaletteApp(ctk.CTk):
 
     def _wire_memory_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe("memory.stored", self._on_memory_stored)
+            self._bus.subscribe(MEMORY_STORED, self._on_memory_stored)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("memory.selected", self._on_memory_selected)
+            self._bus.subscribe(MEMORY_SELECTED, self._on_memory_selected)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("memory.error", self._on_memory_error)
+            self._bus.subscribe(MEMORY_ERROR, self._on_memory_error)
         )
 
     def _on_memory_stored(self, event: Event) -> None:
@@ -320,10 +444,10 @@ class CommandPaletteApp(ctk.CTk):
 
     def _wire_plugin_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe("plugin.catalog", self._on_plugin_catalog)
+            self._bus.subscribe(PLUGIN_CATALOG, self._on_plugin_catalog)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("plugin.error", self._on_plugin_error)
+            self._bus.subscribe(PLUGIN_ERROR, self._on_plugin_error)
         )
 
     def _on_plugin_catalog(self, event: Event) -> None:
@@ -333,6 +457,9 @@ class CommandPaletteApp(ctk.CTk):
             view = self._ensure_view("plugins")
             if isinstance(view, PluginsView):
                 view.show_catalog(list(plugins))
+            home = self._home_view()
+            if home:
+                home.apply_plugin_catalog({"plugins": list(plugins)})
 
         self._ui_queue.enqueue(update)
 
@@ -348,27 +475,127 @@ class CommandPaletteApp(ctk.CTk):
 
     def _wire_note_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe("note.search_results", self._on_note_search_results)
+            self._bus.subscribe(NOTE_SEARCH_RESULTS, self._on_note_search_results)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("note.selected", self._on_note_selected)
+            self._bus.subscribe(NOTE_SELECTED, self._on_note_selected)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("note.created", self._on_note_created)
+            self._bus.subscribe(NOTE_CREATED, self._on_note_created)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("note.error", self._on_note_error)
+            self._bus.subscribe(NOTE_ERROR, self._on_note_error)
         )
+        self._bus_unsubs.append(
+            self._bus.subscribe(NOTE_INDEX_COMPLETE, self._on_note_index_complete)
+        )
+
+    def _wire_live_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe(SYSTEM_SNAPSHOT, self._on_system_snapshot)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe(COMMAND_HISTORY, self._on_command_history)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe(SYSTEM_EVENTS, self._on_system_event)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe(TELEMETRY_EVENT, self._on_telemetry_event)
+        )
+
+    def _on_system_snapshot(self, event: Event) -> None:
+        payload = dict(event.payload)
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.apply_system_snapshot(payload)
+            system = self._system_view()
+            if system:
+                system.apply_system_snapshot(payload)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_command_history(self, event: Event) -> None:
+        payload = dict(event.payload)
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.apply_command_history(payload)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_system_event(self, event: Event) -> None:
+        payload = dict(event.payload)
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.apply_telemetry_event(payload)
+            system = self._system_view()
+            if system:
+                system.apply_system_event(payload)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_telemetry_event(self, event: Event) -> None:
+        payload = dict(event.payload)
+        payload.setdefault("event", event.topic)
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.apply_telemetry_event(payload)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_note_index_complete(self, event: Event) -> None:
+        payload = dict(event.payload)
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.apply_note_index(payload)
+
+        self._ui_queue.enqueue(update)
+
+    def _on_motion_signal(self, signal: MotionSignal) -> None:
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.apply_motion(
+                    signal.primitive_id, signal.intensity, signal.payload
+                )
+            system = self._system_view()
+            if system:
+                system.apply_motion(signal.primitive_id, signal.intensity)
+
+        self._ui_queue.enqueue(update)
+
+    def _apply_footer_all(self, *, online: bool) -> None:
+        snap = self._controller.snapshot()
+        ollama_url = snap.settings.ollama_url
+        vault = snap.settings.obsidian_vault_path or "—"
+        for getter in (self._home_view, self._system_view):
+            view = getter()
+            if view and hasattr(view, "apply_footer"):
+                view.apply_footer(
+                    ollama_url=ollama_url,
+                    vault_path=vault,
+                    online=online,
+                )
 
     def _wire_overlay_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe("overlay.show", self._on_overlay_show)
+            self._bus.subscribe(OVERLAY_SHOW, self._on_overlay_show)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("overlay.anchor", self._on_overlay_anchor)
+            self._bus.subscribe(OVERLAY_ANCHOR, self._on_overlay_anchor)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe("overlay.hide", self._on_overlay_hide)
+            self._bus.subscribe(OVERLAY_HIDE, self._on_overlay_hide)
         )
 
     def _on_overlay_show(self, event: Event) -> None:
@@ -379,6 +606,7 @@ class CommandPaletteApp(ctk.CTk):
         def update() -> None:
             self._overlay_mode = mode
             self._apply_overlay_geometry(mode, x, y)
+            self._attach_page_background(self._current_view)
 
         self._ui_queue.enqueue(update)
 
@@ -467,8 +695,27 @@ class CommandPaletteApp(ctk.CTk):
         for vid, view in self._views.items():
             if vid != view_id:
                 view.pack_forget()
-        self._ensure_view(view_id).pack(fill="both", expand=True)
+        view = self._ensure_view(view_id)
+        if self._overlay_mode == "compact":
+            self._shell_backdrop.hide()
+        else:
+            self._shell_backdrop.show()
+        if view_id == "home":
+            self._shell_backdrop.unmount_page_view()
+            self._shell_backdrop.clear_zone_motion()
+            self._shell_backdrop.set_home_zones_visible(True)
+            view.pack_forget()
+        else:
+            self._shell_backdrop.set_home_zones_visible(False)
+            self._shell_backdrop.clear_zone_motion()
+            self._shell_backdrop.mount_page_view(view)
         self._sidebar.set_active(view_id)
+        self._attach_page_background(view_id)
+
+    def _attach_page_background(self, view_id: str) -> None:
+        if self._overlay_mode != "compact":
+            self._shell_backdrop.refresh()
+        self._background_ctrl.attach(None)
 
     def _navigate(self, view_id: str) -> None:
         self._show_view(view_id)
@@ -476,9 +723,25 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_command(self, text: str) -> None:
         lower = text.strip().lower()
+        if lower in ("?", "help"):
+            self._show_capability_help()
+            return
+
         clipboard: str | None = None
-        if "clipboard" in lower:
+        if wants_clipboard(text):
             clipboard = self._read_clipboard()
+            if not clipboard:
+                message = empty_clipboard_message()
+
+                def update() -> None:
+                    self._navigate("chat")
+                    chat = self._chat_view()
+                    if chat:
+                        chat.show_error(message)
+
+                self._ui_queue.enqueue(update)
+                return
+
         if not (
             lower.startswith("note:")
             or lower.startswith("new note:")
@@ -486,6 +749,7 @@ class CommandPaletteApp(ctk.CTk):
             or lower.startswith("memory:")
             or lower.startswith(">")
             or lower.startswith("go ")
+            or lower in ("settings", "chat", "notes", "plugins", "home", "system")
         ):
             self._pending_user_text = text
         self._controller.publish_command(text, clipboard=clipboard)
@@ -517,10 +781,7 @@ class CommandPaletteApp(ctk.CTk):
         settings_view = self._views.get("settings")
         if isinstance(settings_view, SettingsView):
             settings_view.load_from_snapshot(snap.settings)
-        if snap.last_command and "home" in self._views:
-            self._views["home"].set_extra(
-                f'Last: "{snap.last_command}" → {snap.last_command_intent or "pending"}'
-            )
+        self._apply_footer_all(online=True)
 
     def _fade_in(self, step: int = 0) -> None:
         alpha = min(1.0, (step + 1) / T.FADE_STEPS)
@@ -553,6 +814,8 @@ class CommandPaletteApp(ctk.CTk):
         self.attributes("-alpha", 0.0)
         self._fade_in()
         self.after(T.FADE_IN_MS + 20, self._command_box.focus)
+        self.after(T.FADE_IN_MS + 40, lambda: self._attach_page_background(self._current_view))
+        self.after(T.FADE_IN_MS + 80, lambda: self._shell_backdrop.refresh())
 
     def hide(self) -> None:
         if not self._visible:

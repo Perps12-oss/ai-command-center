@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 import time
 
+from ai_command_center.domain.conversation import ConversationMessage
+
 DEFAULT_CONVERSATION_ID = "default"
 CONTEXT_HISTORY_LIMIT = 6
 
@@ -45,7 +47,7 @@ class ConversationRepository:
         )
         self._conn.commit()
 
-    def list_messages(self) -> list[dict[str, object]]:
+    def list_messages(self) -> list[ConversationMessage]:
         rows = self._conn.execute(
             """
             SELECT role, content, created_at
@@ -56,11 +58,11 @@ class ConversationRepository:
             (DEFAULT_CONVERSATION_ID,),
         ).fetchall()
         return [
-            {
-                "role": str(r["role"]),
-                "content": str(r["content"]),
-                "created_at": float(r["created_at"]),
-            }
+            ConversationMessage(
+                role=str(r["role"]),
+                content=str(r["content"]),
+                created_at=float(r["created_at"]),
+            )
             for r in rows
         ]
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.events.topics import APP_PHASE
 from ai_command_center.services.base import BaseService
 from ai_command_center.services.states import ServiceState
 
@@ -29,20 +30,20 @@ class ServiceManager:
 
     def load_all(self) -> None:
         for service in self._ordered():
-            service.load()
+            service.start()
 
     def hibernate_all(self) -> None:
         for service in reversed(self._ordered()):
-            service.hibernate()
+            service.stop()
 
     def unload_all(self) -> None:
         for service in reversed(self._ordered()):
-            service.unload()
+            service.stop()
 
     def shutdown(self) -> None:
         """Unload everything — no background services remain."""
         self.unload_all()
-        self._bus.publish("app.phase", {"phase": "shutdown"}, source="service_manager")
+        self._bus.publish(APP_PHASE, {"phase": "shutdown"}, source="service_manager")
 
     def _ordered(self) -> Iterable[BaseService]:
         return self._services.values()
@@ -51,4 +52,4 @@ class ServiceManager:
         return any(s.state == ServiceState.ACTIVE for s in self._services.values())
 
     def any_loaded(self) -> bool:
-        return any(s.state != ServiceState.OFF for s in self._services.values())
+        return any(s.state != ServiceState.STOPPED for s in self._services.values())

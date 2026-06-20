@@ -1,5 +1,7 @@
 # AI Command Center — Architecture
 
+See [ARCHITECTURE_ENFORCEMENT.md](ARCHITECTURE_ENFORCEMENT.md) for the implementation directives that coding agents must follow when modifying this repository.
+
 ## Data flow (target)
 
 ```text
@@ -123,6 +125,19 @@ command.routed (chat) → ChatHandler → ModelRouterService.resolve() → model
 memory.remember → MemoryGraphService → memory.stored
 memory.select → MemoryGraphService → memory.selected → ContextManager (opt-in)
 ```
+
+### Telemetry (5C+)
+
+```text
+EventBus → TelemetryService (raw passthrough) → telemetry_events (SQLite)
+scripts/telemetry_summary.py → offline correlation + SESSION SUMMARY
+```
+
+**Firewall:** PASSIVE WITH DERIVED OFFLINE INTELLIGENCE
+
+- Runtime: dumb camera only — no inference, no bus publish, no behavioral classification.
+- Offline: hesitation, retry, command correlation, friction score in `telemetry_summary.py` only.
+- Telemetry optional — removing `TelemetryService` does not break core flows.
 
 ### Plugin registry (5B)
 

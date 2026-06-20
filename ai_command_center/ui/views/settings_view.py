@@ -2,33 +2,53 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import customtkinter as ctk
 
+from ai_command_center.ui.components.floating_ui import FLOAT_GAP, FLOAT_PAD, pack_floating
+from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.ui.layer.layer_stack import PageLayerStack
 from ai_command_center.ui.theme import tokens as T
 
 
-class SettingsView(ctk.CTkFrame):
+class SettingsView(PageLayerStack):
     def __init__(self, master, *, on_save) -> None:
-        super().__init__(master, fg_color="transparent")
+        super().__init__(master, "settings")
         self._on_save = on_save
         self._building = True
 
-        title = ctk.CTkLabel(
-            self,
+        title_card = GlassCard(self.ui_layer)
+        pack_floating(title_card, first=True)
+        ctk.CTkLabel(
+            title_card,
             text="Settings",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=T.TEXT_PRIMARY,
-        )
-        title.pack(anchor="w", padx=T.PAD, pady=(T.PAD, 12))
+            font=T.FONT_TITLE,
+            text_color=T.TEXT_HEADING,
+        ).pack(anchor="w", padx=T.PAD, pady=T.PAD)
 
-        form = ctk.CTkFrame(self, fg_color=T.BG_GLASS, corner_radius=T.CORNER_RADIUS)
-        form.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
+        self._vault_banner = ctk.CTkLabel(
+            self.ui_layer,
+            text="",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            wraplength=640,
+            justify="left",
+        )
+        self._vault_banner.pack(anchor="w", padx=FLOAT_PAD, pady=(0, 8))
+
+        form = GlassCard(self.ui_layer)
+        pack_floating(form, fill="x")
 
         self._default_model = self._field(form, "Default model", "llama3.2:3b")
         self._summarize_model = self._field(form, "Summarize model", "llama3.2:3b")
         self._ollama_url = self._field(form, "Ollama URL", "http://localhost:11434")
         self._hotkey = self._field(form, "Hotkey", "alt+space")
-        self._vault = self._field(form, "Obsidian vault path", "")
+        self._vault = self._field(
+            form,
+            "Obsidian vault path (folder containing your .md notes)",
+            "",
+        )
         self._overlay_mode = ctk.CTkComboBox(
             form,
             values=["palette", "compact"],
@@ -46,9 +66,9 @@ class SettingsView(ctk.CTkFrame):
         save.pack(anchor="w", padx=16, pady=(8, 16))
 
         self._status = ctk.CTkLabel(
-            self, text="", text_color=T.TEXT_MUTED, wraplength=600, justify="left"
+            self.ui_layer, text="", text_color=T.TEXT_MUTED, wraplength=600, justify="left"
         )
-        self._status.pack(anchor="w", padx=T.PAD, pady=(0, T.PAD))
+        self._status.pack(anchor="w", padx=FLOAT_PAD, pady=(0, FLOAT_PAD))
         self._building = False
 
     def _field(self, parent, label: str, default: str) -> ctk.CTkEntry:
@@ -75,6 +95,7 @@ class SettingsView(ctk.CTkFrame):
             self._low_memory.select()
         else:
             self._low_memory.deselect()
+        self._update_vault_banner(vault)
         self._building = False
 
     @staticmethod
@@ -82,17 +103,47 @@ class SettingsView(ctk.CTkFrame):
         entry.delete(0, "end")
         entry.insert(0, value)
 
+    def _update_vault_banner(self, vault_path: str) -> None:
+        path = str(vault_path or "").strip()
+        if not path:
+            self._vault_banner.configure(
+                text="Notes: vault not configured — set folder path below, then Save.",
+                text_color=T.STATUS_ERROR,
+            )
+            return
+        resolved = Path(path)
+        if resolved.is_dir():
+            self._vault_banner.configure(
+                text=f"Notes: vault OK — {resolved}",
+                text_color=T.STATUS_READY,
+            )
+        else:
+            self._vault_banner.configure(
+                text=f"Notes: path not found — {resolved}",
+                text_color=T.STATUS_ERROR,
+            )
+
     def _save(self) -> None:
+        vault = self._vault.get().strip()
+        if vault and not Path(vault).is_dir():
+            self._status.configure(
+                text=f"Vault path does not exist or is not a folder: {vault}",
+                text_color=T.STATUS_ERROR,
+            )
+            self._update_vault_banner(vault)
+            return
+
         pairs = {
             "default_model": self._default_model.get().strip(),
             "summarize_model": self._summarize_model.get().strip(),
             "ollama_url": self._ollama_url.get().strip(),
             "hotkey": self._hotkey.get().strip(),
-            "obsidian_vault_path": self._vault.get().strip(),
+            "obsidian_vault_path": vault,
             "overlay_mode": self._overlay_mode.get().strip(),
             "low_memory_mode": "true" if self._low_memory.get() else "false",
         }
         for key, value in pairs.items():
-            if value:
+            if key == "obsidian_vault_path" or value:
                 self._on_save(key, value)
-        self._status.configure(text="Settings saved.")
+        self._update_vault_banner(vault)
+        self._status.configure(text="Settings saved.", text_color=T.TEXT_MUTED)

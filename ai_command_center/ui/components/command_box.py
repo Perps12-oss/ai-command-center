@@ -8,21 +8,36 @@ from ai_command_center.ui.theme import tokens as T
 
 
 class CommandBox(ctk.CTkFrame):
-    def __init__(self, master, on_submit, **kwargs) -> None:
+    def __init__(self, master, on_submit, on_help=None, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_submit = on_submit
+        self._on_help = on_help
+
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.pack(fill="x")
 
         self._entry = ctk.CTkEntry(
-            self,
-            placeholder_text="Ask anything, note:, remember:, memory:, or > shell…",
+            row,
+            placeholder_text="Chat, note:, remember:, > shell, go settings — type ? for help",
             height=40,
             font=T.FONT_BODY,
             fg_color=T.BG_INPUT,
-            border_color=T.BG_GLASS_BORDER,
+            border_width=1,
+            border_color=T.GLASS_BORDER,
             text_color=T.TEXT_PRIMARY,
         )
-        self._entry.pack(fill="x", expand=True)
+        self._entry.pack(side="left", fill="x", expand=True)
         self._entry.bind("<Return>", self._submit)
+
+        if on_help is not None:
+            ctk.CTkButton(
+                row,
+                text="?",
+                width=36,
+                height=40,
+                font=T.FONT_BODY,
+                command=on_help,
+            ).pack(side="right", padx=(8, 0))
 
     def _submit(self, _event=None) -> None:
         text = self._entry.get().strip()

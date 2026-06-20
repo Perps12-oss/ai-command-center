@@ -1,0 +1,99 @@
+"""Canonical event topics used throughout the application."""
+
+from __future__ import annotations
+
+SETTINGS_UPDATED = "settings.updated"
+SETTINGS_SNAPSHOT = "settings.snapshot"
+SETTINGS_CHANGED = "settings.changed"
+SETTINGS_SET_REQUEST = "settings.set_request"
+
+SERVICE_STARTED = "service.started"
+SERVICE_READY = "service.ready"
+SERVICE_STOPPED = "service.stopped"
+SERVICE_ERROR = "service.error"
+SERVICE_STATE_CHANGED = "service.state_changed"
+
+CONVERSATION_UPDATED = "conversation.updated"
+NOTES_INDEXED = "notes.indexed"
+
+TOOL_STARTED = "tool.started"
+TOOL_COMPLETED = "tool.completed"
+TOOL_FAILED = "tool.failed"
+TOOL_RESULT = "tool.result"
+TOOL_ERROR = "tool.error"
+TOOL_INVOKE = "tool.invoke"
+
+TELEMETRY_EVENT = "telemetry.event"
+TELEMETRY_EVENTS = TELEMETRY_EVENT
+SYSTEM_SNAPSHOT = "system.snapshot"
+
+APP_PHASE = "app.phase"
+APP_ERROR = "app.error"
+APP_WARNING = "app.warning"
+COMMAND_ROUTED = "command.routed"
+UI_COMMAND = "ui.command"
+UI_NAVIGATE = "ui.navigate"
+UI_PALETTE_OPEN = "ui.palette_open"
+UI_PALETTE_CLOSE = "ui.palette_close"
+UI_CHAT_CANCEL = "ui.chat_cancel"
+OVERLAY_SHOW = "overlay.show"
+OVERLAY_HIDE = "overlay.hide"
+OVERLAY_ANCHOR = "overlay.anchor"
+
+CHAT_STARTED = "chat.started"
+CHAT_CHUNK = "chat.chunk"
+CHAT_COMPLETE = "chat.complete"
+CHAT_CANCELLED = "chat.cancelled"
+CHAT_ERROR = "chat.error"
+CHAT_HISTORY_LOADED = "chat.history_loaded"
+CHAT_REQUEST = "chat.request"
+
+OLLAMA_STATUS = "ollama.status"
+OLLAMA_MODEL_LOADED = "ollama.model_loaded"
+OLLAMA_MODEL_UNLOADED = "ollama.model_unloaded"
+
+MODEL_SELECTED = "model.selected"
+MODEL_RESOLVE_REQUEST = "model.resolve.request"
+MODEL_RESOLVE_RESULT = "model.resolve.result"
+
+CONTEXT_REQUEST = "context.request"
+CONTEXT_FRAGMENT = "context.fragment"
+CONTEXT_SNAPSHOT_CREATED = "context.snapshot_created"
+CONTEXT_OVER_BUDGET = "context.over_budget"
+CONTEXT_TRIMMED = "context.trimmed"
+CONTEXT_COMPLETE = "context.complete"
+
+MEMORY_REMEMBER = "memory.remember"
+MEMORY_SELECT = "memory.select"
+MEMORY_LOOKUP_REQUEST = "memory.lookup.request"
+MEMORY_LOOKUP_RESULT = "memory.lookup.result"
+MEMORY_STORED = "memory.stored"
+MEMORY_SELECTED = "memory.selected"
+MEMORY_ERROR = "memory.error"
+MEMORY_CLEARED = "memory.cleared"
+MEMORY_CLEAR_SELECTION = "memory.clear_selection"
+
+SESSION_HISTORY_REQUEST = "session.history.request"
+SESSION_HISTORY_RESULT = "session.history.result"
+SESSION_UPDATE_REQUEST = "session.update.request"
+SESSION_UPDATE_RESULT = "session.update.result"
+
+NOTE_SELECT = "note.select"
+NOTE_SELECTED = "note.selected"
+NOTE_SEARCH_RESULTS = "note.search_results"
+NOTE_CREATED = "note.created"
+NOTE_ERROR = "note.error"
+NOTE_INDEX_COMPLETE = "note.index_complete"
+NOTE_INDEX_PROGRESS = "note.index_progress"
+NOTE_CONTEXT_REQUEST = "note.context.request"
+NOTE_CONTEXT_RESULT = "note.context.result"
+
+PLUGIN_ENABLE_REQUEST = "plugin.enable_request"
+PLUGIN_DISABLE_REQUEST = "plugin.disable_request"
+PLUGIN_CATALOG = "plugin.catalog"
+PLUGIN_ERROR = "plugin.error"
+
+LLM_REQUEST = "llm.request"
+
+SYSTEM_EVENTS = "system.events"
+COMMAND_HISTORY = "command.history"

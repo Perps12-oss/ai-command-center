@@ -7,12 +7,46 @@ Update the **Current** block at every phase boundary (before starting the next p
 ## Current
 
 ```
-Current Phase: Phase 5B — COMPLETE
-Mode: Gate-by-gate
-Previous Phase Snapshot: Phase 5A UI integration (500036c); UCGS kit (c81b0f6)
-Pre-Commit Diff: Phase 5B plugin registry — uncommitted
+Current Phase: Phase 5C — USABILITY FAIL (assessment locked)
+Mode: capability_completion sprint next
+Previous Phase Snapshot: Telemetry session 20260618T132909Z — friction HIGH, 65% command success
+Pre-Commit Diff: capability_completion sprint (uncommitted)
 Historical Ledger: See table below
 ```
+
+### Phase 5C result
+
+| Dimension | Status |
+|-----------|--------|
+| Architecture | PASS |
+| Stability | PASS |
+| Usability | **FAIL** |
+| Gate `verify_phase5c.py` | **FAIL** (expected) |
+
+See [PHASE5C_ASSESSMENT.md](PHASE5C_ASSESSMENT.md).
+
+### Next sprint: `capability_completion` — **IN PROGRESS**
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | Clipboard guard | DONE |
+| 2 | Vault onboarding UX | DONE |
+| 3 | Intent routing v2 + `go settings` handler | DONE |
+| 4 | Capability help (`?` button) | DONE |
+| 5 | Local assistant system prompt (no browser) | DONE |
+| 6 | Gate `verify_capability_completion.py` | PASS |
+
+Re-run Phase 5C stress test after manual validation.
+
+### Phase 5C status (historical)
+
+| Step | Status |
+|------|--------|
+| Protocol locked | `docs/PHASE5C_STRESS_TEST.md` |
+| Preflight harness | `scripts/verify_phase5c_preflight.py` |
+| Scorecard | `scripts/phase5c_scorecard.py` → `%APPDATA%\AICommandCenter\phase5c_scorecard.json` |
+| Manual Layers 1–4 | **PENDING** (tester) |
+| Gate `verify_phase5c.py` | **PENDING** (requires scorecard) |
 
 ### Gate status (latest run)
 
@@ -28,8 +62,21 @@ Historical Ledger: See table below
 | Phase 4F | `verify_phase4f.py` | PASS |
 | Phase 5A | `verify_phase5a.py` | PASS |
 | Phase 5B | `verify_phase5b.py` | PASS |
+| Phase 5C preflight | `verify_phase5c_preflight.py` | PENDING |
+| Phase 5C gate | `verify_phase5c.py` | PENDING |
+| Phase 5C+ telemetry | `verify_phase5c_telemetry.py` | PASS |
+| Capability completion | `verify_capability_completion.py` | PASS |
 | Note audits | `audit_note_integration.py` | PASS |
 | Daily driver | `run_daily_driver.py` | PASS |
+
+### Telemetry firewall (5C+)
+
+**Policy:** PASSIVE WITH DERIVED OFFLINE INTELLIGENCE
+
+- `TelemetryService` logs raw EventBus events only (append-only SQLite).
+- No runtime inference: no hesitation/retry/correlation/command.executed synthesis.
+- All behavioral interpretation lives in `telemetry_summary.py` (offline script).
+- Telemetry is optional — system is fully correct if telemetry is disabled.
 
 ### Phase 4 deliverables (Borrow Map v2)
 
@@ -44,8 +91,9 @@ Historical Ledger: See table below
 
 ### Next
 
-- Optional: push UCGS + 5B commits to origin
-- Phase 5C (TBD): extension plugin load policy, packaged release
+- Start **capability_completion** sprint (see PHASE5C_ASSESSMENT.md)
+- Re-run 5C stress test after critical fixes
+- Phase 5D (packaged release) after usability PASS
 
 ---
 
@@ -63,17 +111,18 @@ Historical Ledger: See table below
 | 4F | `Phase 4F` | `verify_phase4f.py` | Model router, model.selected |
 | 5A | `Phase 5A` | `verify_phase5a.py` | UI wiring: tools, memory commands, model label |
 | 5B | `Phase 5B` | `verify_phase5b.py` | Plugin manifests, catalog service, PluginsView |
+| 5C | `Phase 5C` | `verify_phase5c.py` | Daily driver stress test + scorecard gold standard |
 
 ---
 
 ## UCGS v3 Governance Snapshot
 
-**Audit:** STRICT | **Phase:** 5B | **Verdict:** `APPROVE`
+**Audit:** STRICT | **Phase:** 5C | **Verdict:** `PENDING` (manual stress test)
 
 ```yaml
 ucgs_v3:
-  phase: "5B"
-  verdict: APPROVE
+  phase: "5C"
+  verdict: PENDING
 ```
 
 ---

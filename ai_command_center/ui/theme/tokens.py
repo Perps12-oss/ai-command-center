@@ -1,42 +1,153 @@
-"""Glassmorphism-lite design tokens (ARM64-friendly — no blur shaders)."""
+"""Design tokens — Glassmorphism Lite + Live Command Center v1.3."""
 
-# Backgrounds
-BG_DEEP = "#0D0D1A"
-BG_PANEL = "#16162A"
-BG_GLASS = "#1A1A2E"
-BG_GLASS_BORDER = "#2A2A4A"
-BG_INPUT = "#12121F"
 
-# Accent (overridden from AppState.settings.accent in runtime)
+
+# Backgrounds (CANVAS_FALLBACK only — never use on UI panels)
+
+BG_DEEP = "#0B0C15"
+
+CANVAS_FALLBACK = "#1E2330"
+
+BG_PANEL = "#3A4155"
+
+BG_GLASS = "#424A60"
+
+BG_GLASS_BORDER = "#5A6278"
+
+BG_INPUT = "#3D4558"
+
+
+
+# Glass palette — lighter floating panels (no near-black slabs)
+
+GLASS_BG = "#4A5268"
+
+GLASS_BORDER = "#2E3240"
+
+GLASS_BORDER_ALT = "#2E3240"
+
+GLASS_BORDER_HOVER = "#00FFFF"
+
+LIGHT_GLASS = "#565E74"
+
+
+
+# Accent
+
 ACCENT_DEFAULT = "#3B82F6"
+
 ACCENT_HOVER = "#2563EB"
 
+ACCENT_PRIMARY = ACCENT_DEFAULT
+
+
+
 # Text
-TEXT_PRIMARY = "#F0F0F5"
-TEXT_SECONDARY = "#A0A0B8"
-TEXT_MUTED = "#6B6B80"
+
+TEXT_PRIMARY = "#FFFFFF"
+
+TEXT_SECONDARY = "#94A3B8"
+
+TEXT_MUTED = "#64748B"
+
+TEXT_HEADING = TEXT_PRIMARY
+
+TEXT_LABEL = TEXT_SECONDARY
+
+TEXT_LOG = TEXT_MUTED
+
+TEXT_SHADOW = "#333333"
+
+
 
 # Semantic
+
 STATUS_READY = "#22C55E"
+
 STATUS_BUSY = "#EAB308"
+
 STATUS_ERROR = "#EF4444"
 
+STATUS_READY_BG = "#1A2E24"
+
+STATUS_BUSY_BG = "#2E2A1A"
+
+STATUS_ERROR_BG = "#2E1A1A"
+
+STATUS_OFFLINE_BG = "#1C1C28"
+
+
+
+# Hero / ribbon (ActionRibbon pills + HeroPanel)
+
+HERO_CYAN = "#00FFFF"
+
+HERO_CYAN_DIM = "#1A4A52"
+
+HERO_BORDER_IDLE = "#124853"
+
+HERO_BORDER_HOVER = "#1A6B75"
+
+RIBBON_PILL_BG = "#1A1D26"
+
+RIBBON_PILL_BORDER = "#3A3F53"
+
+
+
 # Typography
+
 FONT_FAMILY = "Segoe UI"
+
 FONT_TITLE = (FONT_FAMILY, 18, "bold")
+
 FONT_HEADER = (FONT_FAMILY, 13, "bold")
+
 FONT_BODY = (FONT_FAMILY, 12)
+
 FONT_SMALL = (FONT_FAMILY, 11)
+
 FONT_MONO = ("Consolas", 11)
 
-# Layout
+
+
+# Layout (frozen shell)
+
 WINDOW_WIDTH = 1100
+
 WINDOW_HEIGHT = 700
-SIDEBAR_WIDTH = 180
-TOP_BAR_HEIGHT = 52
-CORNER_RADIUS = 10
-PAD = 16
+
+HEADER_H = 56
+
+TOP_BAR_HEIGHT = HEADER_H
+
+SIDEBAR_WIDTH = 220
+
+FOOTER_H = 32
+
+PAD = 24
+
+GAP = 16
+
+CORNER_RADIUS = 16
+
+CARD_RADIUS = CORNER_RADIUS
+
+HERO_RADIUS = 30
+
+CARD_MIN_H = 180
+
+
+
+# Sidebar accent stripe
+
+SIDEBAR_STRIPE_W = 3
+
+
 
 # Animation
+
 FADE_IN_MS = 150
+
 FADE_STEPS = 10
+
+

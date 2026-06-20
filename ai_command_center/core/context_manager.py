@@ -70,6 +70,7 @@ class ContextManager:
         notes: list[str] | None = None,
         graph_snippets: list[str] | None = None,
         conversation_history: list[tuple[str, str]] | None = None,
+        clipboard_intent: bool = False,
     ) -> ContextBundle:
         query = query.strip()
         if not query:
@@ -79,10 +80,11 @@ class ContextManager:
         sources: list[str] = []
         sections: list[tuple[int, str, str]] = []
 
-        history_budget = max(200, budget // 3)
-        working_history = list(conversation_history or [])
+        working_history: list[tuple[str, str]] = []
         summary: str | None = None
-        if working_history:
+        if conversation_history and not (clipboard_intent and clipboard):
+            history_budget = max(200, budget // 3)
+            working_history = list(conversation_history)
             working_history, summary = _compress_history(working_history, history_budget)
 
         if summary:
@@ -109,7 +111,8 @@ class ContextManager:
         if clipboard:
             body = clipboard.strip()
             if body:
-                sections.append((4, "clipboard", body))
+                clip_prio = 1 if clipboard_intent else 4
+                sections.append((clip_prio, "clipboard", body))
 
         sections.append((5, "user_query", query))
 

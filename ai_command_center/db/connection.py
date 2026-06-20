@@ -30,6 +30,7 @@ def init_database(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
     connection.executescript(script)
     _migrate_note_fts(connection)
     _migrate_memory_graph(connection)
+    _migrate_telemetry(connection)
     connection.commit()
     if own:
         return connection
@@ -37,14 +38,31 @@ def init_database(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
 
 
 def _migrate_note_fts(conn: sqlite3.Connection) -> None:
-    """Rebuild FTS table when upgrading from external-content schema."""
+    """Rebuild note FTS when upgrading from external-content or stale trigger schema."""
     row = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='note_fts'"
     ).fetchone()
-    if row is None or row["sql"] is None:
+    fts_sql = ""
+    if row is not None:
+        fts_sql = str(row[0] if isinstance(row, tuple) else row["sql"] or "")
+
+    trigger_rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='note_index'"
+    ).fetchall()
+    stale_triggers = [
+        str(r[0] if isinstance(r, tuple) else r["name"]) for r in trigger_rows
+    ]
+
+    standalone = "path" in fts_sql.lower() and "content=" not in fts_sql.lower()
+    needs_rebuild = bool(stale_triggers) or not standalone
+
+    for name in stale_triggers:
+        conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+
+    if not needs_rebuild:
         return
-    if "path" in str(row["sql"]):
-        return
+
+    conn.execute("DELETE FROM note_index")
     conn.execute("DROP TABLE IF EXISTS note_fts")
     conn.executescript(
         """
@@ -84,5 +102,25 @@ def _migrate_memory_graph(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX idx_memory_edges_source ON memory_edges(source_id);
         CREATE INDEX idx_memory_edges_target ON memory_edges(target_id);
+        """
+    )
+
+
+def _migrate_telemetry(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='telemetry_events'"
+    ).fetchone()
+    if row is not None:
+        return
+    conn.executescript(
+        """
+        CREATE TABLE telemetry_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            payload TEXT NOT NULL
+        );
+        CREATE INDEX idx_telemetry_events_event ON telemetry_events(event);
+        CREATE INDEX idx_telemetry_events_timestamp ON telemetry_events(timestamp);
         """
     )

@@ -42,8 +42,19 @@ class NoteRepository:
         if row is not None and float(row["mtime"]) == mtime:
             return False
 
-        self._conn.execute("DELETE FROM note_index WHERE path = ?", (path,))
-        self._conn.execute("DELETE FROM note_fts WHERE path = ?", (path,))
+        old = self._conn.execute(
+            "SELECT title, body FROM note_index WHERE path = ?", (path,)
+        ).fetchone()
+        if old is not None:
+            self._conn.execute(
+                """
+                INSERT INTO note_fts(note_fts, path, title, body)
+                VALUES ('delete', ?, ?, ?)
+                """,
+                (path, str(old["title"]), str(old["body"])),
+            )
+            self._conn.execute("DELETE FROM note_index WHERE path = ?", (path,))
+
         self._conn.execute(
             "INSERT INTO note_index (path, title, mtime, body) VALUES (?, ?, ?, ?)",
             (path, title, mtime, body),
@@ -56,8 +67,18 @@ class NoteRepository:
         return True
 
     def remove(self, path: str) -> None:
-        self._conn.execute("DELETE FROM note_index WHERE path = ?", (path,))
-        self._conn.execute("DELETE FROM note_fts WHERE path = ?", (path,))
+        old = self._conn.execute(
+            "SELECT title, body FROM note_index WHERE path = ?", (path,)
+        ).fetchone()
+        if old is not None:
+            self._conn.execute(
+                """
+                INSERT INTO note_fts(note_fts, path, title, body)
+                VALUES ('delete', ?, ?, ?)
+                """,
+                (path, str(old["title"]), str(old["body"])),
+            )
+            self._conn.execute("DELETE FROM note_index WHERE path = ?", (path,))
         self._conn.commit()
 
     def search(self, query: str, *, limit: int = 20) -> list[NoteHit]:

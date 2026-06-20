@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 from ai_command_center.core.event_bus import Event, EventBus
+from ai_command_center.core.events.topics import SETTINGS_CHANGED, SETTINGS_SNAPSHOT, SETTINGS_SET_REQUEST
+from ai_command_center.core.settings.settings_service import SettingsService as CoreSettingsService
 from ai_command_center.db.repository import SettingsRepository
 from ai_command_center.services.base import BaseService
 
@@ -21,7 +23,6 @@ _DEFAULTS: dict[str, str] = {
     "window_height": "700",
     "obsidian_vault_path": "",
     "overlay_mode": "palette",
-    "summarize_model": "llama3.2:3b",
 }
 
 
@@ -32,11 +33,12 @@ class SettingsService(BaseService):
         super().__init__(bus)
         self._repo = repo
         self._unsubscribers: list[Callable[[], None]] = []
+        self._core_settings = CoreSettingsService(repo=repo, bus=bus)
 
     def _on_load(self) -> None:
         self._repo.ensure_defaults(_DEFAULTS)
         self._unsubscribers.append(
-            self._bus.subscribe("settings.set_request", self._on_set_request)
+            self._bus.subscribe(SETTINGS_SET_REQUEST, self._on_set_request)
         )
         self._publish_snapshot()
 
@@ -50,12 +52,12 @@ class SettingsService(BaseService):
         value = event.payload.get("value")
         if key is None or value is None:
             return
-        self.set(str(key), str(value))
+        self.set(str(key), value)
 
-    def set(self, key: str, value: str) -> None:
-        self._repo.set(key, value)
+    def set(self, key: str, value: Any) -> None:
+        self._core_settings.set(key, value)
         self._bus.publish(
-            "settings.changed",
+            SETTINGS_CHANGED,
             {"key": key, "value": value},
             source=self.name,
         )
@@ -63,4 +65,4 @@ class SettingsService(BaseService):
 
     def _publish_snapshot(self) -> None:
         payload = {k: self._repo.get(k, v) for k, v in _DEFAULTS.items()}
-        self._bus.publish("settings.snapshot", payload, source=self.name)
+        self._bus.publish(SETTINGS_SNAPSHOT, payload, source=self.name)

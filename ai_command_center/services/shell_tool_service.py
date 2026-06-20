@@ -7,6 +7,7 @@ from typing import Callable
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import COMMAND_ROUTED, TOOL_INVOKE
 from ai_command_center.services.base import BaseService
 from ai_command_center.services.command_router_service import INTENT_SHELL
 
@@ -22,7 +23,7 @@ class ShellToolService(BaseService):
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
-            self._bus.subscribe("command.routed", self._on_command_routed)
+            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
         )
 
     def _on_unload(self) -> None:
@@ -40,7 +41,7 @@ class ShellToolService(BaseService):
         if not command:
             return
         self._bus.publish(
-            "tool.invoke",
+            TOOL_INVOKE,
             {
                 "contract_version": TOOL_CONTRACT_VERSION,
                 "invoke_id": uuid.uuid4().hex,

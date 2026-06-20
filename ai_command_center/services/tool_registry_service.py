@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from ai_command_center.core.events.topics import TOOL_STARTED, TOOL_RESULT, TOOL_ERROR
 from ai_command_center.core.tools import ToolSpec
 from ai_command_center.services.base import BaseService
+from ai_command_center.tools.tool_registry import ToolRegistry
 
 
 class ToolRegistryService(BaseService):
@@ -14,11 +16,13 @@ class ToolRegistryService(BaseService):
     def __init__(self, bus) -> None:
         super().__init__(bus)
         self._tools: dict[str, ToolSpec] = {}
+        self._registry = ToolRegistry()
 
     def register(self, spec: ToolSpec) -> None:
         self._tools[spec.name] = spec
+        self._registry.register_tool(spec.name, {"description": spec.description, "name": spec.name})
         self._bus.publish(
-            "tool.registered",
+            TOOL_STARTED,
             {"name": spec.name, "description": spec.description},
             source=self.name,
         )

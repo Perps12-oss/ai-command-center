@@ -7,6 +7,14 @@ from abc import abstractmethod
 
 from ai_command_center.core.context_manager import ContextBundle
 from ai_command_center.core.contracts import OLLAMA_SERVICE_API_VERSION
+from ai_command_center.core.events.topics import (
+    CHAT_CANCELLED,
+    CHAT_CHUNK,
+    CHAT_COMPLETE,
+    CHAT_STARTED,
+    OLLAMA_MODEL_LOADED,
+    OLLAMA_MODEL_UNLOADED,
+)
 from ai_command_center.services.base import BaseService
 
 # Stub response prefix — proves bundle reached Ollama layer without network.
@@ -86,7 +94,7 @@ class StubOllamaService(OllamaServiceBase):
     def load_model(self, model: str) -> None:
         self._loaded_model = model
         self._bus.publish(
-            "ollama.model_loaded",
+            OLLAMA_MODEL_LOADED,
             {"model": model, "stub": True},
             source=self.name,
         )
@@ -96,7 +104,7 @@ class StubOllamaService(OllamaServiceBase):
         self._loaded_model = None
         if prev:
             self._bus.publish(
-                "ollama.model_unloaded",
+                OLLAMA_MODEL_UNLOADED,
                 {"model": prev, "stub": True},
                 source=self.name,
             )
@@ -116,7 +124,7 @@ class StubOllamaService(OllamaServiceBase):
         self._cancelled = False
 
         self._bus.publish(
-            "chat.started",
+            CHAT_STARTED,
             {
                 "request_id": rid,
                 "model": model,
@@ -131,7 +139,7 @@ class StubOllamaService(OllamaServiceBase):
         for i in range(0, len(response), 12):
             if self._cancelled:
                 self._bus.publish(
-                    "chat.cancelled",
+                    CHAT_CANCELLED,
                     {"request_id": rid, "stub": True},
                     source=self.name,
                 )
@@ -139,20 +147,20 @@ class StubOllamaService(OllamaServiceBase):
                 return rid
             chunk = response[i : i + 12]
             self._bus.publish(
-                "chat.chunk",
+                CHAT_CHUNK,
                 {"request_id": rid, "text": chunk, "stub": True},
                 source=self.name,
             )
 
         if self._cancelled:
             self._bus.publish(
-                "chat.cancelled",
+                CHAT_CANCELLED,
                 {"request_id": rid, "stub": True},
                 source=self.name,
             )
         else:
             self._bus.publish(
-                "chat.complete",
+                CHAT_COMPLETE,
                 {
                     "request_id": rid,
                     "text": response,

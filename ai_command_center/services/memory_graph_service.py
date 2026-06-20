@@ -5,6 +5,18 @@ from __future__ import annotations
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import (
+    COMMAND_ROUTED,
+    MEMORY_CLEAR_SELECTION,
+    MEMORY_CLEARED,
+    MEMORY_ERROR,
+    MEMORY_LOOKUP_REQUEST,
+    MEMORY_LOOKUP_RESULT,
+    MEMORY_REMEMBER,
+    MEMORY_SELECT,
+    MEMORY_STORED,
+    MEMORY_SELECTED,
+)
 from ai_command_center.db.memory_repository import MemoryRepository
 from ai_command_center.services.base import BaseService
 from ai_command_center.services.command_router_service import (
@@ -24,16 +36,19 @@ class MemoryGraphService(BaseService):
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
-            self._bus.subscribe("memory.remember", self._on_remember)
+            self._bus.subscribe(MEMORY_REMEMBER, self._on_remember)
         )
         self._unsubscribers.append(
-            self._bus.subscribe("memory.select", self._on_select)
+            self._bus.subscribe(MEMORY_SELECT, self._on_select)
         )
         self._unsubscribers.append(
-            self._bus.subscribe("memory.clear_selection", self._on_clear)
+            self._bus.subscribe(MEMORY_CLEAR_SELECTION, self._on_clear)
         )
         self._unsubscribers.append(
-            self._bus.subscribe("command.routed", self._on_command_routed)
+            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(MEMORY_LOOKUP_REQUEST, self._on_lookup_request)
         )
 
     def _on_unload(self) -> None:
@@ -57,8 +72,8 @@ class MemoryGraphService(BaseService):
     def _handle_remember_command(self, body: str) -> None:
         if not body:
             self._bus.publish(
-                "memory.error",
-                {"message": "remember: requires label | content"},
+                MEMORY_ERROR,
+                {"message": "remember: requires label | content (example: remember: api-key | sk-...)"},
                 source=self.name,
             )
             return
@@ -68,14 +83,14 @@ class MemoryGraphService(BaseService):
             label, _, content = body.partition(" ")
         if not label or not content:
             self._bus.publish(
-                "memory.error",
+                MEMORY_ERROR,
                 {"message": "remember: use 'label | content' or 'label content...'"},
                 source=self.name,
             )
             return
         self._on_remember(
             Event(
-                topic="memory.remember",
+                topic=MEMORY_REMEMBER,
                 payload={"label": label, "content": content},
                 source=self.name,
             )
@@ -84,17 +99,33 @@ class MemoryGraphService(BaseService):
     def _handle_select_command(self, query: str) -> None:
         if not query:
             self._bus.publish(
-                "memory.error",
+                MEMORY_ERROR,
                 {"message": "memory: requires a search query"},
                 source=self.name,
             )
             return
         self._on_select(
             Event(
-                topic="memory.select",
+                topic=MEMORY_SELECT,
                 payload={"query": query},
                 source=self.name,
             )
+        )
+
+    def _on_lookup_request(self, event: Event) -> None:
+        query = str(event.payload.get("query", "")).strip()
+        snippets: list[str] = []
+        if query:
+            nodes = self._repo.search(query)
+            snippets = [f"[memory:{n.label}]\n{n.content}" for n in nodes[:3]]
+        self._bus.publish(
+            MEMORY_LOOKUP_RESULT,
+            {
+                "request_id": event.payload.get("request_id", ""),
+                "snippets": snippets,
+                "source": self.name,
+            },
+            source=self.name,
         )
 
     def _on_remember(self, event: Event) -> None:
@@ -102,7 +133,7 @@ class MemoryGraphService(BaseService):
         content = str(event.payload.get("content", "")).strip()
         if not label or not content:
             self._bus.publish(
-                "memory.error",
+                MEMORY_ERROR,
                 {"message": "memory.remember requires label and content"},
                 source=self.name,
             )
@@ -116,7 +147,7 @@ class MemoryGraphService(BaseService):
             relation=str(event.payload.get("relation", "relates_to")),
         )
         self._bus.publish(
-            "memory.stored",
+            MEMORY_STORED,
             {"id": node_id, "label": label},
             source=self.name,
         )
@@ -133,20 +164,18 @@ class MemoryGraphService(BaseService):
             nodes = self._repo.search(query)
         if not nodes:
             self._bus.publish(
-                "memory.error",
+                MEMORY_ERROR,
                 {"message": "no memory nodes matched selection"},
                 source=self.name,
             )
             return
-        self._selected_snippets = [
-            f"[memory:{n.label}]\n{n.content}" for n in nodes[:3]
-        ]
+        self._selected_snippets = [f"[memory:{n.label}]\n{n.content}" for n in nodes[:3]]
         self._bus.publish(
-            "memory.selected",
+            MEMORY_SELECTED,
             {"count": len(self._selected_snippets), "labels": [n.label for n in nodes[:3]]},
             source=self.name,
         )
 
     def _on_clear(self, _event: Event) -> None:
         self._selected_snippets.clear()
-        self._bus.publish("memory.cleared", {}, source=self.name)
+        self._bus.publish(MEMORY_CLEARED, {}, source=self.name)

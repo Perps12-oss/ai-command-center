@@ -3,13 +3,26 @@
 from __future__ import annotations
 
 import queue
+import sqlite3
 import threading
 import time
 from pathlib import Path
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
-from ai_command_center.db.note_repository import NoteRepository
+from ai_command_center.core.events.topics import (
+    COMMAND_ROUTED,
+    NOTE_CREATED,
+    NOTE_ERROR,
+    NOTE_INDEX_COMPLETE,
+    NOTE_INDEX_PROGRESS,
+    NOTE_SEARCH_RESULTS,
+    NOTE_SELECT,
+    NOTE_SELECTED,
+    SETTINGS_SNAPSHOT,
+)
+from ai_command_center.core.settings.settings_repository import SettingsRepository
+from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.services.base import BaseService
 from ai_command_center.services.command_router_service import (
     INTENT_NOTE_NEW,
@@ -39,9 +52,10 @@ class ObsidianService(BaseService):
 
     name = "obsidian"
 
-    def __init__(self, bus, repo: NoteRepository) -> None:
+    def __init__(self, bus, repo: NoteRepository, settings_repo: SettingsRepository | None = None) -> None:
         super().__init__(bus)
         self._repo = repo
+        self._settings_repo = settings_repo
         self._repo_lock = threading.Lock()
         self._vault_path: Path | None = None
         self._selected_path: str | None = None
@@ -55,6 +69,7 @@ class ObsidianService(BaseService):
         self._last_vault_stats: tuple[int, int] = (0, 0)
 
     def _on_load(self) -> None:
+        self._repo.set_vault_path(self._vault_path_from_settings())
         self._index_stop.clear()
         self._index_thread = threading.Thread(
             target=self._index_worker,
@@ -62,15 +77,24 @@ class ObsidianService(BaseService):
             daemon=True,
         )
         self._index_thread.start()
-        self._unsubscribers.append(
-            self._bus.subscribe("settings.snapshot", self._on_settings_snapshot)
-        )
-        self._unsubscribers.append(
-            self._bus.subscribe("command.routed", self._on_command_routed)
-        )
-        self._unsubscribers.append(
-            self._bus.subscribe("note.select", self._on_note_select)
-        )
+        self._unsubscribers.append(self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot))
+        self._unsubscribers.append(self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed))
+        self._unsubscribers.append(self._bus.subscribe(NOTE_SELECT, self._on_note_select))
+        self._unsubscribers.append(self._bus.subscribe("note.context.request", self._on_note_context_request))
+        if self._settings_repo is not None:
+            self._apply_vault_path(self._settings_repo.get("obsidian_vault_path", ""))
+
+    def _vault_path_from_settings(self) -> str:
+        if self._settings_repo is None:
+            return ""
+        return str(self._settings_repo.get("obsidian_vault_path", ""))
+
+    def _apply_vault_path(self, raw: str) -> None:
+        path = str(raw or "").strip()
+        self._vault_path = Path(path) if path else None
+        self._repo.set_vault_path(self._vault_path)
+        if self._vault_path is not None and self._vault_path.is_dir():
+            self._schedule_index(self._vault_path)
 
     def _on_unload(self) -> None:
         self._index_stop.set()
@@ -83,8 +107,18 @@ class ObsidianService(BaseService):
         self._unsubscribers.clear()
 
     def _on_settings_snapshot(self, event: Event) -> None:
-        raw = str(event.payload.get("obsidian_vault_path", "")).strip()
-        self._vault_path = Path(raw) if raw else None
+        self._apply_vault_path(str(event.payload.get("obsidian_vault_path", "")))
+
+    def _on_note_context_request(self, event: Event) -> None:
+        self._bus.publish(
+            "note.context.result",
+            {
+                "request_id": event.payload.get("request_id", ""),
+                "notes": self.get_context_notes(),
+                "selected_path": self._selected_path,
+            },
+            source=self.name,
+        )
 
     def get_context_notes(self) -> list[str]:
         """Note bodies selected for opt-in chat injection."""
@@ -115,7 +149,7 @@ class ObsidianService(BaseService):
         body = self.read_note(path)
         if body is None:
             self._bus.publish(
-                "note.error",
+                NOTE_ERROR,
                 {"message": f"Could not read note: {path}"},
                 source=self.name,
             )
@@ -123,7 +157,7 @@ class ObsidianService(BaseService):
         self._selected_path = path
         self._selected_body = body
         self._bus.publish(
-            "note.selected",
+            NOTE_SELECTED,
             {"path": path, "title": _title_from_markdown(Path(path), body)},
             source=self.name,
         )
@@ -131,7 +165,7 @@ class ObsidianService(BaseService):
     def _require_vault(self) -> Path | None:
         if self._vault_path is None or not self._vault_path.is_dir():
             self._bus.publish(
-                "note.error",
+                NOTE_ERROR,
                 {
                     "message": (
                         "Obsidian vault not configured. Set obsidian_vault_path in settings."
@@ -150,7 +184,7 @@ class ObsidianService(BaseService):
     def _handle_search(self, query: str) -> None:
         if not query:
             self._bus.publish(
-                "note.error",
+                NOTE_ERROR,
                 {"message": "note: requires a search query"},
                 source=self.name,
             )
@@ -184,7 +218,7 @@ class ObsidianService(BaseService):
         with self._repo_lock:
             indexed_count = self._repo.count_indexed()
         self._bus.publish(
-            "note.search_results",
+            NOTE_SEARCH_RESULTS,
             {
                 "query": query,
                 "results": [
@@ -204,7 +238,7 @@ class ObsidianService(BaseService):
     def _handle_new_note(self, body: str) -> None:
         if not body:
             self._bus.publish(
-                "note.error",
+                NOTE_ERROR,
                 {"message": "new note: requires note body"},
                 source=self.name,
             )
@@ -214,15 +248,22 @@ class ObsidianService(BaseService):
             return
 
         inbox = vault / "Inbox"
-        inbox.mkdir(exist_ok=True)
+        inbox.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d-%H%M%S")
         path = inbox / f"Quick-{stamp}.md"
         title = _title_from_markdown(path, body)
         content = body if body.lstrip().startswith("#") else f"# {title}\n\n{body}"
-        path.write_text(content, encoding="utf-8")
+        written = self._repo.write_note(path.relative_to(vault), content)
+        if written is None:
+            self._bus.publish(
+                NOTE_ERROR,
+                {"message": "Could not write note to vault"},
+                source=self.name,
+            )
+            return
         self._index_file(vault, path)
         self._bus.publish(
-            "note.created",
+            NOTE_CREATED,
             {"path": str(path.relative_to(vault)).replace("\\", "/"), "title": title},
             source=self.name,
         )
@@ -276,7 +317,7 @@ class ObsidianService(BaseService):
                     indexed += 1
                 if scanned % _PROGRESS_EVERY == 0:
                     self._bus.publish(
-                        "note.index_progress",
+                        NOTE_INDEX_PROGRESS,
                         {
                             "scanned_files": scanned,
                             "indexed_files": indexed,
@@ -291,7 +332,7 @@ class ObsidianService(BaseService):
             with self._repo_lock:
                 total_indexed = self._repo.count_indexed()
             self._bus.publish(
-                "note.index_complete",
+                NOTE_INDEX_COMPLETE,
                 {
                     "scanned_files": scanned,
                     "indexed_files": total_indexed,
@@ -329,5 +370,13 @@ class ObsidianService(BaseService):
         except OSError:
             return False
         title = _title_from_markdown(path, body)
-        with self._repo_lock:
-            return self._repo.upsert(rel, title, body, stat.st_mtime)
+        try:
+            with self._repo_lock:
+                return self._repo.upsert(rel, title, body, stat.st_mtime)
+        except sqlite3.IntegrityError as exc:
+            self._bus.publish(
+                NOTE_ERROR,
+                {"message": f"Could not index {rel}: {exc}"},
+                source=self.name,
+            )
+            return False

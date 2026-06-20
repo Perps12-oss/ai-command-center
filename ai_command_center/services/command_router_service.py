@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.topics import COMMAND_ROUTED, UI_COMMAND
 from ai_command_center.core.contracts import COMMAND_ROUTED_VERSION
 from ai_command_center.services.base import BaseService
 
@@ -17,6 +18,29 @@ INTENT_NAVIGATE = "navigate"
 INTENT_MEMORY_REMEMBER = "memory_remember"
 INTENT_MEMORY_SELECT = "memory_select"
 INTENT_UNKNOWN = "unknown"
+
+_VIEW_ALIASES: dict[str, str] = {
+    "settings": "settings",
+    "chat": "chat",
+    "notes": "notes",
+    "plugins": "plugins",
+    "home": "home",
+    "system": "system",
+}
+
+# Obvious shell verbs when user omits the ">" prefix.
+_SHELL_VERBS: tuple[str, ...] = (
+    "echo ",
+    "dir",
+    "dir ",
+    "cd ",
+    "type ",
+    "ls ",
+    "pwd",
+    "whoami",
+    "get-childitem",
+    "get-content ",
+)
 
 
 class CommandRouterService(BaseService):
@@ -34,7 +58,7 @@ class CommandRouterService(BaseService):
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
-        self._unsubscribers.append(self._bus.subscribe("ui.command", self._on_ui_command))
+        self._unsubscribers.append(self._bus.subscribe(UI_COMMAND, self._on_ui_command))
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -50,7 +74,7 @@ class CommandRouterService(BaseService):
         if clipboard and intent == INTENT_CHAT:
             args = {**args, "clipboard": str(clipboard)}
         self._bus.publish(
-            "command.routed",
+            COMMAND_ROUTED,
             {
                 "contract_version": COMMAND_ROUTED_VERSION,
                 "text": text,
@@ -64,7 +88,10 @@ class CommandRouterService(BaseService):
 
     @staticmethod
     def _classify(text: str) -> tuple[str, dict[str, str]]:
-        lower = text.lower()
+        stripped = text.strip()
+        lower = stripped.lower()
+        if lower in _VIEW_ALIASES:
+            return INTENT_NAVIGATE, {"view": _VIEW_ALIASES[lower]}
         if text.startswith(">"):
             return INTENT_SHELL, {"command": text[1:].strip()}
         if lower.startswith("note:"):
@@ -77,4 +104,7 @@ class CommandRouterService(BaseService):
             return INTENT_MEMORY_REMEMBER, {"body": text[9:].strip()}
         if lower.startswith("memory:"):
             return INTENT_MEMORY_SELECT, {"query": text[7:].strip()}
+        for verb in _SHELL_VERBS:
+            if lower == verb.strip() or lower.startswith(verb):
+                return INTENT_SHELL, {"command": stripped}
         return INTENT_CHAT, {"prompt": text}
