@@ -368,6 +368,9 @@ class CommandPaletteApp(ctk.CTk):
             home = self._home_view()
             if home:
                 home.update_ollama(online, model)
+            chat = self._chat_view()
+            if chat and online and model:
+                chat.set_model(model)
 
         self._ui_queue.enqueue(update)
 
@@ -377,6 +380,9 @@ class CommandPaletteApp(ctk.CTk):
         def update() -> None:
             if model:
                 self._top.update_status(self._controller.snapshot().phase, model)
+                chat = self._chat_view()
+                if chat:
+                    chat.set_model(model)
 
         self._ui_queue.enqueue(update)
 
