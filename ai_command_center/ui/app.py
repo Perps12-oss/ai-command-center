@@ -150,6 +150,7 @@ class CommandPaletteApp(ctk.CTk):
                     on_cancel=self._controller.publish_chat_cancel,
                     on_export=self._on_chat_export,
                     on_regenerate=self._on_chat_regenerate,
+                    on_send=self._on_command,
                 )
             elif view_id == "notes":
                 self._views[view_id] = NotesView(

@@ -1,6 +1,7 @@
-"""Chat view — mobile-style messaging UI, strictly isolated to conversation display."""
+"""Chat view — modern mobile-style messaging UI, strictly isolated to conversation display."""
 from __future__ import annotations
 
+import time
 from typing import Callable
 
 import customtkinter as ctk
@@ -10,10 +11,46 @@ from ai_command_center.ui.theme import tokens as T
 
 # ── Layout constants ───────────────────────────────────────────────────────────
 _BUBBLE_RADIUS  = 18
-_BUBBLE_WRAP    = 560   # wraplength for label text (px)
-_BUBBLE_TBX_W   = 580   # textbox width for assistant bubble (px)
-_BUBBLE_MAX_PAD = 80    # horizontal spacer that pushes bubbles left/right
-_SIDE_PAD       = 12    # outer horizontal padding on each message row
+_BUBBLE_WRAP    = 540   # wraplength for label text (px)
+_BUBBLE_TBX_W   = 560   # textbox width for assistant bubble (px)
+_BUBBLE_MAX_PAD = 80    # minimum spacer that pushes bubbles away from the far side
+_SIDE_PAD       = 12    # outer horizontal padding on message rows
+
+
+def _hhmm() -> str:
+    return time.strftime("%H:%M")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Copy micro-button  (shared by both bubble types)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _CopyBtn(ctk.CTkButton):
+    """Tiny clipboard button — flashes ✓ for 1.5 s then resets."""
+
+    def __init__(self, master, get_text: Callable[[], str]) -> None:
+        super().__init__(
+            master,
+            text="⎘",
+            width=24,
+            height=20,
+            font=(T.FONT_FAMILY, 11),
+            fg_color="transparent",
+            hover_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_MUTED,
+            corner_radius=4,
+            command=self._copy,
+        )
+        self._get_text = get_text
+
+    def _copy(self) -> None:
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(self._get_text())
+            self.configure(text="✓", text_color=T.STATUS_READY)
+            self.after(1500, lambda: self.configure(text="⎘", text_color=T.TEXT_MUTED))
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +58,7 @@ _SIDE_PAD       = 12    # outer horizontal padding on each message row
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _UserBubble(ctk.CTkFrame):
-    """Solid accent-colour pill — right side of the conversation."""
+    """Solid accent-colour pill, right side.  Timestamp + copy sit below it."""
 
     def __init__(self, master, text: str) -> None:
         super().__init__(
@@ -30,6 +67,7 @@ class _UserBubble(ctk.CTkFrame):
             corner_radius=_BUBBLE_RADIUS,
             border_width=0,
         )
+        self._text = text
         ctk.CTkLabel(
             self,
             text=text,
@@ -42,11 +80,11 @@ class _UserBubble(ctk.CTkFrame):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Assistant bubble  (left-aligned, soft surface colour, supports streaming)
+#  Assistant bubble  (left-aligned, soft surface colour, streaming-aware)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _AssistantBubble(ctk.CTkFrame):
-    """Soft surface pill — left side, streams text in, auto-sizes."""
+    """Soft surface pill, left side — streams text in, auto-sizes."""
 
     def __init__(self, master) -> None:
         super().__init__(
@@ -71,8 +109,6 @@ class _AssistantBubble(ctk.CTkFrame):
         self._textbox.configure(state="disabled")
         self._set("●  ●  ●")
 
-    # ── internal ───────────────────────────────────────────────────────────────
-
     def _set(self, text: str) -> None:
         self._textbox.configure(state="normal")
         self._textbox.delete("1.0", "end")
@@ -85,8 +121,6 @@ class _AssistantBubble(ctk.CTkFrame):
         h = max(40, min(lines * 20 + 20, 500))
         self._textbox.configure(height=h)
 
-    # ── public ─────────────────────────────────────────────────────────────────
-
     def append_raw(self, chunk: str) -> None:
         self._raw += chunk
         self._set(self._raw)
@@ -97,29 +131,27 @@ class _AssistantBubble(ctk.CTkFrame):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  System strip  (thin notice bar — errors, tool results, cancelled)
+#  System strip  (errors, tool results, cancellations — not a chat bubble)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _SystemStrip(ctk.CTkFrame):
-    """Minimal inline notice — not a chat bubble, never shows developer paths."""
-
     _PALETTE: dict[str, tuple[str, str]] = {
         "error":     ("#3A1010", T.STATUS_ERROR),
         "tool":      ("#0F2010", T.STATUS_READY),
         "cancelled": ("#1E1E10", T.TEXT_MUTED),
         "system":    ("transparent", T.TEXT_MUTED),
     }
+    _DOT = {"error": "✕", "tool": "✓", "cancelled": "◼", "system": "ℹ"}
 
     def __init__(self, master, kind: str, label: str, body: str) -> None:
         bg, fg = self._PALETTE.get(kind, self._PALETTE["system"])
         super().__init__(master, fg_color=bg, corner_radius=8, border_width=0)
 
-        inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="x", padx=14, pady=7)
-
-        dot = {"error": "✕", "tool": "✓", "cancelled": "◼", "system": "ℹ"}.get(kind, "·")
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=14, pady=7)
+        dot = self._DOT.get(kind, "·")
         ctk.CTkLabel(
-            inner,
+            hdr,
             text=f"{dot}  {label or kind.upper()}",
             font=(T.FONT_FAMILY, 11, "bold"),
             text_color=fg,
@@ -143,19 +175,19 @@ class _SystemStrip(ctk.CTkFrame):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _InputPill(ctk.CTkFrame):
-    """Pill-shaped input bar — attachment icon · text field · send/stop button."""
+    """Pill-shaped input bar: attachment icon · text field · round send/stop button."""
 
-    def __init__(self, master, on_send: Callable[[str], None] | None, on_stop: Callable[[], None]) -> None:
-        super().__init__(
-            master,
-            fg_color=T.BG_PANEL,
-            corner_radius=0,
-        )
-        self._on_send = on_send
-        self._on_stop = on_stop
+    def __init__(
+        self,
+        master,
+        on_send: Callable[[str], None] | None,
+        on_stop: Callable[[], None],
+    ) -> None:
+        super().__init__(master, fg_color=T.BG_PANEL, corner_radius=0)
+        self._on_send   = on_send
+        self._on_stop   = on_stop
         self._streaming = False
 
-        # Outer pill wrapper
         pill = ctk.CTkFrame(
             self,
             fg_color=T.BG_GLASS,
@@ -165,7 +197,7 @@ class _InputPill(ctk.CTkFrame):
         )
         pill.pack(fill="x", padx=16, pady=10)
 
-        # ── Attachment / plugin icon ───────────────────────────────────────────
+        # Attachment / plugin icon
         ctk.CTkButton(
             pill,
             text="⊕",
@@ -179,7 +211,7 @@ class _InputPill(ctk.CTkFrame):
             command=lambda: None,
         ).pack(side="left", padx=(8, 0), pady=6)
 
-        # ── Text entry ─────────────────────────────────────────────────────────
+        # Text entry
         self._entry = ctk.CTkEntry(
             pill,
             placeholder_text="Message…",
@@ -193,7 +225,7 @@ class _InputPill(ctk.CTkFrame):
         self._entry.pack(side="left", fill="x", expand=True, padx=6, pady=6)
         self._entry.bind("<Return>", self._submit)
 
-        # ── Send / Stop button ─────────────────────────────────────────────────
+        # Send / Stop round button
         self._action_btn = ctk.CTkButton(
             pill,
             text="▶",
@@ -208,7 +240,7 @@ class _InputPill(ctk.CTkFrame):
         )
         self._action_btn.pack(side="right", padx=(0, 8), pady=6)
 
-        # ── Status micro-label ─────────────────────────────────────────────────
+        # Status micro-label (right of pill)
         self._status_lbl = ctk.CTkLabel(
             self,
             text="",
@@ -246,13 +278,10 @@ class _InputPill(ctk.CTkFrame):
                 fg_color=T.ACCENT_DEFAULT,
                 hover_color=T.ACCENT_HOVER,
             )
-            self._status_lbl.configure(text="", text_color=T.TEXT_MUTED)
+            self._status_lbl.configure(text="")
 
     def set_status(self, text: str, color: str = "") -> None:
-        self._status_lbl.configure(
-            text=text,
-            text_color=color or T.TEXT_MUTED,
-        )
+        self._status_lbl.configure(text=text, text_color=color or T.TEXT_MUTED)
 
     def focus_input(self) -> None:
         self._entry.focus_set()
@@ -267,23 +296,23 @@ class ChatView(ctk.CTkFrame):
 
     Architecture contract
     ─────────────────────
-    • Receives data only via the public methods listed below (called from
-      UIQueue on the main thread).
+    • Data arrives only via the public methods listed below, called from
+      UIQueue on the main thread.
     • No EventBus, service, or backend imports.
-    • No developer logs, token counts, pipeline paths, or system telemetry.
+    • No developer logs, pipeline paths, or system telemetry on screen.
 
-    Callbacks (all optional except on_cancel)
-    ─────────────────────────────────────────
-    on_cancel(request_id)      — stop streaming
-    on_export(history)         — export conversation list[dict]
-    on_regenerate()            — re-run last prompt
-    on_send(text)              — submit text from the inline input pill
+    Callbacks (on_cancel required; rest optional)
+    ─────────────────────────────────────────────
+    on_cancel(request_id)   — stop streaming
+    on_export(history)      — list[dict] export
+    on_regenerate()         — re-run last prompt
+    on_send(text)           — submit text from the inline input pill
     """
 
     def __init__(
         self,
         master,
-        on_cancel: Callable,
+        on_cancel:     Callable,
         on_export:     Callable[[list[dict]], None] | None = None,
         on_regenerate: Callable[[], None]            | None = None,
         on_send:       Callable[[str], None]         | None = None,
@@ -295,28 +324,24 @@ class ChatView(ctk.CTkFrame):
         self._on_regenerate = on_regenerate
         self._on_send       = on_send
 
-        self._request_id:       str | None             = None
-        self._streaming:        bool                   = False
-        self._streaming_bubble: _AssistantBubble | None = None
-        self._chunk_buffer:     str                    = ""
-        self._flush_pending:    bool                   = False
-        self._history:          list[dict]             = []
+        self._request_id:        str | None              = None
+        self._streaming:         bool                    = False
+        self._streaming_bubble:  _AssistantBubble | None = None
+        self._chunk_buffer:      str                     = ""
+        self._flush_pending:     bool                    = False
+        self._history:           list[dict]              = []
 
         self._build()
 
     # ── layout ────────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        # Message scroll area
         self._scroll = ctk.CTkScrollableFrame(
-            self,
-            fg_color=T.BG_DEEP,
-            corner_radius=0,
+            self, fg_color=T.BG_DEEP, corner_radius=0
         )
         self._scroll.pack(fill="both", expand=True)
         self._scroll.columnconfigure(0, weight=1)
 
-        # Input pill at the bottom
         self._pill = _InputPill(
             self,
             on_send=self._on_send,
@@ -324,65 +349,101 @@ class ChatView(ctk.CTkFrame):
         )
         self._pill.pack(fill="x", side="bottom")
 
-    # ── row helpers ───────────────────────────────────────────────────────────
+    # ── row helpers  (right = user, left = assistant) ──────────────────────────
 
-    def _row_right(self) -> tuple[ctk.CTkFrame, ctk.CTkFrame]:
-        """Return (row_frame, right_slot) — bubble packs into right_slot."""
-        row = ctk.CTkFrame(self._scroll, fg_color="transparent")
-        row.pack(fill="x", padx=_SIDE_PAD, pady=(0, 6))
-        spacer = ctk.CTkFrame(row, fg_color="transparent", width=_BUBBLE_MAX_PAD)
-        spacer.pack(side="left", fill="x", expand=True)
-        slot = ctk.CTkFrame(row, fg_color="transparent")
-        slot.pack(side="right")
-        return row, slot
+    def _user_row(self, text: str) -> None:
+        """Right-aligned user bubble + [copy ⎘] [HH:MM] metadata below."""
+        outer = ctk.CTkFrame(self._scroll, fg_color="transparent")
+        outer.pack(fill="x", padx=_SIDE_PAD, pady=(0, 2))
 
-    def _row_left(self) -> tuple[ctk.CTkFrame, ctk.CTkFrame]:
-        """Return (row_frame, left_slot) — bubble packs into left_slot."""
-        row = ctk.CTkFrame(self._scroll, fg_color="transparent")
-        row.pack(fill="x", padx=_SIDE_PAD, pady=(0, 6))
-        slot = ctk.CTkFrame(row, fg_color="transparent")
-        slot.pack(side="left")
-        spacer = ctk.CTkFrame(row, fg_color="transparent", width=_BUBBLE_MAX_PAD)
-        spacer.pack(side="right", fill="x", expand=True)
-        return row, slot
+        # Bubble row
+        brow = ctk.CTkFrame(outer, fg_color="transparent")
+        brow.pack(fill="x")
+        ctk.CTkFrame(brow, fg_color="transparent").pack(
+            side="left", fill="x", expand=True
+        )
+        bubble = _UserBubble(brow, text)
+        bubble.pack(side="right", anchor="e")
+
+        # Metadata row (right-aligned: copy · timestamp)
+        mrow = ctk.CTkFrame(outer, fg_color="transparent")
+        mrow.pack(fill="x", pady=(2, 6))
+        ctk.CTkFrame(mrow, fg_color="transparent").pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(
+            mrow,
+            text=_hhmm(),
+            font=(T.FONT_FAMILY, 10),
+            text_color=T.TEXT_MUTED,
+        ).pack(side="right", padx=(0, 4))
+        _CopyBtn(mrow, lambda t=text: t).pack(side="right")
+
+    def _assistant_row(self) -> _AssistantBubble:
+        """Left-aligned assistant bubble; returns bubble for streaming.
+        Metadata (copy + timestamp) appended when finalized."""
+        outer = ctk.CTkFrame(self._scroll, fg_color="transparent")
+        outer.pack(fill="x", padx=_SIDE_PAD, pady=(0, 2))
+        outer._meta_pending = True  # type: ignore[attr-defined]
+        outer._ts            = _hhmm()  # type: ignore[attr-defined]
+
+        brow = ctk.CTkFrame(outer, fg_color="transparent")
+        brow.pack(fill="x")
+        bubble = _AssistantBubble(brow)
+        bubble.pack(side="left", anchor="w")
+        ctk.CTkFrame(brow, fg_color="transparent").pack(
+            side="right", fill="x", expand=True
+        )
+
+        # Keep reference so we can add metadata after finalize()
+        self._last_assistant_outer = outer
+        return bubble
+
+    def _finalize_assistant_meta(self, bubble: _AssistantBubble) -> None:
+        """Attach copy + timestamp metadata row after streaming completes."""
+        outer = getattr(self, "_last_assistant_outer", None)
+        if outer is None:
+            return
+        mrow = ctk.CTkFrame(outer, fg_color="transparent")
+        mrow.pack(fill="x", pady=(2, 6))
+        _CopyBtn(mrow, lambda: bubble._raw).pack(side="left")
+        ctk.CTkLabel(
+            mrow,
+            text=getattr(outer, "_ts", _hhmm()),
+            font=(T.FONT_FAMILY, 10),
+            text_color=T.TEXT_MUTED,
+        ).pack(side="left", padx=(4, 0))
+        self._last_assistant_outer = None
 
     # ── public API ─────────────────────────────────────────────────────────────
 
     def load_history(self, messages: list[dict]) -> None:
-        """Populate from a saved conversation list."""
+        """Populate from a saved conversation."""
         self._clear()
         self._history = list(messages)
         for item in messages:
             role    = str(item.get("role", ""))
             content = str(item.get("content", ""))
             if role == "user":
-                self._add_user(content)
+                self._user_row(content)
             elif role == "assistant":
-                _, slot = self._row_left()
-                bubble  = _AssistantBubble(slot)
-                bubble.pack()
+                bubble = self._assistant_row()
                 bubble.finalize(content)
+                self._finalize_assistant_meta(bubble)
         self._scroll_to_bottom()
 
     def show_user_message(self, text: str) -> None:
-        """Add a user message bubble (right-aligned)."""
         self._history.append({"role": "user", "content": text})
-        self._add_user(text)
+        self._user_row(text)
         self._scroll_to_bottom()
 
     def begin_assistant(self, request_id: str) -> None:
-        """Start a streaming assistant response bubble."""
-        self._request_id  = request_id
-        self._streaming   = True
+        self._request_id   = request_id
+        self._streaming    = True
         self._chunk_buffer = ""
-        _, slot = self._row_left()
-        self._streaming_bubble = _AssistantBubble(slot)
-        self._streaming_bubble.pack()
+        self._streaming_bubble = self._assistant_row()
         self._pill.set_streaming(True)
         self._scroll_to_bottom()
 
     def append_chunk(self, text: str) -> None:
-        """Buffer a streaming chunk; flush on next idle tick."""
         if not self._streaming:
             return
         self._chunk_buffer += text
@@ -391,46 +452,43 @@ class ChatView(ctk.CTkFrame):
             self.after(T.CHUNK_FLUSH_MS, self._flush_chunks)
 
     def finish_assistant(self, text: str) -> None:
-        """Finalise the streaming bubble with the complete response."""
         self._flush_pending = False
         self._chunk_buffer  = ""
         if self._streaming_bubble:
             self._streaming_bubble.finalize(text)
+            self._finalize_assistant_meta(self._streaming_bubble)
         self._history.append({"role": "assistant", "content": text})
         self._end_stream()
         self._scroll_to_bottom()
 
     def show_cancelled(self) -> None:
-        """Mark the current bubble as cancelled."""
         self._flush_pending = False
         self._chunk_buffer  = ""
         if self._streaming_bubble:
             self._streaming_bubble.finalize(self._streaming_bubble._raw or "…")
-        self._add_system("cancelled", "Stopped", "Generation was cancelled.")
+            self._finalize_assistant_meta(self._streaming_bubble)
+        self._add_strip("cancelled", "Stopped", "Generation was cancelled.")
         self._end_stream()
         self._scroll_to_bottom()
 
     def show_error(self, message: str) -> None:
-        """Show an error strip and clear the in-progress bubble."""
         self._flush_pending = False
         self._chunk_buffer  = ""
         if self._streaming_bubble:
             self._streaming_bubble.pack_forget()
             self._streaming_bubble = None
-        self._add_system("error", "Error", message)
+        self._add_strip("error", "Error", message)
         self._end_stream(error=True)
         self._scroll_to_bottom()
 
     def show_tool_output(self, tool: str, output: str, *, success: bool = True) -> None:
-        """Show a tool result strip below the conversation."""
         kind  = "tool" if success else "error"
         label = f"Tool: {tool}"
-        self._add_system(kind, label, output)
+        self._add_strip(kind, label, output)
         self._scroll_to_bottom()
 
     def show_system_message(self, message: str) -> None:
-        """Show a neutral system info strip."""
-        self._add_system("system", "", message)
+        self._add_strip("system", "", message)
         self._scroll_to_bottom()
 
     # ── internal ──────────────────────────────────────────────────────────────
@@ -442,20 +500,18 @@ class ChatView(ctk.CTkFrame):
             self._chunk_buffer = ""
             self._scroll_to_bottom()
 
-    def _add_user(self, text: str) -> None:
-        _, slot = self._row_right()
-        _UserBubble(slot, text).pack()
-
-    def _add_system(self, kind: str, label: str, body: str) -> None:
-        strip = _SystemStrip(self._scroll, kind, label, body)
-        strip.pack(fill="x", padx=_SIDE_PAD + 4, pady=(0, 4))
+    def _add_strip(self, kind: str, label: str, body: str) -> None:
+        _SystemStrip(self._scroll, kind, label, body).pack(
+            fill="x", padx=_SIDE_PAD + 4, pady=(0, 4)
+        )
 
     def _clear(self) -> None:
         for child in self._scroll.winfo_children():
             child.destroy()
-        self._streaming_bubble = None
-        self._streaming        = False
-        self._history          = []
+        self._streaming_bubble         = None
+        self._streaming                = False
+        self._history                  = []
+        self._last_assistant_outer     = None  # type: ignore[assignment]
 
     def _handle_stop(self) -> None:
         if self._request_id:
