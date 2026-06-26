@@ -101,7 +101,7 @@ class WorkspaceResolver:
             confidence=confidence,
             expires_at=self._capped_expiry(now),
         )
-        self._anchor = context
+        self._anchor = self._clone(context)
         return context
 
     def _retain_anchor(self, snapshot: TelemetrySnapshot, now: float) -> WorkspaceContext:
@@ -121,8 +121,20 @@ class WorkspaceResolver:
             metadata=dict(anchor.metadata),
         )
         self._lease = replace(self._lease, expires_at=self._capped_expiry(now))
-        self._anchor = renewed
+        self._anchor = self._clone(renewed)
         return renewed
+
+    @staticmethod
+    def _clone(context: WorkspaceContext) -> WorkspaceContext:
+        # Independent copy: stored anchor and returned context never share mutable
+        # state, so a caller mutating one can never corrupt the other.
+        return replace(
+            context,
+            active_files=list(context.active_files),
+            recent_snapshots=list(context.recent_snapshots),
+            memory_refs=list(context.memory_refs),
+            metadata=dict(context.metadata),
+        )
 
     def _capped_expiry(self, now: float) -> float:
         # Renew for one TTL, but never past the workspace's absolute max lifetime.
@@ -159,7 +171,11 @@ class WorkspaceResolver:
     def _title(evidence: str, source: str, snapshot: TelemetrySnapshot) -> str:
         if source in _PATH_SOURCES:
             return Path(evidence).name or evidence
-        return snapshot.app_name or snapshot.window_title or "Untitled Workspace"
+        return (
+            snapshot.app_name.strip()
+            or snapshot.window_title.strip()
+            or "Untitled Workspace"
+        )
 
     @staticmethod
     def _inferred_task(snapshot: TelemetrySnapshot) -> str:

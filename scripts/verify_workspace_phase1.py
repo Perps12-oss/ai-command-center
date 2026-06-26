@@ -111,6 +111,32 @@ def main() -> int:
     if capped.resolve(transient_cap).workspace_id == cap_anchor.workspace_id:
         failures.append("workspace should collapse once max-lease cap is exceeded")
 
+    # 7. No aliasing on the fresh-resolve path: mutating a returned context must
+    # not corrupt the resolver's internal anchor (immutable-state architecture).
+    alias_clock = [0.0]
+    aliased = WorkspaceResolver(lease_ttl_seconds=60.0, clock=lambda: alias_clock[0])
+    returned = aliased.resolve(snap, repo_root="/home/dev/ai-command-center")
+    returned.active_files.append("tamper.py")
+    returned.metadata["confidence"] = -999.0
+    transient_alias = TelemetrySnapshot.empty(now=alias_clock[0])
+    retained = aliased.resolve(transient_alias)  # retains anchor across excursion
+    if "tamper.py" in retained.active_files:
+        failures.append("caller mutation leaked into resolver anchor (aliasing)")
+    if retained.metadata.get("confidence") == -999.0:
+        failures.append("caller mutation of metadata corrupted resolver state (aliasing)")
+
+    # 8. Whitespace-only telemetry must not produce a blank workspace title.
+    blank = TelemetrySnapshot(
+        timestamp=1.0,
+        target_hwnd=0,
+        app_name="   ",
+        window_title="\t ",
+        clipboard_text="",
+    )
+    blank_ctx = WorkspaceResolver().resolve(blank)
+    if blank_ctx.title.strip() == "":
+        failures.append("whitespace-only telemetry produced a blank workspace title")
+
     if failures:
         print("FAIL:")
         for item in failures:
