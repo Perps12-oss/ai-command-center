@@ -24,7 +24,7 @@ class _MemoryRow(ctk.CTkFrame):
             fg_color=T.BG_GLASS,
             border_color=T.BG_GLASS_BORDER,
             border_width=1,
-            corner_radius=6,
+            corner_radius=T.SMALL_RADIUS,
         )
         left = ctk.CTkFrame(self, fg_color="transparent")
         left.pack(side="left", fill="both", expand=True, padx=12, pady=10)
@@ -57,7 +57,7 @@ class _MemoryRow(ctk.CTkFrame):
             fg_color="transparent",
             hover_color=T.MSG_ERROR_BG,
             text_color=T.TEXT_MUTED,
-            corner_radius=6,
+            corner_radius=T.SMALL_RADIUS,
             command=on_delete,
         ).pack(side="right", padx=10, pady=10)
 
@@ -77,10 +77,12 @@ class MemoryView(ctk.CTkFrame):
         master,
         *,
         on_delete: Callable[[str | None, str], None],
+        on_add: Callable[[str, str], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_delete = on_delete
+        self._on_add = on_add
         self._items: list[dict] = []
         self._build()
 
@@ -102,6 +104,20 @@ class MemoryView(ctk.CTkFrame):
             header, text="", font=T.FONT_SMALL, text_color=T.TEXT_MUTED
         )
         self._count_lbl.pack(side="left", pady=10)
+
+        if self._on_add is not None:
+            ctk.CTkButton(
+                header,
+                text="+ Add",
+                width=70,
+                height=28,
+                font=T.FONT_SMALL,
+                fg_color=T.ACCENT_DEFAULT,
+                hover_color=T.ACCENT_HOVER,
+                text_color="white",
+                corner_radius=T.SMALL_RADIUS,
+                command=self._show_add_dialog,
+            ).pack(side="right", padx=T.PAD, pady=8)
 
         search_bar = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=0)
         search_bar.pack(fill="x")
@@ -131,10 +147,88 @@ class MemoryView(ctk.CTkFrame):
         self._items = list(items)
         self._render()
 
+    def add_memory(self, payload: dict) -> None:
+        """Insert a newly stored memory at the top from a service payload."""
+        text = f"{payload.get('label', '')} | {payload.get('content', '')}"
+        self._items.insert(0, {"text": text, "timestamp": "", "id": payload.get("id")})
+        self._render()
+
     def prepend_memory(self, text: str, timestamp: str = "") -> None:
         """Insert a newly stored memory at the top (no full reload needed)."""
         self._items.insert(0, {"text": text, "timestamp": timestamp, "id": None})
         self._render()
+
+    def _show_add_dialog(self) -> None:
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Add memory")
+        dialog.configure(fg_color=T.BG_PANEL)
+        dialog.geometry("420x220")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog,
+            text="Label",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 2))
+        label_entry = ctk.CTkEntry(
+            dialog,
+            font=T.FONT_BODY,
+            fg_color=T.BG_INPUT,
+            border_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+        )
+        label_entry.pack(fill="x", padx=T.PAD)
+
+        ctk.CTkLabel(
+            dialog,
+            text="Content",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(8, 2))
+        content_entry = ctk.CTkEntry(
+            dialog,
+            font=T.FONT_BODY,
+            fg_color=T.BG_INPUT,
+            border_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+        )
+        content_entry.pack(fill="x", padx=T.PAD)
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(padx=T.PAD, pady=(16, 12))
+
+        def _cancel() -> None:
+            dialog.destroy()
+
+        def _confirm() -> None:
+            label = label_entry.get().strip()
+            content = content_entry.get().strip()
+            if label and content and self._on_add is not None:
+                self._on_add(label, content)
+            dialog.destroy()
+
+        ctk.CTkButton(
+            btn_row,
+            text="Cancel",
+            font=T.FONT_SMALL,
+            fg_color=T.BG_GLASS,
+            hover_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+            command=_cancel,
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            btn_row,
+            text="Save",
+            font=T.FONT_SMALL,
+            fg_color=T.ACCENT_DEFAULT,
+            hover_color=T.ACCENT_HOVER,
+            text_color="white",
+            command=_confirm,
+        ).pack(side="left")
 
     def _confirm_delete(self, ref: dict) -> None:
         dialog = ctk.CTkToplevel(self)

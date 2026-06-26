@@ -30,7 +30,7 @@ class CommandPalette(ctk.CTkToplevel):
         self.configure(fg_color=T.BG_GLASS_BORDER)
         self.resizable(False, False)
 
-        inner = ctk.CTkFrame(self, fg_color=T.BG_GLASS, corner_radius=10)
+        inner = ctk.CTkFrame(self, fg_color=T.BG_GLASS, corner_radius=T.CORNER_RADIUS)
         inner.pack(fill="both", expand=True, padx=1, pady=1)
 
         search_row = ctk.CTkFrame(inner, fg_color="transparent")
@@ -139,7 +139,7 @@ class CommandPalette(ctk.CTkToplevel):
             row = ctk.CTkFrame(
                 self._list_frame,
                 fg_color=T.BG_PANEL if is_sel else "transparent",
-                corner_radius=6,
+                corner_radius=T.SMALL_RADIUS,
                 height=44,
             )
             row.pack(fill="x", padx=8, pady=2)

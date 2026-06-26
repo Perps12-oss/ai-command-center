@@ -63,7 +63,7 @@ class HeroPanel(ctk.CTkFrame):
                 width=60,
                 progress_color=T.HERO_CYAN,
                 fg_color=T.BG_INPUT,
-                corner_radius=8,
+                corner_radius=T.CARD_RADIUS,
             )
             seg.pack(side="left", expand=True, fill="x", padx=4)
             seg.set(0.3)
@@ -90,7 +90,7 @@ class HeroPanel(ctk.CTkFrame):
             ctk.CTkFrame(
                 row,
                 fg_color=T.HERO_CYAN_DIM,
-                corner_radius=6,
+                corner_radius=T.SMALL_RADIUS,
                 width=70,
                 height=40,
             ).pack(side="left", expand=True, fill="both", padx=3)

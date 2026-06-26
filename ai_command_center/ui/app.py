@@ -19,6 +19,7 @@ from ai_command_center.core.events.topics import (
     COMMAND_HISTORY,
     COMMAND_ROUTED,
     MEMORY_ERROR,
+    MEMORY_REMEMBER,
     MEMORY_SELECTED,
     MEMORY_STORED,
     MODEL_SELECTED,
@@ -208,13 +209,15 @@ class CommandPaletteApp(ctk.CTk):
             elif view_id == "notes":
                 self._views[view_id] = NotesView(
                     self._content,
-                    on_select=self._controller.publish_note_select,
+                    on_select=self._on_note_select,
                     on_search=lambda q: self._on_command(f"note: {q}"),
+                    on_create=self._on_note_create,
                 )
             elif view_id == "memory":
                 self._views[view_id] = MemoryView(
                     self._content,
                     on_delete=self._on_memory_delete,
+                    on_add=self._on_memory_add,
                 )
             elif view_id == "system":
                 self._views[view_id] = SystemView(self._content)
@@ -323,6 +326,13 @@ class CommandPaletteApp(ctk.CTk):
     def _on_memory_delete(self, memory_id: str | None, text: str = "") -> None:
         if memory_id:
             self._controller.publish_memory_delete(memory_id)
+
+    def _on_memory_add(self, label: str, content: str) -> None:
+        self._bus.publish(
+            MEMORY_REMEMBER,
+            {"label": label, "content": content},
+            source="ui",
+        )
 
     # ── command input ──────────────────────────────────────────────────────────
 
@@ -612,10 +622,21 @@ class CommandPaletteApp(ctk.CTk):
 
         self._ui_queue.enqueue(update)
 
+    def _on_note_select(self, path: str, title: str) -> None:
+        self._controller.publish_note_select(path)
+
+    def _on_note_create(self, title: str, content: str) -> None:
+        self._on_command(f"new note: {title} | {content}")
+
     def _on_note_selected(self, event: Event) -> None:
         path = str(event.payload.get("path", ""))
+        title = str(event.payload.get("title", os.path.basename(path)))
+        body = str(event.payload.get("body", ""))
 
         def update() -> None:
+            notes = self._notes_view()
+            if notes:
+                notes.show_preview(path, title, body)
             self._toast.show(f"Opened: {os.path.basename(path)}", kind="info")
 
         self._ui_queue.enqueue(update)

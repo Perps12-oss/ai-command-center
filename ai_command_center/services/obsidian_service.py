@@ -160,7 +160,7 @@ class ObsidianService(BaseService):
         self._selected_body = body
         self._bus.publish(
             NOTE_SELECTED,
-            {"path": path, "title": _title_from_markdown(Path(path), body)},
+            {"path": path, "title": _title_from_markdown(Path(path), body), "body": body},
             source=self.name,
         )
 

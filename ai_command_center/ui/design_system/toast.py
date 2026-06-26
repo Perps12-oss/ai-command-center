@@ -27,7 +27,7 @@ class _ToastBubble(ctk.CTkFrame):
             fg_color=T.BG_PANEL,
             border_color=color,
             border_width=1,
-            corner_radius=8,
+            corner_radius=T.CARD_RADIUS,
             width=300,
         )
         self._on_dismiss = on_dismiss
@@ -54,11 +54,11 @@ class _ToastBubble(ctk.CTkFrame):
             text="✕",
             width=18,
             height=18,
-            font=(T.FONT_FAMILY, 10),
+            font=T.FONT_SMALL,
             fg_color="transparent",
             hover_color=T.BG_GLASS_BORDER,
             text_color=T.TEXT_MUTED,
-            corner_radius=4,
+            corner_radius=T.SMALL_RADIUS,
             command=self._dismiss,
         ).pack(side="right", padx=(4, 0))
 

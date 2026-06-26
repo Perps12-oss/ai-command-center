@@ -83,12 +83,12 @@ class Badge(ctk.CTkFrame):
             fg_color=f"{color}22",
             border_color=f"{color}44",
             border_width=1,
-            corner_radius=12,
+            corner_radius=T.PILL_RADIUS,
             **kwargs,
         )
         ctk.CTkLabel(
             self,
             text=text,
-            font=("Segoe UI", 11, "bold"),
+            font=FONT_ROLE,
             text_color=color,
         ).pack(padx=10, pady=2)

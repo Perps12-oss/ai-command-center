@@ -16,7 +16,7 @@ class StatusPill(ctk.CTkFrame):
             "offline": (T.TEXT_MUTED, T.STATUS_OFFLINE_BG),
         }
         fg, bg = colors.get(state, colors["ready"])
-        super().__init__(master, fg_color=bg, corner_radius=12, **kwargs)
+        super().__init__(master, fg_color=bg, corner_radius=T.PILL_RADIUS, **kwargs)
         self._dot = ctk.CTkLabel(self, text="●", font=T.FONT_SMALL, text_color=fg)
         self._dot.pack(side="left", padx=(8, 2), pady=4)
         self._label = ctk.CTkLabel(self, text=text, font=T.FONT_SMALL, text_color=fg)

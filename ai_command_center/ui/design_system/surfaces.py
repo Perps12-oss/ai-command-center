@@ -10,7 +10,11 @@ from ai_command_center.ui.design_system.theme_v2 import (
     BG_PANEL,
     CARD_RADIUS,
     CORNER_RADIUS,
+    FONT_HEADER,
+    FONT_ROLE,
     PAD,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
 )
 
 
@@ -30,8 +34,8 @@ class Card(ctk.CTkFrame):
             ctk.CTkLabel(
                 self,
                 text=title,
-                font=("Segoe UI", 13, "bold"),
-                text_color="#F0F0F5",
+                font=FONT_HEADER,
+                text_color=TEXT_PRIMARY,
                 anchor="w",
             ).pack(anchor="w", padx=PAD, pady=(PAD, 4))
 
@@ -56,7 +60,7 @@ class Section(ctk.CTkFrame):
         ctk.CTkLabel(
             self,
             text=label.upper(),
-            font=("Segoe UI", 10, "bold"),
-            text_color="#6B6B80",
+            font=FONT_ROLE,
+            text_color=TEXT_MUTED,
             anchor="w",
         ).pack(anchor="w")

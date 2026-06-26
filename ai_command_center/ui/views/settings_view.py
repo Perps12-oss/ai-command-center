@@ -23,7 +23,7 @@ class _Swatch(ctk.CTkFrame):
             width=40,
             height=40,
             fg_color=accent,
-            corner_radius=20,
+            corner_radius=T.BUBBLE_RADIUS,
             border_width=0,
         )
         self._ring.pack()

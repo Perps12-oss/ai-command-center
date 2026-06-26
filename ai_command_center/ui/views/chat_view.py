@@ -10,10 +10,11 @@ import customtkinter as ctk
 
 from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
 from ai_command_center.ui.markdown_plain import format_assistant_markdown
+from ai_command_center.ui.markdown_view import parse_markdown
 from ai_command_center.ui.design_system import theme_v2 as T
 
 # ── Layout constants ───────────────────────────────────────────────────────────
-_BUBBLE_RADIUS  = 20
+_BUBBLE_RADIUS  = T.BUBBLE_RADIUS
 _BUBBLE_WRAP    = 520
 _BUBBLE_TBX_W   = 540
 _SIDE_PAD       = 16
@@ -48,11 +49,11 @@ class _CopyBtn(ctk.CTkButton):
             master,
             text="⎘",
             width=22, height=18,
-            font=(T.FONT_FAMILY, 10),
+            font=T.FONT_SMALL,
             fg_color="transparent",
             hover_color="transparent",
             text_color=_CLR_META,
-            corner_radius=4,
+            corner_radius=T.SMALL_RADIUS,
             command=self._copy,
         )
         self._get = get_text
@@ -124,15 +125,35 @@ class _AssistantBubble(ctk.CTkFrame):
             height=44,
         )
         self._textbox.pack(padx=16, pady=13)
+        # Markdown tags
+        self._textbox.tag_config("bold", font=(T.FONT_FAMILY, 14, "bold"))
+        self._textbox.tag_config("italic", font=(T.FONT_FAMILY, 14, "italic"))
+        self._textbox.tag_config(
+            "code", font=(T.FONT_FAMILY, 13), foreground=T.CODE_TEXT, background=T.CODE_BG
+        )
+        self._textbox.tag_config(
+            "code_block",
+            font=(T.FONT_MONO, 12),
+            foreground=T.CODE_TEXT,
+            background=T.CODE_BG,
+            lmargin1=8,
+            lmargin2=8,
+        )
+        self._textbox.tag_config("header", font=(T.FONT_FAMILY, 16, "bold"), foreground=T.TEXT_HEADING)
+        self._textbox.tag_config("list", foreground=T.TEXT_PRIMARY)
         self._textbox.configure(state="disabled")
         self._write("●  ●  ●")
         self._live = True
         self._blink()
 
-    def _write(self, text: str) -> None:
+    def _write(self, text: str, segments: list[tuple[str, str | None]] | None = None) -> None:
         self._textbox.configure(state="normal")
         self._textbox.delete("1.0", "end")
-        self._textbox.insert("1.0", text)
+        if segments:
+            for seg, tag in segments:
+                self._textbox.insert("end", seg, tag)
+        else:
+            self._textbox.insert("1.0", text)
         self._textbox.configure(state="disabled")
         self._resize()
 
@@ -159,7 +180,7 @@ class _AssistantBubble(ctk.CTkFrame):
     def finalize(self, full_text: str) -> None:
         self._live = False
         self._raw  = full_text
-        self._write(format_assistant_markdown(full_text))
+        self._write("", segments=parse_markdown(full_text))
 
     def get_raw_text(self) -> str:
         """Expose the raw markdown content without breaking encapsulation."""
@@ -190,7 +211,7 @@ class _SystemStrip(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=bg,
-            corner_radius=8,
+            corner_radius=T.CARD_RADIUS,
             border_width=0,
         )
         dot = self._DOT.get(kind, "·")
@@ -283,7 +304,7 @@ class _SessionBar(ctk.CTkFrame):
             fg_color="transparent",
             hover_color=T.BG_GLASS,
             text_color=T.TEXT_MUTED,
-            corner_radius=6,
+            corner_radius=T.SMALL_RADIUS,
             command=on_toggle_history,
         )
         self._toggle_btn.pack(side="left", padx=(10, 4), pady=7)
@@ -318,7 +339,7 @@ class _SessionBar(ctk.CTkFrame):
                 fg_color=T.BG_GLASS,
                 hover_color=T.BG_GLASS_BORDER,
                 text_color=_CLR_META,
-                corner_radius=6,
+                corner_radius=T.SMALL_RADIUS,
                 command=on_export,
             ).pack(side="right", padx=10, pady=8)
 

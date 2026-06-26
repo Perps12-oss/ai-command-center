@@ -27,7 +27,7 @@ class _SessionRow(ctk.CTkFrame):
         super().__init__(
             master,
             fg_color=T.ACCENT_DEFAULT if active else "transparent",
-            corner_radius=8,
+            corner_radius=T.CARD_RADIUS,
             cursor="hand2",
         )
         self._sid       = sid
@@ -136,7 +136,7 @@ class ChatHistoryPanel(ctk.CTkFrame):
             fg_color=T.ACCENT_DEFAULT,
             hover_color=T.ACCENT_HOVER,
             text_color="#FFFFFF",
-            corner_radius=8,
+            corner_radius=T.CARD_RADIUS,
             command=on_new,
         ).pack(fill="x", padx=10, pady=(12, 6))
 
@@ -147,7 +147,7 @@ class ChatHistoryPanel(ctk.CTkFrame):
         ctk.CTkLabel(
             self,
             text="RECENT",
-            font=(T.FONT_FAMILY, 9),
+            font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
             anchor="w",
         ).pack(fill="x", padx=12, pady=(0, 2))
@@ -164,7 +164,7 @@ class ChatHistoryPanel(ctk.CTkFrame):
         self._placeholder = ctk.CTkLabel(
             self._list,
             text="No sessions yet.\nStart typing to\ncreate one.",
-            font=(T.FONT_FAMILY, 11),
+            font=T.FONT_BODY,
             text_color=T.TEXT_MUTED,
             justify="center",
         )

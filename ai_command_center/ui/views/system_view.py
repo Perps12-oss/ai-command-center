@@ -49,7 +49,7 @@ class _MeterBar(ctk.CTkFrame):
             row, text="\u2014", font=T.FONT_SMALL, text_color=T.TEXT_PRIMARY, width=120, anchor="e"
         )
         self._value_lbl.pack(side="right")
-        self._bar = ctk.CTkProgressBar(self, height=6, corner_radius=3, progress_color=T.STATUS_READY)
+        self._bar = ctk.CTkProgressBar(self, height=6, corner_radius=T.PROGRESS_RADIUS, progress_color=T.STATUS_READY)
         self._bar.pack(fill="x", pady=(3, 8))
         self._bar.set(0)
 
@@ -77,8 +77,8 @@ class _Sparkline(ctk.CTkFrame):
 
         hdr = ctk.CTkFrame(self, fg_color="transparent")
         hdr.pack(fill="x")
-        ctk.CTkLabel(hdr, text=label, font=(T.FONT_FAMILY, 10), text_color=T.TEXT_MUTED, anchor="w").pack(side="left")
-        self._peak_lbl = ctk.CTkLabel(hdr, text="", font=(T.FONT_FAMILY, 10), text_color=T.TEXT_MUTED, anchor="e")
+        ctk.CTkLabel(hdr, text=label, font=T.FONT_SMALL, text_color=T.TEXT_MUTED, anchor="w").pack(side="left")
+        self._peak_lbl = ctk.CTkLabel(hdr, text="", font=T.FONT_SMALL, text_color=T.TEXT_MUTED, anchor="e")
         self._peak_lbl.pack(side="right")
 
         self._canvas = ctk.CTkCanvas(self, height=self._H, bg=T.BG_DEEP, highlightthickness=0)
@@ -125,7 +125,7 @@ class _IOTile(ctk.CTkFrame):
             fg_color=T.BG_GLASS,
             border_color=T.BG_GLASS_BORDER,
             border_width=1,
-            corner_radius=8,
+            corner_radius=T.CARD_RADIUS,
         )
         ctk.CTkLabel(self, text=title, font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w").pack(fill="x", padx=10, pady=(8, 4))
         row = ctk.CTkFrame(self, fg_color="transparent")
@@ -146,6 +146,110 @@ class _IOTile(ctk.CTkFrame):
     def update(self, in_val: str, out_val: str) -> None:
         self._in_lbl.configure(text=in_val)
         self._out_lbl.configure(text=out_val)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Process table
+# ──────────────────────────────────────────────────────────────────────────────
+
+class _ProcessTable(ctk.CTkFrame):
+    """Sortable, filterable top-process table."""
+
+    _SORT_KEY = {
+        "cpu": lambda p: p[1],
+        "mem": lambda p: p[2],
+        "pid": lambda p: p[0],
+        "name": lambda p: p[3].lower(),
+    }
+
+    def __init__(self, master) -> None:
+        super().__init__(master, fg_color="transparent")
+        self._procs: list[tuple[int, float, float, str]] = []
+        self._sort_col = "cpu"
+        self._sort_desc = True
+        self._filter = ""
+
+        self._search = ctk.CTkEntry(
+            self,
+            placeholder_text="Filter processes…",
+            font=T.FONT_BODY,
+            height=28,
+            fg_color=T.BG_INPUT,
+            border_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+        )
+        self._search.pack(fill="x", padx=T.PAD, pady=(0, 6))
+        self._search.bind("<KeyRelease>", lambda _e: self._apply_filter())
+
+        hdr = ctk.CTkFrame(self, fg_color=T.BG_PANEL, height=26)
+        hdr.pack(fill="x", padx=T.PAD)
+        hdr.pack_propagate(False)
+        self._headers: dict[str, ctk.CTkLabel] = {}
+        for col, title, width in (
+            ("cpu", "CPU", 70),
+            ("mem", "MEM", 70),
+            ("pid", "PID", 70),
+            ("name", "NAME", 0),
+        ):
+            lbl = ctk.CTkLabel(
+                hdr,
+                text=title,
+                font=T.FONT_ROLE,
+                text_color=T.TEXT_MUTED,
+                width=width,
+                anchor="w" if col == "name" else "e",
+            )
+            lbl.pack(side="left" if col == "name" else "right", padx=(8, 0) if col == "name" else (4, 0))
+            lbl.bind("<Button-1>", lambda _e, c=col: self._set_sort(c))
+            self._headers[col] = lbl
+
+        self._rows = ctk.CTkFrame(self, fg_color="transparent")
+        self._rows.pack(fill="x", padx=T.PAD, pady=(4, 0))
+        self._rows.columnconfigure(0, weight=1)
+
+    def _set_sort(self, col: str) -> None:
+        if self._sort_col == col:
+            self._sort_desc = not self._sort_desc
+        else:
+            self._sort_col = col
+            self._sort_desc = True
+        self._render()
+
+    def _apply_filter(self) -> None:
+        self._filter = self._search.get().strip().lower()
+        self._render()
+
+    def set_data(self, procs: list[tuple[int, float, float, str]]) -> None:
+        self._procs = procs
+        self._render()
+
+    def _render(self) -> None:
+        for w in self._rows.winfo_children():
+            w.destroy()
+
+        shown = [p for p in self._procs if self._filter in p[3].lower()]
+        shown.sort(key=self._SORT_KEY[self._sort_col], reverse=self._sort_desc)
+        for col, lbl in self._headers.items():
+            marker = " ▼" if self._sort_col == col and self._sort_desc else " ▲" if self._sort_col == col else ""
+            base = {"cpu": "CPU", "mem": "MEM", "pid": "PID", "name": "NAME"}[col]
+            lbl.configure(text=base + marker)
+
+        if not shown:
+            ctk.CTkLabel(
+                self._rows,
+                text="No processes match",
+                font=T.FONT_BODY,
+                text_color=T.TEXT_MUTED,
+            ).pack(pady=8)
+            return
+
+        for pid, cpu, mem, name in shown[:15]:
+            row = ctk.CTkFrame(self._rows, fg_color="transparent")
+            row.pack(fill="x", pady=(1, 1))
+            ctk.CTkLabel(row, text=f"{cpu:5.1f}%", font=T.FONT_MONO, text_color=T.TEXT_SECONDARY, width=70, anchor="e").pack(side="right", padx=(4, 0))
+            ctk.CTkLabel(row, text=f"{mem:5.1f}%", font=T.FONT_MONO, text_color=T.TEXT_SECONDARY, width=70, anchor="e").pack(side="right", padx=(4, 0))
+            ctk.CTkLabel(row, text=str(pid), font=T.FONT_MONO, text_color=T.TEXT_SECONDARY, width=70, anchor="e").pack(side="right", padx=(4, 0))
+            ctk.CTkLabel(row, text=name[:36], font=T.FONT_MONO, text_color=T.TEXT_PRIMARY, anchor="w").pack(side="left", fill="x", expand=True, padx=(8, 0))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -225,9 +329,9 @@ class SystemView(ctk.CTkFrame):
         # ── Top processes ──────────────────────────────────────────────────────
         top_card = GlassCard(scroll)
         top_card.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
-        ctk.CTkLabel(top_card, text="TOP PROCESSES (CPU)", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w").pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
-        self._top_lbl = ctk.CTkLabel(top_card, text="\u2014", font=T.FONT_MONO, text_color=T.TEXT_SECONDARY, anchor="w", justify="left")
-        self._top_lbl.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+        ctk.CTkLabel(top_card, text="TOP PROCESSES", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w").pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
+        self._top_table = _ProcessTable(top_card)
+        self._top_table.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
         self._start_polling()
 
@@ -249,14 +353,17 @@ class SystemView(ctk.CTkFrame):
             proc_mem = proc.memory_info().rss / 1024 / 1024
             proc_cpu = proc.cpu_percent(interval=0.1)
 
-            procs = []
-            for p in _psutil.process_iter(["pid", "name", "cpu_percent"]):
+            procs: list[tuple[int, float, float, str]] = []
+            for p in _psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
                 try:
-                    procs.append((p.info["cpu_percent"] or 0, p.info["name"], p.info["pid"]))
+                    procs.append((
+                        p.info["pid"],
+                        p.info["cpu_percent"] or 0.0,
+                        p.info["memory_percent"] or 0.0,
+                        str(p.info["name"] or ""),
+                    ))
                 except Exception:
                     pass
-            procs.sort(reverse=True)
-            top5 = procs[:5]
 
             # Disk I/O delta
             disk_delta = (None, None)
@@ -287,7 +394,7 @@ class SystemView(ctk.CTkFrame):
             self._prev_ts = now
 
             self.after(0, lambda: self._update_ui(
-                cpu, vm, proc_cpu, proc_mem, top5, disk_delta, net_delta
+                cpu, vm, proc_cpu, proc_mem, procs, disk_delta, net_delta
             ))
         except Exception:
             pass
@@ -299,7 +406,7 @@ class SystemView(ctk.CTkFrame):
         vm,
         proc_cpu: float,
         proc_mem: float,
-        top5: list,
+        procs: list[tuple[int, float, float, str]],
         disk_delta: tuple,
         net_delta: tuple,
     ) -> None:
@@ -315,15 +422,19 @@ class SystemView(ctk.CTkFrame):
         self._ram_bar.update(ram_pct, f"{ram_used:.1f} / {ram_total:.1f} GB")
         self._ram_spark.push(ram_pct)
 
+        warnings: list[str] = []
+        if cpu >= 85:
+            warnings.append(f"CPU {cpu:.0f}%")
+        if ram_pct >= 85:
+            warnings.append(f"RAM {ram_pct:.0f}%")
+        warn_text = "  ·  ".join(warnings)
         self._proc_lbl.configure(
             text=f"This process — CPU: {proc_cpu:.1f}%   RAM: {proc_mem:.0f} MB"
+            + (f"   ⚠ {warn_text}" if warn_text else ""),
+            text_color=T.STATUS_ERROR if warnings else T.TEXT_SECONDARY,
         )
 
-        lines = "\n".join(
-            f"{pct:5.1f}%  {name[:28]:<28}  pid {pid}"
-            for pct, name, pid in top5
-        )
-        self._top_lbl.configure(text=lines or "\u2014")
+        self._top_table.set_data(procs)
         self._refresh_lbl.configure(text=f"Updated {time.strftime('%H:%M:%S')}")
 
         # Disk

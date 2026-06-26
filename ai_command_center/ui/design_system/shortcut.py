@@ -34,7 +34,7 @@ class ShortcutOverlay(ctk.CTkToplevel):
         self.overrideredirect(True)
         self.configure(fg_color=T.BG_GLASS_BORDER)
 
-        inner = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=12)
+        inner = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=T.PILL_RADIUS)
         inner.pack(fill="both", expand=True, padx=1, pady=1)
 
         hdr = ctk.CTkFrame(inner, fg_color="transparent")
@@ -54,7 +54,7 @@ class ShortcutOverlay(ctk.CTkToplevel):
             fg_color=T.BG_GLASS,
             hover_color=T.STATUS_ERROR,
             text_color=T.TEXT_MUTED,
-            corner_radius=6,
+            corner_radius=T.SMALL_RADIUS,
             command=self.hide,
         ).pack(side="right")
 
@@ -73,7 +73,7 @@ class ShortcutOverlay(ctk.CTkToplevel):
             key_lbl = ctk.CTkFrame(
                 row_f,
                 fg_color=T.BG_GLASS,
-                corner_radius=4,
+                corner_radius=T.SMALL_RADIUS,
                 height=24,
             )
             key_lbl.pack(side="left")

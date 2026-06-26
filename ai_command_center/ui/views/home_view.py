@@ -45,7 +45,7 @@ class _ActionCard(ctk.CTkFrame):
             fg_color=T.BG_GLASS,
             border_color=T.BG_GLASS_BORDER,
             border_width=1,
-            corner_radius=8,
+            corner_radius=T.CARD_RADIUS,
         )
         self._command = command
         self._default_border = T.BG_GLASS_BORDER
@@ -98,7 +98,7 @@ class _StatusPill(ctk.CTkFrame):
             fg_color=T.BG_GLASS,
             border_color=T.BG_GLASS_BORDER,
             border_width=1,
-            corner_radius=8,
+            corner_radius=T.CARD_RADIUS,
         )
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=12, pady=(10, 2))
@@ -153,7 +153,7 @@ class _StatsStrip(ctk.CTkFrame):
     """Row of quick-stat counters: messages · memories · notes."""
 
     def __init__(self, master) -> None:
-        super().__init__(master, fg_color=T.BG_GLASS, corner_radius=8)
+        super().__init__(master, fg_color=T.BG_GLASS, corner_radius=T.CARD_RADIUS)
         self._labels: dict[str, ctk.CTkLabel] = {}
         for key, title in (("messages", "Messages"), ("memories", "Memories"), ("notes", "Notes")):
             col = ctk.CTkFrame(self, fg_color="transparent")

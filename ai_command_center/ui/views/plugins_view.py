@@ -49,22 +49,48 @@ class PluginsView(ctk.CTkFrame):
             self._status.configure(text="No plugins found in plugins/manifests/")
             return
 
-        for plugin in plugins:
-            self._add_row(plugin)
+        core = [p for p in plugins if str(p.get("kind", "extension")) == "core"]
+        ext = [p for p in plugins if str(p.get("kind", "extension")) != "core"]
+        if core:
+            self._add_section("Core plugins")
+            for plugin in core:
+                self._add_row(plugin)
+        if ext:
+            self._add_section("Extensions")
+            for plugin in ext:
+                self._add_row(plugin)
 
         enabled = sum(1 for p in plugins if p.get("enabled"))
         self._status.configure(text=f"{len(plugins)} plugin(s) — {enabled} enabled")
+
+    def _add_section(self, label: str) -> None:
+        ctk.CTkLabel(
+            self._list,
+            text=label.upper(),
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(8, 4))
 
     def show_error(self, message: str) -> None:
         self._status.configure(text=message, text_color=T.STATUS_ERROR)
 
     def _add_row(self, plugin: dict) -> None:
+        from ai_command_center.ui.components.glass_card import GlassCard
+
         plugin_id = str(plugin.get("id", ""))
-        row = ctk.CTkFrame(self._list, fg_color=T.BG_PANEL, corner_radius=8)
-        row.pack(fill="x", padx=8, pady=6)
+        kind = str(plugin.get("kind", "extension"))
+        enabled = bool(plugin.get("enabled", True))
+        error = str(plugin.get("error", ""))
+        pending = bool(plugin.get("pending_restart", False))
+
+        card = GlassCard(self._list)
+        card.pack(fill="x", padx=8, pady=6)
+        row = ctk.CTkFrame(card, fg_color="transparent")
+        row.pack(fill="x", padx=12, pady=(10, 10))
 
         header = ctk.CTkFrame(row, fg_color="transparent")
-        header.pack(fill="x", padx=12, pady=(10, 4))
+        header.pack(fill="x", pady=(0, 4))
 
         ctk.CTkLabel(
             header,
@@ -73,12 +99,13 @@ class PluginsView(ctk.CTkFrame):
             text_color=T.TEXT_PRIMARY,
         ).pack(side="left")
 
-        kind = str(plugin.get("kind", "extension"))
+        status_color = T.STATUS_ERROR if error else T.STATUS_READY if enabled else T.STATUS_BUSY
+        status_text = "error" if error else "enabled" if enabled else "disabled"
         ctk.CTkLabel(
             header,
-            text=kind,
+            text=status_text,
             font=T.FONT_SMALL,
-            text_color=T.TEXT_MUTED,
+            text_color=status_color,
         ).pack(side="right")
 
         ctk.CTkLabel(
@@ -88,7 +115,7 @@ class PluginsView(ctk.CTkFrame):
             text_color=T.TEXT_SECONDARY,
             wraplength=560,
             justify="left",
-        ).pack(anchor="w", padx=12, pady=(0, 4))
+        ).pack(anchor="w", pady=(0, 4))
 
         topics = plugin.get("bus_topics") or []
         if topics:
@@ -99,25 +126,69 @@ class PluginsView(ctk.CTkFrame):
                 text_color=T.TEXT_MUTED,
                 wraplength=560,
                 justify="left",
-            ).pack(anchor="w", padx=12, pady=(0, 8))
+            ).pack(anchor="w", pady=(0, 4))
 
-        enabled = bool(plugin.get("enabled", True))
-        if kind == "core":
+        if error:
             ctk.CTkLabel(
                 row,
+                text=f"Error: {error}",
+                font=T.FONT_SMALL,
+                text_color=T.STATUS_ERROR,
+                wraplength=560,
+                justify="left",
+            ).pack(anchor="w", pady=(0, 4))
+
+        footer = ctk.CTkFrame(row, fg_color="transparent")
+        footer.pack(fill="x", pady=(4, 0))
+        if kind == "core":
+            ctk.CTkLabel(
+                footer,
                 text="Core — always enabled",
                 font=T.FONT_SMALL,
                 text_color=T.STATUS_READY,
-            ).pack(anchor="w", padx=12, pady=(0, 10))
+            ).pack(side="left")
         else:
             label = "Disable" if enabled else "Enable"
             ctk.CTkButton(
-                row,
+                footer,
                 text=label,
                 width=90,
                 height=28,
                 font=T.FONT_SMALL,
-                command=lambda pid=plugin_id, en=enabled: self._on_toggle(pid, not en),
-            ).pack(anchor="w", padx=12, pady=(0, 10))
+                fg_color=T.ACCENT_DEFAULT if not enabled else T.BG_GLASS,
+                hover_color=T.ACCENT_HOVER if not enabled else T.BG_GLASS_BORDER,
+                text_color="white" if not enabled else T.TEXT_PRIMARY,
+                command=lambda pid=plugin_id, en=enabled: self._mark_pending(pid, not en),
+            ).pack(side="left")
 
-        self._rows[plugin_id] = row
+        if pending:
+            ctk.CTkLabel(
+                footer,
+                text="Restart required",
+                font=T.FONT_SMALL,
+                text_color=T.STATUS_BUSY,
+            ).pack(side="left", padx=(12, 0))
+
+        self._rows[plugin_id] = card
+
+    def _mark_pending(self, plugin_id: str, enabled: bool) -> None:
+        self._on_toggle(plugin_id, enabled)
+        card = self._rows.get(plugin_id)
+        if card is not None:
+            footer = None
+            for child in card.winfo_children():
+                if isinstance(child, ctk.CTkFrame):
+                    for sub in child.winfo_children():
+                        if isinstance(sub, ctk.CTkFrame):
+                            footer = sub
+                            break
+            if footer is not None:
+                for child in footer.winfo_children():
+                    if isinstance(child, ctk.CTkLabel) and "Restart" in str(child.cget("text")):
+                        return
+                ctk.CTkLabel(
+                    footer,
+                    text="Restart required",
+                    font=T.FONT_SMALL,
+                    text_color=T.STATUS_BUSY,
+                ).pack(side="left", padx=(12, 0))

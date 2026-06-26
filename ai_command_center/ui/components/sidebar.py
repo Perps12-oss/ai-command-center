@@ -53,7 +53,7 @@ class Sidebar(ctk.CTkFrame):
                 text_color=T.TEXT_SECONDARY,
                 hover_color=T.LIGHT_GLASS,
                 height=36,
-                corner_radius=18,
+                corner_radius=T.CORNER_RADIUS,
                 command=lambda v=view_id: self._select(v, on_navigate),
             )
             btn.pack(fill="both", expand=True, padx=4)
@@ -63,7 +63,7 @@ class Sidebar(ctk.CTkFrame):
         user = ctk.CTkFrame(
             self,
             fg_color=T.GLASS_BG,
-            corner_radius=12,
+            corner_radius=T.PILL_RADIUS,
             border_width=1,
             border_color=T.GLASS_BORDER,
         )
