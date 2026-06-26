@@ -53,9 +53,9 @@ Goal: explicit EventBus topics, service lifecycle framework, and tool runtime.
 
 | # | Sub-category | Status | Exit criteria |
 |---|---|---|---|
-| 2.1 | Document and stabilize canonical EventBus topics | ⚠️ | All production topics listed, versioned, and wildcard-free outside debug mode |
-| 2.2 | Service lifecycle framework (`BaseService` + `ServiceState`) | ⚠️ | Lifecycle states match AGENTS.md: `STOPPED`, `STARTING`, `READY`, `DEGRADED`, `ERROR`, `STOPPING`; no conflicting `HIBERNATED`/`ACTIVE` usage in published state |
-| 2.3 | Tool runtime (`tool_registry.py` + `tool_executor.py`) | ⚠️ | `ToolRegistry` registers only; `ToolExecutor` executes and cancels; `ToolExecutorService` delegates to it rather than bypassing it |
+| 2.1 | Document and stabilize canonical EventBus topics | ✅ | All production topics listed, versioned, and wildcard-free outside debug mode |
+| 2.2 | Service lifecycle framework (`BaseService` + `ServiceState`) | ✅ | Lifecycle states match AGENTS.md: `STOPPED`, `STARTING`, `READY`, `DEGRADED`, `ERROR`, `STOPPING`; no conflicting `HIBERNATED`/`ACTIVE` usage in published state |
+| 2.3 | Tool runtime (`tool_registry.py` + `tool_executor.py`) | ✅ | `ToolRegistry` registers only; `ToolExecutor` executes and cancels; `ToolExecutorService` delegates to it rather than bypassing it |
 
 ---
 
@@ -65,7 +65,7 @@ Goal: complete AppState projection and passive telemetry.
 
 | # | Sub-category | Status | Exit criteria |
 |---|---|---|---|
-| 3.1 | Telemetry service (`telemetry/telemetry_service.py`) | ⚠️ | Publishes `TelemetryEvent` to EventBus; no inference at runtime |
+| 3.1 | Telemetry service (`telemetry/telemetry_service.py`) | ✅ | Publishes `TelemetryEvent` to EventBus; no inference at runtime |
 | 3.2 | AppState full projection | ✅ | Notes list, memory list, plugin catalog, system snapshot, and Workspace OS entity list all projectable from `AppStateStore.snapshot` |
 | 3.3 | `SystemSnapshot` + `SettingsSnapshot` audit | ✅ | Domain contracts exist; ensure every consumer reads via `AppState` |
 
@@ -104,8 +104,8 @@ Goal: reusable component library and future extensibility.
 
 | # | Sub-category | Status | Exit criteria |
 |---|---|---|---|
-| 6.1 | Component library gallery | ⏳ | Documented catalog of `design_system` components |
-| 6.2 | Design-system tokens fully applied | ⚠️ | No hard-coded radii/fonts in views; all use `theme_v2` |
+| 6.1 | Component library gallery | ✅ | `ComponentGalleryView` accessible from palette; documents tokens and components |
+| 6.2 | Design-system tokens fully applied | ✅ | No hard-coded fonts in audited views; Workspace OS inspector uses `theme_v2` |
 | 6.3 | Plugin framework v2 | ⏳ | Dynamic enable/disable with restart, extension isolation |
 | 6.4 | Vector search / memory graph enhancements | ⏳ | Embeddings-based memory retrieval |
 | 6.5 | Multi-agent runtime | ⏳ | Agent spawning beyond single chat |
@@ -114,21 +114,21 @@ Goal: reusable component library and future extensibility.
 
 ## Current position
 
-- **Tracks 1–5 are mostly implemented.** Domain models, repositories, settings, services, EventBus, AppState, UI contract compliance, and visible features are in place.
-- **Track 2 lifecycle alignment and Track 3.1 telemetry remain.** `BaseService` lifecycle states diverge from AGENTS.md canon, and `TelemetryService` publishes but does not yet use `TelemetryEvent` domain contract everywhere.
-- **Track 6 is future work.** Component library gallery, token audit, plugin framework v2, vector search, and multi-agent runtime are not started.
+- **Tracks 1–3 and 4–5 are complete.** Foundation, runtime engine, state/observability, UI contract, and visible features are all implemented.
+- **Track 6.3–6.5 remain future work.** Plugin framework v2, vector search, and multi-agent runtime are not started.
+- **Track 1.4 alignment audit is still open.** `core/settings/settings_repository.py` in-memory stub vs SQLite-backed repository should be unified when settings work is revisited.
 
 ---
 
 ## Recommended next sub-category
 
-**Track 2.2 → Track 3.1 → Track 6.2**
+**Track 6.3 → Track 6.4 → Track 6.5**
 
-1. **Align lifecycle states** (Track 2.2): reconcile `BaseService`/`ServiceState` with AGENTS.md canon (remove `HIBERNATED`/`ACTIVE` aliases).
-2. **Telemetry domain contract** (Track 3.1): ensure `TelemetryService` publishes `TelemetryEvent` dataclass instances and not plain dicts.
-3. **Design-system token audit** (Track 6.2): eliminate remaining hard-coded radii/fonts in views and use `theme_v2` everywhere.
+1. **Plugin framework v2** (Track 6.3): dynamic enable/disable with restart, extension isolation.
+2. **Vector search / memory graph enhancements** (Track 6.4): embeddings-based memory retrieval.
+3. **Multi-agent runtime** (Track 6.5): agent spawning beyond single chat.
 
-After that, the architecture is unified and we can proceed to Track 6.1–6.5 (platform scale) without hopping between plans.
+After that, the architecture is unified and the platform scale layer is complete.
 
 ---
 

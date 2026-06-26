@@ -1,6 +1,34 @@
-"""Canonical event topics used throughout the application."""
+"""Canonical event topics used throughout the application.
+
+This module is the single source of truth for all EventBus topics. Services,
+UI, AppState reducers, and verification scripts must use these constants; no
+hard-coded topic strings should exist elsewhere. Every topic is explicit and
+versioned; wildcard subscriptions are restricted to debug/diagnostic code.
+
+Topic categories:
+
+- **Settings** (`settings.*`): settings mutation, snapshots, and change events.
+- **Service lifecycle** (`service.*`): `service.started`, `service.ready`,
+  `service.stopped`, `service.error`.
+- **Chat** (`chat.*`): request, chunk, complete, cancel, error, export, and
+  clipboard helpers.
+- **Memory** (`memory.*`): remember, lookup, store, select, delete.
+- **Notes** (`note.*`): select, search, create, index, context.
+- **Plugins** (`plugin.*`): enable/disable, catalog, state changes, errors.
+- **Tools** (`tool.*`): invoke, started, completed, failed, result, error.
+- **System** (`system.*`): snapshot, events, telemetry.
+- **Model** (`model.*`, `ollama.*`): selection and resolution.
+- **Context** (`context.*`): context assembly and budget warnings.
+- **Session** (`session.*`): conversation history persistence.
+- **UI** (`ui.*`, `overlay.*`, `app.*`): user intent and overlay control.
+- **Workspace OS** (`ui.workspace_os.*`, `ui.inspector.*`): entity creation,
+  resource launch, and inspector control.
+"""
 
 from __future__ import annotations
+
+# Version marker for verification scripts and diagnostics.
+TOPIC_VERSION = 1
 
 SETTINGS_UPDATED = "settings.updated"
 SETTINGS_SNAPSHOT = "settings.snapshot"
@@ -114,3 +142,102 @@ UI_CREATE_CARD = "ui.workspace_os.create_card"
 UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
 UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
 UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"
+
+
+__all__ = [
+    "TOPIC_VERSION",
+    "SETTINGS_UPDATED",
+    "SETTINGS_SNAPSHOT",
+    "SETTINGS_CHANGED",
+    "SETTINGS_SET_REQUEST",
+    "SERVICE_STARTED",
+    "SERVICE_READY",
+    "SERVICE_STOPPED",
+    "SERVICE_ERROR",
+    "SERVICE_STATE_CHANGED",
+    "CONVERSATION_UPDATED",
+    "NOTES_INDEXED",
+    "TOOL_STARTED",
+    "TOOL_COMPLETED",
+    "TOOL_FAILED",
+    "TOOL_RESULT",
+    "TOOL_ERROR",
+    "TOOL_INVOKE",
+    "TELEMETRY_EVENT",
+    "TELEMETRY_EVENTS",
+    "SYSTEM_SNAPSHOT",
+    "APP_PHASE",
+    "APP_ERROR",
+    "APP_WARNING",
+    "COMMAND_ROUTED",
+    "UI_COMMAND",
+    "UI_NAVIGATE",
+    "UI_PALETTE_OPEN",
+    "UI_PALETTE_CLOSE",
+    "UI_CHAT_CANCEL",
+    "OVERLAY_SHOW",
+    "OVERLAY_HIDE",
+    "OVERLAY_ANCHOR",
+    "CHAT_STARTED",
+    "CHAT_CHUNK",
+    "CHAT_COMPLETE",
+    "CHAT_CANCELLED",
+    "CHAT_ERROR",
+    "CHAT_HISTORY_LOADED",
+    "CHAT_REQUEST",
+    "CHAT_EXPORT_REQUEST",
+    "CHAT_EXPORT_RESULT",
+    "CHAT_EXPORT_ERROR",
+    "CLIPBOARD_REQUEST",
+    "CLIPBOARD_CONTENT",
+    "OLLAMA_STATUS",
+    "OLLAMA_MODEL_LOADED",
+    "OLLAMA_MODEL_UNLOADED",
+    "MODEL_SELECTED",
+    "MODEL_RESOLVE_REQUEST",
+    "MODEL_RESOLVE_RESULT",
+    "CONTEXT_REQUEST",
+    "CONTEXT_FRAGMENT",
+    "CONTEXT_SNAPSHOT_CREATED",
+    "CONTEXT_OVER_BUDGET",
+    "CONTEXT_TRIMMED",
+    "CONTEXT_COMPLETE",
+    "MEMORY_REMEMBER",
+    "MEMORY_SELECT",
+    "MEMORY_LOOKUP_REQUEST",
+    "MEMORY_LOOKUP_RESULT",
+    "MEMORY_STORED",
+    "MEMORY_SELECTED",
+    "MEMORY_ERROR",
+    "MEMORY_CLEARED",
+    "MEMORY_CLEAR_SELECTION",
+    "MEMORY_DELETE_REQUEST",
+    "SESSION_HISTORY_REQUEST",
+    "SESSION_HISTORY_RESULT",
+    "SESSION_UPDATE_REQUEST",
+    "SESSION_UPDATE_RESULT",
+    "NOTE_SELECT",
+    "NOTE_SELECTED",
+    "NOTE_SEARCH_RESULTS",
+    "NOTE_CREATED",
+    "NOTE_ERROR",
+    "NOTE_INDEX_COMPLETE",
+    "NOTE_INDEX_PROGRESS",
+    "NOTE_CONTEXT_REQUEST",
+    "NOTE_CONTEXT_RESULT",
+    "PLUGIN_ENABLE_REQUEST",
+    "PLUGIN_DISABLE_REQUEST",
+    "PLUGIN_CATALOG",
+    "PLUGIN_STATE_CHANGED",
+    "PLUGIN_ERROR",
+    "LLM_REQUEST",
+    "SYSTEM_EVENTS",
+    "COMMAND_HISTORY",
+    "UI_INSPECTOR_OPEN",
+    "UI_INSPECTOR_CLOSE",
+    "UI_CREATE_WORKSPACE",
+    "UI_CREATE_CARD",
+    "UI_CREATE_RESOURCE",
+    "UI_LAUNCH_RESOURCE",
+    "UI_SEARCH_WORKSPACE_OS",
+]

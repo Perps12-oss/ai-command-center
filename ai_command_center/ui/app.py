@@ -53,6 +53,7 @@ from ai_command_center.ui.design_system import theme_manager
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.views.chat_view import ChatView
+from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
 from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
@@ -70,6 +71,7 @@ VIEW_IDS: tuple[str, ...] = (
     "system",
     "plugins",
     "settings",
+    "gallery",
 )
 
 # Gate-visible topic literals for Phase 5A verification: tool.result, model.selected, memory.stored.
@@ -177,6 +179,7 @@ class CommandPaletteApp(ctk.CTk):
             ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
             ("⚙  System", "System monitor", lambda: self._navigate("system")),
             ("🧩  Plugins", "Manage plugins", lambda: self._navigate("plugins")),
+            ("🎨  Component Gallery", "Design-system tokens and components", lambda: self._navigate("gallery")),
             ("◈  Settings", "Open settings & themes", lambda: self._navigate("settings")),
             ("⬇  Export Chat", "Save conversation to markdown", self._on_chat_export_request),
             ("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate),
@@ -257,6 +260,8 @@ class CommandPaletteApp(ctk.CTk):
                     self._content,
                     on_toggle=self._controller.publish_plugin_toggle,
                 )
+            elif view_id == "gallery":
+                self._views[view_id] = ComponentGalleryView(self._content)
             else:
                 self._views[view_id] = PlaceholderView(self._content, view_id)
         return self._views[view_id]
@@ -322,12 +327,15 @@ class CommandPaletteApp(ctk.CTk):
 
     # ── chat export / regenerate callbacks ────────────────────────────────────
 
-    def _on_chat_export_request(self) -> None:
-        chat = self._chat_view()
-        if chat and chat._history:
-            self._controller.publish_chat_export(list(chat._history))
+    def _on_chat_export(self, history: list[dict]) -> None:
+        if history:
+            self._controller.publish_chat_export(list(history))
         else:
             self._toast.show("No chat history to export", kind="warning")
+
+    def _on_chat_export_request(self) -> None:
+        chat = self._chat_view()
+        self._on_chat_export(list(chat._history) if chat else [])
 
     def _on_chat_export_result(self, event: Event) -> None:
         path = str(event.payload.get("path", ""))

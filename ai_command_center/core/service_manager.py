@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class ServiceManager:
-    """Registers services and coordinates load / hibernate / unload."""
+    """Registers services and coordinates start/stop lifecycle."""
 
     def __init__(self, bus: EventBus) -> None:
         self._bus = bus
@@ -34,24 +34,24 @@ class ServiceManager:
         for service in self._ordered():
             service.start()
 
-    def hibernate_all(self) -> None:
-        for service in reversed(self._ordered()):
-            service.stop()
-
     def unload_all(self) -> None:
         for service in reversed(self._ordered()):
             service.stop()
 
     def shutdown(self) -> None:
-        """Unload everything — no background services remain."""
+        """Stop all services — no background services remain."""
         self.unload_all()
         self._bus.publish(APP_PHASE, {"phase": "shutdown"}, source="service_manager")
 
     def _ordered(self) -> Iterable[BaseService]:
         return self._services.values()
 
-    def any_active(self) -> bool:
-        return any(s.state == ServiceState.ACTIVE for s in self._services.values())
+    def any_ready(self) -> bool:
+        return any(s.state == ServiceState.READY for s in self._services.values())
 
     def any_loaded(self) -> bool:
         return any(s.state != ServiceState.STOPPED for s in self._services.values())
+
+    def any_active(self) -> bool:
+        """Deprecated alias for any_ready()."""
+        return self.any_ready()

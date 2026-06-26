@@ -1,4 +1,9 @@
-"""Base service contract — load / hibernate / unload."""
+"""Base service contract — canonical lifecycle per AGENTS.md v4.
+
+Lifecycle states: STOPPED → STARTING → READY | DEGRADED | ERROR → STOPPING → STOPPED.
+Services publish state changes via SERVICE_STATE_CHANGED and the explicit
+milestones SERVICE_STARTED, SERVICE_READY, SERVICE_STOPPED, SERVICE_ERROR.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +24,7 @@ if TYPE_CHECKING:
 
 
 class BaseService(ABC):
-    """All services implement demand-based lifecycle hooks."""
+    """All services implement the canonical STARTING/READY/ERROR/STOPPING lifecycle."""
 
     name: str = "base"
 
@@ -32,9 +37,11 @@ class BaseService(ABC):
         return self._state
 
     def get_state(self) -> str:
+        """Return the canonical service state string."""
         return self._state.value
 
     def _set_state(self, state: ServiceState, detail: str = "") -> None:
+        """Update internal state and publish a state-change event."""
         self._state = state
         self._bus.publish(
             SERVICE_STATE_CHANGED,
@@ -42,61 +49,70 @@ class BaseService(ABC):
             source=self.name,
         )
 
+    def load(self) -> None:
+        """Deprecated alias for start(); kept for verification scripts."""
+        self.start()
+
+    def unload(self) -> None:
+        """Deprecated alias for stop(); kept for verification scripts."""
+        self.stop()
+
     def start(self) -> None:
-        if self._state in {ServiceState.READY, ServiceState.ACTIVE, ServiceState.IDLE}:
+        """Start the service if it is not already ready or running."""
+        if self._state in {ServiceState.READY, ServiceState.STARTING}:
             return
+        if self._state == ServiceState.ERROR:
+            # Allow restart from error state.
+            pass
         self._set_state(ServiceState.STARTING, "starting")
-        self.load()
-        self.activate()
+        try:
+            self._on_load()
+        except Exception as exc:
+            self._set_state(ServiceState.ERROR, str(exc))
+            self._bus.publish(
+                SERVICE_ERROR,
+                {"service": self.name, "detail": str(exc)},
+                source=self.name,
+            )
+            return
         self._set_state(ServiceState.READY, "ready")
         self._bus.publish(SERVICE_STARTED, {"service": self.name}, source=self.name)
         self._bus.publish(SERVICE_READY, {"service": self.name}, source=self.name)
 
     def stop(self) -> None:
+        """Stop the service if it is not already stopped."""
         if self._state == ServiceState.STOPPED:
             return
         self._set_state(ServiceState.STOPPING, "stopping")
-        self.hibernate()
-        self.unload()
+        try:
+            self._on_unload()
+        except Exception as exc:
+            self._bus.publish(
+                SERVICE_ERROR,
+                {"service": self.name, "detail": str(exc)},
+                source=self.name,
+            )
         self._set_state(ServiceState.STOPPED, "stopped")
         self._bus.publish(SERVICE_STOPPED, {"service": self.name}, source=self.name)
 
-    def load(self) -> None:
-        if self._state in {ServiceState.IDLE, ServiceState.ACTIVE, ServiceState.READY}:
+    def degrade(self, detail: str = "degraded") -> None:
+        """Mark the service as degraded but still operational."""
+        if self._state != ServiceState.READY:
             return
-        self._on_load()
-        self._set_state(ServiceState.IDLE, "loaded")
-
-    def hibernate(self) -> None:
-        if self._state == ServiceState.STOPPED:
-            return
-        self._on_hibernate()
-        self._set_state(ServiceState.HIBERNATED, "hibernated")
-
-    def unload(self) -> None:
-        if self._state == ServiceState.STOPPED:
-            return
-        self._on_unload()
-        self._set_state(ServiceState.STOPPED, "unloaded")
-
-    def activate(self) -> None:
-        if self._state == ServiceState.STOPPED:
-            self.load()
-        self._on_activate()
-        self._set_state(ServiceState.ACTIVE, "active")
+        self._set_state(ServiceState.DEGRADED, detail)
 
     def fail(self, detail: str = "error") -> None:
+        """Mark the service as failed."""
         self._set_state(ServiceState.ERROR, detail)
-        self._bus.publish(SERVICE_ERROR, {"service": self.name, "detail": detail}, source=self.name)
+        self._bus.publish(
+            SERVICE_ERROR,
+            {"service": self.name, "detail": detail},
+            source=self.name,
+        )
 
     @abstractmethod
-    def _on_load(self) -> None: ...
-
-    def _on_hibernate(self) -> None:
-        pass
+    def _on_load(self) -> None:
+        """One-time setup; subscribe to topics and allocate resources."""
 
     def _on_unload(self) -> None:
-        pass
-
-    def _on_activate(self) -> None:
-        pass
+        """Teardown; unsubscribe and release resources."""

@@ -13,13 +13,9 @@ class DummyService(BaseService):
     def __init__(self, bus: EventBus) -> None:
         super().__init__(bus)
         self.loaded = False
-        self.activated = False
 
     def _on_load(self) -> None:
         self.loaded = True
-
-    def _on_activate(self) -> None:
-        self.activated = True
 
 
 class Phase2ContractTests(unittest.TestCase):
@@ -54,8 +50,8 @@ class Phase2ContractTests(unittest.TestCase):
         service.start()
 
         self.assertTrue(service.loaded)
-        self.assertTrue(service.activated)
         self.assertEqual(ServiceState.READY, service.state)
+        self.assertEqual(service.get_state(), "ready")
         self.assertEqual([SERVICE_STARTED, SERVICE_READY], events)
 
 

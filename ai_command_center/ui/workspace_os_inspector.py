@@ -17,6 +17,7 @@ from ai_command_center.core.events.topics import (
     UI_LAUNCH_RESOURCE,
     UI_SEARCH_WORKSPACE_OS,
 )
+from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 
 
@@ -64,15 +65,16 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         header = ctk.CTkLabel(
             self,
             text="Workspace OS",
-            font=("Inter", 24, "bold"),
+            font=T.FONT_TITLE,
+            text_color=T.TEXT_HEADING,
         )
         header.pack(pady=(16, 8))
 
         status = ctk.CTkLabel(
             self,
             text="Experimental",
-            font=("Inter", 10),
-            text_color=("#888888", "#888888"),
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
         )
         status.pack()
 
@@ -127,7 +129,7 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self._entities_list.configure(state="disabled")
 
         # Recent activity
-        activity_label = ctk.CTkLabel(self, text="Recent Activity", font=("Inter", 14, "bold"))
+        activity_label = ctk.CTkLabel(self, text="Recent Activity", font=T.FONT_HEADER)
         activity_label.pack(anchor="w", padx=16, pady=(8, 0))
         self._activity_list = ctk.CTkTextbox(self, height=120, wrap="word")
         self._activity_list.pack(fill="x", padx=16, pady=8)
@@ -185,7 +187,7 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
                     text="Launch",
                     width=60,
                     height=20,
-                    font=("Inter", 10),
+                    font=T.FONT_SMALL,
                     command=lambda eid=entity.entity_id, rt=resource_type, val=value: self._controller.launch_resource(
                         str(eid), rt, val
                     ),

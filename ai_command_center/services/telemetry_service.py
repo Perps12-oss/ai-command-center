@@ -1,8 +1,9 @@
 """
 Passive telemetry — observation only (Phase 5C+).
 
-Subscribes to EventBus topics; append-only SQLite log of raw bus events.
-No inference, correlation, or behavioral classification at runtime.
+Subscribes to EventBus topics, stores append-only SQLite log of raw bus events,
+and publishes normalized TelemetryEvent back to the EventBus. No inference,
+correlation, or behavioral classification at runtime.
 Derived metrics: telemetry_summary.py (offline only).
 """
 
@@ -27,6 +28,7 @@ from ai_command_center.core.events.topics import (
     NOTE_ERROR,
     NOTE_SEARCH_RESULTS,
     OLLAMA_STATUS,
+    TELEMETRY_EVENT,
     TOOL_ERROR,
     TOOL_RESULT,
     UI_COMMAND,
@@ -37,7 +39,6 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.db.telemetry_repository import TelemetryRepository
 from ai_command_center.domain.telemetry_event import TelemetryEvent
 from ai_command_center.services.base import BaseService
-from ai_command_center.telemetry.telemetry_service import TelemetryService as CoreTelemetryService
 
 _HANDLER_SLOW_MS = 5.0
 
@@ -65,7 +66,7 @@ _BUS_TOPICS = (
 
 
 class TelemetryService(BaseService):
-    """Dumb camera: bus event → normalized row → SQLite."""
+    """Dumb camera: bus event → normalized TelemetryEvent → EventBus + SQLite."""
 
     name = "telemetry"
 
@@ -74,7 +75,6 @@ class TelemetryService(BaseService):
         self._repo = repo
         self._session_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self._unsubscribers: list[Callable[[], None]] = []
-        self._core_telemetry = CoreTelemetryService()
 
     @property
     def session_id(self) -> str:
@@ -109,7 +109,16 @@ class TelemetryService(BaseService):
             payload=tuple(payload.items()),
             emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
         )
-        self._core_telemetry.capture(normalized)
+        self._bus.publish(
+            TELEMETRY_EVENT,
+            {
+                "event_type": normalized.event_type,
+                "payload": dict(normalized.payload),
+                "emitted_at": normalized.timestamp,
+                "session_id": self._session_id,
+            },
+            source=self.name,
+        )
         handler_ms = (time.perf_counter() - started) * 1000.0
         if handler_ms >= _HANDLER_SLOW_MS:
             self._record(

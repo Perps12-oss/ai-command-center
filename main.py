@@ -83,6 +83,7 @@ def main() -> int:
 
     print("AI Command Center running. Alt+Space to toggle palette. Ctrl+Shift+W for Workspace OS Inspector. Tray icon active.")
     app.protocol("WM_DELETE_WINDOW", app.hide)
+    app.show()
 
     try:
         app.mainloop()
