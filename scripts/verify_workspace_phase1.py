@@ -78,6 +78,12 @@ def main() -> int:
         failures.append("retained workspace did not hydrate the latest snapshot")
     if not held.recent_snapshots:
         failures.append("retained workspace did not record continuity history")
+    # Continuity must not depend on object identity: a fresh instance is returned
+    # and the previously returned context is left untouched (no hidden aliasing).
+    if held is anchor:
+        failures.append("retain returned the same object instance (aliasing)")
+    if anchor.active_snapshot is not snap or anchor.recent_snapshots:
+        failures.append("retain mutated a previously returned WorkspaceContext")
 
     # After lease expiry, the same transient reading forms a new workspace.
     clock[0] += 61.0

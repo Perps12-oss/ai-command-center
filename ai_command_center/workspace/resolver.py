@@ -6,6 +6,11 @@ Resolution is fully deterministic — same evidence always yields the same
 stable when the user briefly switches to a low-evidence context (A6, Context
 Persistence). Lease renewal is bounded by an absolute maximum lifetime so a
 continuous stream of transient readings cannot keep a workspace alive forever.
+
+Every ``resolve`` call returns a fresh ``WorkspaceContext``; continuity is carried
+by a stable ``workspace_id``, the lease, and copied semantic state — never by a
+shared mutable object. This avoids hidden aliasing and suits an immutable-state
+(EventBus/AppState) architecture.
 """
 
 from __future__ import annotations
@@ -100,14 +105,24 @@ class WorkspaceResolver:
         return context
 
     def _retain_anchor(self, snapshot: TelemetrySnapshot, now: float) -> WorkspaceContext:
+        # Continuity is carried by workspace_id + lease + copied state, never by
+        # mutating a previously returned object: each cycle yields a fresh context.
         anchor = self._anchor
         assert anchor is not None and self._lease is not None
-        anchor.recent_snapshots.append(repr(anchor.active_snapshot.timestamp))
-        if len(anchor.recent_snapshots) > 10:
-            del anchor.recent_snapshots[:-10]
-        anchor.active_snapshot = snapshot
+        history = [*anchor.recent_snapshots, repr(anchor.active_snapshot.timestamp)][-10:]
+        renewed = WorkspaceContext(
+            workspace_id=anchor.workspace_id,
+            title=anchor.title,
+            inferred_task=anchor.inferred_task,
+            active_snapshot=snapshot,
+            active_files=list(anchor.active_files),
+            recent_snapshots=history,
+            memory_refs=list(anchor.memory_refs),
+            metadata=dict(anchor.metadata),
+        )
         self._lease = replace(self._lease, expires_at=self._capped_expiry(now))
-        return anchor
+        self._anchor = renewed
+        return renewed
 
     def _capped_expiry(self, now: float) -> float:
         # Renew for one TTL, but never past the workspace's absolute max lifetime.
