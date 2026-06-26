@@ -4,36 +4,35 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from ai_command_center.ui.components.floating_ui import pack_floating
 from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.layer.layer_stack import PageLayerStack
 from ai_command_center.ui.theme import tokens as T
 
 VIEW_LABELS: dict[str, str] = {
     "home": "Home Dashboard",
     "chat": "Chat Workspace",
     "notes": "Obsidian Notes",
+    "memory": "Memory",
     "system": "System Monitor",
     "plugins": "Plugins",
     "settings": "Settings",
 }
 
 VIEW_HINTS: dict[str, str] = {
-    "home": "Quick actions and system overview — Phase 3.",
-    "chat": "Ollama streaming chat — Phase 3.",
-    "notes": "Vault search and quick notes — Phase 3.",
-    "system": "CPU, RAM, shared memory — Phase 4.",
-    "plugins": "Plugin manager — Phase 4.",
-    "settings": "Accent, hotkey, low memory mode — coming soon.",
+    "home": "Quick actions and system overview.",
+    "chat": "Ollama streaming chat.",
+    "notes": "Vault search and quick notes.",
+    "memory": "Browse and manage stored memories.",
+    "system": "CPU, RAM, and shared memory monitor.",
+    "plugins": "Plugin manager.",
+    "settings": "Accent, hotkey, low memory mode.",
 }
 
 
-class PlaceholderView(PageLayerStack):
+class PlaceholderView(ctk.CTkFrame):
     def __init__(self, master, view_id: str, **kwargs) -> None:
-        page = view_id if view_id in ("home", "system", "chat", "notes", "plugins", "settings") else "settings"
-        super().__init__(master, page, **kwargs)
-        card = GlassCard(self.ui_layer)
-        pack_floating(card, fill="both", expand=True, first=True)
+        super().__init__(master, fg_color="transparent", **kwargs)
+        card = GlassCard(self)
+        card.pack(fill="both", expand=True, padx=T.PAD, pady=(T.PAD, 8))
 
         ctk.CTkLabel(
             card,

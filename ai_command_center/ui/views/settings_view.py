@@ -5,9 +5,7 @@ from pathlib import Path
 
 import customtkinter as ctk
 
-from ai_command_center.ui.components.floating_ui import FLOAT_PAD, pack_floating
 from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.layer.layer_stack import PageLayerStack
 from ai_command_center.ui.theme import theme_manager, tokens as T
 
 
@@ -53,14 +51,17 @@ class _Swatch(ctk.CTkFrame):
         )
 
 
-class SettingsView(PageLayerStack):
+class SettingsView(ctk.CTkFrame):
     def __init__(self, master, *, on_save) -> None:
-        super().__init__(master, "settings")
+        super().__init__(master, fg_color="transparent")
         self._on_save = on_save
         self._building = True
 
-        title_card = GlassCard(self.ui_layer)
-        pack_floating(title_card, first=True)
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        scroll.pack(fill="both", expand=True)
+
+        title_card = GlassCard(scroll)
+        title_card.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
         ctk.CTkLabel(
             title_card,
             text="Settings",
@@ -69,18 +70,18 @@ class SettingsView(PageLayerStack):
         ).pack(anchor="w", padx=T.PAD, pady=T.PAD)
 
         self._vault_banner = ctk.CTkLabel(
-            self.ui_layer,
+            scroll,
             text="",
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
             wraplength=640,
             justify="left",
         )
-        self._vault_banner.pack(anchor="w", padx=FLOAT_PAD, pady=(0, 8))
+        self._vault_banner.pack(anchor="w", padx=T.PAD, pady=(0, 8))
 
         # Appearance section
-        appear = GlassCard(self.ui_layer)
-        pack_floating(appear, fill="x")
+        appear = GlassCard(scroll)
+        appear.pack(fill="x", padx=T.PAD, pady=(0, 8))
 
         ctk.CTkLabel(
             appear,
@@ -143,8 +144,8 @@ class SettingsView(PageLayerStack):
         self._opacity_lbl.pack(side="right", padx=(8, 0))
 
         # Connection section
-        form = GlassCard(self.ui_layer)
-        pack_floating(form, fill="x")
+        form = GlassCard(scroll)
+        form.pack(fill="x", padx=T.PAD, pady=(0, 8))
 
         ctk.CTkLabel(
             form,
@@ -181,13 +182,13 @@ class SettingsView(PageLayerStack):
         save.pack(anchor="w", padx=16, pady=(8, 16))
 
         self._status = ctk.CTkLabel(
-            self.ui_layer,
+            scroll,
             text="",
             text_color=T.TEXT_MUTED,
             wraplength=600,
             justify="left",
         )
-        self._status.pack(anchor="w", padx=FLOAT_PAD, pady=(0, FLOAT_PAD))
+        self._status.pack(anchor="w", padx=T.PAD, pady=(0, T.PAD))
         self._building = False
 
     def _field(self, parent, label: str, default: str) -> ctk.CTkEntry:

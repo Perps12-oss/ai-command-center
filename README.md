@@ -1,10 +1,12 @@
 # AI Command Center
 
-Phase 0 preflight scaffold for a local AI command surface on **Windows ARM64**.
+Local AI command surface for **Windows ARM64** — canonical repository.
 
 ## Project home
 
-`c:\Users\S8633\OneDrive\Desktop\ai-command-center`
+`c:\Users\S8633\Documents\GITHUB\ai-command-center` (canonical)
+
+Legacy OneDrive copy is kept as a read-only backup until the unified app is proven stable.
 
 ## Target hardware
 
@@ -22,7 +24,7 @@ Runtime application data (not in repo): `%APPDATA%\AICommandCenter`
 ## Setup
 
 ```powershell
-cd c:\Users\S8633\OneDrive\Desktop\ai-command-center
+cd c:\Users\S8633\Documents\GITHUB\ai-command-center
 C:\Users\S8633\AppData\Local\Python\bin\python.exe -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
@@ -30,26 +32,27 @@ pip install -r requirements.txt
 python scripts\preflight_arm64.py
 ```
 
-## Phase 2 — Command palette UI
-
-```powershell
-C:\Users\S8633\AppData\Local\Python\bin\python.exe scripts\verify_phase2.py
-C:\Users\S8633\AppData\Local\Python\bin\python.exe main.py
-```
-
-- **Alt+Space** — official global hotkey to toggle command palette (not Win+Space)
-- **System tray** — Open / Exit; status color by phase
-- **Glass shell** — sidebar, command box, placeholder views
-- UI uses **EventBus + AppState only** (see `docs/ARCHITECTURE.md`)
-
-## Phase 1 — Core infrastructure
+## Stage 1 — Unified UI
 
 ```powershell
 C:\Users\S8633\AppData\Local\Python\bin\python.exe scripts\verify_phase1.py
 C:\Users\S8633\AppData\Local\Python\bin\python.exe main.py
 ```
 
-Architecture: `Services → Events → AppState → UI` (UI in Phase 2).
+- **Alt+Space** — official global hotkey to toggle command palette
+- **Ctrl+Shift+W** — Workspace OS Inspector
+- **System tray** — Open / Exit; status color by phase
+- **Glass shell** — sidebar, command box, unified views (Home, Chat, Notes, Memory, System, Plugins, Settings)
+- **Transparency slider** — Settings → Appearance → Window opacity
+- UI uses **EventBus + AppState only** (see `docs/ARCHITECTURE.md`)
+
+## Phase 1 — Core infrastructure
+
+```powershell
+C:\Users\S8633\AppData\Local\Python\bin\python.exe scripts\verify_phase1.py
+```
+
+Architecture: `Services → Events → AppState → UI`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for repository policy, state ownership, and EventBus rules.
 
