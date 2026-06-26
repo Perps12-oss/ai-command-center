@@ -93,6 +93,15 @@ class CallableProvider(ContextProvider):
                 ContextFragment(key=str(k), value=v, source=self.source)
                 for k, v in raw.items()
             )
+        # str/bytes are scalar values, not fragment collections.
+        if not isinstance(raw, (str, bytes)) and isinstance(raw, Iterable):
+            items = tuple(raw)
+            if not items:
+                return ()
+            if all(isinstance(item, ContextFragment) for item in items):
+                return items
+            # A non-fragment iterable is treated as a single scalar value.
+            return (ContextFragment(key=self._key, value=items, source=self.source),)
         return (ContextFragment(key=self._key, value=raw, source=self.source),)
 
 

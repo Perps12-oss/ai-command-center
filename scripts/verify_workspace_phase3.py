@@ -82,6 +82,31 @@ def main() -> int:
     if "uia" not in optional_acq.acquire(include_ui_automation=True):
         failures.append("UI Automation should be included when opted in")
 
+    # 5b. A reader returning a sequence of ContextFragments is expanded, not wrapped.
+    seq_frags = (
+        ContextFragment(key="a", value=1, source=ContextSource.CLIPBOARD),
+        ContextFragment(key="b", value=2, source=ContextSource.CLIPBOARD),
+    )
+    seq_acq = ContextAcquirer(
+        [CallableProvider(ContextSource.CLIPBOARD, lambda: seq_frags)]
+    ).acquire()
+    if [f.key for f in seq_acq.fragments] != ["a", "b"]:
+        failures.append("CallableProvider should expand a sequence of ContextFragments")
+    if seq_acq.value("a") != 1 or seq_acq.value("b") != 2:
+        failures.append("fragment sequence values not preserved")
+    # An empty sequence means 'nothing available now'.
+    empty_acq = ContextAcquirer(
+        [CallableProvider(ContextSource.CLIPBOARD, lambda: [])]
+    ).acquire()
+    if empty_acq.fragments:
+        failures.append("empty reader sequence should yield no fragments")
+    # A plain string is still a single scalar value, never iterated char-by-char.
+    str_acq = ContextAcquirer(
+        [CallableProvider(ContextSource.CLIPBOARD, lambda: "hello", key="clip")]
+    ).acquire()
+    if str_acq.value("clip") != "hello":
+        failures.append("string reader value should be a single scalar fragment")
+
     # 6. A failing provider is isolated; core still produces context and records error.
     class Boom(ContextProvider):
         source = ContextSource.KNOWN_INTEGRATION

@@ -99,7 +99,7 @@ class WorkspaceResolver:
         self._lease = WorkspaceLease(
             workspace_id=workspace_id,
             confidence=confidence,
-            expires_at=self._capped_expiry(now),
+            expires_at=self._capped_expiry(now, created_at=now),
         )
         self._anchor = self._clone(context)
         return context
@@ -120,7 +120,11 @@ class WorkspaceResolver:
             memory_refs=list(anchor.memory_refs),
             metadata=dict(anchor.metadata),
         )
-        self._lease = replace(self._lease, expires_at=self._capped_expiry(now))
+        assert self._anchor_created_at is not None
+        self._lease = replace(
+            self._lease,
+            expires_at=self._capped_expiry(now, created_at=self._anchor_created_at),
+        )
         self._anchor = self._clone(renewed)
         return renewed
 
@@ -136,11 +140,13 @@ class WorkspaceResolver:
             metadata=dict(context.metadata),
         )
 
-    def _capped_expiry(self, now: float) -> float:
+    def _capped_expiry(self, now: float, *, created_at: float) -> float:
         # Renew for one TTL, but never past the workspace's absolute max lifetime.
+        # The anchor's creation time is passed in explicitly so the cap never
+        # depends on instance-attribute assignment order at the call site.
         target = now + self._ttl
-        if self._max_lease is not None and self._anchor_created_at is not None:
-            target = min(target, self._anchor_created_at + self._max_lease)
+        if self._max_lease is not None:
+            target = min(target, created_at + self._max_lease)
         return target
 
     @staticmethod
