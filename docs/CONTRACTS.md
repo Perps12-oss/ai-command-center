@@ -54,6 +54,25 @@ Unchanged.
 
 ---
 
+## workspace.resolved v1.0 (WS-10 runtime wiring)
+
+```json
+{
+  "contract_version": "1.0",
+  "workspace_id": "ws-...",
+  "title": "vault",
+  "inferred_task": "summarize my notes",
+  "confidence": 0.70,
+  "evidence_source": "obsidian_vault",
+  "suggestions": [{"label": "Explain Error", "command": "...", "score": 0.9}]
+}
+```
+
+**Producer:** `WorkspaceService` only (on `ui.command`, pull-based)  
+**Consumer:** `AppStateStore` reducer (`AppState.workspace`) and `ui/app.py` (bus subscription) — projection only, no execution
+
+---
+
 ## Version bump policy
 
 1. Update `core/contracts.py` + `SUPPORTED_VERSIONS`
