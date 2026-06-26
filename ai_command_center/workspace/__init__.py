@@ -6,6 +6,9 @@ Phase 3 (Part III): reliability-first, pull-based context acquisition.
 Phase 4 (Part VI): action architecture (ActionResult / OutputTarget / dispatch).
 Phase 5 (Part VII): deterministic, pre-AI suggestion engine.
 Phase 6 (Part V): runtime lifecycle state machine wiring the layers together.
+Phase 7 (Part VIII): plugin architecture (Tier-1 exclusive matching).
+Phase 8 (Part IX): workspace-centric, immutable memory model.
+Phase 9 (Part X): AI reasoning subsystem boundary (supporting role only).
 
 Pure, deterministic, dependency-free: no EventBus, no repositories, no background
 telemetry acquisition, no execution, no AI. Higher phases wire these objects into
@@ -51,6 +54,21 @@ from ai_command_center.workspace.lifecycle import (
     LifecycleResult,
     RuntimePipeline,
 )
+from ai_command_center.workspace.memory import (
+    ExecutionRecord,
+    MemoryStore,
+    Relationship,
+    TaskRecord,
+    WorkspaceMemory,
+)
+from ai_command_center.workspace.plugins import CommandPlugin, PluginRegistry
+from ai_command_center.workspace.reasoning import (
+    CallableReasoningEngine,
+    ReasoningEngine,
+    ReasoningRequest,
+    ReasoningResponse,
+    ReasoningTask,
+)
 from ai_command_center.workspace.resolver import WorkspaceResolver
 from ai_command_center.workspace.suggestions import (
     DEFAULT_RULES,
@@ -94,4 +112,16 @@ __all__ = [
     "LifecyclePhase",
     "LifecycleResult",
     "RuntimePipeline",
+    "CommandPlugin",
+    "PluginRegistry",
+    "TaskRecord",
+    "ExecutionRecord",
+    "Relationship",
+    "WorkspaceMemory",
+    "MemoryStore",
+    "ReasoningTask",
+    "ReasoningRequest",
+    "ReasoningResponse",
+    "ReasoningEngine",
+    "CallableReasoningEngine",
 ]
