@@ -88,3 +88,15 @@ class MemoryRepository:
             content=str(row["content"]),
             tier=str(row["tier"]),
         )
+
+    def delete(self, node_id: str) -> bool:
+        cursor = self._conn.execute(
+            "DELETE FROM memory_nodes WHERE id = ?",
+            (node_id,),
+        )
+        self._conn.execute(
+            "DELETE FROM memory_edges WHERE source_id = ? OR target_id = ?",
+            (node_id, node_id),
+        )
+        self._conn.commit()
+        return cursor.rowcount > 0

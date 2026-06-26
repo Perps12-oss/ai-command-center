@@ -1,241 +1,345 @@
-﻿"""Home - Hybrid spatial grid (ribbon / metrics / activity feed)."""
-
-
-
+"""Home dashboard — live status, activity feed, quick stats, quick actions."""
 from __future__ import annotations
 
+import time
+from collections import deque
+
+import customtkinter as ctk
+
+from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.ui.theme import tokens as T
+
+_QUICK_ACTIONS: tuple[tuple[str, str, str], ...] = (
+    ("\u2318  Ask AI",        "Type any question in the command box below",                  "accent"),
+    ("\U0001f4cb  Clipboard", "Type \u201csummarize clipboard\u201d to process copied text", "secondary"),
+    ("\U0001f4dd  Notes",     "Type \u201cnote: keyword\u201d to search your Obsidian vault", "secondary"),
+    ("\U0001f4be  Remember",  "Type \u201cremember: label | content\u201d to store a memory", "secondary"),
+    (">_  Shell",             "Type \u201c> command\u201d to run a shell command",            "secondary"),
+    ("\U0001f9e0  Memory",    "Type \u201cmemory: keyword\u201d to recall stored facts",      "secondary"),
+)
+
+_ACTIVITY_ICON = {
+    "chat":    "💬",
+    "note":    "📝",
+    "memory":  "🧠",
+    "tool":    "🔧",
+    "system":  "⚙",
+    "error":   "✕",
+}
+
+_MAX_ACTIVITY = 5
 
 
-from typing import TYPE_CHECKING
+def _accent_for(key: str) -> str:
+    return T.ACCENT_DEFAULT if key == "accent" else T.TEXT_SECONDARY
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+#  Internal widgets
+# ──────────────────────────────────────────────────────────────────────────────
 
-from ai_command_center.core.event_bus import EventBus
-
-from ai_command_center.ui.components.action_ribbon import ActionRibbon
-
-from ai_command_center.ui.components.activity_feed_panel import ActivityFeedPanel
-
-from ai_command_center.ui.components.metric_card_v2 import MetricCardV2
-
-from ai_command_center.ui.layer.layer_stack import PageLayerStack
-
-
-
-if TYPE_CHECKING:
-
-    from ai_command_center.ui.layer.content_backdrop import ShellBackdrop
-
-
-
-
-
-class HomeView(PageLayerStack):
-
-    """Logic controller for home; visual surface is ShellBackdrop overlay zones."""
-
-
-
-    def __init__(self, master, *, shell: ShellBackdrop, bus: EventBus | None = None, **kwargs) -> None:
-
-        super().__init__(master, "home", **kwargs)
-
-        self._shell = shell
-
-        self.place_forget()
-
-        self.background_canvas.place_forget()
-
-
-
-        ribbon_host = shell.get_zone_host("action_ribbon")
-
-        feed_host = shell.get_zone_host("activity_feed")
-
-
-
-        self._ribbon = ActionRibbon(ribbon_host)
-
-        self._ribbon.pack(fill="both", expand=True)
-
-
-
-        self._cards: dict[str, MetricCardV2] = {}
-
-        card_specs = (
-
-            ("SystemStatus", "System Status", "ring", "metric_system"),
-
-            ("Knowledge", "Knowledge Base", "default", "metric_knowledge"),
-
-            ("UsageOverview", "Usage Overview", "sparkline", "metric_usage"),
-
-            ("Plugins", "Plugins", "default", "metric_plugins"),
-
+class _ActionCard(ctk.CTkFrame):
+    def __init__(self, master, icon_title: str, hint: str, color_key: str) -> None:
+        super().__init__(
+            master,
+            fg_color=T.BG_GLASS,
+            border_color=T.BG_GLASS_BORDER,
+            border_width=1,
+            corner_radius=8,
         )
-
-        for card_id, title, viz, zone_id in card_specs:
-
-            host = shell.get_zone_host(zone_id)
-
-            card = MetricCardV2(host, card_id, title, viz=viz)
-
-            card.pack(fill="both", expand=True, padx=4, pady=4)
-
-            self._cards[card_id] = card
-
-
-
-        self._feed = ActivityFeedPanel(feed_host, bus=bus)
-
-        self._feed.pack(fill="both", expand=True)
-
-
-
-        shell.after_idle(shell.refresh)
+        ctk.CTkLabel(
+            self,
+            text=icon_title,
+            font=T.FONT_HEADER,
+            text_color=_accent_for(color_key),
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(10, 2))
+        ctk.CTkLabel(
+            self,
+            text=hint,
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            wraplength=260,
+            justify="left",
+        ).pack(fill="x", padx=12, pady=(0, 10))
 
 
+class _StatusPill(ctk.CTkFrame):
+    """Single live-status indicator: dot + label + sub-label."""
 
-    def mount_bus(self, bus: EventBus) -> None:
+    _DOT_UNKNOWN = "\u25cb"
+    _DOT_OK      = "\u25cf"
+    _DOT_BUSY    = "\u25d4"
+    _DOT_ERROR   = "\u25cf"
 
-        self._feed.mount_bus(bus)
-
-
-
-    def apply_system_snapshot(self, payload: dict) -> None:
-
-        cpu = float(payload.get("cpu_percent", 0))
-
-        ram = float(payload.get("ram_percent", 0))
-
-        health = str(payload.get("health", "unknown"))
-
-
-
-        badge_state = "ready" if health == "healthy" else "busy" if health == "stressed" else "offline"
-
-        self._cards["SystemStatus"].update_metrics(
-
-            value=f"{cpu:.0f}% CPU",
-
-            badge_text=health.title(),
-
-            badge_state=badge_state,
-
-            delta=float(payload.get("cpu_delta")) if payload.get("cpu_delta") is not None else None,
-
-            percent=cpu,
-
-            subtitle=f"ram {ram:.0f}%",
-
+    def __init__(self, master, title: str) -> None:
+        super().__init__(
+            master,
+            fg_color=T.BG_GLASS,
+            border_color=T.BG_GLASS_BORDER,
+            border_width=1,
+            corner_radius=8,
         )
+        top = ctk.CTkFrame(self, fg_color="transparent")
+        top.pack(fill="x", padx=12, pady=(10, 2))
+
+        self._dot = ctk.CTkLabel(
+            top,
+            text=self._DOT_UNKNOWN,
+            font=(T.FONT_FAMILY, 13, "bold"),
+            text_color=T.TEXT_MUTED,
+            width=16,
+        )
+        self._dot.pack(side="left")
+        ctk.CTkLabel(
+            top,
+            text=title.upper(),
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+        ).pack(side="left", padx=(4, 0))
+
+        self._main_lbl = ctk.CTkLabel(
+            self, text="\u2014", font=T.FONT_SMALL, text_color=T.TEXT_MUTED, anchor="w"
+        )
+        self._main_lbl.pack(fill="x", padx=12, pady=(0, 4))
+
+        self._sub_lbl = ctk.CTkLabel(
+            self, text="", font=(T.FONT_FAMILY, 10), text_color=T.TEXT_MUTED, anchor="w"
+        )
+        self._sub_lbl.pack(fill="x", padx=12, pady=(0, 10))
+
+    def set_ok(self, main: str, sub: str = "") -> None:
+        self._dot.configure(text=self._DOT_OK, text_color=T.STATUS_READY)
+        self._main_lbl.configure(text=main, text_color=T.STATUS_READY)
+        self._sub_lbl.configure(text=sub, text_color=T.TEXT_MUTED)
+
+    def set_busy(self, main: str, sub: str = "") -> None:
+        self._dot.configure(text=self._DOT_BUSY, text_color=T.STATUS_BUSY)
+        self._main_lbl.configure(text=main, text_color=T.STATUS_BUSY)
+        self._sub_lbl.configure(text=sub, text_color=T.TEXT_MUTED)
+
+    def set_error(self, main: str, sub: str = "") -> None:
+        self._dot.configure(text=self._DOT_ERROR, text_color=T.STATUS_ERROR)
+        self._main_lbl.configure(text=main, text_color=T.STATUS_ERROR)
+        self._sub_lbl.configure(text=sub, text_color=T.TEXT_MUTED)
+
+    def set_unknown(self, main: str = "\u2014", sub: str = "") -> None:
+        self._dot.configure(text=self._DOT_UNKNOWN, text_color=T.TEXT_MUTED)
+        self._main_lbl.configure(text=main, text_color=T.TEXT_MUTED)
+        self._sub_lbl.configure(text=sub, text_color=T.TEXT_MUTED)
 
 
+class _StatsStrip(ctk.CTkFrame):
+    """Row of quick-stat counters: messages · memories · notes."""
+
+    def __init__(self, master) -> None:
+        super().__init__(master, fg_color=T.BG_GLASS, corner_radius=8)
+        self._labels: dict[str, ctk.CTkLabel] = {}
+        for key, title in (("messages", "Messages"), ("memories", "Memories"), ("notes", "Notes")):
+            col = ctk.CTkFrame(self, fg_color="transparent")
+            col.pack(side="left", fill="both", expand=True, padx=16, pady=10)
+            val = ctk.CTkLabel(col, text="0", font=T.FONT_HEADER, text_color=T.TEXT_PRIMARY, anchor="center")
+            val.pack(fill="x")
+            ctk.CTkLabel(col, text=title, font=(T.FONT_FAMILY, 10), text_color=T.TEXT_MUTED, anchor="center").pack(fill="x")
+            self._labels[key] = val
+
+    def update(self, messages: int, memories: int, notes: int) -> None:
+        self._labels["messages"].configure(text=str(messages))
+        self._labels["memories"].configure(text=str(memories))
+        self._labels["notes"].configure(text=str(notes))
+
+
+class _ActivityFeed(ctk.CTkFrame):
+    """Shows the last N events as rows inside a GlassCard."""
+
+    def __init__(self, master) -> None:
+        super().__init__(master, fg_color="transparent")
+        self._entries: deque[tuple[str, str, str]] = deque(maxlen=_MAX_ACTIVITY)
+        self._row_frames: list[ctk.CTkFrame] = []
+        self._build_rows()
+
+    def _build_rows(self) -> None:
+        for f in self._row_frames:
+            f.destroy()
+        self._row_frames.clear()
+
+        if not self._entries:
+            placeholder = ctk.CTkFrame(self, fg_color="transparent")
+            placeholder.pack(fill="x", padx=T.PAD, pady=10)
+            ctk.CTkLabel(
+                placeholder,
+                text="No activity yet \u2014 start typing above.",
+                font=T.FONT_SMALL,
+                text_color=T.TEXT_MUTED,
+                anchor="w",
+            ).pack(fill="x")
+            self._row_frames.append(placeholder)
+            return
+
+        for icon, text, ts in self._entries:
+            row = ctk.CTkFrame(self, fg_color="transparent")
+            row.pack(fill="x", padx=T.PAD, pady=(4, 0))
+            ctk.CTkLabel(row, text=icon, font=T.FONT_SMALL, text_color=T.ACCENT_DEFAULT, width=20).pack(side="left")
+            ctk.CTkLabel(row, text=text, font=T.FONT_SMALL, text_color=T.TEXT_SECONDARY, anchor="w", wraplength=560, justify="left").pack(side="left", fill="x", expand=True, padx=(6, 0))
+            ctk.CTkLabel(row, text=ts, font=(T.FONT_FAMILY, 10), text_color=T.TEXT_MUTED).pack(side="right")
+            self._row_frames.append(row)
+
+    def add(self, text: str, kind: str = "system") -> None:
+        icon = _ACTIVITY_ICON.get(kind, "◈")
+        ts   = time.strftime("%H:%M")
+        self._entries.appendleft((icon, text, ts))
+        self._build_rows()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  HomeView
+# ──────────────────────────────────────────────────────────────────────────────
+
+class HomeView(ctk.CTkFrame):
+    """Home dashboard.
+
+    Architecture contract — public API called from app.py via UIQueue:
+      update_ollama(online, model)
+      update_vault(*, indexing, files, ms)
+      update_vault_search(query, count)
+      update_memory(count)
+      update_stats(messages, memories, notes)
+      add_activity(text, kind)
+      set_last_command(text)       (legacy compat)
+    """
+
+    def __init__(self, master, **kwargs) -> None:
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self._memory_count = 0
+        self._note_count = 0
+        self._build()
+
+    def _build(self) -> None:
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
+        scroll.pack(fill="both", expand=True)
+
+        # Hero banner
+        hero = GlassCard(scroll)
+        hero.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
+        hero_inner = ctk.CTkFrame(hero, fg_color="transparent")
+        hero_inner.pack(fill="x", padx=T.PAD, pady=14)
+        ctk.CTkLabel(
+            hero_inner,
+            text="\u25c7  AI Command Center",
+            font=T.FONT_TITLE,
+            text_color=T.TEXT_PRIMARY,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            hero_inner,
+            text="Alt+Space to toggle  ·  Ctrl+K for commands  ·  ? for shortcuts",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+        ).pack(side="right")
+        ctk.CTkLabel(
+            hero,
+            text="Your local AI assistant \u2014 ask questions, search notes, run shell commands, remember facts.",
+            font=T.FONT_BODY,
+            text_color=T.TEXT_SECONDARY,
+            wraplength=900,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(0, 14))
+
+        # Quick stats strip
+        ctk.CTkLabel(
+            scroll, text="QUICK STATS", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w"
+        ).pack(fill="x", padx=T.PAD + 2, pady=(4, 4))
+        self._stats = _StatsStrip(scroll)
+        self._stats.pack(fill="x", padx=T.PAD, pady=(0, 8))
+
+        # Live status strip
+        ctk.CTkLabel(
+            scroll, text="LIVE STATUS", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w"
+        ).pack(fill="x", padx=T.PAD + 2, pady=(4, 4))
+        status_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        status_row.pack(fill="x", padx=T.PAD, pady=(0, 10))
+        status_row.columnconfigure((0, 1, 2), weight=1, uniform="scol")
+        self._pill_ollama = _StatusPill(status_row, "Ollama")
+        self._pill_ollama.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+        self._pill_vault  = _StatusPill(status_row, "Vault")
+        self._pill_vault.grid(row=0, column=1, sticky="nsew", padx=4)
+        self._pill_memory = _StatusPill(status_row, "Memory")
+        self._pill_memory.grid(row=0, column=2, sticky="nsew", padx=(4, 0))
+
+        # Quick actions
+        ctk.CTkLabel(
+            scroll, text="QUICK ACTIONS", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w"
+        ).pack(fill="x", padx=T.PAD + 2, pady=(4, 4))
+        grid = ctk.CTkFrame(scroll, fg_color="transparent")
+        grid.pack(fill="x", padx=T.PAD, pady=(0, 8))
+        grid.columnconfigure((0, 1, 2), weight=1, uniform="col")
+        for i, (title, hint, color_key) in enumerate(_QUICK_ACTIONS):
+            _ActionCard(grid, title, hint, color_key).grid(
+                row=i // 3, column=i % 3, sticky="nsew", padx=4, pady=4
+            )
+
+        # Recent activity feed
+        ctk.CTkLabel(
+            scroll, text="RECENT ACTIVITY", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w"
+        ).pack(fill="x", padx=T.PAD + 2, pady=(8, 4))
+        activity_card = GlassCard(scroll)
+        activity_card.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+        self._activity_feed = _ActivityFeed(activity_card)
+        self._activity_feed.pack(fill="x", pady=(4, 8))
+
+    # ── public API ─────────────────────────────────────────────────────────────
+
+    def update_ollama(self, online: bool, model: str = "") -> None:
+        if online:
+            self._pill_ollama.set_ok("Online", f"model: {model}" if model else "connected")
+        else:
+            self._pill_ollama.set_error("Offline", "Ollama not reachable")
+
+    def update_vault(self, *, indexing: bool = False, files: int = 0, ms: int = 0) -> None:
+        self._note_count = files
+        if indexing:
+            self._pill_vault.set_busy("Indexing\u2026", f"{files} files so far")
+        elif files > 0:
+            self._pill_vault.set_ok(f"{files} notes indexed", f"{ms} ms" if ms else "")
+        else:
+            self._pill_vault.set_unknown("Not configured", "Set vault path in Settings")
+
+    def update_vault_search(self, query: str, count: int) -> None:
+        short_q = (query[:28] + "\u2026") if len(query) > 28 else query
+        if count > 0:
+            self._pill_vault.set_ok(f"{count} result{'s' if count != 1 else ''}", f"note: {short_q}")
+        else:
+            self._pill_vault.set_busy("No results", f"note: {short_q}")
+
+    def update_memory(self, count: int) -> None:
+        self._memory_count = count
+        if count == 0:
+            self._pill_memory.set_unknown("No memories", "Use \u201cremember:\u201d to store facts")
+        else:
+            self._pill_memory.set_ok(f"{count} memor{'y' if count == 1 else 'ies'} stored")
+
+    def update_stats(self, messages: int = 0, memories: int = 0, notes: int = 0) -> None:
+        self._stats.update(messages, memories, notes)
+
+    def add_activity(self, text: str, kind: str = "system") -> None:
+        self._activity_feed.add(text, kind)
 
     def apply_command_history(self, payload: dict) -> None:
-
         commands = payload.get("commands") or []
-
         total = int(payload.get("total", len(commands)))
-
-        self._cards["UsageOverview"].update_metrics(
-
-            value=str(total),
-
-            badge_text="Commands",
-
-            badge_state="ready",
-
-            percent=min(100.0, total * 5),
-
-            subtitle=f"{len(commands)} recent",
-
+        self._stats.update(
+            messages=total,
+            memories=self._memory_count,
+            notes=self._note_count,
         )
-
-        for item in commands[-5:]:
-
+        for item in commands[-3:]:
             detail = str(item.get("detail", item.get("text", "")))
-
             if detail:
+                self.add_activity(detail, "system")
 
-                self._feed.push_command(detail)
+    def set_last_command(self, text: str) -> None:
+        self._activity_feed.add(text, "system")
 
-
-
-    def apply_note_index(self, payload: dict) -> None:
-
-        indexed = int(payload.get("indexed_files", 0))
-
-        vault_files = int(payload.get("vault_files", 0))
-
-        label = f"{indexed // 1000}k" if indexed >= 1000 else str(indexed)
-
-        docs = f"{indexed:,} Documents" if indexed else "0 Documents"
-
-        self._cards["Knowledge"].update_metrics(
-
-            value=label,
-
-            badge_text="Indexed",
-
-            badge_state="ready",
-
-            percent=(indexed / vault_files * 100) if vault_files else 0,
-
-            subtitle=docs,
-
-            history=[f"vault {vault_files} files"],
-
-        )
-
-
-
-    def apply_plugin_catalog(self, payload: dict) -> None:
-
-        plugins = payload.get("plugins") or []
-
-        enabled = sum(1 for p in plugins if p.get("enabled"))
-
-        names = [str(p.get("name", ""))[:12] for p in plugins[:3]]
-
-        self._cards["Plugins"].update_metrics(
-
-            value=f"{enabled} Active",
-
-            badge_text=f"{len(plugins)} total",
-
-            badge_state="ready",
-
-            subtitle=", ".join(names) if names else "No plugins",
-
-            history=names,
-
-        )
-
-
-
-    def apply_activity_event(self, payload: dict) -> None:
-
-        event = str(payload.get("event", payload.get("kind", "event")))
-
-        self._feed.append_line(event, tag="success")
-
-
-
-    def apply_footer(self, *, ollama_url: str, vault_path: str, online: bool) -> None:
-
-        pass
-
-
-
-    def apply_motion(self, primitive_id: str, intensity: float, payload: dict) -> None:
-
-        if primitive_id in ("HeroPanel", "ActionRibbon"):
-
-            glow = float(payload.get("glow_intensity", intensity))
-
-            cpu = float(payload.get("cpu_percent", 30))
-
-            self._ribbon.set_live(cpu, cpu * 0.8, cpu * 0.5, glow=glow)
-
-
+    def set_extra(self, text: str) -> None:
+        self.set_last_command(text)

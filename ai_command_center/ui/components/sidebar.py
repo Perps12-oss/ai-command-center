@@ -10,6 +10,7 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("home", "Home"),
     ("chat", "Chat"),
     ("notes", "Notes"),
+    ("memory", "Memory"),
     ("system", "System"),
     ("plugins", "Plugins"),
     ("settings", "Settings"),
@@ -99,3 +100,14 @@ class Sidebar(ctk.CTkFrame):
     def set_active(self, view_id: str) -> None:
         self._active = view_id
         self._highlight()
+
+    def toggle_collapse(self) -> None:
+        if self.winfo_width() > 60:
+            self.configure(width=48)
+            for btn in self._buttons.values():
+                btn.configure(text="", width=28)
+        else:
+            self.configure(width=T.SIDEBAR_WIDTH)
+            labels = dict(NAV_ITEMS)
+            for vid, btn in self._buttons.items():
+                btn.configure(text=labels.get(vid, vid), width=0)

@@ -72,6 +72,7 @@ MEMORY_SELECTED = "memory.selected"
 MEMORY_ERROR = "memory.error"
 MEMORY_CLEARED = "memory.cleared"
 MEMORY_CLEAR_SELECTION = "memory.clear_selection"
+MEMORY_DELETE_REQUEST = "memory.delete_request"
 
 SESSION_HISTORY_REQUEST = "session.history.request"
 SESSION_HISTORY_RESULT = "session.history.result"

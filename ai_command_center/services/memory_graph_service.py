@@ -9,6 +9,7 @@ from ai_command_center.core.events.topics import (
     COMMAND_ROUTED,
     MEMORY_CLEAR_SELECTION,
     MEMORY_CLEARED,
+    MEMORY_DELETE_REQUEST,
     MEMORY_ERROR,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
@@ -50,6 +51,9 @@ class MemoryGraphService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(MEMORY_LOOKUP_REQUEST, self._on_lookup_request)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(MEMORY_DELETE_REQUEST, self._on_delete_request)
+        )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -58,6 +62,29 @@ class MemoryGraphService(BaseService):
 
     def get_context_snippets(self) -> list[str]:
         return list(self._selected_snippets)
+
+    def _on_delete_request(self, event: Event) -> None:
+        node_id = str(event.payload.get("id", ""))
+        if not node_id:
+            self._bus.publish(
+                MEMORY_ERROR,
+                {"message": "Delete request missing memory id"},
+                source=self.name,
+            )
+            return
+        deleted = self._repo.delete(node_id)
+        if deleted:
+            self._bus.publish(
+                MEMORY_CLEARED,
+                {"id": node_id},
+                source=self.name,
+            )
+        else:
+            self._bus.publish(
+                MEMORY_ERROR,
+                {"message": f"Memory not found: {node_id}"},
+                source=self.name,
+            )
 
     def _on_command_routed(self, event: Event) -> None:
         if event.source != "command_router":
