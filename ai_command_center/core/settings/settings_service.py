@@ -17,12 +17,12 @@ class SettingsService:
 
     def __init__(
         self,
-        repo: SettingsRepository | None = None,
+        repo: SettingsRepository,
         schema: SettingsSchema | None = None,
         *,
         bus: EventBus | None = None,
     ) -> None:
-        self._repo = repo or SettingsRepository()
+        self._repo = repo
         self._schema = schema or SettingsSchema()
         self._bus = bus
         self._migration = MigrationManager()

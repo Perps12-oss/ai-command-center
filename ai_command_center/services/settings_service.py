@@ -5,9 +5,14 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from ai_command_center.core.event_bus import Event, EventBus
-from ai_command_center.core.events.topics import SETTINGS_CHANGED, SETTINGS_SNAPSHOT, SETTINGS_SET_REQUEST
+from ai_command_center.core.events.topics import (
+    SETTINGS_CHANGED,
+    SETTINGS_SET_REQUEST,
+    SETTINGS_SNAPSHOT,
+)
 from ai_command_center.core.settings.settings_service import SettingsService as CoreSettingsService
-from ai_command_center.db.repository import SettingsRepository
+from ai_command_center.domain.settings_snapshot import SettingsSnapshot
+from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.services.base import BaseService
 
 _DEFAULTS: dict[str, str] = {
@@ -28,6 +33,8 @@ _DEFAULTS: dict[str, str] = {
 
 
 class SettingsService(BaseService):
+    """Bus-facing settings service: validates writes and publishes SettingsSnapshot."""
+
     name = "settings"
 
     def __init__(self, bus: EventBus, repo: SettingsRepository) -> None:
@@ -64,6 +71,12 @@ class SettingsService(BaseService):
         )
         self._publish_snapshot()
 
+    def get_snapshot(self) -> SettingsSnapshot:
+        return self._core_settings.get_snapshot()
+
     def _publish_snapshot(self) -> None:
-        payload = {k: self._repo.get(k, v) for k, v in _DEFAULTS.items()}
-        self._bus.publish(SETTINGS_SNAPSHOT, payload, source=self.name)
+        self._bus.publish(
+            SETTINGS_SNAPSHOT,
+            self._core_settings.get_snapshot().to_payload(),
+            source=self.name,
+        )

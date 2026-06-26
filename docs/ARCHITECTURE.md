@@ -165,9 +165,10 @@ Runtime lifecycle inside the service process.
 
 Examples:
 
-- `ServiceState.ACTIVE`
-- `ServiceState.IDLE`
-- `ServiceState.HIBERNATED`
+- `ServiceState.READY`
+- `ServiceState.STARTING`
+- `ServiceState.DEGRADED`
+- `ServiceState.ERROR`
 
 **Source of truth:** `BaseService._state`  
 **UI visibility:** mirrored into `AppState.services` via `service.state_changed` events.
@@ -189,7 +190,9 @@ Examples:
 
 ## Settings
 
-SQLite → `SettingsRepository` → `SettingsService` → **`settings.snapshot`** event → AppState reducer.
+SQLite → `repositories.settings_repository.SettingsRepository` (canonical) → `core.settings.settings_service.CoreSettingsService` (schema/migration) → `services.settings_service.SettingsService` (EventBus I/O) → **`settings.snapshot`** event → AppState reducer.
+
+The compatibility re-export in `core/settings/settings_repository.py` ensures the canonical repository is the only one used; the old in-memory stub has been removed.
 
 ### `settings.snapshot` payload
 
@@ -200,13 +203,18 @@ SQLite → `SettingsRepository` → `SettingsService` → **`settings.snapshot`*
   "default_model": "llama3.2:3b",
   "ollama_url": "http://localhost:11434",
   "hotkey": "alt+space",
-  "low_memory_mode": "false",
-  "window_width": "1100",
-  "window_height": "700"
+  "low_memory_mode": false,
+  "window_width": 1100,
+  "window_height": 700,
+  "window_alpha": 0.95,
+  "obsidian_vault_path": "",
+  "overlay_mode": "palette",
+  "telemetry_enabled": true,
+  "schema_version": 1
 }
 ```
 
-Emitted on service load and after every settings write.
+Payload is produced from `SettingsSnapshot.to_payload()`. Emitted on service load and after every settings write.
 
 ### UI mutation path
 

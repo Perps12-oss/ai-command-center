@@ -43,7 +43,7 @@ Goal: canonical data contracts, settings layer, and repository ownership.
 | 1.1 | Domain models under `ai_command_center/domain/` | ✅ | All runtime contracts are dataclasses; no plain dicts in services |
 | 1.2 | Settings layer (`core/settings/`) | ✅ | Schema validation, migration, snapshot event wired |
 | 1.3 | Repository layer (`repositories/` + `core/*_repository.py`) | ✅ | Storage owned only by repositories; ApplicationCore is the sole constructor |
-| 1.4 | **Alignment audit** — remove duplicated/inconsistent repository packages | ⚠️ | One canonical repository per concern; `core/settings/settings_repository.py` in-memory stub replaced or unified |
+| 1.4 | **Alignment audit** — remove duplicated/inconsistent repository packages | ✅ | `core/settings/settings_repository.py` re-exports canonical SQLite-backed repository; `services/settings_service` publishes `SettingsSnapshot` |
 
 ---
 
@@ -116,7 +116,6 @@ Goal: reusable component library and future extensibility.
 
 - **Tracks 1–3 and 4–5 are complete.** Foundation, runtime engine, state/observability, UI contract, and visible features are all implemented.
 - **Track 6.3–6.5 remain future work.** Plugin framework v2, vector search, and multi-agent runtime are not started.
-- **Track 1.4 alignment audit is still open.** `core/settings/settings_repository.py` in-memory stub vs SQLite-backed repository should be unified when settings work is revisited.
 
 ---
 
