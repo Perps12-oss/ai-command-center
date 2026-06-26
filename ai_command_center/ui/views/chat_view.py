@@ -803,6 +803,9 @@ class ChatView(ctk.CTkFrame):
         self._model = name
         self._refresh_session_bar()
 
+    def focus_input(self) -> None:
+        self._pill.focus_input()
+
     def update_context_bar(self, sources: list[str], tokens: int) -> None:
         if not sources:
             self._context_bar.configure(text=f"Sources: — · Tokens: {tokens}")

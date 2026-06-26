@@ -91,7 +91,9 @@ class _Sparkline(ctk.CTkFrame):
         self._peak_lbl.configure(text=f"peak {max(self._history):.0f}%")
         self._draw()
 
-    def _draw(self) -> None:
+    def _draw(self, no_color_updates: bool = False, **kwargs) -> None:
+        if not hasattr(self, "_history"):
+            return
         c = self._canvas
         c.delete("all")
         w = c.winfo_width() or 400

@@ -257,6 +257,10 @@ class CommandPaletteApp(ctk.CTk):
         view = self._ensure_view(view_id)
         view.pack(fill="both", expand=True)
         self._sidebar.set_active(view_id)
+        if view_id == "settings":
+            settings_view = self._views.get("settings")
+            if isinstance(settings_view, SettingsView):
+                settings_view.load_from_snapshot(self._controller.snapshot().settings)
         if view_id == "chat":
             chat = self._chat_view()
             if chat:
@@ -393,10 +397,6 @@ class CommandPaletteApp(ctk.CTk):
                 home.update_ollama(True, snap.settings.default_model)
             else:
                 home.update_ollama(False)
-
-        settings_view = self._views.get("settings")
-        if isinstance(settings_view, SettingsView):
-            settings_view.load_from_snapshot(snap.settings)
 
         chat = self._chat_view()
         if chat:
