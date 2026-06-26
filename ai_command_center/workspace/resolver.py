@@ -4,7 +4,8 @@ Transforms a telemetry reading plus evidence hints into a stable work session.
 Resolution is fully deterministic — same evidence always yields the same
 ``workspace_id`` (A5, Determinism Before AI). A lease keeps the active workspace
 stable when the user briefly switches to a low-evidence context (A6, Context
-Persistence).
+Persistence). Lease renewal is bounded by an absolute maximum lifetime so a
+continuous stream of transient readings cannot keep a workspace alive forever.
 """
 
 from __future__ import annotations
@@ -44,12 +45,15 @@ class WorkspaceResolver:
         self,
         *,
         lease_ttl_seconds: float = 300.0,
+        max_lease_seconds: float | None = 3600.0,
         clock: Callable[[], float] = time.time,
     ) -> None:
         self._ttl = lease_ttl_seconds
+        self._max_lease = max_lease_seconds
         self._clock = clock
         self._lease: WorkspaceLease | None = None
         self._anchor: WorkspaceContext | None = None
+        self._anchor_created_at: float | None = None
 
     @property
     def lease(self) -> WorkspaceLease | None:
@@ -86,10 +90,11 @@ class WorkspaceResolver:
             active_files=list(recent_files),
             metadata={"evidence_source": source, "confidence": confidence},
         )
+        self._anchor_created_at = now
         self._lease = WorkspaceLease(
             workspace_id=workspace_id,
             confidence=confidence,
-            expires_at=now + self._ttl,
+            expires_at=self._capped_expiry(now),
         )
         self._anchor = context
         return context
@@ -101,8 +106,15 @@ class WorkspaceResolver:
         if len(anchor.recent_snapshots) > 10:
             del anchor.recent_snapshots[:-10]
         anchor.active_snapshot = snapshot
-        self._lease = replace(self._lease, expires_at=now + self._ttl)
+        self._lease = replace(self._lease, expires_at=self._capped_expiry(now))
         return anchor
+
+    def _capped_expiry(self, now: float) -> float:
+        # Renew for one TTL, but never past the workspace's absolute max lifetime.
+        target = now + self._ttl
+        if self._max_lease is not None and self._anchor_created_at is not None:
+            target = min(target, self._anchor_created_at + self._max_lease)
+        return target
 
     @staticmethod
     def _strongest_evidence(

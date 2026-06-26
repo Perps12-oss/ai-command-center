@@ -85,6 +85,26 @@ def main() -> int:
     if reformed.workspace_id == anchor.workspace_id:
         failures.append("expired lease should not retain the old workspace")
 
+    # 6. Max-lease cap — repeated transient renewals cannot outlive the absolute
+    # max lifetime; the workspace collapses once the cap is reached.
+    cap_clock = [0.0]
+    capped = WorkspaceResolver(
+        lease_ttl_seconds=60.0, max_lease_seconds=100.0, clock=lambda: cap_clock[0]
+    )
+    cap_anchor = capped.resolve(snap, repo_root="/home/dev/ai-command-center")
+    transient_cap = TelemetrySnapshot.empty(now=cap_clock[0])
+    # Renew within the TTL window; the renewed expiry is capped at the max lifetime.
+    cap_clock[0] = 50.0
+    if capped.resolve(transient_cap).workspace_id != cap_anchor.workspace_id:
+        failures.append("transient reading within max lifetime should retain workspace")
+    cap_lease = capped.lease
+    if cap_lease is not None and cap_lease.expires_at > 100.0:
+        failures.append("lease renewal must not extend past max-lease cap")
+    # Past the cap, even a transient reading must form a new workspace.
+    cap_clock[0] = 101.0
+    if capped.resolve(transient_cap).workspace_id == cap_anchor.workspace_id:
+        failures.append("workspace should collapse once max-lease cap is exceeded")
+
     if failures:
         print("FAIL:")
         for item in failures:
