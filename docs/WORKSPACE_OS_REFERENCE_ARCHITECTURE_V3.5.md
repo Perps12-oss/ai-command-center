@@ -43,23 +43,29 @@
 
 > Phase 2 is pure and deterministic (A5): `IntentResolver` ranks candidates (strongest score first, ties by `source`) and applies the confidence policy without executing or invoking AI. Gate: `scripts/verify_workspace_phase2.py`.
 
-## Runtime Lifecycle (Part V)
-- [ ] Phase 0A — Invocation (Alt+Space → create palette, show window, focus input; no blocking ops)
-- [ ] Phase 0B — Context Acquisition (async: clipboard, telemetry, workspace resolution, suggestions)
-- [ ] Phase 1 — Hydration (progressive UI updates: workspace/context badges, suggestions, recent activity)
-- [ ] Phase 2 — Intent Resolution (commands, searches, plugins, automations, AI; deterministic first)
-- [ ] Phase 3 — Execution (structured action results)
-- [ ] Phase 4 — Delivery (dispatch results to targets)
+## Runtime Lifecycle (Part V) — ✅ Phase 6 (delivered)
+- [x] Phase 0A — Invocation (no blocking ops modeled in the pipeline) — `LifecyclePhase.INVOCATION`
+- [x] Phase 0B — Context Acquisition (clipboard/index/integration; UI Automation optional) — `RuntimePipeline.run()` → `ContextAcquirer`
+- [x] Phase 1 — Hydration (suggestions generated before AI) — `SuggestionEngine.suggest()`
+- [x] Phase 2 — Intent Resolution (deterministic; exposes confidence) — `IntentResolver.resolve()`
+- [x] Phase 3 — Execution (structured action results) — only for `AUTO_EXECUTE` action-bearing intents
+- [x] Phase 4 — Delivery (dispatch results to targets) — `ActionDispatcher.dispatch()`
 
-## Action Architecture (Part VI)
-- [ ] `ActionResult` base type
-- [ ] Standard action types: `TextInsertion`, `OpenFile`, `LaunchApplication`, `RunCommand`, `CreateNote`
-- [ ] `OutputTarget.dispatch()` interface
-- [ ] Output targets: SendInput, Clipboard, Obsidian, Shell, Browser, VSCode
+> Phase 6 is a pure, deterministic state machine in `ai_command_center/workspace/lifecycle.py` that wires the prior layers (Parts III/IV/VI/VII). Collaborators are injected; ambiguous (suggest/clarify) intents never silently execute. Gate: `scripts/verify_workspace_phase6.py`.
 
-## Suggestion Engine (Part VII)
-- [ ] Generate suggestions before AI reasoning whenever possible
-- [ ] Minimize typing / routing friction / unnecessary AI invocation
+## Action Architecture (Part VI) — ✅ Phase 4 (delivered)
+- [x] `ActionResult` base type — `ai_command_center/workspace/actions.py`
+- [x] Standard action types: `TextInsertion`, `OpenFile`, `LaunchApplication`, `RunCommand`, `CreateNote` (frozen)
+- [x] `OutputTarget.dispatch()` interface + `ActionDispatcher` (routes to first accepting target, isolates failures)
+- [x] Output targets: pluggable via injected `CallableTarget` adapters (SendInput, Clipboard, Obsidian, Shell, Browser, VSCode supplied by higher layers)
+
+> Phase 4 is pure — no OS side effects in this layer; real delivery (SendInput/shell/Obsidian/...) is injected. Gate: `scripts/verify_workspace_phase4.py`.
+
+## Suggestion Engine (Part VII) — ✅ Phase 5 (delivered)
+- [x] Generate suggestions before AI reasoning whenever possible — `SuggestionEngine` (deterministic, rule-based; e.g. Python-traceback → Explain Error / Create Issue / Search Notes / Save Snippet)
+- [x] Minimize typing / routing friction / unnecessary AI invocation — pre-AI rules over `AcquiredContext`; no AI calls
+
+> Phase 5 is pure and deterministic in `ai_command_center/workspace/suggestions.py`; ranking is stable (score, then label, then rule). Gate: `scripts/verify_workspace_phase5.py`.
 
 ## Plugin Architecture (Part VIII)
 - [ ] `CommandPlugin` contract (name, priority, match, enrich_context, execute)
