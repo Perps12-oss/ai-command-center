@@ -66,6 +66,23 @@ Historical Ledger: See table below
 
 ---
 
+## Workspace OS Reference Architecture v3.5
+
+New delivery track implementing [WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md](WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md).
+
+| Phase | Scope | Gate | Status |
+|-------|-------|------|--------|
+| WS-1 | Core domain model (Part II): `TelemetrySnapshot`, `WorkspaceContext`, `WorkspaceLease`, Workspace Resolver | `verify_workspace_phase1.py` | DONE |
+| WS-2 | Intent resolution (Part IV): `ResolutionCandidate`, confidence policy (`classify`/`ResolutionMode`), `IntentResolver` | `verify_workspace_phase2.py` | DONE |
+| WS-3 | Context acquisition (Part III): `ContextSource` hierarchy, `ContextFragment`, `ContextProvider`, `ContextAcquirer` (supersede merge, pull-based) | `verify_workspace_phase3.py` | DONE |
+| WS-4 | Action architecture (Part VI): `ActionResult` + standard types, `OutputTarget`/`CallableTarget`, `ActionDispatcher` | `verify_workspace_phase4.py` | DONE |
+| WS-5 | Suggestion engine (Part VII): `Suggestion`, `SuggestionRule`, `SuggestionEngine` (pre-AI, deterministic) | `verify_workspace_phase5.py` | DONE |
+| WS-6 | Runtime lifecycle (Part V): `LifecyclePhase`, `RuntimePipeline` (acquire→hydrate→resolve→execute→deliver) | `verify_workspace_phase6.py` | DONE |
+
+WS-1…WS-6 are additive and pure (no EventBus / repository / background acquisition / OS side effects / AI); they do not alter existing Phase 0–5B behavior. Real OS readers and output targets are injected by higher layers.
+
+---
+
 ## UCGS v3 Governance Snapshot
 
 **Audit:** STRICT | **Phase:** 5B | **Verdict:** `APPROVE`
