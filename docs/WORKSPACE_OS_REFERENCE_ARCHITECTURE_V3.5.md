@@ -34,10 +34,12 @@
 - [ ] Reliability-first acquisition hierarchy: Clipboard → Explicit Input → Workspace Indexes → Known Integrations → UI Automation
 - [ ] Higher-ranked sources supersede lower; UI Automation optional
 
-## Intent Resolution Architecture (Part IV)
-- [ ] `ResolutionCandidate` (score, target, source)
-- [ ] Confidence policy: ≥0.90 auto-execute, 0.50–0.90 suggest, <0.50 clarify
-- [ ] No subsystem silently executes ambiguous actions; all expose confidence
+## Intent Resolution Architecture (Part IV) — ✅ Phase 2 (delivered)
+- [x] `ResolutionCandidate` (score, target, source) — `ai_command_center/workspace/intent.py`
+- [x] Confidence policy: ≥0.90 auto-execute, 0.50–0.90 suggest, <0.50 clarify — `classify()` / `ResolutionMode`
+- [x] No subsystem silently executes ambiguous actions; all expose confidence — `IntentResolver` is classify-only; empty/low-confidence sets resolve to CLARIFY
+
+> Phase 2 is pure and deterministic (A5): `IntentResolver` ranks candidates (strongest score first, ties by `source`) and applies the confidence policy without executing or invoking AI. Gate: `scripts/verify_workspace_phase2.py`.
 
 ## Runtime Lifecycle (Part V)
 - [ ] Phase 0A — Invocation (Alt+Space → create palette, show window, focus input; no blocking ops)

@@ -73,8 +73,9 @@ New delivery track implementing [WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md](WO
 | Phase | Scope | Gate | Status |
 |-------|-------|------|--------|
 | WS-1 | Core domain model (Part II): `TelemetrySnapshot`, `WorkspaceContext`, `WorkspaceLease`, Workspace Resolver | `verify_workspace_phase1.py` | DONE |
+| WS-2 | Intent resolution (Part IV): `ResolutionCandidate`, confidence policy (`classify`/`ResolutionMode`), `IntentResolver` | `verify_workspace_phase2.py` | DONE |
 
-WS-1 is additive and pure (no EventBus / repository / telemetry acquisition); it does not alter existing Phase 0–5B behavior.
+WS-1/WS-2 are additive and pure (no EventBus / repository / telemetry acquisition / execution / AI); they do not alter existing Phase 0–5B behavior.
 
 ---
 
