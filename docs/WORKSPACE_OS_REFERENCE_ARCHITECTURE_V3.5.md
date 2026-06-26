@@ -30,9 +30,11 @@
 
 > Phase 1 also realizes **A5 (Determinism Before AI)** and **A6 (Context Persistence)** at the domain layer: identical evidence always resolves to the same `workspace_id`, and a lease retains the active workspace across transient low-evidence excursions. Gate: `scripts/verify_workspace_phase1.py`.
 
-## Context Acquisition Architecture (Part III)
-- [ ] Reliability-first acquisition hierarchy: Clipboard → Explicit Input → Workspace Indexes → Known Integrations → UI Automation
-- [ ] Higher-ranked sources supersede lower; UI Automation optional
+## Context Acquisition Architecture (Part III) — ✅ Phase 3 (delivered)
+- [x] Reliability-first acquisition hierarchy: Clipboard → Explicit Input → Workspace Indexes → Known Integrations → UI Automation — `ContextSource` in `ai_command_center/workspace/context_acquisition.py`
+- [x] Higher-ranked sources supersede lower; UI Automation optional — `ContextAcquirer.acquire()` (supersede merge; UI Automation excluded unless `include_ui_automation=True`)
+
+> Phase 3 is **pull-based** (no background polling / auto-ingestion): context is gathered only when `acquire()` is called. Providers are injected so the core stays pure and platform-agnostic; OS-specific readers (clipboard, UI automation) are thin adapters supplied later. A failing provider is isolated so core functionality works without UI Automation. Gate: `scripts/verify_workspace_phase3.py`.
 
 ## Intent Resolution Architecture (Part IV) — ✅ Phase 2 (delivered)
 - [x] `ResolutionCandidate` (score, target, source) — `ai_command_center/workspace/intent.py`
