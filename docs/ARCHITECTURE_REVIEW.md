@@ -127,13 +127,14 @@ Plugin Framework v2 is **implemented without ownership-boundary violations**.
 
 ## 4. Recommended Next Steps
 
-1. **Track 6.4 — Vector Search / Memory Graph**
+1. **Track 6.4 — Vector Search / Memory Graph (proceed immediately)**
    - Add an `EmbeddingService` that computes embeddings and publishes `memory.embedding_added`.
    - Use a vector repository for storage; keep all service communication via EventBus.
+   - Focus areas: memory relationships, workspace recall, suggestion enrichment.
 
-2. **Track 6.5 — Multi-Agent Runtime**
-   - Introduce an `AgentService` that spawns agents as lightweight state machines.
-   - Agents publish intents through the EventBus; no direct service calls.
+2. **Track 6.5 — Multi-Agent Runtime (gated)**
+   - **Do not implement until the architecture review in `docs/ARCHITECTURE_REVIEW_MULTI_AGENT.md` is signed off.**
+   - The review must answer A1 (Context Before Conversation), A2 (Execution Before Explanation), and A5 (Determinism Before AI), and explain how agents avoid becoming the primary execution path.
 
 ---
 
