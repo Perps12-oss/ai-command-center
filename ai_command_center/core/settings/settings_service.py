@@ -39,6 +39,7 @@ class SettingsService:
             low_memory_mode=bool(payload.get("low_memory_mode", False)),
             window_width=int(payload.get("window_width", 1100)),
             window_height=int(payload.get("window_height", 700)),
+            window_alpha=float(payload.get("window_alpha", 0.95)),
             obsidian_vault_path=str(payload.get("obsidian_vault_path", "")),
             overlay_mode=str(payload.get("overlay_mode", "palette")),
             model_name=str(payload.get("model_name", "llama3.2:3b")),

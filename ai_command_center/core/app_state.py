@@ -131,6 +131,20 @@ def _coerce_int(value: Any, default: int) -> int:
         return default
 
 
+def _coerce_float(value: Any, default: float) -> float:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return default
+    try:
+        return float(text)
+    except ValueError:
+        return default
+
+
 def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
     return SettingsSnapshot(
         theme=str(payload.get("theme", "dark")),
@@ -142,6 +156,7 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         low_memory_mode=_coerce_bool(payload.get("low_memory_mode", False)),
         window_width=_coerce_int(payload.get("window_width", 1100), 1100),
         window_height=_coerce_int(payload.get("window_height", 700), 700),
+        window_alpha=_coerce_float(payload.get("window_alpha", 0.95), 0.95),
         obsidian_vault_path=str(payload.get("obsidian_vault_path", "")),
         overlay_mode=str(payload.get("overlay_mode", "palette")),
         model_name=str(payload.get("model_name", "llama3.2:3b")),

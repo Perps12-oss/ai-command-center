@@ -43,7 +43,7 @@ from ai_command_center.ui.components.command_box import CommandBox
 from ai_command_center.ui.components.sidebar import Sidebar
 from ai_command_center.ui.components.top_bar import TopBar
 from ai_command_center.ui.controller import UIController
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.theme import theme_manager, tokens as T
 from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.layer.background_controller import BackgroundController
 from ai_command_center.ui.layer.content_backdrop import ShellBackdrop
@@ -113,6 +113,12 @@ class CommandPaletteApp(ctk.CTk):
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
         self._apply_state()
+        snap = self._controller.snapshot()
+        theme_manager.apply(
+            self,
+            theme_name=snap.settings.theme,
+            alpha=snap.settings.window_alpha,
+        )
         self._visible = False
 
     def _build_layout(self) -> None:
@@ -751,17 +757,28 @@ class CommandPaletteApp(ctk.CTk):
                     self._top.update_status("error", snap.settings.default_model)
                     self._last_terminal_chat_key = terminal_key
         self._apply_footer_all(online=True)
+        try:
+            theme_manager.apply(
+                self,
+                theme_name=snap.settings.theme,
+                alpha=snap.settings.window_alpha,
+            )
+        except Exception:
+            pass
 
     def _fade_in(self, step: int = 0) -> None:
-        alpha = min(1.0, (step + 1) / T.FADE_STEPS)
+        target = theme_manager.active_alpha()
+        alpha = min(target, (step + 1) / T.FADE_STEPS * target)
         self.attributes("-alpha", alpha)
         if step + 1 < T.FADE_STEPS:
             delay = max(1, T.FADE_IN_MS // T.FADE_STEPS)
             self.after(delay, lambda: self._fade_in(step + 1))
 
     def _fade_out(self, on_done) -> None:
+        start_alpha = theme_manager.active_alpha()
+
         def step(n: int) -> None:
-            alpha = max(0.0, 1.0 - (n + 1) / T.FADE_STEPS)
+            alpha = max(0.0, start_alpha - (n + 1) / T.FADE_STEPS * start_alpha)
             self.attributes("-alpha", alpha)
             if n + 1 < T.FADE_STEPS:
                 delay = max(1, T.FADE_IN_MS // T.FADE_STEPS)

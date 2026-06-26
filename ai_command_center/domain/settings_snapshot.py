@@ -20,6 +20,7 @@ class SettingsSnapshot:
     low_memory_mode: bool = False
     window_width: int = 1100
     window_height: int = 700
+    window_alpha: float = 0.95
     obsidian_vault_path: str = ""
     overlay_mode: str = "palette"
 
@@ -42,6 +43,7 @@ class SettingsSnapshot:
             "low_memory_mode": self.low_memory_mode,
             "window_width": self.window_width,
             "window_height": self.window_height,
+            "window_alpha": self.window_alpha,
             "obsidian_vault_path": self.obsidian_vault_path,
             "overlay_mode": self.overlay_mode,
             "model_name": self.model_name,
