@@ -65,6 +65,7 @@ class CommandPaletteApp(ctk.CTk):
         self._wire_memory_events()
         self._wire_plugin_events()
         self._wire_home_events()
+        self._wire_workspace_events()
         self._setup_keybindings()
         self.update_idletasks()
         theme_manager.apply(self)
@@ -499,6 +500,31 @@ class CommandPaletteApp(ctk.CTk):
             view = self._views.get("plugins")
             if isinstance(view, PluginsView):
                 view.show_error(message)
+
+        self._ui_queue.enqueue(update)
+
+    # ── workspace event wiring ────────────────────────────────────────────────
+
+    def _wire_workspace_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe("workspace.resolved", self._on_workspace_resolved)
+        )
+
+    def _on_workspace_resolved(self, event: Event) -> None:
+        title = str(event.payload.get("title", "")).strip()
+        suggestions = event.payload.get("suggestions") or []
+
+        def update() -> None:
+            home = self._home_view()
+            if not home:
+                return
+            if title:
+                home.add_activity(f"Workspace: {title}", "system")
+            for item in suggestions[:3]:
+                if isinstance(item, dict):
+                    label = str(item.get("label", "")).strip()
+                    if label:
+                        home.add_activity(f"Suggestion: {label}", "system")
 
         self._ui_queue.enqueue(update)
 

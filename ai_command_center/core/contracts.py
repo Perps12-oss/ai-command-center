@@ -15,9 +15,13 @@ OLLAMA_SERVICE_API_VERSION = "1.0"
 # tool.invoke / tool.result envelope (Phase 4B)
 TOOL_CONTRACT_VERSION = "1.0"
 
+# workspace.resolved envelope (WorkspaceService -> AppState/UI, v3.5 runtime wiring)
+WORKSPACE_RESOLVED_VERSION = "1.0"
+
 SUPPORTED_VERSIONS: dict[str, tuple[str, ...]] = {
     "context_bundle": (CONTEXT_BUNDLE_VERSION_LEGACY, CONTEXT_BUNDLE_VERSION),
     "command_routed": (COMMAND_ROUTED_VERSION,),
     "ollama_service": (OLLAMA_SERVICE_API_VERSION,),
     "tool": (TOOL_CONTRACT_VERSION,),
+    "workspace_resolved": (WORKSPACE_RESOLVED_VERSION,),
 }
