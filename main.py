@@ -8,6 +8,7 @@ from ai_command_center.application import create_application
 from ai_command_center.platform.detector import is_arm64
 from ai_command_center.ui.app import CommandPaletteApp
 from ai_command_center.ui.tray import TrayController
+from ai_command_center.ui.workspace_os_inspector import WorkspaceOsInspector
 from ai_command_center.utils.hotkey import register_hotkey, validate_hotkey
 
 
@@ -25,6 +26,7 @@ def main() -> int:
 
     app = CommandPaletteApp(core.bus, core.state_store)
     shutting_down = False
+    inspector: WorkspaceOsInspector | None = None
 
     def shutdown() -> None:
         nonlocal shutting_down
@@ -32,6 +34,11 @@ def main() -> int:
             return
         shutting_down = True
         tray.stop()
+        try:
+            if inspector is not None:
+                inspector.destroy()
+        except Exception:
+            pass
         try:
             app.destroy()
         except Exception:
@@ -43,6 +50,15 @@ def main() -> int:
 
     def toggle_palette() -> None:
         app.after(0, app.toggle)
+
+    def toggle_inspector() -> None:
+        nonlocal inspector
+        if inspector is not None and inspector.winfo_exists():
+            inspector.after(0, inspector.destroy)
+            inspector = None
+            return
+        if core.workspace_os is not None and core.workspace_os.enabled:
+            inspector = WorkspaceOsInspector(app, core.bus, core)
 
     tray = TrayController(
         on_open=show_palette,
@@ -58,7 +74,14 @@ def main() -> int:
     else:
         print(f"Hotkey fallback (tray only): {hk_msg}", file=sys.stderr)
 
-    print("AI Command Center running. Alt+Space to toggle palette. Tray icon active.")
+    # Workspace OS Inspector hotkey (Track B - Phase 2)
+    inspector_ok, inspector_msg = register_hotkey("ctrl+shift+w", toggle_inspector)
+    if inspector_ok:
+        print(f"Workspace OS Inspector hotkey: {inspector_msg}")
+    else:
+        print(f"Workspace OS Inspector hotkey unavailable: {inspector_msg}", file=sys.stderr)
+
+    print("AI Command Center running. Alt+Space to toggle palette. Ctrl+Shift+W for Workspace OS Inspector. Tray icon active.")
     app.protocol("WM_DELETE_WINDOW", app.hide)
 
     try:

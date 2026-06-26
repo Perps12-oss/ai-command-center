@@ -142,13 +142,13 @@ class ChatHandlerService(BaseService):
         notes: list[str] = []
         if isinstance(notes_raw, list):
             notes = [str(n) for n in notes_raw if str(n).strip()]
-        self._publish_request(NOTE_CONTEXT_REQUEST, request_id, {})
+        if self._obsidian is not None:
+            notes.extend(str(n) for n in self._obsidian.get_context_notes() if str(n).strip())
         self._publish_request(MEMORY_LOOKUP_REQUEST, request_id, {"query": query})
         self._publish_request(SESSION_HISTORY_REQUEST, request_id, {})
         self._publish_request(MODEL_RESOLVE_REQUEST, request_id, {"intent": INTENT_CHAT, "query": query})
 
         pending = self._pending.get(request_id, {})
-        notes.extend(str(n) for n in pending.get("notes", []) if str(n).strip())
         graph_snippets = [str(n) for n in pending.get("graph_snippets", []) if str(n).strip()]
         history = pending.get("history")
         model = str(pending.get("model", self._default_model))

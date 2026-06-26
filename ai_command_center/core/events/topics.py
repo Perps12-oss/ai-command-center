@@ -72,6 +72,7 @@ MEMORY_SELECTED = "memory.selected"
 MEMORY_ERROR = "memory.error"
 MEMORY_CLEARED = "memory.cleared"
 MEMORY_CLEAR_SELECTION = "memory.clear_selection"
+MEMORY_DELETE_REQUEST = "memory.delete_request"
 
 SESSION_HISTORY_REQUEST = "session.history.request"
 SESSION_HISTORY_RESULT = "session.history.result"
@@ -98,3 +99,12 @@ LLM_REQUEST = "llm.request"
 
 SYSTEM_EVENTS = "system.events"
 COMMAND_HISTORY = "command.history"
+
+# Workspace OS UI topics (Track B - Phase 2)
+UI_INSPECTOR_OPEN = "ui.inspector.open"
+UI_INSPECTOR_CLOSE = "ui.inspector.close"
+UI_CREATE_WORKSPACE = "ui.workspace_os.create_workspace"
+UI_CREATE_CARD = "ui.workspace_os.create_card"
+UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
+UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
+UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"

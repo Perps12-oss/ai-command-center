@@ -7,6 +7,7 @@ from collections.abc import Callable
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
+    MEMORY_DELETE_REQUEST,
     NOTE_SELECT,
     OVERLAY_ANCHOR,
     OVERLAY_HIDE,
@@ -100,3 +101,10 @@ class UIController:
     def publish_plugin_toggle(self, plugin_id: str, enabled: bool) -> None:
         topic = PLUGIN_ENABLE_REQUEST if enabled else PLUGIN_DISABLE_REQUEST
         self._bus.publish(topic, {"id": plugin_id}, source="ui")
+
+    def publish_memory_delete(self, memory_id: str) -> None:
+        self._bus.publish(
+            MEMORY_DELETE_REQUEST,
+            {"id": memory_id},
+            source="ui",
+        )

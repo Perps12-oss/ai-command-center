@@ -21,6 +21,7 @@ _DEFAULTS: dict[str, str] = {
     "low_memory_mode": "false",
     "window_width": "1100",
     "window_height": "700",
+    "window_alpha": "0.95",
     "obsidian_vault_path": "",
     "overlay_mode": "palette",
 }

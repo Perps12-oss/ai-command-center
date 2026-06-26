@@ -1,153 +1,87 @@
-"""Design tokens — Glassmorphism Lite + Live Command Center v1.3."""
-
-
-
-# Backgrounds (CANVAS_FALLBACK only — never use on UI panels)
-
-BG_DEEP = "#0B0C15"
-
-CANVAS_FALLBACK = "#1E2330"
-
-BG_PANEL = "#3A4155"
-
-BG_GLASS = "#424A60"
-
-BG_GLASS_BORDER = "#5A6278"
-
-BG_INPUT = "#3D4558"
-
-
-
-# Glass palette — lighter floating panels (no near-black slabs)
-
-GLASS_BG = "#4A5268"
-
-GLASS_BORDER = "#2E3240"
-
-GLASS_BORDER_ALT = "#2E3240"
-
-GLASS_BORDER_HOVER = "#00FFFF"
-
-LIGHT_GLASS = "#565E74"
-
-
-
-# Accent
-
-ACCENT_DEFAULT = "#3B82F6"
-
-ACCENT_HOVER = "#2563EB"
-
-ACCENT_PRIMARY = ACCENT_DEFAULT
-
-
-
-# Text
-
-TEXT_PRIMARY = "#FFFFFF"
-
-TEXT_SECONDARY = "#94A3B8"
-
-TEXT_MUTED = "#64748B"
-
-TEXT_HEADING = TEXT_PRIMARY
-
-TEXT_LABEL = TEXT_SECONDARY
-
-TEXT_LOG = TEXT_MUTED
-
-TEXT_SHADOW = "#333333"
-
-
-
-# Semantic
-
-STATUS_READY = "#22C55E"
-
-STATUS_BUSY = "#EAB308"
-
-STATUS_ERROR = "#EF4444"
-
-STATUS_READY_BG = "#1A2E24"
-
-STATUS_BUSY_BG = "#2E2A1A"
-
-STATUS_ERROR_BG = "#2E1A1A"
-
-STATUS_OFFLINE_BG = "#1C1C28"
-
-
-
-# Hero / ribbon (ActionRibbon pills + HeroPanel)
-
-HERO_CYAN = "#00FFFF"
-
-HERO_CYAN_DIM = "#1A4A52"
-
-HERO_BORDER_IDLE = "#124853"
-
-HERO_BORDER_HOVER = "#1A6B75"
-
-RIBBON_PILL_BG = "#1A1D26"
-
-RIBBON_PILL_BORDER = "#3A3F53"
-
-
-
-# Typography
-
-FONT_FAMILY = "Segoe UI"
-
-FONT_TITLE = (FONT_FAMILY, 18, "bold")
-
-FONT_HEADER = (FONT_FAMILY, 13, "bold")
-
-FONT_BODY = (FONT_FAMILY, 12)
-
-FONT_SMALL = (FONT_FAMILY, 11)
-
-FONT_MONO = ("Consolas", 11)
-
-
-
-# Layout (frozen shell)
-
-WINDOW_WIDTH = 1100
-
-WINDOW_HEIGHT = 700
-
-HEADER_H = 56
-
-TOP_BAR_HEIGHT = HEADER_H
-
-SIDEBAR_WIDTH = 220
-
-FOOTER_H = 32
-
-PAD = 24
-
-GAP = 16
-
-CORNER_RADIUS = 16
-
-CARD_RADIUS = CORNER_RADIUS
-
-HERO_RADIUS = 30
-
-CARD_MIN_H = 180
-
-
-
-# Sidebar accent stripe
-
-SIDEBAR_STRIPE_W = 3
-
-
-
-# Animation
-
-FADE_IN_MS = 150
-
-FADE_STEPS = 10
-
-
+﻿"""Backward-compatible token export from the Workspace Design System v1.
+
+All components importing `from ai_command_center.ui.theme import tokens as T`
+continue to work. The canonical source is `ai_command_center.ui.design_system.theme_v2`.
+"""
+
+from __future__ import annotations
+
+from ai_command_center.ui.design_system.theme_v2 import (
+    ACCENT_DEFAULT,
+    ACCENT_HOVER,
+    ACCENT_PRIMARY,
+    BG_DEEP,
+    BG_GLASS,
+    BG_GLASS_BORDER,
+    BG_INPUT,
+    BG_PANEL,
+    CANVAS_FALLBACK,
+    CARD_MIN_H,
+    CARD_RADIUS,
+    CHUNK_FLUSH_MS,
+    CODE_BG,
+    CODE_BORDER,
+    CODE_TEXT,
+    CORNER_RADIUS,
+    FADE_IN_MS,
+    FADE_STEPS,
+    FONT_BODY,
+    FONT_FAMILY,
+    FONT_HEADER,
+    FONT_MONO,
+    FONT_ROLE,
+    FONT_SMALL,
+    FONT_TITLE,
+    FOOTER_H,
+    GAP,
+    GLASS_BG,
+    GLASS_BORDER,
+    GLASS_BORDER_ALT,
+    GLASS_BORDER_HOVER,
+    HEADER_H,
+    HERO_BORDER_HOVER,
+    HERO_BORDER_IDLE,
+    HERO_CYAN,
+    HERO_CYAN_DIM,
+    HERO_RADIUS,
+    LIGHT_GLASS,
+    MSG_ASSISTANT_BG,
+    MSG_ASSISTANT_BORDER,
+    MSG_ASSISTANT_TEXT,
+    MSG_CANCELLED_TEXT,
+    MSG_ERROR_BG,
+    MSG_ERROR_BORDER,
+    MSG_ERROR_TEXT,
+    MSG_SYSTEM_BG,
+    MSG_SYSTEM_TEXT,
+    MSG_TOOL_BG,
+    MSG_TOOL_BORDER,
+    MSG_TOOL_TEXT,
+    MSG_USER_BG,
+    MSG_USER_BORDER,
+    MSG_USER_TEXT,
+    PAD,
+    RIBBON_PILL_BG,
+    RIBBON_PILL_BORDER,
+    SIDEBAR_STRIPE_W,
+    SIDEBAR_WIDTH,
+    STATUS_BUSY,
+    STATUS_BUSY_BG,
+    STATUS_ERROR,
+    STATUS_ERROR_BG,
+    STATUS_OFFLINE_BG,
+    STATUS_READY,
+    STATUS_READY_BG,
+    TEXT_HEADING,
+    TEXT_LABEL,
+    TEXT_LOG,
+    TEXT_MUTED,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    TEXT_SHADOW,
+    THEMES,
+    TOP_BAR_HEIGHT,
+    WINDOW_ALPHA,
+    WINDOW_HEIGHT,
+    WINDOW_WIDTH,
+)
