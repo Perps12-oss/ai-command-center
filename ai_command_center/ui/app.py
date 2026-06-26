@@ -389,7 +389,7 @@ class CommandPaletteApp(ctk.CTk):
                 memories=self._memory_count,
                 notes=self._note_count,
             )
-            if snap.ollama_online:
+            if snap.system_snapshot.ollama_online:
                 home.update_ollama(True, snap.settings.default_model)
             else:
                 home.update_ollama(False)
