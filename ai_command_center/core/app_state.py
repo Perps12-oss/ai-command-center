@@ -16,6 +16,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     "command.routed",
     "app.error",
     "app.phase",
+    "workspace.resolved",
 )
 
 
@@ -44,6 +45,27 @@ class SettingsSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class SuggestionSnapshot:
+    """UI-consumable pre-AI suggestion projection."""
+
+    label: str
+    command: str
+    score: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceSnapshot:
+    """UI-consumable active-workspace projection from workspace.resolved events."""
+
+    workspace_id: str = ""
+    title: str = ""
+    inferred_task: str = ""
+    confidence: float = 0.0
+    evidence_source: str = "none"
+    suggestions: tuple[SuggestionSnapshot, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class AppState:
     """Immutable snapshot of application state."""
 
@@ -55,6 +77,7 @@ class AppState:
     settings_version: int = 0
     last_command: str = ""
     last_command_intent: str = ""
+    workspace: WorkspaceSnapshot = WorkspaceSnapshot()
     errors: tuple[str, ...] = ()
 
 
@@ -143,6 +166,35 @@ def _reduce_error(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_workspace_resolved(state: AppState, event: Event) -> AppState:
+    if event.topic != "workspace.resolved":
+        return state
+    raw_suggestions = event.payload.get("suggestions") or ()
+    suggestions = tuple(
+        SuggestionSnapshot(
+            label=str(item.get("label", "")),
+            command=str(item.get("command", "")),
+            score=float(item.get("score", 0.0)),
+        )
+        for item in raw_suggestions
+        if isinstance(item, dict)
+    )
+    workspace = WorkspaceSnapshot(
+        workspace_id=str(event.payload.get("workspace_id", "")),
+        title=str(event.payload.get("title", "")),
+        inferred_task=str(event.payload.get("inferred_task", "")),
+        confidence=float(event.payload.get("confidence", 0.0)),
+        evidence_source=str(event.payload.get("evidence_source", "none")),
+        suggestions=suggestions,
+    )
+    return replace(
+        state,
+        workspace=workspace,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_phase(state: AppState, event: Event) -> AppState:
     if event.topic != "app.phase":
         return state
@@ -160,6 +212,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_settings_changed,
     _reduce_settings_snapshot,
     _reduce_command_routed,
+    _reduce_workspace_resolved,
     _reduce_error,
     _reduce_phase,
 )

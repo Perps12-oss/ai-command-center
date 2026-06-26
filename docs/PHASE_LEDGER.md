@@ -81,8 +81,11 @@ New delivery track implementing [WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md](WO
 | WS-7 | Plugin architecture (Part VIII): `CommandPlugin` contract, `PluginRegistry` (Tier-1 exclusive matching) | `verify_workspace_phase7.py` | DONE |
 | WS-8 | Memory architecture (Part IX): workspace-centric `WorkspaceMemory` (immutable), `MemoryStore` | `verify_workspace_phase8.py` | DONE |
 | WS-9 | AI reasoning subsystem (Part X): `ReasoningRequest`/`ReasoningResponse`/`ReasoningTask`, injectable `ReasoningEngine` | `verify_workspace_phase9.py` | DONE |
+| WS-10 | Runtime/service wiring: `WorkspaceService` (resolves on `ui.command`, publishes `workspace.resolved`), `AppState.workspace`/`WorkspaceSnapshot` reducer, UI bus subscription, `workspace_resolved` contract | `verify_workspace_phase10.py` | DONE |
 
 WS-1…WS-9 are additive and pure (no EventBus / repository / background acquisition / OS side effects / AI); they do not alter existing Phase 0–5B behavior. Real OS readers and output targets are injected by higher layers.
+
+WS-10 is the first runtime integration: it wires the pure domain into the existing EventBus/AppState/UI as a pull-based, event-driven service (no background polling/telemetry). Evidence (command text, clipboard, vault path) is read only from event payloads; the canonical chat pipeline is untouched.
 
 ---
 

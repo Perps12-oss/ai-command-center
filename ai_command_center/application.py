@@ -26,6 +26,7 @@ from ai_command_center.services.settings_service import SettingsService
 from ai_command_center.services.shell_tool_service import ShellToolService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
+from ai_command_center.services.workspace_service import WorkspaceService
 
 
 @dataclass
@@ -81,6 +82,7 @@ def create_application(*, debug_mode: bool = False) -> ApplicationCore:
     services.register(obsidian)
     services.register(memory_graph)
     services.register(session)
+    services.register(WorkspaceService(bus))
     services.register(
         ChatHandlerService(
             bus,
