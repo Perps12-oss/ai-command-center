@@ -14,7 +14,7 @@ Constants: `ai_command_center/core/contracts.py`
 @dataclass
 class ContextBundle:
     prompt: str
-    sources: tuple[str, ...]  # may include conversation_summary, memory_graph_*
+    sources: tuple[str, ...]  # may include workspace, conversation_summary, memory_graph_*
     token_estimate: int
     version: str = "1.1"
 ```

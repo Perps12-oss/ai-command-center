@@ -82,10 +82,13 @@ New delivery track implementing [WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md](WO
 | WS-8 | Memory architecture (Part IX): workspace-centric `WorkspaceMemory` (immutable), `MemoryStore` | `verify_workspace_phase8.py` | DONE |
 | WS-9 | AI reasoning subsystem (Part X): `ReasoningRequest`/`ReasoningResponse`/`ReasoningTask`, injectable `ReasoningEngine` | `verify_workspace_phase9.py` | DONE |
 | WS-10 | Runtime/service wiring: `WorkspaceService` (resolves on `ui.command`, publishes `workspace.resolved`), `AppState.workspace`/`WorkspaceSnapshot` reducer, UI bus subscription, `workspace_resolved` contract | `verify_workspace_phase10.py` | DONE |
+| WS-11 | Workspace context in the canonical chat pipeline (`ContextManager.build_context(workspace=...)`, `ChatHandlerService` caches `workspace.resolved`; registration ordered so resolution precedes routing) + dedicated HomeView **ACTIVE WORKSPACE** panel | `verify_workspace_phase11.py` | DONE |
 
 WS-1…WS-9 are additive and pure (no EventBus / repository / background acquisition / OS side effects / AI); they do not alter existing Phase 0–5B behavior. Real OS readers and output targets are injected by higher layers.
 
 WS-10 is the first runtime integration: it wires the pure domain into the existing EventBus/AppState/UI as a pull-based, event-driven service (no background polling/telemetry). Evidence (command text, clipboard, vault path) is read only from event payloads; the canonical chat pipeline is untouched.
+
+WS-11 extends that integration into the canonical chat pipeline: the resolved workspace (title, inferred task, top suggestions) is injected into `ContextManager` as a `[workspace]` framing block so the local LLM is oriented on the active session, and a dedicated HomeView panel surfaces the workspace and its pre-AI suggestions. `WorkspaceService` is registered before `CommandRouterService` so that, for one `ui.command`, `workspace.resolved` is published before `command.routed`, letting the chat handler frame the bundle synchronously. Still pull-based and event-driven — no background polling.
 
 ---
 

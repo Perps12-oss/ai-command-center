@@ -66,6 +66,7 @@ class ContextManager:
         self,
         query: str,
         *,
+        workspace: str | None = None,
         clipboard: str | None = None,
         notes: list[str] | None = None,
         graph_snippets: list[str] | None = None,
@@ -78,6 +79,13 @@ class ContextManager:
         budget = self.context_budget_tokens
         sources: list[str] = []
         sections: list[tuple[int, str, str]] = []
+
+        # Workspace framing is the most durable context: it orients the model on
+        # the active work session and is added first so it survives budget trimming.
+        if workspace:
+            body = workspace.strip()
+            if body:
+                sections.append((0, "workspace", body))
 
         history_budget = max(200, budget // 3)
         working_history = list(conversation_history or [])

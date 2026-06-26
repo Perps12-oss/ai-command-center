@@ -72,6 +72,11 @@ def create_application(*, debug_mode: bool = False) -> ApplicationCore:
     session = SessionService(bus, conv_repo)
     plugins = PluginRegistryService(bus)
     services.register(SettingsService(bus, settings_repo))
+    # WorkspaceService is registered (and thus subscribed) before the command
+    # router so that, for a single ui.command, the workspace is resolved and
+    # published before command.routed is emitted — letting the chat handler
+    # frame the bundle with the current workspace synchronously.
+    services.register(WorkspaceService(bus))
     services.register(CommandRouterService(bus))
     services.register(tool_registry)
     services.register(tool_executor)
@@ -82,7 +87,6 @@ def create_application(*, debug_mode: bool = False) -> ApplicationCore:
     services.register(obsidian)
     services.register(memory_graph)
     services.register(session)
-    services.register(WorkspaceService(bus))
     services.register(
         ChatHandlerService(
             bus,

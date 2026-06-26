@@ -192,6 +192,98 @@ class _ActivityFeed(ctk.CTkFrame):
         self._build_rows()
 
 
+class _WorkspacePanel(ctk.CTkFrame):
+    """Dedicated panel for the active workspace + its pre-AI suggestions."""
+
+    _PLACEHOLDER = "No active workspace yet \u2014 run a command to resolve one."
+
+    def __init__(self, master) -> None:
+        super().__init__(
+            master,
+            fg_color=T.BG_GLASS,
+            border_color=T.BG_GLASS_BORDER,
+            border_width=1,
+            corner_radius=8,
+        )
+        self._title = ctk.CTkLabel(
+            self,
+            text="\u2014",
+            font=T.FONT_HEADER,
+            text_color=T.TEXT_PRIMARY,
+            anchor="w",
+        )
+        self._title.pack(fill="x", padx=12, pady=(10, 0))
+
+        self._meta = ctk.CTkLabel(
+            self,
+            text=self._PLACEHOLDER,
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            wraplength=820,
+            justify="left",
+        )
+        self._meta.pack(fill="x", padx=12, pady=(2, 6))
+
+        self._suggestions = ctk.CTkFrame(self, fg_color="transparent")
+        self._suggestions.pack(fill="x", padx=12, pady=(0, 10))
+        self._suggestion_rows: list[ctk.CTkFrame] = []
+
+    def _clear_suggestions(self) -> None:
+        for row in self._suggestion_rows:
+            row.destroy()
+        self._suggestion_rows.clear()
+
+    def update(
+        self,
+        *,
+        title: str,
+        inferred_task: str = "",
+        confidence: float = 0.0,
+        evidence_source: str = "",
+        suggestions: tuple[tuple[str, str], ...] = (),
+    ) -> None:
+        title = title.strip()
+        self._title.configure(text=title or "\u2014")
+
+        meta_bits: list[str] = []
+        if inferred_task.strip():
+            meta_bits.append(inferred_task.strip())
+        if evidence_source.strip():
+            tail = f"via {evidence_source.strip()}"
+            if confidence > 0:
+                tail += f" ({confidence:.0%})"
+            meta_bits.append(tail)
+        self._meta.configure(
+            text="  \u00b7  ".join(meta_bits) if meta_bits else self._PLACEHOLDER,
+            text_color=T.TEXT_SECONDARY if meta_bits else T.TEXT_MUTED,
+        )
+
+        self._clear_suggestions()
+        for label, command in suggestions[:4]:
+            label = label.strip()
+            if not label:
+                continue
+            row = ctk.CTkFrame(self._suggestions, fg_color="transparent")
+            row.pack(fill="x", pady=(2, 0))
+            ctk.CTkLabel(
+                row,
+                text=f"\u2192  {label}",
+                font=T.FONT_SMALL,
+                text_color=T.ACCENT_DEFAULT,
+                anchor="w",
+            ).pack(side="left")
+            if command.strip():
+                ctk.CTkLabel(
+                    row,
+                    text=command.strip(),
+                    font=(T.FONT_FAMILY, 10),
+                    text_color=T.TEXT_MUTED,
+                    anchor="e",
+                ).pack(side="right")
+            self._suggestion_rows.append(row)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 #  HomeView
 # ──────────────────────────────────────────────────────────────────────────────
@@ -205,6 +297,7 @@ class HomeView(ctk.CTkFrame):
       update_vault_search(query, count)
       update_memory(count)
       update_stats(messages, memories, notes)
+      update_workspace(*, title, inferred_task, confidence, evidence_source, suggestions)
       add_activity(text, kind)
       set_last_command(text)       (legacy compat)
     """
@@ -244,6 +337,13 @@ class HomeView(ctk.CTkFrame):
             justify="left",
             anchor="w",
         ).pack(fill="x", padx=T.PAD, pady=(0, 14))
+
+        # Active workspace panel
+        ctk.CTkLabel(
+            scroll, text="ACTIVE WORKSPACE", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w"
+        ).pack(fill="x", padx=T.PAD + 2, pady=(4, 4))
+        self._workspace = _WorkspacePanel(scroll)
+        self._workspace.pack(fill="x", padx=T.PAD, pady=(0, 8))
 
         # Quick stats strip
         ctk.CTkLabel(
@@ -319,6 +419,23 @@ class HomeView(ctk.CTkFrame):
 
     def update_stats(self, messages: int = 0, memories: int = 0, notes: int = 0) -> None:
         self._stats.update(messages, memories, notes)
+
+    def update_workspace(
+        self,
+        *,
+        title: str,
+        inferred_task: str = "",
+        confidence: float = 0.0,
+        evidence_source: str = "",
+        suggestions: tuple[tuple[str, str], ...] = (),
+    ) -> None:
+        self._workspace.update(
+            title=title,
+            inferred_task=inferred_task,
+            confidence=confidence,
+            evidence_source=evidence_source,
+            suggestions=suggestions,
+        )
 
     def add_activity(self, text: str, kind: str = "system") -> None:
         self._activity_feed.add(text, kind)

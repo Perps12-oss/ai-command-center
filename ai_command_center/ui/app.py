@@ -512,19 +512,32 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_workspace_resolved(self, event: Event) -> None:
         title = str(event.payload.get("title", "")).strip()
-        suggestions = event.payload.get("suggestions") or []
+        inferred_task = str(event.payload.get("inferred_task", "")).strip()
+        evidence_source = str(event.payload.get("evidence_source", "")).strip()
+        try:
+            confidence = float(event.payload.get("confidence", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        raw_suggestions = event.payload.get("suggestions") or []
+        suggestions: tuple[tuple[str, str], ...] = tuple(
+            (str(item.get("label", "")).strip(), str(item.get("command", "")).strip())
+            for item in raw_suggestions
+            if isinstance(item, dict) and str(item.get("label", "")).strip()
+        )
 
         def update() -> None:
             home = self._home_view()
             if not home:
                 return
+            home.update_workspace(
+                title=title,
+                inferred_task=inferred_task,
+                confidence=confidence,
+                evidence_source=evidence_source,
+                suggestions=suggestions,
+            )
             if title:
                 home.add_activity(f"Workspace: {title}", "system")
-            for item in suggestions[:3]:
-                if isinstance(item, dict):
-                    label = str(item.get("label", "")).strip()
-                    if label:
-                        home.add_activity(f"Suggestion: {label}", "system")
 
         self._ui_queue.enqueue(update)
 

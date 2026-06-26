@@ -47,6 +47,7 @@ class ChatHandlerService(BaseService):
         self._model_router = model_router
         self._memory_graph = memory_graph
         self._default_model = "llama3.2:3b"
+        self._workspace_context: str = ""
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -55,6 +56,9 @@ class ChatHandlerService(BaseService):
         )
         self._unsubscribers.append(
             self._bus.subscribe("settings.snapshot", self._on_settings_snapshot)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe("workspace.resolved", self._on_workspace_resolved)
         )
 
     def _on_unload(self) -> None:
@@ -66,6 +70,25 @@ class ChatHandlerService(BaseService):
         self._default_model = str(
             event.payload.get("default_model", self._default_model)
         )
+
+    def _on_workspace_resolved(self, event: Event) -> None:
+        # Cache a compact framing of the active workspace; injected into the
+        # next ContextManager bundle so the model is oriented on the session.
+        title = str(event.payload.get("title", "")).strip()
+        task = str(event.payload.get("inferred_task", "")).strip()
+        labels = [
+            str(item.get("label", "")).strip()
+            for item in (event.payload.get("suggestions") or [])
+            if isinstance(item, dict) and str(item.get("label", "")).strip()
+        ]
+        lines: list[str] = []
+        if title:
+            lines.append(f"Active workspace: {title}")
+        if task:
+            lines.append(f"Inferred task: {task}")
+        if labels:
+            lines.append("Relevant actions: " + ", ".join(labels[:3]))
+        self._workspace_context = "\n".join(lines)
 
     def _on_command_routed(self, event: Event) -> None:
         if event.payload.get("intent") != INTENT_CHAT:
@@ -102,6 +125,7 @@ class ChatHandlerService(BaseService):
 
         bundle = self._context_manager.build_context(
             query,
+            workspace=self._workspace_context or None,
             clipboard=clipboard_text,
             notes=notes or None,
             graph_snippets=graph_snippets,
