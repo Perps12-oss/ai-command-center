@@ -75,7 +75,7 @@ UI → settings.set_request → SettingsService → SQLite → settings.changed 
 
 ---
 
-## 3. Plugin Framework v2 Feasibility Assessment
+## 3. Plugin Framework v2 (Implemented)
 
 ### What Track 6.3 Requires
 
@@ -83,85 +83,55 @@ UI → settings.set_request → SettingsService → SQLite → settings.changed 
 - Extension isolation (extensions cannot disable core plugins).
 - Persistent plugin state across restarts.
 
-### Current State
+### Implementation
 
-- `PluginRegistryService` reads YAML manifests from `plugins/manifests/` and publishes `plugin.catalog`.
-- It handles `plugin.enable_request` and `plugin.disable_request` in memory only; core plugins are protected.
-- There is no persistence for enabled/disabled state.
-- There is no dynamic loading/unloading of extension code.
+- Added `plugin_state` table to `ai_command_center/db/schema.sql`.
+- Extended `PluginManifestRepository` with `load_enabled_states()` and `save_enabled_state()`.
+- Added `service` field to `PluginManifest` so a plugin can declare its primary service.
+- Updated `PluginRegistryService` to:
+  - Merge persisted state over manifest defaults on load.
+  - Persist state changes on enable/disable.
+  - Publish `plugin.state_changed` with `pending_restart`.
+  - Publish `service.restart_request` when the plugin declares a service.
+- Added `SERVICE_RESTART_REQUEST` topic and made `ServiceManager` subscribe to it; it performs `stop()` then `start()` for the named service.
+- Wired `PluginManifestRepository` into `PluginRegistryService` in `application.py`.
+- Changed `shell.yaml` from `kind: core` to `kind: extension` with `service: shell_tool` to provide a real extension test target.
 
-### Can It Be Implemented Without Ownership Violations?
-
-**Yes, with three additions:**
-
-#### 1. Add a `PluginManifestRepository` for persistence
-
-The repository already exists (`ai_command_center/repositories/plugin_manifest_repository.py`). It should be extended to store the enabled/disabled state in SQLite, keyed by plugin ID. The repository layer owns storage; the service layer owns the business rule that core plugins cannot be disabled.
-
-#### 2. Add a `PluginLifecycleService` (or extend `PluginRegistryService`) that only publishes events
-
-When a plugin is enabled/disabled, the service should:
-
-- Validate the request (core plugins protected).
-- Persist the new state via the repository.
-- Publish `plugin.state_changed`.
-- If the plugin requires a service restart, publish `service.restart_request`.
-
-It must **not** call `service.start()` or `service.stop()` directly.
-
-#### 3. Extend `ServiceManager` to listen to `service.restart_request`
-
-Currently `ServiceManager` is invoked imperatively by `ApplicationCore.startup()` and `shutdown()`. To maintain the architecture, `ServiceManager` should subscribe to `service.restart_request` on the EventBus and perform the actual stop/start sequence. This keeps service lifecycle ownership inside `ServiceManager` while still honoring the no-direct-service-calls rule.
-
-### Proposed Event Flow
+### Event Flow
 
 ```text
-UI → plugin.disable_request { id: "notes" }
+UI → plugin.disable_request { id: "shell" }
   → PluginRegistryService
     → validate (not core)
     → PluginManifestRepository.save_state(id, enabled=false)
-    → plugin.state_changed
-    → service.restart_request { service: "obsidian" } (if plugin declares dependent services)
+    → plugin.state_changed { id: "shell", enabled: false, pending_restart: true }
+    → service.restart_request { service: "shell_tool" }
   → ServiceManager (subscriber)
-    → stop(obsidian)
-    → start(obsidian)
-    → service.ready / service.error
+    → stop(shell_tool)
+    → start(shell_tool)
   → AppState reducer
   → UI render
 ```
 
 ### Isolation Strategy
 
-- **Core plugins** are protected by the registry service itself.
-- **Extension plugins** can declare bus topics and tool specs in their manifests; they are loaded by a `PluginLoader` that registers them with `ToolRegistry` and `EventBus`. The loader only publishes registration events; it never touches repositories or other services directly.
-- **Sandboxing**: Python does not provide true sandboxing. Extension isolation should be limited to:
-  - No direct repository access (enforced by architecture rules and code review).
-  - No direct service calls (enforced by architecture).
-  - Extension tools/topics are registered into shared registries; misbehaving extensions can be disabled by the registry service.
+- **Core plugins** are protected by the registry service.
+- **Extension plugins** declare bus topics and a primary service in their manifests.
+- No direct repository access from services outside the plugin registry; no direct service calls.
 
 ### Conclusion
 
-Plugin Framework v2 is **feasible without introducing ownership-boundary violations**, provided that:
-
-1. Plugin state is persisted through the existing repository layer.
-2. Plugin changes are communicated via the EventBus only.
-3. `ServiceManager` is taught to restart services via EventBus subscription, rather than being invoked imperatively from another service.
-4. Dynamic extension loading is handled by a dedicated loader that only publishes registration events.
+Plugin Framework v2 is **implemented without ownership-boundary violations**.
 
 ---
 
 ## 4. Recommended Next Steps
 
-1. **Track 6.3 — Plugin Framework v2**
-   - Persist plugin enabled/disabled state in `PluginManifestRepository`.
-   - Add `service.restart_request` topic and make `ServiceManager` subscribe to it.
-   - Add a `PluginLoader` that registers extension tools/topics through the EventBus.
-
-2. **Track 6.4 — Vector Search / Memory Graph**
+1. **Track 6.4 — Vector Search / Memory Graph**
    - Add an `EmbeddingService` that computes embeddings and publishes `memory.embedding_added`.
    - Use a vector repository for storage; keep all service communication via EventBus.
 
-3. **Track 6.5 — Multi-Agent Runtime**
+2. **Track 6.5 — Multi-Agent Runtime**
    - Introduce an `AgentService` that spawns agents as lightweight state machines.
    - Agents publish intents through the EventBus; no direct service calls.
 
@@ -169,4 +139,4 @@ Plugin Framework v2 is **feasible without introducing ownership-boundary violati
 
 ## 5. Sign-off
 
-All current architecture boundaries are intact. Track 1.4 is complete. Track 6.3 is ready for implementation without violating the ownership rules in `AGENTS.md`.
+All current architecture boundaries are intact. Track 1.4 and Track 6.3 are complete.

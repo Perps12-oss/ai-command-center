@@ -36,6 +36,7 @@ from ai_command_center.db.connection import init_database
 from ai_command_center.repositories.conversation_repository import ConversationRepository
 from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.repositories.note_repository import NoteRepository
+from ai_command_center.repositories.plugin_manifest_repository import PluginManifestRepository
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
 from ai_command_center.services.chat_export_service import ChatExportService
@@ -103,7 +104,8 @@ def create_application(
     obsidian = ObsidianService(bus, note_repo)
     memory_graph = MemoryGraphService(bus, memory_repo)
     session = SessionService(bus, conv_repo)
-    plugins = PluginRegistryService(bus)
+    plugin_repo = PluginManifestRepository(db)
+    plugins = PluginRegistryService(bus, repo=plugin_repo)
     telemetry = TelemetryService(bus, TelemetryRepository(db))
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)

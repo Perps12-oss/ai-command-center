@@ -40,6 +40,7 @@ SERVICE_READY = "service.ready"
 SERVICE_STOPPED = "service.stopped"
 SERVICE_ERROR = "service.error"
 SERVICE_STATE_CHANGED = "service.state_changed"
+SERVICE_RESTART_REQUEST = "service.restart_request"
 
 CONVERSATION_UPDATED = "conversation.updated"
 NOTES_INDEXED = "notes.indexed"
@@ -155,6 +156,7 @@ __all__ = [
     "SERVICE_STOPPED",
     "SERVICE_ERROR",
     "SERVICE_STATE_CHANGED",
+    "SERVICE_RESTART_REQUEST",
     "CONVERSATION_UPDATED",
     "NOTES_INDEXED",
     "TOOL_STARTED",

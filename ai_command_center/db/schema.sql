@@ -92,3 +92,12 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
 
 CREATE INDEX IF NOT EXISTS idx_telemetry_events_event ON telemetry_events(event);
 CREATE INDEX IF NOT EXISTS idx_telemetry_events_timestamp ON telemetry_events(timestamp);
+
+-- Phase 5B+ plugin state persistence
+CREATE TABLE IF NOT EXISTS plugin_state (
+    plugin_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_plugin_state_enabled ON plugin_state(enabled);

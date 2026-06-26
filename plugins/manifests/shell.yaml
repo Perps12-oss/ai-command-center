@@ -2,7 +2,8 @@ id: shell
 name: Shell Tool
 version: "1.0"
 description: Single-step shell commands via the > prefix
-kind: core
+kind: extension
+service: shell_tool
 bus_topics:
   - tool.invoke
   - tool.result

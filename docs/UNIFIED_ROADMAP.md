@@ -106,7 +106,7 @@ Goal: reusable component library and future extensibility.
 |---|---|---|---|
 | 6.1 | Component library gallery | ✅ | `ComponentGalleryView` accessible from palette; documents tokens and components |
 | 6.2 | Design-system tokens fully applied | ✅ | No hard-coded fonts in audited views; Workspace OS inspector uses `theme_v2` |
-| 6.3 | Plugin framework v2 | ⏳ | Dynamic enable/disable with restart, extension isolation |
+| 6.3 | Plugin framework v2 | ✅ | Persistent plugin state, core protection, service restart via EventBus |
 | 6.4 | Vector search / memory graph enhancements | ⏳ | Embeddings-based memory retrieval |
 | 6.5 | Multi-agent runtime | ⏳ | Agent spawning beyond single chat |
 
@@ -114,18 +114,17 @@ Goal: reusable component library and future extensibility.
 
 ## Current position
 
-- **Tracks 1–3 and 4–5 are complete.** Foundation, runtime engine, state/observability, UI contract, and visible features are all implemented.
-- **Track 6.3–6.5 remain future work.** Plugin framework v2, vector search, and multi-agent runtime are not started.
+- **Tracks 1–3, 4–5, and 6.3 are complete.** Foundation, runtime engine, state/observability, UI contract, visible features, and plugin framework v2 are implemented.
+- **Tracks 6.4–6.5 remain future work.** Vector search and multi-agent runtime are not started.
 
 ---
 
 ## Recommended next sub-category
 
-**Track 6.3 → Track 6.4 → Track 6.5**
+**Track 6.4 → Track 6.5**
 
-1. **Plugin framework v2** (Track 6.3): dynamic enable/disable with restart, extension isolation.
-2. **Vector search / memory graph enhancements** (Track 6.4): embeddings-based memory retrieval.
-3. **Multi-agent runtime** (Track 6.5): agent spawning beyond single chat.
+1. **Vector search / memory graph enhancements** (Track 6.4): embeddings-based memory retrieval.
+2. **Multi-agent runtime** (Track 6.5): agent spawning beyond single chat.
 
 After that, the architecture is unified and the platform scale layer is complete.
 

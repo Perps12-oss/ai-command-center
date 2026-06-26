@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Callable, Iterable
 
-from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.topics import APP_PHASE
+from ai_command_center.core.event_bus import Event, EventBus
+from ai_command_center.core.events.topics import APP_PHASE, SERVICE_RESTART_REQUEST
 from ai_command_center.services.states import ServiceState
 
 if TYPE_CHECKING:
@@ -13,11 +13,17 @@ if TYPE_CHECKING:
 
 
 class ServiceManager:
-    """Registers services and coordinates start/stop lifecycle."""
+    """Registers services and coordinates start/stop lifecycle.
+
+    Listens to `service.restart_request` so that other services (e.g. the
+    plugin registry) can ask for a service restart without calling this manager
+    directly.
+    """
 
     def __init__(self, bus: EventBus) -> None:
         self._bus = bus
         self._services: dict[str, BaseService] = {}
+        self._unsubscribe_restart: Callable[[], None] | None = None
 
     def register(self, service: BaseService) -> None:
         if service.name in self._services:
@@ -31,10 +37,14 @@ class ServiceManager:
         return tuple(sorted(self._services))
 
     def load_all(self) -> None:
+        self._subscribe_restart()
         for service in self._ordered():
             service.start()
 
     def unload_all(self) -> None:
+        if self._unsubscribe_restart is not None:
+            self._unsubscribe_restart()
+            self._unsubscribe_restart = None
         for service in reversed(self._ordered()):
             service.stop()
 
@@ -42,6 +52,27 @@ class ServiceManager:
         """Stop all services — no background services remain."""
         self.unload_all()
         self._bus.publish(APP_PHASE, {"phase": "shutdown"}, source="service_manager")
+
+    def _subscribe_restart(self) -> None:
+        if self._unsubscribe_restart is None:
+            self._unsubscribe_restart = self._bus.subscribe(
+                SERVICE_RESTART_REQUEST, self._on_restart_request
+            )
+
+    def _on_restart_request(self, event: Event) -> None:
+        name = str(event.payload.get("service", "")).strip()
+        if not name:
+            return
+        service = self._services.get(name)
+        if service is None:
+            self._bus.publish(
+                APP_PHASE,
+                {"phase": "error", "message": f"unknown service: {name}"},
+                source="service_manager",
+            )
+            return
+        service.stop()
+        service.start()
 
     def _ordered(self) -> Iterable[BaseService]:
         return self._services.values()

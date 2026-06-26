@@ -139,12 +139,26 @@ scripts/telemetry_summary.py → offline correlation + SESSION SUMMARY
 - Offline: hesitation, retry, command correlation, friction score in `telemetry_summary.py` only.
 - Telemetry optional — removing `TelemetryService` does not break core flows.
 
-### Plugin registry (5B)
+### Plugin registry (5B+ v2)
 
 ```text
-plugins/manifests/*.yaml → PluginRegistryService → plugin.catalog → PluginsView
-plugin.enable_request / plugin.disable_request (extension only; core protected)
+plugins/manifests/*.yaml → PluginManifestRepository
+                                              ↓
+PluginRegistryService → plugin.catalog → PluginsView
+       ↓
+plugin.enable_request / plugin.disable_request
+       ↓
+SQLite plugin_state (persist)
+plugin.state_changed
+service.restart_request { service: "..." }
+       ↓
+ServiceManager → stop(service) → start(service)
 ```
+
+- Core plugins cannot be disabled.
+- Extension plugin state persists in SQLite.
+- Toggling an extension with a declared `service` triggers a `service.restart_request`.
+- `ServiceManager` listens to restart requests and performs the actual lifecycle sequence.
 
 ### Overlay (4C)
 

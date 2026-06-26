@@ -14,6 +14,7 @@ class PluginManifest:
     kind: str  # core | extension
     bus_topics: tuple[str, ...]
     enabled: bool = True
+    service: str = ""  # primary service to restart when toggled
 
     def to_dict(self) -> dict:
         return {
@@ -24,4 +25,5 @@ class PluginManifest:
             "kind": self.kind,
             "bus_topics": list(self.bus_topics),
             "enabled": self.enabled,
+            "service": self.service,
         }
