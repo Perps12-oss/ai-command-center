@@ -6,7 +6,7 @@ import customtkinter as ctk
 
 from ai_command_center.ui.components.floating_ui import floating_scroll
 from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 
 class ActivityPulse(ctk.CTkFrame):

@@ -6,7 +6,8 @@ from pathlib import Path
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.theme import theme_manager, tokens as T
+from ai_command_center.ui.design_system import theme_manager
+from ai_command_center.ui.design_system import theme_v2 as T
 
 
 class _Swatch(ctk.CTkFrame):

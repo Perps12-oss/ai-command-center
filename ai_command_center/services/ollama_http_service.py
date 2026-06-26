@@ -49,12 +49,17 @@ class OllamaHttpService(OllamaServiceBase):
         self._loaded_model: str | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
+        self._session: aiohttp.ClientSession | None = None
         self._active_request_id: str | None = None
         self._active_future: asyncio.Future[Any] | None = None
+        self._health_task: asyncio.Future[Any] | None = None
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
         self._start_loop()
+        self._session = asyncio.run_coroutine_threadsafe(
+            self._create_session(), self._loop
+        ).result(timeout=5.0)
         self._unsubscribers.append(
             self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
         )
@@ -64,19 +69,45 @@ class OllamaHttpService(OllamaServiceBase):
         self._unsubscribers.append(
             self._bus.subscribe(LLM_REQUEST, self._on_llm_request)
         )
-        asyncio.run_coroutine_threadsafe(self._health_check(), self._loop)
+        self._health_task = asyncio.run_coroutine_threadsafe(
+            self._delayed_health_check(), self._loop
+        )
+
+    async def _delayed_health_check(self) -> None:
+        await asyncio.sleep(1)
+        await self._health_check()
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
         self.cancel()
+        if self._health_task is not None:
+            self._health_task.cancel()
+            self._health_task = None
         if self._loop and self._loop.is_running():
-            self._loop.call_soon_threadsafe(self._loop.stop)
+            session = self._session
+            self._session = None
+            asyncio.run_coroutine_threadsafe(
+                self._shutdown_loop(session), self._loop
+            )
         if self._thread:
-            self._thread.join(timeout=3.0)
+            self._thread.join(timeout=5.0)
         self._loop = None
         self._thread = None
+
+    async def _shutdown_loop(self, session: aiohttp.ClientSession | None) -> None:
+        try:
+            if session is not None:
+                await session.close()
+        except Exception:
+            pass
+        tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        for t in tasks:
+            t.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        asyncio.get_running_loop().stop()
 
     def _on_settings_snapshot(self, event: Event) -> None:
         self._base_url = str(event.payload.get("ollama_url", self._base_url)).rstrip("/")
@@ -172,27 +203,35 @@ class OllamaHttpService(OllamaServiceBase):
         return False
 
     async def _health_check(self) -> None:
-        online = False
-        detail = ""
-        try:
-            timeout = aiohttp.ClientTimeout(total=_CONNECT_TIMEOUT_S)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+        while True:
+            online = False
+            detail = ""
+            try:
+                session = self._session
+                if session is None:
+                    break
                 async with session.get(f"{self._base_url}/api/tags") as resp:
                     online = resp.status == 200
                     if not online:
                         detail = f"HTTP {resp.status}"
-        except aiohttp.ClientConnectorError:
-            detail = "connection refused"
-        except asyncio.TimeoutError:
-            detail = "timeout"
-        except Exception as exc:
-            detail = str(exc)
+            except aiohttp.ClientConnectorError:
+                detail = "connection refused"
+            except asyncio.TimeoutError:
+                detail = "timeout"
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                detail = str(exc)
 
-        self._bus.publish(
-            OLLAMA_STATUS,
-            {"online": online, "detail": detail, "url": self._base_url},
-            source=self.name,
-        )
+            self._bus.publish(
+                OLLAMA_STATUS,
+                {"online": online, "detail": detail, "url": self._base_url},
+                source=self.name,
+            )
+            try:
+                await asyncio.sleep(30)
+            except asyncio.CancelledError:
+                break
 
     async def _load_model_async(self, model: str) -> None:
         payload = {
@@ -202,13 +241,15 @@ class OllamaHttpService(OllamaServiceBase):
             "keep_alive": self._effective_keep_alive(),
         }
         try:
-            async with self._open_session() as session:
-                async with session.post(
-                    f"{self._base_url}/api/generate", json=payload
-                ) as resp:
-                    if resp.status != 200:
-                        text = await resp.text()
-                        raise RuntimeError(f"load_model failed: {text[:200]}")
+            session = self._session
+            if session is None:
+                raise RuntimeError("Ollama service not loaded")
+            async with session.post(
+                f"{self._base_url}/api/generate", json=payload
+            ) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise RuntimeError(f"load_model failed: {text[:200]}")
             self._loaded_model = model
             self._bus.publish(
                 "ollama.model_loaded",
@@ -221,11 +262,13 @@ class OllamaHttpService(OllamaServiceBase):
     async def _unload_model_async(self, model: str) -> None:
         payload = {"model": model, "keep_alive": 0}
         try:
-            async with self._open_session() as session:
-                async with session.post(
-                    f"{self._base_url}/api/generate", json=payload
-                ) as resp:
-                    await resp.read()
+            session = self._session
+            if session is None:
+                raise RuntimeError("Ollama service not loaded")
+            async with session.post(
+                f"{self._base_url}/api/generate", json=payload
+            ) as resp:
+                await resp.read()
             self._loaded_model = None
             self._bus.publish(
                 "ollama.model_unloaded",
@@ -235,12 +278,22 @@ class OllamaHttpService(OllamaServiceBase):
         except Exception as exc:
             self._publish_error(None, f"Failed to unload model: {exc}")
 
+    async def _create_session(self) -> aiohttp.ClientSession:
+        return self._open_session()
+
     def _open_session(self) -> aiohttp.ClientSession:
+        import socket
+
         timeout = aiohttp.ClientTimeout(
             total=_REQUEST_TIMEOUT_S,
             connect=_CONNECT_TIMEOUT_S,
         )
-        return aiohttp.ClientSession(timeout=timeout)
+        connector = aiohttp.TCPConnector(
+            family=socket.AF_INET,
+            enable_cleanup_closed=True,
+            force_close=True,
+        )
+        return aiohttp.ClientSession(timeout=timeout, connector=connector)
 
     async def _stream_chat_async(
         self,
@@ -270,36 +323,38 @@ class OllamaHttpService(OllamaServiceBase):
                 "stream": True,
                 "options": {"keep_alive": self._effective_keep_alive()},
             }
-            async with self._open_session() as session:
-                async with session.post(
-                    f"{self._base_url}/api/chat", json=payload
-                ) as resp:
-                    if resp.status != 200:
-                        body = await resp.text()
-                        raise RuntimeError(
-                            f"Ollama returned HTTP {resp.status}: {body[:300]}"
-                        )
+            session = self._session
+            if session is None:
+                raise RuntimeError("Ollama service not loaded")
+            async with session.post(
+                f"{self._base_url}/api/chat", json=payload
+            ) as resp:
+                if resp.status != 200:
+                    body = await resp.text()
+                    raise RuntimeError(
+                        f"Ollama returned HTTP {resp.status}: {body[:300]}"
+                    )
 
-                    async for raw_line in resp.content:
-                        if asyncio.current_task() and asyncio.current_task().cancelled():
-                            raise asyncio.CancelledError()
-                        line = raw_line.decode("utf-8", errors="replace").strip()
-                        if not line:
-                            continue
-                        data = json.loads(line)
-                        chunk = str(data.get("message", {}).get("content", ""))
-                        if chunk:
-                            full_text.append(chunk)
-                            self._bus.publish(
-                                CHAT_CHUNK,
-                                {
-                                    "request_id": request_id,
-                                    "text": chunk,
-                                },
-                                source=self.name,
-                            )
-                        if data.get("done"):
-                            break
+                async for raw_line in resp.content:
+                    if asyncio.current_task() and asyncio.current_task().cancelled():
+                        raise asyncio.CancelledError()
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line:
+                        continue
+                    data = json.loads(line)
+                    chunk = str(data.get("message", {}).get("content", ""))
+                    if chunk:
+                        full_text.append(chunk)
+                        self._bus.publish(
+                            CHAT_CHUNK,
+                            {
+                                "request_id": request_id,
+                                "text": chunk,
+                            },
+                            source=self.name,
+                        )
+                    if data.get("done"):
+                        break
 
             text = "".join(full_text)
             self._bus.publish(

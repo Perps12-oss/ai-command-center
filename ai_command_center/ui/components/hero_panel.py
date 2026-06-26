@@ -7,7 +7,7 @@ from pathlib import Path
 import customtkinter as ctk
 
 from ai_command_center.services.asset_service import AssetService
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 _ASSET = (
     Path(__file__).resolve().parents[1]

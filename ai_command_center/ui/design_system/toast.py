@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 _KIND_COLOR = {
     "info":    T.ACCENT_DEFAULT,

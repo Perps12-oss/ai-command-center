@@ -10,7 +10,7 @@ import customtkinter as ctk
 
 from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
 from ai_command_center.ui.markdown_plain import format_assistant_markdown
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 # ── Layout constants ───────────────────────────────────────────────────────────
 _BUBBLE_RADIUS  = 20

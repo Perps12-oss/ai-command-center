@@ -71,7 +71,7 @@ def main() -> int:
     from ai_command_center.services.session_service import SessionService
     from ai_command_center.services.settings_service import SettingsService
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         db = connect(Path(tmp) / "cap.db")
         init_database(db)
         bus2 = EventBus(debug_mode=True)
@@ -100,6 +100,11 @@ def main() -> int:
         for svc in (handler, ollama, session, settings):
             svc.unload()
         db.close()
+        db = None
+        import gc
+
+        gc.collect()
+        time.sleep(0.2)
 
     settings_py = (PROJECT_ROOT / "ai_command_center" / "ui" / "views" / "settings_view.py").read_text(
         encoding="utf-8"

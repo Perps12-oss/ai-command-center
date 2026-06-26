@@ -7,15 +7,15 @@ from collections import deque
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
-_QUICK_ACTIONS: tuple[tuple[str, str, str], ...] = (
-    ("\u2318  Ask AI",        "Type any question in the command box below",                  "accent"),
-    ("\U0001f4cb  Clipboard", "Type \u201csummarize clipboard\u201d to process copied text", "secondary"),
-    ("\U0001f4dd  Notes",     "Type \u201cnote: keyword\u201d to search your Obsidian vault", "secondary"),
-    ("\U0001f4be  Remember",  "Type \u201cremember: label | content\u201d to store a memory", "secondary"),
-    (">_  Shell",             "Type \u201c> command\u201d to run a shell command",            "secondary"),
-    ("\U0001f9e0  Memory",    "Type \u201cmemory: keyword\u201d to recall stored facts",      "secondary"),
+_QUICK_ACTIONS: tuple[tuple[str, str, str, str], ...] = (
+    ("\u2318  Ask AI",        "Type any question in the command box below",                  "accent",    "What can you help me with?"),
+    ("\U0001f4cb  Clipboard", "Type \u201csummarize clipboard\u201d to process copied text", "secondary", "summarize clipboard"),
+    ("\U0001f4dd  Notes",     "Type \u201cnote: keyword\u201d to search your Obsidian vault", "secondary", "note: "),
+    ("\U0001f4be  Remember",  "Type \u201cremember: label | content\u201d to store a memory", "secondary", "remember: | "),
+    (">_  Shell",             "Type \u201c> command\u201d to run a shell command",            "secondary", "> "),
+    ("\U0001f9e0  Memory",    "Type \u201cmemory: keyword\u201d to recall stored facts",      "secondary", "memory: "),
 )
 
 _ACTIVITY_ICON = {
@@ -39,7 +39,7 @@ def _accent_for(key: str) -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 
 class _ActionCard(ctk.CTkFrame):
-    def __init__(self, master, icon_title: str, hint: str, color_key: str) -> None:
+    def __init__(self, master, icon_title: str, hint: str, color_key: str, command=None) -> None:
         super().__init__(
             master,
             fg_color=T.BG_GLASS,
@@ -47,6 +47,9 @@ class _ActionCard(ctk.CTkFrame):
             border_width=1,
             corner_radius=8,
         )
+        self._command = command
+        self._default_border = T.BG_GLASS_BORDER
+        self._hover_border = T.GLASS_BORDER_HOVER
         ctk.CTkLabel(
             self,
             text=icon_title,
@@ -63,6 +66,22 @@ class _ActionCard(ctk.CTkFrame):
             wraplength=260,
             justify="left",
         ).pack(fill="x", padx=12, pady=(0, 10))
+        if command is not None:
+            self.bind("<Enter>", self._on_enter)
+            self.bind("<Leave>", self._on_leave)
+            self.bind("<Button-1>", lambda _e: self._on_click())
+            for child in self.winfo_children():
+                child.bind("<Button-1>", lambda _e: self._on_click())
+
+    def _on_enter(self, _event) -> None:
+        self.configure(border_color=self._hover_border)
+
+    def _on_leave(self, _event) -> None:
+        self.configure(border_color=self._default_border)
+
+    def _on_click(self) -> None:
+        if self._command is not None:
+            self._command()
 
 
 class _StatusPill(ctk.CTkFrame):
@@ -209,8 +228,9 @@ class HomeView(ctk.CTkFrame):
       set_last_command(text)       (legacy compat)
     """
 
-    def __init__(self, master, **kwargs) -> None:
+    def __init__(self, master, *, on_command=None, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
+        self._on_command = on_command
         self._memory_count = 0
         self._note_count = 0
         self._build()
@@ -274,8 +294,9 @@ class HomeView(ctk.CTkFrame):
         grid = ctk.CTkFrame(scroll, fg_color="transparent")
         grid.pack(fill="x", padx=T.PAD, pady=(0, 8))
         grid.columnconfigure((0, 1, 2), weight=1, uniform="col")
-        for i, (title, hint, color_key) in enumerate(_QUICK_ACTIONS):
-            _ActionCard(grid, title, hint, color_key).grid(
+        for i, (title, hint, color_key, command_text) in enumerate(_QUICK_ACTIONS):
+            cmd = (lambda t=command_text: self._publish_command(t)) if self._on_command else None
+            _ActionCard(grid, title, hint, color_key, command=cmd).grid(
                 row=i // 3, column=i % 3, sticky="nsew", padx=4, pady=4
             )
 
@@ -289,6 +310,10 @@ class HomeView(ctk.CTkFrame):
         self._activity_feed.pack(fill="x", pady=(4, 8))
 
     # ── public API ─────────────────────────────────────────────────────────────
+
+    def _publish_command(self, text: str) -> None:
+        if self._on_command is not None:
+            self._on_command(text)
 
     def update_ollama(self, online: bool, model: str = "") -> None:
         if online:

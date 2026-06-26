@@ -6,7 +6,7 @@ from typing import Callable
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 
 class _MemoryRow(ctk.CTkFrame):
@@ -136,6 +136,54 @@ class MemoryView(ctk.CTkFrame):
         self._items.insert(0, {"text": text, "timestamp": timestamp, "id": None})
         self._render()
 
+    def _confirm_delete(self, ref: dict) -> None:
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Delete memory")
+        dialog.configure(fg_color=T.BG_PANEL)
+        dialog.geometry("360x140")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        text = str(ref.get("text", ""))[:80]
+        ctk.CTkLabel(
+            dialog,
+            text=f'Delete this memory?\n"{text}"',
+            font=T.FONT_BODY,
+            text_color=T.TEXT_PRIMARY,
+            justify="center",
+        ).pack(padx=T.PAD, pady=(16, 12))
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(padx=T.PAD, pady=(0, 12))
+
+        def _cancel() -> None:
+            dialog.destroy()
+
+        def _confirm() -> None:
+            self._items = [it for it in self._items if it is not ref]
+            self._on_delete(ref.get("id"), ref.get("text", ""))
+            self._render()
+            dialog.destroy()
+
+        ctk.CTkButton(
+            btn_row,
+            text="Cancel",
+            font=T.FONT_SMALL,
+            fg_color=T.BG_GLASS,
+            hover_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+            command=_cancel,
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            btn_row,
+            text="Delete",
+            font=T.FONT_SMALL,
+            fg_color=T.STATUS_ERROR,
+            hover_color="#B91C1C",
+            text_color="white",
+            command=_confirm,
+        ).pack(side="left")
+
     def _visible_items(self) -> list[dict]:
         q = self._search.get().strip().lower()
         if not q:
@@ -172,9 +220,7 @@ class MemoryView(ctk.CTkFrame):
 
             def make_delete(ref=item_ref):
                 def _do():
-                    self._items = [it for it in self._items if it is not ref]
-                    self._on_delete(ref.get("id"), ref.get("text", ""))
-                    self._render()
+                    self._confirm_delete(ref)
                 return _do
 
             row = _MemoryRow(

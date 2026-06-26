@@ -5,7 +5,7 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 _PANEL_W   = 210
 _ROW_H     = 58

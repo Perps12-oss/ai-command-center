@@ -46,8 +46,8 @@ from ai_command_center.ui.components.sidebar import Sidebar
 from ai_command_center.ui.design_system.toast import ToastManager
 from ai_command_center.ui.components.top_bar import TopBar
 from ai_command_center.ui.controller import UIController
-from ai_command_center.ui.theme import theme_manager
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_manager
+from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.home_view import HomeView
@@ -193,7 +193,10 @@ class CommandPaletteApp(ctk.CTk):
     def _ensure_view(self, view_id: str) -> object:
         if view_id not in self._views:
             if view_id == "home":
-                self._views[view_id] = HomeView(self._content)
+                self._views[view_id] = HomeView(
+                    self._content,
+                    on_command=self._on_command,
+                )
             elif view_id == "chat":
                 self._views[view_id] = ChatView(
                     self._content,
@@ -206,6 +209,7 @@ class CommandPaletteApp(ctk.CTk):
                 self._views[view_id] = NotesView(
                     self._content,
                     on_select=self._controller.publish_note_select,
+                    on_search=lambda q: self._on_command(f"note: {q}"),
                 )
             elif view_id == "memory":
                 self._views[view_id] = MemoryView(

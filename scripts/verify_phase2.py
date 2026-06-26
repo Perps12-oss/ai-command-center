@@ -33,7 +33,7 @@ def main() -> int:
     if UI_STREAM_INTERVAL_MS != 50:
         failures.append(f"UI_STREAM_INTERVAL_MS expected 50, got {UI_STREAM_INTERVAL_MS}")
 
-    from ai_command_center.ui.theme import tokens as T
+    from ai_command_center.ui.design_system import theme_v2 as T
 
     if T.WINDOW_WIDTH != 1100 or T.WINDOW_HEIGHT != 700:
         failures.append("Window size not 1100x700")

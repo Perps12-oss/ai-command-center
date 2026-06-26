@@ -5,13 +5,14 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 
 class NotesView(ctk.CTkFrame):
-    def __init__(self, master, on_select, **kwargs) -> None:
+    def __init__(self, master, on_select, on_search=None, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_select = on_select
+        self._on_search = on_search
 
         card = GlassCard(self)
         card.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
@@ -34,6 +35,18 @@ class NotesView(ctk.CTkFrame):
         )
         self._status.pack(side="left", padx=(12, 0))
 
+        self._search = ctk.CTkEntry(
+            card,
+            placeholder_text="Search notes…",
+            font=T.FONT_BODY,
+            height=32,
+            fg_color=T.BG_INPUT,
+            border_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+        )
+        self._search.pack(fill="x", padx=T.PAD, pady=(0, 8))
+        self._search.bind("<Return>", lambda _e: self._publish_search())
+
         self._selected = ctk.CTkLabel(
             card,
             text="",
@@ -46,6 +59,11 @@ class NotesView(ctk.CTkFrame):
 
         self._scroll = ctk.CTkScrollableFrame(card, fg_color=T.BG_DEEP)
         self._scroll.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
+
+    def _publish_search(self) -> None:
+        query = self._search.get().strip()
+        if query and self._on_search is not None:
+            self._on_search(query)
 
     def show_results(self, query: str, results: list[dict]) -> None:
         for child in self._scroll.winfo_children():

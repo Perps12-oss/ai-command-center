@@ -1,4 +1,4 @@
-"""Runtime theme application — module-level singleton.
+"""Runtime theme application.
 
 Applies window-level alpha and exposes the active accent colour.
 No EventBus interaction; app.py calls apply() after receiving a
@@ -7,7 +7,7 @@ settings change and forwards the new values to widgets that care.
 
 from __future__ import annotations
 
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 _active_name: str = "VS Dark"
 _active_alpha: float = T.WINDOW_ALPHA

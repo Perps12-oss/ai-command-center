@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 
 class PluginsView(ctk.CTkFrame):
@@ -16,7 +16,7 @@ class PluginsView(ctk.CTkFrame):
         ctk.CTkLabel(
             self,
             text="Plugins",
-            font=ctk.CTkFont(size=18, weight="bold"),
+            font=T.FONT_TITLE,
             text_color=T.TEXT_PRIMARY,
         ).pack(anchor="w", padx=T.PAD, pady=(T.PAD, 8))
 

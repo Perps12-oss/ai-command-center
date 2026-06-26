@@ -12,7 +12,7 @@ import tkinter as tk
 
 
 
-from ai_command_center.ui.theme import tokens as T
+from ai_command_center.ui.design_system import theme_v2 as T
 
 
 

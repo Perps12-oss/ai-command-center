@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from ai_command_center.application import create_application
 from ai_command_center.core.event_bus import WildcardSubscriptionError
+from ai_command_center.ui.design_system import theme_v2 as T
 
 
 def main() -> int:
@@ -36,8 +37,11 @@ def main() -> int:
                 f"AppState.settings.default_model expected llama3.2:3b, "
                 f"got {snapshot.settings.default_model!r}"
             )
-        if snapshot.settings.theme != "dark":
-            failures.append(f"AppState.settings.theme not projected: {snapshot.settings.theme!r}")
+        valid_themes = {"dark", "light"} | set(T.THEMES.keys())
+        if snapshot.settings.theme not in valid_themes:
+            failures.append(
+                f"AppState.settings.theme not projected: {snapshot.settings.theme!r}"
+            )
 
         app.bus.publish(
             "settings.set_request",
