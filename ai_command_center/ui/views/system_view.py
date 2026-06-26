@@ -447,17 +447,17 @@ class SystemView(ctk.CTkFrame):
         if recv_s is not None:
             self._net_tile.update(_human_bytes(recv_s), _human_bytes(sent_s))
 
-    def apply_system_snapshot(self, payload: dict) -> None:
+    def apply_system_snapshot(self, snapshot) -> None:
         """Update meters from the architecture's SystemSnapshot event."""
-        cpu = float(payload.get("cpu_percent", 0))
-        ram = float(payload.get("ram_percent", 0))
+        cpu = float(getattr(snapshot, "cpu_percent", 0.0))
+        ram = float(getattr(snapshot, "ram_percent", 0.0))
         self._cpu_bar.update(cpu, f"{cpu:.0f}%")
         self._cpu_spark.push(cpu)
         self._ram_bar.update(ram, f"{ram:.0f}%")
         self._ram_spark.push(ram)
-        health = str(payload.get("health", "unknown"))
+        phase = str(getattr(snapshot, "phase", "idle"))
         self._proc_lbl.configure(
-            text=f"System health: {health.title()}  ·  Source: SystemSnapshot"
+            text=f"System phase: {phase.title()}  ·  Source: SystemSnapshot"
         )
 
     def on_hide(self) -> None:

@@ -112,7 +112,6 @@ class CapabilityRegistry:
     ) -> Any:
         """Invoke AI capability on entity."""
         capabilities = self._capabilities.get(capability_type, [])
-        for capability in capabilities:
-            if entity_id in [cap.id for cap in capabilities]:  # Simplified check
-                return capability.handler(entity_id, parameters)
+        if capabilities:
+            return capabilities[0].handler(entity_id, parameters)
         raise ValueError(f"Capability {capability_type} not found for entity {entity_id}")

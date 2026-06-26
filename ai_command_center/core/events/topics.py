@@ -45,6 +45,7 @@ SERVICE_RESTART_REQUEST = "service.restart_request"
 CONVERSATION_UPDATED = "conversation.updated"
 NOTES_INDEXED = "notes.indexed"
 
+TOOL_REGISTERED = "tool.registered"
 TOOL_STARTED = "tool.started"
 TOOL_COMPLETED = "tool.completed"
 TOOL_FAILED = "tool.failed"
@@ -159,6 +160,7 @@ __all__ = [
     "SERVICE_RESTART_REQUEST",
     "CONVERSATION_UPDATED",
     "NOTES_INDEXED",
+    "TOOL_REGISTERED",
     "TOOL_STARTED",
     "TOOL_COMPLETED",
     "TOOL_FAILED",
