@@ -53,6 +53,8 @@ Architecture: `Services → Events → AppState → UI` (UI in Phase 2).
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for repository policy, state ownership, and EventBus rules.
 
+Reference architecture (TO-DO LIST / target design): [docs/WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md](docs/WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md).
+
 **Phase 3:** [docs/PHASE3.md](docs/PHASE3.md) — scope, build order, review gates. Run `scripts/verify_context_manager.py` before Ollama code.
 
 | Module | Role |
