@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import pyperclip
+
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
+    CHAT_EXPORT_REQUEST,
+    CLIPBOARD_CONTENT,
+    CLIPBOARD_REQUEST,
     MEMORY_DELETE_REQUEST,
     NOTE_SELECT,
     OVERLAY_ANCHOR,
@@ -108,3 +113,28 @@ class UIController:
             {"id": memory_id},
             source="ui",
         )
+
+    def publish_chat_export(self, history: list[dict]) -> None:
+        self._bus.publish(
+            CHAT_EXPORT_REQUEST,
+            {"history": list(history)},
+            source="ui",
+        )
+
+    def read_clipboard(self) -> str | None:
+        try:
+            text = pyperclip.paste()
+        except Exception:
+            return None
+        if not text or not str(text).strip():
+            return None
+        return str(text)
+
+    def publish_clipboard_request(self) -> None:
+        self._bus.publish(CLIPBOARD_REQUEST, {}, source="ui")
+        try:
+            text = self.read_clipboard()
+        except Exception:
+            text = None
+        if text:
+            self._bus.publish(CLIPBOARD_CONTENT, {"text": text}, source="ui")

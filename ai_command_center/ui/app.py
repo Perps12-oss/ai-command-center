@@ -14,6 +14,8 @@ from ai_command_center.core.clipboard_intent import (
 from ai_command_center.core.event_bus import Event, EventBus
 from ai_command_center.core.events.topics import (
     CHAT_CHUNK,
+    CHAT_EXPORT_ERROR,
+    CHAT_EXPORT_RESULT,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
     COMMAND_HISTORY,
@@ -181,7 +183,31 @@ class CommandPaletteApp(ctk.CTk):
             ("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse),
             ("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show),
         ]
+        commands.extend(self._workspace_os_palette_commands())
         self._command_palette.show(commands)
+
+    def _workspace_os_palette_commands(self) -> list[tuple[str, str, Callable[[], None]]]:
+        """Build launchable Workspace OS entity commands from AppState."""
+        from ai_command_center.core.events.topics import UI_LAUNCH_RESOURCE
+
+        items: list[tuple[str, str, Callable[[], None]]] = []
+        for entity in self._controller.snapshot().workspace_os.entities:
+            meta = dict(entity.metadata)
+            resource_type = meta.get("resource_type")
+            value = meta.get("url") or meta.get("path") or meta.get("command") or ""
+            if not resource_type or not value:
+                continue
+            label = f"🚀  {entity.title}"
+            desc = f"Workspace OS {entity.entity_type} ({resource_type})"
+            payload = {
+                "resource_id": entity.entity_id,
+                "resource_type": resource_type,
+                "value": value,
+            }
+            items.append(
+                (label, desc, lambda p=payload: self._bus.publish(UI_LAUNCH_RESOURCE, p, source="ui"))
+            )
+        return items
 
     def _maybe_show_shortcuts(self, event) -> None:
         focused = self.focus_get()
@@ -255,6 +281,10 @@ class CommandPaletteApp(ctk.CTk):
         v = self._views.get("memory")
         return v if isinstance(v, MemoryView) else None
 
+    def _plugins_view(self) -> PluginsView | None:
+        v = self._views.get("plugins")
+        return v if isinstance(v, PluginsView) else None
+
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:
             view_id = "home"
@@ -292,28 +322,24 @@ class CommandPaletteApp(ctk.CTk):
 
     # ── chat export / regenerate callbacks ────────────────────────────────────
 
-    def _on_chat_export(self, history: list[dict]) -> None:
-        import datetime
-        import pathlib
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = pathlib.Path.home() / f"chat_export_{ts}.md"
-        lines = [f"# Chat Export — {ts}\n"]
-        for msg in history:
-            role = msg.get("role", "unknown").upper()
-            content = msg.get("content", "")
-            lines.append(f"## {role}\n{content}\n")
-        try:
-            path.write_text("\n".join(lines), encoding="utf-8")
-            self._toast.show(f"Saved to {path.name}", kind="success")
-        except Exception as exc:
-            self._toast.show(f"Export failed: {exc}", kind="error")
-
     def _on_chat_export_request(self) -> None:
         chat = self._chat_view()
         if chat and chat._history:
-            self._on_chat_export(list(chat._history))
+            self._controller.publish_chat_export(list(chat._history))
         else:
             self._toast.show("No chat history to export", kind="warning")
+
+    def _on_chat_export_result(self, event: Event) -> None:
+        path = str(event.payload.get("path", ""))
+        self._ui_queue.enqueue(
+            lambda: self._toast.show(f"Saved to {path}", kind="success")
+        )
+
+    def _on_chat_export_error(self, event: Event) -> None:
+        message = str(event.payload.get("message", "Export failed"))
+        self._ui_queue.enqueue(
+            lambda: self._toast.show(f"Export failed: {message}", kind="error")
+        )
 
     def _on_chat_regenerate(self) -> None:
         chat = self._chat_view()
@@ -344,7 +370,7 @@ class CommandPaletteApp(ctk.CTk):
 
         clipboard: str | None = None
         if wants_clipboard(text):
-            clipboard = self._read_clipboard()
+            clipboard = self._controller.read_clipboard()
             if not clipboard:
                 message = empty_clipboard_message()
 
@@ -368,12 +394,6 @@ class CommandPaletteApp(ctk.CTk):
         ):
             self._pending_user_text = text
         self._controller.publish_command(text, clipboard=clipboard)
-
-    def _read_clipboard(self) -> str | None:
-        try:
-            return self.clipboard_get()
-        except Exception:
-            return None
 
     def _show_capability_help(self) -> None:
         show_capability_help(self)
@@ -452,6 +472,26 @@ class CommandPaletteApp(ctk.CTk):
             )
         except Exception:
             pass
+
+        self._apply_catalog_views(snap)
+
+    def _apply_catalog_views(self, snap) -> None:
+        """Render Memory, Notes, Plugins, and System views from AppState."""
+        memory = self._memory_view()
+        if memory:
+            memory.load_from_appstate(snap)
+
+        notes = self._notes_view()
+        if notes:
+            notes.load_from_appstate(snap)
+
+        plugins = self._plugins_view()
+        if plugins:
+            plugins.load_from_appstate(snap)
+
+        system = self._system_view()
+        if system:
+            system.apply_system_snapshot(snap.system_snapshot)
 
     # ── fade / show / hide ─────────────────────────────────────────────────────
 
@@ -553,6 +593,12 @@ class CommandPaletteApp(ctk.CTk):
         self._bus_unsubs.append(
             self._bus.subscribe(CHAT_HISTORY_LOADED, self._on_chat_history_loaded)
         )
+        self._bus_unsubs.append(
+            self._bus.subscribe(CHAT_EXPORT_RESULT, self._on_chat_export_result)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe(CHAT_EXPORT_ERROR, self._on_chat_export_error)
+        )
 
     def _on_chat_started(self, event: Event) -> None:
         request_id = str(event.payload.get("request_id", ""))
@@ -611,14 +657,9 @@ class CommandPaletteApp(ctk.CTk):
         )
 
     def _on_note_results(self, event: Event) -> None:
-        query = str(event.payload.get("query", ""))
-        results = event.payload.get("results") or []
-
+        """Note search results are projected into AppState; view renders from there."""
         def update() -> None:
             self._navigate("notes")
-            notes = self._notes_view()
-            if notes:
-                notes.show_results(query, results)
 
         self._ui_queue.enqueue(update)
 
@@ -630,13 +671,8 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_note_selected(self, event: Event) -> None:
         path = str(event.payload.get("path", ""))
-        title = str(event.payload.get("title", os.path.basename(path)))
-        body = str(event.payload.get("body", ""))
 
         def update() -> None:
-            notes = self._notes_view()
-            if notes:
-                notes.show_preview(path, title, body)
             self._toast.show(f"Opened: {os.path.basename(path)}", kind="info")
 
         self._ui_queue.enqueue(update)
@@ -692,9 +728,6 @@ class CommandPaletteApp(ctk.CTk):
             home = self._home_view()
             if home:
                 home.update_memory(self._memory_count)
-            memory = self._memory_view()
-            if memory:
-                memory.add_memory(event.payload)
 
         self._ui_queue.enqueue(update)
 
@@ -759,13 +792,9 @@ class CommandPaletteApp(ctk.CTk):
         )
 
     def _on_plugin_catalog(self, event: Event) -> None:
-        plugins = event.payload.get("plugins") or []
-
+        """Plugin catalog is projected into AppState; view renders from there."""
         def update() -> None:
             self._navigate("plugins")
-            plugins_view = self._views.get("plugins")
-            if isinstance(plugins_view, PluginsView):
-                plugins_view.show_catalog(plugins)
 
         self._ui_queue.enqueue(update)
 
@@ -849,15 +878,8 @@ class CommandPaletteApp(ctk.CTk):
         )
 
     def _on_system_snapshot(self, event: Event) -> None:
-        payload = event.payload or {}
-
-        def update() -> None:
-            system = self._system_view()
-            if system:
-                system.apply_system_snapshot(payload)
-            self._apply_state()
-
-        self._ui_queue.enqueue(update)
+        """System snapshot is projected into AppState; view renders from there."""
+        self._ui_queue.enqueue(self._apply_state)
 
     def _on_ollama_status(self, event: Event) -> None:
         online = bool(event.payload.get("online", False))

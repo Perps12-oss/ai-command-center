@@ -40,6 +40,22 @@ class PluginsView(ctk.CTkFrame):
         )
         self._status.pack(anchor="w", padx=T.PAD, pady=(0, T.PAD))
 
+    def load_from_appstate(self, snap) -> None:
+        """Render plugin catalog from AppState projection."""
+        plugins = [
+            {
+                "id": item.plugin_id,
+                "name": item.name,
+                "description": item.description,
+                "kind": item.kind,
+                "enabled": item.enabled,
+                "error": item.error,
+                "pending_restart": item.pending_restart,
+            }
+            for item in snap.plugin_catalog
+        ]
+        self.show_catalog(plugins)
+
     def show_catalog(self, plugins: list[dict]) -> None:
         for child in self._list.winfo_children():
             child.destroy()

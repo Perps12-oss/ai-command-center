@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import customtkinter as ctk
 
+from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import (
     EVENT_ENTITY_CREATED,
     EVENT_TIMELINE_EVENT,
@@ -20,15 +19,13 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 
-if TYPE_CHECKING:
-    from ai_command_center.application import ApplicationCore
-
 
 class WorkspaceOsInspector(ctk.CTkToplevel):
     """
     Minimal Workspace OS inspector window.
 
     Displays live stats, recent activity, and provides entity creation.
+    Reads all state from AppStateStore; publishes intents via EventBus.
     Opened via Ctrl+Shift+W.
     """
 
@@ -39,11 +36,11 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self,
         master: ctk.CTk,
         bus: EventBus,
-        core: ApplicationCore,
+        state_store: AppStateStore,
     ) -> None:
         super().__init__(master)
         self._bus = bus
-        self._core = core
+        self._state_store = state_store
         self._controller = WorkspaceOsUIController(bus)
         self._unsubs: list = []
 
@@ -153,15 +150,8 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self.destroy()
 
     def _refresh(self) -> None:
-        """
-        Refresh stats and activity from AppState, and entity list from services.
-
-        Stats and recent activity are read from AppState to respect the UI
-        contract. The full entity list is still read from the service layer
-        until a full AppState projection is added in a later phase.
-        """
-        wos = self._core.workspace_os
-        snapshot = self._core.state_store.snapshot.workspace_os
+        """Refresh all inspector state from AppState."""
+        snapshot = self._state_store.snapshot.workspace_os
 
         self._entities_label.configure(text=f"Entities: {snapshot.entity_count}")
         self._relationships_label.configure(
@@ -171,12 +161,7 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self._events_label.configure(text=f"Events: {snapshot.event_count}")
 
         self._render_activity(snapshot.recent_events)
-
-        if wos is not None:
-            # Read-only projection gap: full entity list is not yet in AppState.
-            self._render_entities(wos.entity_service.list_all())
-        else:
-            self._render_entities([])
+        self._render_entities(snapshot.entities)
 
     def _render_entities(self, entities: list) -> None:
         """Render the entities list with launch buttons."""
@@ -184,8 +169,9 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self._entities_list.delete("0.0", "end")
 
         for entity in entities:
-            resource_type = entity.metadata.get("resource_type")
-            value = entity.metadata.get("url") or entity.metadata.get("path") or entity.metadata.get("command") or ""
+            meta = dict(entity.metadata)
+            resource_type = meta.get("resource_type")
+            value = meta.get("url") or meta.get("path") or meta.get("command") or ""
             line = f"[{entity.entity_type}] {entity.title}"
             if resource_type:
                 line += f" ({resource_type})"
@@ -200,7 +186,7 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
                     width=60,
                     height=20,
                     font=("Inter", 10),
-                    command=lambda eid=entity.id, rt=resource_type, val=value: self._controller.launch_resource(
+                    command=lambda eid=entity.entity_id, rt=resource_type, val=value: self._controller.launch_resource(
                         str(eid), rt, val
                     ),
                 )
@@ -235,34 +221,33 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
             self._controller.create_workspace(title)
 
     def _show_create_card(self) -> None:
-        """Open a simple dialog to create a card."""
+        """Open a simple dialog to create a card in the first workspace."""
         dialog = ctk.CTkInputDialog(text="Card name:", title="Create Card")
         title = dialog.get_input()
         if title:
-            # For simplicity, create the card in the first workspace found.
-            wos = self._core.workspace_os
-            if wos is not None:
-                workspaces = wos.workspace_service.get_all()
-                if workspaces:
-                    self._controller.create_card(str(workspaces[0].id), title)
+            workspace = self._first_entity("workspace")
+            if workspace:
+                self._controller.create_card(str(workspace.entity_id), title)
 
     def _show_create_resource(self) -> None:
-        """Open a simple dialog to create a URL resource."""
+        """Open a simple dialog to create a URL resource in the first card."""
         dialog = _CreateResourceDialog(self)
         self.wait_window(dialog)
         if dialog.result:
-            wos = self._core.workspace_os
-            if wos is not None:
-                cards = [
-                    e for e in wos.entity_service.list_all() if e.entity_type == "card"
-                ]
-                if cards:
-                    self._controller.create_resource(
-                        str(cards[0].id),
-                        dialog.result["title"],
-                        "url",
-                        dialog.result["url"],
-                    )
+            card = self._first_entity("card")
+            if card:
+                self._controller.create_resource(
+                    str(card.entity_id),
+                    dialog.result["title"],
+                    "url",
+                    dialog.result["url"],
+                )
+
+    def _first_entity(self, entity_type: str):
+        for e in self._state_store.snapshot.workspace_os.entities:
+            if e.entity_type == entity_type:
+                return e
+        return None
 
 
 class _CreateResourceDialog(ctk.CTkToplevel):

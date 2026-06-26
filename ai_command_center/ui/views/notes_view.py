@@ -117,19 +117,30 @@ class NotesView(ctk.CTkFrame):
         if query and self._on_search is not None:
             self._on_search(query)
 
+    def load_from_appstate(self, snap) -> None:
+        """Render notes catalog and selected note from AppState projection."""
+        results = [
+            {"path": item.path, "title": item.title, "snippet": item.snippet}
+            for item in snap.notes_catalog
+        ]
+        self.show_results("", results)
+        selected = snap.note_selected
+        if selected:
+            self.show_preview(selected.path, selected.title, selected.snippet)
+
     def show_results(self, query: str, results: list[dict]) -> None:
         for child in self._scroll.winfo_children():
             child.destroy()
 
         if not results:
             self._status.configure(
-                text=f'No results for "{query}"',
+                text='No results',
                 text_color=T.TEXT_MUTED,
             )
             return
 
         self._status.configure(
-            text=f'{len(results)} result(s) for "{query}"',
+            text=f'{len(results)} note(s)',
             text_color=T.TEXT_SECONDARY,
         )
         for item in results:

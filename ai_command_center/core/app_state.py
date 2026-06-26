@@ -10,6 +10,9 @@ from typing import Any
 from ai_command_center.core.event_bus import (
     EVENT_ACTION_REGISTERED,
     EVENT_ENTITY_CREATED,
+    EVENT_ENTITY_DELETED,
+    EVENT_ENTITY_RELATIONSHIPS_CHANGED,
+    EVENT_ENTITY_UPDATED,
     EVENT_RELATIONSHIP_CREATED,
     EVENT_TIMELINE_EVENT,
     Event,
@@ -25,6 +28,15 @@ from ai_command_center.core.events.topics import (
     CHAT_STARTED,
     COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    MEMORY_CLEARED,
+    MEMORY_SELECTED,
+    MEMORY_STORED,
+    NOTE_CREATED,
+    NOTE_INDEX_COMPLETE,
+    NOTE_SEARCH_RESULTS,
+    NOTE_SELECTED,
+    PLUGIN_CATALOG,
+    PLUGIN_STATE_CHANGED,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -47,11 +59,24 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     APP_ERROR,
     APP_PHASE,
     SYSTEM_SNAPSHOT,
-    # Workspace OS (Track B - Phase 2)
+    # Notes / Memory / Plugins (Track 3.2)
+    NOTE_SEARCH_RESULTS,
+    NOTE_SELECTED,
+    NOTE_CREATED,
+    NOTE_INDEX_COMPLETE,
+    MEMORY_STORED,
+    MEMORY_SELECTED,
+    MEMORY_CLEARED,
+    PLUGIN_CATALOG,
+    PLUGIN_STATE_CHANGED,
+    # Workspace OS (Track B - Phase 2 + 3.2)
     EVENT_ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
     EVENT_ACTION_REGISTERED,
     EVENT_TIMELINE_EVENT,
+    EVENT_ENTITY_UPDATED,
+    EVENT_ENTITY_DELETED,
+    EVENT_ENTITY_RELATIONSHIPS_CHANGED,
 )
 
 
@@ -63,14 +88,55 @@ class ServiceSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkspaceOsEntity:
+    """Lightweight Workspace OS entity projection."""
+
+    entity_id: str = ""
+    entity_type: str = ""
+    title: str = ""
+    metadata: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class WorkspaceOsSnapshot:
-    """Minimal Workspace OS projection for the inspector UI."""
+    """Workspace OS projection for the inspector UI."""
 
     entity_count: int = 0
     relationship_count: int = 0
     action_count: int = 0
     event_count: int = 0
     recent_events: tuple[str, ...] = ()
+    entities: tuple[WorkspaceOsEntity, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class NoteItem:
+    """Projection of a note search result."""
+
+    path: str = ""
+    title: str = ""
+    snippet: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryItem:
+    """Projection of a stored memory node."""
+
+    node_id: str = ""
+    label: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class PluginItem:
+    """Projection of a plugin catalog entry."""
+
+    plugin_id: str = ""
+    name: str = ""
+    description: str = ""
+    kind: str = "extension"
+    enabled: bool = True
+    error: str = ""
+    pending_restart: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,8 +164,24 @@ class AppState:
     last_chat_error: str = ""
     errors: tuple[str, ...] = ()
 
+    # Track 3.2 — full projection of feature catalogs
+    notes_catalog: tuple[NoteItem, ...] = ()
+    note_selected: NoteItem | None = None
+    note_index_status: tuple[int, int] = ()  # (files, ms)
+    memory_catalog: tuple[MemoryItem, ...] = ()
+    memory_selected: tuple[str, ...] = ()
+    plugin_catalog: tuple[PluginItem, ...] = ()
+
 
 Reducer = Callable[[AppState, Event], AppState]
+
+
+def _freeze_metadata(raw: Any) -> tuple[tuple[str, str], ...]:
+    if not isinstance(raw, dict):
+        return ()
+    return tuple(
+        (str(k), str(v)) for k, v in raw.items() if v is not None
+    )
 
 
 def _coerce_bool(value: Any, default: bool = False) -> bool:
@@ -131,20 +213,6 @@ def _coerce_int(value: Any, default: int) -> int:
         return default
 
 
-def _coerce_float(value: Any, default: float) -> float:
-    if isinstance(value, bool):
-        return default
-    if isinstance(value, (int, float)):
-        return float(value)
-    text = str(value).strip()
-    if not text:
-        return default
-    try:
-        return float(text)
-    except ValueError:
-        return default
-
-
 def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
     return SettingsSnapshot(
         theme=str(payload.get("theme", "dark")),
@@ -156,7 +224,6 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         low_memory_mode=_coerce_bool(payload.get("low_memory_mode", False)),
         window_width=_coerce_int(payload.get("window_width", 1100), 1100),
         window_height=_coerce_int(payload.get("window_height", 700), 700),
-        window_alpha=_coerce_float(payload.get("window_alpha", 0.95), 0.95),
         obsidian_vault_path=str(payload.get("obsidian_vault_path", "")),
         overlay_mode=str(payload.get("overlay_mode", "palette")),
         model_name=str(payload.get("model_name", "llama3.2:3b")),
@@ -376,10 +443,45 @@ def _reduce_system_snapshot(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
-    """Increment Workspace OS counters and recent events from event stream."""
+    """Update Workspace OS counters, recent events, and entity list."""
     current = state.workspace_os
     if event.topic == EVENT_ENTITY_CREATED:
-        snapshot = replace(current, entity_count=current.entity_count + 1)
+        raw_meta = event.payload.get("metadata", {})
+        meta = _freeze_metadata(raw_meta)
+        entity = WorkspaceOsEntity(
+            entity_id=str(event.payload.get("entity_id", "")),
+            entity_type=str(event.payload.get("entity_type", "")),
+            title=str(event.payload.get("title", "")),
+            metadata=meta,
+        )
+        snapshot = replace(
+            current,
+            entity_count=current.entity_count + 1,
+            entities=current.entities + (entity,),
+        )
+    elif event.topic == EVENT_ENTITY_UPDATED:
+        updated_id = str(event.payload.get("entity_id", ""))
+        meta = _freeze_metadata(event.payload.get("metadata", {}))
+        updated = tuple(
+            WorkspaceOsEntity(
+                entity_id=updated_id,
+                entity_type=str(event.payload.get("entity_type", e.entity_type)),
+                title=str(event.payload.get("title", e.title)),
+                metadata=meta if meta else e.metadata,
+            )
+            if e.entity_id == updated_id
+            else e
+            for e in current.entities
+        )
+        snapshot = replace(current, entities=updated)
+    elif event.topic == EVENT_ENTITY_DELETED:
+        deleted_id = str(event.payload.get("entity_id", ""))
+        remaining = tuple(e for e in current.entities if e.entity_id != deleted_id)
+        snapshot = replace(
+            current,
+            entity_count=max(0, current.entity_count - 1),
+            entities=remaining,
+        )
     elif event.topic == EVENT_RELATIONSHIP_CREATED:
         snapshot = replace(current, relationship_count=current.relationship_count + 1)
     elif event.topic == EVENT_ACTION_REGISTERED:
@@ -403,6 +505,175 @@ def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_note_results(state: AppState, event: Event) -> AppState:
+    """Project note search results into AppState."""
+    if event.topic != NOTE_SEARCH_RESULTS:
+        return state
+    raw_results = event.payload.get("results") or []
+    items: list[NoteItem] = []
+    for item in raw_results:
+        if not isinstance(item, dict):
+            continue
+        items.append(
+            NoteItem(
+                path=str(item.get("path", "")),
+                title=str(item.get("title", "")),
+                snippet=str(item.get("snippet", "")),
+            )
+        )
+    return replace(
+        state,
+        notes_catalog=tuple(items),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_note_selected(state: AppState, event: Event) -> AppState:
+    """Project selected note preview into AppState."""
+    if event.topic != NOTE_SELECTED:
+        return state
+    selected = NoteItem(
+        path=str(event.payload.get("path", "")),
+        title=str(event.payload.get("title", "")),
+        snippet=str(event.payload.get("body", "")),
+    )
+    return replace(
+        state,
+        note_selected=selected,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_note_created(state: AppState, event: Event) -> AppState:
+    """Append newly created note to the catalog."""
+    if event.topic != NOTE_CREATED:
+        return state
+    path = str(event.payload.get("path", ""))
+    item = NoteItem(path=path, title=path, snippet="")
+    return replace(
+        state,
+        notes_catalog=(item,) + state.notes_catalog,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_note_index_complete(state: AppState, event: Event) -> AppState:
+    """Record note indexing status."""
+    if event.topic != NOTE_INDEX_COMPLETE:
+        return state
+    files = int(event.payload.get("files", 0))
+    ms = int(event.payload.get("ms", 0))
+    return replace(
+        state,
+        note_index_status=(files, ms),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_memory_stored(state: AppState, event: Event) -> AppState:
+    """Append newly stored memory to the catalog."""
+    if event.topic != MEMORY_STORED:
+        return state
+    item = MemoryItem(
+        node_id=str(event.payload.get("id", "")),
+        label=str(event.payload.get("label", "")),
+    )
+    return replace(
+        state,
+        memory_catalog=(item,) + state.memory_catalog,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_memory_selected(state: AppState, event: Event) -> AppState:
+    """Project selected memory labels into AppState."""
+    if event.topic != MEMORY_SELECTED:
+        return state
+    labels = event.payload.get("labels")
+    if isinstance(labels, (list, tuple)):
+        selected = tuple(str(label) for label in labels)
+    else:
+        selected = ()
+    return replace(
+        state,
+        memory_selected=selected,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_memory_cleared(state: AppState, event: Event) -> AppState:
+    """Handle memory selection clear or node deletion."""
+    if event.topic != MEMORY_CLEARED:
+        return state
+    node_id = str(event.payload.get("id", ""))
+    if node_id:
+        catalog = tuple(item for item in state.memory_catalog if item.node_id != node_id)
+        return replace(
+            state,
+            memory_catalog=catalog,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    return replace(
+        state,
+        memory_selected=(),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_plugin_catalog(state: AppState, event: Event) -> AppState:
+    """Project plugin catalog into AppState."""
+    if event.topic != PLUGIN_CATALOG:
+        return state
+    raw_plugins = event.payload.get("plugins") or []
+    items: list[PluginItem] = []
+    for plugin in raw_plugins:
+        if not isinstance(plugin, dict):
+            continue
+        items.append(
+            PluginItem(
+                plugin_id=str(plugin.get("id", "")),
+                name=str(plugin.get("name", "")),
+                description=str(plugin.get("description", "")),
+                kind=str(plugin.get("kind", "extension")),
+                enabled=bool(plugin.get("enabled", True)),
+                error=str(plugin.get("error", "")),
+                pending_restart=bool(plugin.get("pending_restart", False)),
+            )
+        )
+    return replace(
+        state,
+        plugin_catalog=tuple(items),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_plugin_state_changed(state: AppState, event: Event) -> AppState:
+    """Update enabled flag for a plugin in the catalog."""
+    if event.topic != PLUGIN_STATE_CHANGED:
+        return state
+    plugin_id = str(event.payload.get("id", ""))
+    enabled = bool(event.payload.get("enabled", True))
+    updated = tuple(
+        replace(item, enabled=enabled) if item.plugin_id == plugin_id else item
+        for item in state.plugin_catalog
+    )
+    return replace(
+        state,
+        plugin_catalog=updated,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
     _reduce_settings_changed,
@@ -418,6 +689,15 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_phase,
     _reduce_system_snapshot,
     _reduce_workspace_os_event,
+    _reduce_note_results,
+    _reduce_note_selected,
+    _reduce_note_created,
+    _reduce_note_index_complete,
+    _reduce_memory_stored,
+    _reduce_memory_selected,
+    _reduce_memory_cleared,
+    _reduce_plugin_catalog,
+    _reduce_plugin_state_changed,
 )
 
 

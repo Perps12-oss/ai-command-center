@@ -74,6 +74,7 @@ class EntityService:
                 "entity_id": str(created.id),
                 "entity_type": created.entity_type,
                 "title": created.title,
+                "metadata": dict(created.metadata),
             },
             source="entity_service",
         )
@@ -115,6 +116,7 @@ class EntityService:
                 "entity_id": str(saved.id),
                 "entity_type": saved.entity_type,
                 "title": saved.title,
+                "metadata": dict(saved.metadata),
             },
             source="entity_service",
         )

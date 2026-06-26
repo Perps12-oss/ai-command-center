@@ -147,6 +147,14 @@ class MemoryView(ctk.CTkFrame):
         self._items = list(items)
         self._render()
 
+    def load_from_appstate(self, snap) -> None:
+        """Render memory catalog from AppState projection."""
+        items: list[dict] = []
+        for item in snap.memory_catalog:
+            items.append({"text": item.label, "timestamp": "", "id": item.node_id})
+        self._items = items
+        self._render()
+
     def add_memory(self, payload: dict) -> None:
         """Insert a newly stored memory at the top from a service payload."""
         text = f"{payload.get('label', '')} | {payload.get('content', '')}"

@@ -38,6 +38,7 @@ from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
@@ -105,7 +106,9 @@ def create_application(
     plugins = PluginRegistryService(bus)
     telemetry = TelemetryService(bus, TelemetryRepository(db))
     system_monitor = SystemMonitorService(bus)
+    chat_export = ChatExportService(bus)
     services.register(telemetry)
+    services.register(chat_export)
     services.register(system_monitor)
     services.register(SettingsService(bus, settings_repo))
     services.register(CommandRouterService(bus))

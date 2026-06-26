@@ -52,7 +52,12 @@ class TrayController:
         return "#22C55E"
 
     def _run(self) -> None:
-        import pystray
+        try:
+            import pystray
+        except Exception as exc:
+            print(f"Tray unavailable: {exc}")
+            self._running = False
+            return
 
         def make_icon() -> Image.Image:
             return _icon(self._color_for_phase(self._get_phase()))
@@ -73,4 +78,9 @@ class TrayController:
             "AI Command Center",
             menu,
         )
-        self._icon.run()
+        try:
+            self._icon.run()
+        except Exception as exc:
+            print(f"Tray stopped: {exc}")
+        finally:
+            self._running = False

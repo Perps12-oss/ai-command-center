@@ -47,6 +47,12 @@ CHAT_CANCELLED = "chat.cancelled"
 CHAT_ERROR = "chat.error"
 CHAT_HISTORY_LOADED = "chat.history_loaded"
 CHAT_REQUEST = "chat.request"
+CHAT_EXPORT_REQUEST = "chat.export_request"
+CHAT_EXPORT_RESULT = "chat.export_result"
+CHAT_EXPORT_ERROR = "chat.export_error"
+
+CLIPBOARD_REQUEST = "clipboard.request"
+CLIPBOARD_CONTENT = "clipboard.content"
 
 OLLAMA_STATUS = "ollama.status"
 OLLAMA_MODEL_LOADED = "ollama.model_loaded"
