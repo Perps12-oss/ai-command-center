@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ai_command_center.core.events.topics import TOOL_STARTED
+from ai_command_center.core.events.topics import TOOL_REGISTERED
 from ai_command_center.core.tools import ToolSpec
 from ai_command_center.services.base import BaseService
 from ai_command_center.tools.tool_registry import ToolRegistry
@@ -24,7 +24,7 @@ class ToolRegistryService(BaseService):
     def register(self, spec: ToolSpec) -> None:
         self._registry.register_tool(spec)
         self._bus.publish(
-            TOOL_STARTED,
+            TOOL_REGISTERED,
             {"name": spec.name, "description": spec.description},
             source=self.name,
         )
