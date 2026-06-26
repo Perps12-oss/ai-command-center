@@ -67,18 +67,24 @@
 
 > Phase 5 is pure and deterministic in `ai_command_center/workspace/suggestions.py`; ranking is stable (score, then label, then rule). Gate: `scripts/verify_workspace_phase5.py`.
 
-## Plugin Architecture (Part VIII)
-- [ ] `CommandPlugin` contract (name, priority, match, enrich_context, execute)
-- [ ] Plugin location `%APPDATA%\AICommandCenter\plugins\`
-- [ ] Tier 1 exclusive matching (highest priority match wins)
+## Plugin Architecture (Part VIII) — ✅ Phase 7 (delivered)
+- [x] `CommandPlugin` contract (name, priority, match, enrich_context, execute) — `ai_command_center/workspace/plugins.py`
+- [x] Plugin location `%APPDATA%\AICommandCenter\plugins\` (documented; discovery/loading is a runtime concern, not this pure layer)
+- [x] Tier 1 exclusive matching (highest priority match wins) — `PluginRegistry.select()` (ties by name; faulty plugins isolated)
 
-## Memory Architecture (Part IX)
-- [ ] Workspace-centric memory (workspace/task/execution history, file & note relationships, preferences)
-- [ ] Conversation history secondary
+> Phase 7 is pure/deterministic; pipeline enrichment is supported for context only (`PluginRegistry.enrich()`), never fan-out execution. Gate: `scripts/verify_workspace_phase7.py`.
 
-## AI Reasoning Subsystem (Part X)
-- [ ] AI as supporting subsystem only (does not own state/routing/execution/persistence)
-- [ ] Responsibilities: summarization, classification, transformation, planning, context expansion
+## Memory Architecture (Part IX) — ✅ Phase 8 (delivered)
+- [x] Workspace-centric memory (workspace/task/execution history, file & note relationships, preferences) — `WorkspaceMemory` in `ai_command_center/workspace/memory.py`
+- [x] Conversation history secondary — `WorkspaceMemory.conversation` (separate from primary entities)
+
+> Phase 8 is an immutable in-memory model (`with_*` returns new instances; `MemoryStore` keyed by `workspace_id` for cross-session continuity). Persistence (SQLite) is a repository concern. Gate: `scripts/verify_workspace_phase8.py`.
+
+## AI Reasoning Subsystem (Part X) — ✅ Phase 9 (delivered)
+- [x] AI as supporting subsystem only (does not own state/routing/execution/persistence) — `ReasoningEngine` boundary in `ai_command_center/workspace/reasoning.py`
+- [x] Responsibilities: summarization, classification, transformation, planning, context expansion — `ReasoningTask`; in: `ReasoningRequest` (context/intent/knowledge), out: `ReasoningResponse` (ActionResults/structured/suggestions)
+
+> Phase 9 defines the boundary as types + an injectable engine (concrete model call supplied later); it never executes or persists. Gate: `scripts/verify_workspace_phase9.py`.
 
 ## Product North Star (Part XII)
 - [ ] Flow: `User → Command Palette → Workspace Context → Tools/Memory/Automation → AI (when needed) → Execution`

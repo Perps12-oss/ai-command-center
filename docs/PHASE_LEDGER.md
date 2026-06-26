@@ -78,8 +78,11 @@ New delivery track implementing [WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md](WO
 | WS-4 | Action architecture (Part VI): `ActionResult` + standard types, `OutputTarget`/`CallableTarget`, `ActionDispatcher` | `verify_workspace_phase4.py` | DONE |
 | WS-5 | Suggestion engine (Part VII): `Suggestion`, `SuggestionRule`, `SuggestionEngine` (pre-AI, deterministic) | `verify_workspace_phase5.py` | DONE |
 | WS-6 | Runtime lifecycle (Part V): `LifecyclePhase`, `RuntimePipeline` (acquire→hydrate→resolve→execute→deliver) | `verify_workspace_phase6.py` | DONE |
+| WS-7 | Plugin architecture (Part VIII): `CommandPlugin` contract, `PluginRegistry` (Tier-1 exclusive matching) | `verify_workspace_phase7.py` | DONE |
+| WS-8 | Memory architecture (Part IX): workspace-centric `WorkspaceMemory` (immutable), `MemoryStore` | `verify_workspace_phase8.py` | DONE |
+| WS-9 | AI reasoning subsystem (Part X): `ReasoningRequest`/`ReasoningResponse`/`ReasoningTask`, injectable `ReasoningEngine` | `verify_workspace_phase9.py` | DONE |
 
-WS-1…WS-6 are additive and pure (no EventBus / repository / background acquisition / OS side effects / AI); they do not alter existing Phase 0–5B behavior. Real OS readers and output targets are injected by higher layers.
+WS-1…WS-9 are additive and pure (no EventBus / repository / background acquisition / OS side effects / AI); they do not alter existing Phase 0–5B behavior. Real OS readers and output targets are injected by higher layers.
 
 ---
 
