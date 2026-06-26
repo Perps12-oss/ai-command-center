@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from ai_command_center.core.app_state import AppStateStore
@@ -23,7 +24,7 @@ class SystemSnapshotBuilder:
 
     def publish(self, *, state_store: AppStateStore | None = None, extra: dict[str, Any] | None = None) -> None:
         snapshot = self.build(state_store=state_store, extra=extra)
-        self._bus.publish(SYSTEM_SNAPSHOT, snapshot.__dict__, source="system_snapshot_builder")
+        self._bus.publish(SYSTEM_SNAPSHOT, asdict(snapshot), source="system_snapshot_builder")
         return None
 
     def build(self, *, state_store: AppStateStore | None = None, extra: dict[str, Any] | None = None) -> SystemSnapshot:

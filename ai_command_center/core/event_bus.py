@@ -12,6 +12,68 @@ from typing import Any
 
 WILDCARD_TOPIC = "*"
 
+# Phase 1: Expanded event topics from frozen architecture specification
+# Entity events
+EVENT_ENTITY_CREATED = "entity.created"
+EVENT_ENTITY_UPDATED = "entity.updated"
+EVENT_ENTITY_DELETED = "entity.deleted"
+EVENT_ENTITY_RELATIONSHIPS_CHANGED = "entity.relationships.changed"
+
+# Relationship events
+EVENT_RELATIONSHIP_CREATED = "relationship.created"
+EVENT_RELATIONSHIP_DELETED = "relationship.deleted"
+EVENT_RELATIONSHIP_QUERY_REQUEST = "relationship.query.request"
+
+# Action events
+EVENT_ACTION_REGISTERED = "action.registered"
+EVENT_ACTION_INVOKED = "action.invoked"
+EVENT_ACTION_COMPLETED = "action.completed"
+EVENT_ACTION_FAILED = "action.failed"
+
+# Workspace events
+EVENT_WORKSPACE_CREATED = "workspace.created"
+EVENT_WORKSPACE_ACTIVATED = "workspace.activated"
+EVENT_WORKSPACE_DEACTIVATED = "workspace.deactivated"
+EVENT_WORKSPACE_LAYOUT_CHANGED = "workspace.layout.changed"
+
+# Timeline events (all major actions)
+EVENT_TIMELINE_EVENT = "timeline.event"
+
+# Search events
+EVENT_SEARCH_EXECUTED = "search.executed"
+EVENT_SEARCH_RESULTS = "search.results"
+
+# Command palette events
+EVENT_COMMAND_PALETTE_OPENED = "command_palette.opened"
+EVENT_COMMAND_PALETTE_SEARCH = "command_palette.search"
+EVENT_COMMAND_PALETTE_ITEM_SELECTED = "command_palette.item.selected"
+
+# AI events
+EVENT_AGENT_SPAWNED = "agent.spawned"
+EVENT_AGENT_TERMINATED = "agent.terminated"
+EVENT_AI_ACTION_INVOKED = "ai.action.invoked"
+EVENT_AI_ACTION_COMPLETED = "ai.action.completed"
+
+# Plugin events
+EVENT_PLUGIN_LOADED = "plugin.loaded"
+EVENT_PLUGIN_UNLOADED = "plugin.unloaded"
+EVENT_PLUGIN_REGISTERED_ENTITY = "plugin.registered.entity"
+EVENT_PLUGIN_REGISTERED_ACTION = "plugin.registered.action"
+EVENT_PLUGIN_REGISTERED_VIEW = "plugin.registered.view"
+EVENT_PLUGIN_REGISTERED_SEARCH_PROVIDER = "plugin.registered.search_provider"
+
+# Observability events
+EVENT_OBSERVABILITY_METRIC = "observability.metric"
+EVENT_OBSERVABILITY_ERROR = "observability.error"
+
+# Permission events
+EVENT_PERMISSION_CHECK = "permission.check"
+EVENT_PERMISSION_DENIED = "permission.denied"
+
+# State snapshot events
+EVENT_SNAPSHOT_CREATED = "snapshot.created"
+EVENT_SNAPSHOT_RESTORED = "snapshot.restored"
+
 
 @dataclass(frozen=True, slots=True)
 class Event:

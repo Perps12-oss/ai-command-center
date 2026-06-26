@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
@@ -11,10 +13,7 @@ from ai_command_center.core.clipboard_intent import (
 )
 from ai_command_center.core.event_bus import Event, EventBus
 from ai_command_center.core.events.topics import (
-    CHAT_CANCELLED,
     CHAT_CHUNK,
-    CHAT_COMPLETE,
-    CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
     COMMAND_HISTORY,
@@ -83,6 +82,8 @@ class CommandPaletteApp(ctk.CTk):
         self._current_view = "home"
         self._active_request_id: str | None = None
         self._pending_user_text: str | None = None
+        self._completed_request_ids: deque[str] = deque(maxlen=32)
+        self._last_terminal_chat_key: tuple[str, str] | None = None
         self._overlay_mode = "palette"
         self._bus_unsubs: list = []
         self._motion = MotionScheduler(bus)
@@ -238,15 +239,6 @@ class CommandPaletteApp(ctk.CTk):
             self._bus.subscribe(CHAT_CHUNK, self._on_chat_chunk)
         )
         self._bus_unsubs.append(
-            self._bus.subscribe(CHAT_COMPLETE, self._on_chat_complete)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe(CHAT_CANCELLED, self._on_chat_cancelled)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe(CHAT_ERROR, self._on_chat_error)
-        )
-        self._bus_unsubs.append(
             self._bus.subscribe(OLLAMA_STATUS, self._on_ollama_status)
         )
         self._bus_unsubs.append(
@@ -255,24 +247,6 @@ class CommandPaletteApp(ctk.CTk):
         self._bus_unsubs.append(
             self._bus.subscribe(MODEL_SELECTED, self._on_model_selected)
         )
-        self._bus_unsubs.append(
-            self._bus.subscribe(COMMAND_ROUTED, self._on_chat_context_routed)
-        )
-
-    def _on_chat_context_routed(self, event: Event) -> None:
-        if event.source != "chat_handler":
-            return
-        if event.payload.get("status") != "processing":
-            return
-        sources = event.payload.get("context_sources") or []
-        tokens = int(event.payload.get("token_estimate", 0))
-
-        def update() -> None:
-            chat = self._chat_view()
-            if chat:
-                chat.update_context_bar(list(sources), tokens)
-
-        self._ui_queue.enqueue(update)
 
     def _on_chat_history_loaded(self, event: Event) -> None:
         messages = event.payload.get("messages") or []
@@ -286,6 +260,10 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_chat_started(self, event: Event) -> None:
         rid = str(event.payload.get("request_id", ""))
+        if self._active_request_id and rid and rid == self._active_request_id:
+            return
+        if rid and rid in self._completed_request_ids:
+            self._completed_request_ids.remove(rid)
         self._active_request_id = rid or None
 
         def update() -> None:
@@ -300,6 +278,11 @@ class CommandPaletteApp(ctk.CTk):
         self._ui_queue.enqueue(update)
 
     def _on_chat_chunk(self, event: Event) -> None:
+        rid = str(event.payload.get("request_id", ""))
+        if not self._active_request_id:
+            return
+        if self._active_request_id and rid and rid != self._active_request_id:
+            return
         text = str(event.payload.get("text", ""))
         if not text:
             return
@@ -308,40 +291,6 @@ class CommandPaletteApp(ctk.CTk):
             chat = self._chat_view()
             if chat:
                 chat.append_chunk(text)
-
-        self._ui_queue.enqueue(update)
-
-    def _on_chat_complete(self, event: Event) -> None:
-        text = str(event.payload.get("text", ""))
-
-        def update() -> None:
-            chat = self._chat_view()
-            if chat:
-                chat.finish_assistant(text)
-            self._active_request_id = None
-            self._top.update_status("ready", self._controller.snapshot().settings.default_model)
-
-        self._ui_queue.enqueue(update)
-
-    def _on_chat_cancelled(self, event: Event) -> None:
-        def update() -> None:
-            chat = self._chat_view()
-            if chat:
-                chat.show_cancelled()
-            self._active_request_id = None
-
-        self._ui_queue.enqueue(update)
-
-    def _on_chat_error(self, event: Event) -> None:
-        message = str(event.payload.get("message", "Unknown error"))
-
-        def update() -> None:
-            self._navigate("chat")
-            chat = self._chat_view()
-            if chat:
-                chat.show_error(message)
-            self._active_request_id = None
-            self._top.update_status("error", self._controller.snapshot().settings.default_model)
 
         self._ui_queue.enqueue(update)
 
@@ -754,6 +703,8 @@ class CommandPaletteApp(ctk.CTk):
     def _apply_state(self) -> None:
         snap = self._controller.snapshot()
         self._top.update_status(snap.phase, snap.settings.default_model)
+        if snap.chat_status == "streaming":
+            self._last_terminal_chat_key = None
         self._overlay_mode = snap.settings.overlay_mode
         try:
             if self._overlay_mode == "compact":
@@ -768,6 +719,37 @@ class CommandPaletteApp(ctk.CTk):
         settings_view = self._views.get("settings")
         if isinstance(settings_view, SettingsView):
             settings_view.load_from_snapshot(snap.settings)
+        chat = self._chat_view()
+        if chat:
+            chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
+
+            terminal_key = (str(snap.chat_status), str(snap.last_chat_request_id))
+            if snap.chat_status == "complete":
+                if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
+                    chat.finish_assistant(str(snap.last_assistant_message))
+                    if snap.last_chat_request_id not in self._completed_request_ids:
+                        self._completed_request_ids.append(snap.last_chat_request_id)
+                    self._active_request_id = None
+                    self._top.update_status("ready", snap.settings.default_model)
+                    self._last_terminal_chat_key = terminal_key
+            elif snap.chat_status == "cancelled":
+                if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
+                    chat.show_cancelled()
+                    if snap.last_chat_request_id not in self._completed_request_ids:
+                        self._completed_request_ids.append(snap.last_chat_request_id)
+                    self._active_request_id = None
+                    self._last_terminal_chat_key = terminal_key
+            elif snap.chat_status == "error":
+                if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
+                    self._navigate("chat")
+                    chat = self._chat_view()
+                    if chat:
+                        chat.show_error(str(snap.last_chat_error or "Unknown error"))
+                    if snap.last_chat_request_id not in self._completed_request_ids:
+                        self._completed_request_ids.append(snap.last_chat_request_id)
+                    self._active_request_id = None
+                    self._top.update_status("error", snap.settings.default_model)
+                    self._last_terminal_chat_key = terminal_key
         self._apply_footer_all(online=True)
 
     def _fade_in(self, step: int = 0) -> None:

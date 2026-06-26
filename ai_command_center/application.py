@@ -5,11 +5,33 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 
+from ai_command_center.core.action.action_registry import ActionRegistry
+from ai_command_center.core.ai.capability_registry_service import (
+    AICapabilityRegistryService,
+)
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.context_manager import ContextManager
+from ai_command_center.core.entity.entity_repository import EntityRepository
+from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.feature.feature_registry import FeatureRegistry
+from ai_command_center.core.observability.observability_service import (
+    ObservabilityService,
+)
+from ai_command_center.core.permission.permission_service import PermissionService
+from ai_command_center.core.relationship.relationship_repository import (
+    RelationshipRepository,
+)
+from ai_command_center.core.relationship.relationship_service import RelationshipService
+from ai_command_center.core.search.command_palette_service import CommandPaletteService
+from ai_command_center.core.search.search_provider import FTSSearchProvider
 from ai_command_center.core.service_manager import ServiceManager
+from ai_command_center.core.snapshot.snapshot_service import SnapshotService
 from ai_command_center.core.state.system_snapshot_builder import SystemSnapshotBuilder
+from ai_command_center.core.timeline.timeline_repository import TimelineRepository
+from ai_command_center.core.timeline.timeline_service import TimelineService
+from ai_command_center.core.workspace.workspace_service import WorkspaceService
+from ai_command_center.core.workspace_os_service import WorkspaceOsService
 from ai_command_center.db.connection import init_database
 from ai_command_center.repositories.conversation_repository import ConversationRepository
 from ai_command_center.repositories.memory_repository import MemoryRepository
@@ -43,6 +65,7 @@ class ApplicationCore:
     state_store: AppStateStore
     services: ServiceManager
     db: sqlite3.Connection
+    workspace_os: WorkspaceOsService | None = None
 
     def startup(self) -> None:
         self.bus.publish("app.phase", {"phase": "starting"}, source="application")
@@ -57,8 +80,13 @@ class ApplicationCore:
         self.bus.publish("app.phase", {"phase": "stopped"}, source="application")
 
 
-def create_application(*, debug_mode: bool = False) -> ApplicationCore:
-    db = init_database()
+def create_application(
+    *,
+    debug_mode: bool = False,
+    workspace_os_enabled: bool = True,
+    db: sqlite3.Connection | None = None,
+) -> ApplicationCore:
+    db = db or init_database()
     bus = EventBus(debug_mode=debug_mode)
     state_store = AppStateStore(bus)
     services = ServiceManager(bus)
@@ -96,10 +124,53 @@ def create_application(*, debug_mode: bool = False) -> ApplicationCore:
             ollama,
         )
     )
+
+    # Workspace OS Phase 2 integration: construct new repositories and services
+    # and expose them through a single lifecycle wrapper. Existing services are
+    # untouched; this is purely additive wiring. The workspace_os_enabled flag
+    # allows the new layer to be disabled without affecting existing Phase 6
+    # behavior.
+    workspace_os: WorkspaceOsService | None = None
+    if workspace_os_enabled:
+        entity_repo = EntityRepository(db)
+        relationship_repo = RelationshipRepository(db)
+        timeline_repo = TimelineRepository(db)
+
+        entity_service = EntityService(entity_repo, bus)
+        relationship_service = RelationshipService(relationship_repo, bus)
+        workspace_service = WorkspaceService(entity_service, bus)
+        action_registry = ActionRegistry(bus)
+        timeline_service = TimelineService(timeline_repo, bus)
+        permission_service = PermissionService(bus)
+        observability_service = ObservabilityService(bus)
+        snapshot_service = SnapshotService(db, bus)
+        feature_registry = FeatureRegistry()
+        ai_capability_registry_service = AICapabilityRegistryService(permission_service)
+        command_palette_service = CommandPaletteService(bus)
+        search_provider = FTSSearchProvider(entity_service)
+
+        workspace_os = WorkspaceOsService(
+            bus=bus,
+            entity_service=entity_service,
+            relationship_service=relationship_service,
+            workspace_service=workspace_service,
+            action_registry=action_registry,
+            timeline_service=timeline_service,
+            permission_service=permission_service,
+            observability_service=observability_service,
+            snapshot_service=snapshot_service,
+            feature_registry=feature_registry,
+            ai_capability_registry_service=ai_capability_registry_service,
+            command_palette_service=command_palette_service,
+            search_provider=search_provider,
+        )
+        services.register(workspace_os)
+
     return ApplicationCore(
         bus=bus,
         state_store=state_store,
         services=services,
         db=db,
+        workspace_os=workspace_os,
     )
 
