@@ -108,7 +108,7 @@ def main() -> int:
         failures.append("ollama_http_service.py missing")
     else:
         src = http_path.read_text(encoding="utf-8")
-        for token in ("aiohttp", "ContextBundle", "chat.chunk", "chat.cancelled"):
+        for token in ("aiohttp", "ContextBundle", "CHAT_CHUNK", "CHAT_CANCELLED"):
             if token not in src:
                 failures.append(f"ollama_http_service.py missing {token}")
 

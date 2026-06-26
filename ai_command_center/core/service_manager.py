@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import APP_PHASE
-from ai_command_center.services.base import BaseService
 from ai_command_center.services.states import ServiceState
+
+if TYPE_CHECKING:
+    from ai_command_center.services.base import BaseService
 
 
 class ServiceManager:
