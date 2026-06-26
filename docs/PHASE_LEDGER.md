@@ -66,6 +66,18 @@ Historical Ledger: See table below
 
 ---
 
+## Workspace OS Reference Architecture v3.5
+
+New delivery track implementing [WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md](WORKSPACE_OS_REFERENCE_ARCHITECTURE_V3.5.md).
+
+| Phase | Scope | Gate | Status |
+|-------|-------|------|--------|
+| WS-1 | Core domain model (Part II): `TelemetrySnapshot`, `WorkspaceContext`, `WorkspaceLease`, Workspace Resolver | `verify_workspace_phase1.py` | DONE |
+
+WS-1 is additive and pure (no EventBus / repository / telemetry acquisition); it does not alter existing Phase 0–5B behavior.
+
+---
+
 ## UCGS v3 Governance Snapshot
 
 **Audit:** STRICT | **Phase:** 5B | **Verdict:** `APPROVE`

@@ -22,11 +22,13 @@
 - [ ] A8 — Local-First Capability: core workflows function offline / air-gapped
 - [ ] A9 — Progressive Disclosure: reveal complexity gradually
 
-## Core Domain Model (Part II)
-- [ ] `TelemetrySnapshot` sensor object (timestamp, target_hwnd, app_name, window_title, clipboard_text)
-- [ ] `WorkspaceContext` primary domain object
-- [ ] Workspace Resolver (telemetry → stable work sessions)
-- [ ] `WorkspaceLease` persistence model (prevent accidental workspace collapse)
+## Core Domain Model (Part II) — ✅ Phase 1 (delivered)
+- [x] `TelemetrySnapshot` sensor object (timestamp, target_hwnd, app_name, window_title, clipboard_text) — `ai_command_center/workspace/domain.py`
+- [x] `WorkspaceContext` primary domain object — `ai_command_center/workspace/domain.py`
+- [x] Workspace Resolver (telemetry → stable work sessions, deterministic) — `ai_command_center/workspace/resolver.py`
+- [x] `WorkspaceLease` persistence model (prevent accidental workspace collapse) — `ai_command_center/workspace/domain.py`
+
+> Phase 1 also realizes **A5 (Determinism Before AI)** and **A6 (Context Persistence)** at the domain layer: identical evidence always resolves to the same `workspace_id`, and a lease retains the active workspace across transient low-evidence excursions. Gate: `scripts/verify_workspace_phase1.py`.
 
 ## Context Acquisition Architecture (Part III)
 - [ ] Reliability-first acquisition hierarchy: Clipboard → Explicit Input → Workspace Indexes → Known Integrations → UI Automation
