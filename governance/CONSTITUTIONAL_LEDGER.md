@@ -16,6 +16,7 @@ Tracks constitutional amendments, architectural exception records (AER), constit
 
 | Date | Task | Triggered Articles | Decision | Reviewer |
 |---|---|---|---|---|
+| 2026-06-26 | Chat Workspace v1.5 Phase 3–5 closeout | Ownership Flow, UI Isolation, AppState Governance, Topic Governance, Source-of-Truth Integrity, Regression Policy | APPROVED | AI pair programmer (Cascade) |
 
 ## Superseded Gates
 

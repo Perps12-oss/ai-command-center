@@ -51,3 +51,11 @@ python scripts/verify_phase5c_telemetry.py
 ```
 
 Phase 6 extends these with release-specific checks as they are introduced.
+
+## Progress
+
+- Completed: Task 3 — stabilize async service shutdown path in `OllamaHttpService` and suppress expected disconnect noise in `scripts/verify_phase3b.py` mock server.
+- Completed: Task 1 — release checklist and tagging policy documented in `docs/RELEASE_CHECKLIST.md`.
+- Completed: Task 4 — release notes template and upgrade/rollback instructions documented in `docs/RELEASE_NOTES_TEMPLATE.md`, linked from `README.md`.
+- Remaining: Task 2 — add CI job to run Phase gate bundle and publish artifacts.
+- Remaining: Finalize release-specific validation commands and operator runbook updates if needed.

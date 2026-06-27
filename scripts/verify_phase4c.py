@@ -28,7 +28,7 @@ def main() -> int:
 
     from ai_command_center.core.event_bus import EventBus
     from ai_command_center.db.connection import connect, init_database
-    from ai_command_center.db.repository import SettingsRepository
+    from ai_command_center.repositories.settings_repository import SettingsRepository
     from ai_command_center.services.settings_service import SettingsService
 
     with tempfile.TemporaryDirectory() as tmp:

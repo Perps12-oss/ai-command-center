@@ -44,6 +44,7 @@ def main() -> int:
 
     from ai_command_center.application import create_application
     from ai_command_center.core.event_bus import EventBus
+    from ai_command_center.repositories.plugin_manifest_repository import PluginManifestRepository
     from ai_command_center.services.plugin_registry_service import PluginRegistryService
 
     app = create_application(debug_mode=True)
@@ -60,7 +61,7 @@ def main() -> int:
         payloads[event.topic] = dict(event.payload)
 
     bus.subscribe_all(tap)
-    registry = PluginRegistryService(bus)
+    registry = PluginRegistryService(bus, PluginManifestRepository())
     registry.load()
 
     if not _wait(events, "plugin.catalog"):

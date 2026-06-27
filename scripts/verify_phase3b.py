@@ -23,16 +23,19 @@ async def _mock_ollama_chat(request):
         headers={"Content-Type": "application/x-ndjson"},
     )
     await response.prepare(request)
-    chunks = ["Hello", " ", "from", " ", "Ollama"]
-    for piece in chunks:
-        line = json.dumps(
-            {"message": {"role": "assistant", "content": piece}, "done": False}
+    try:
+        chunks = ["Hello", " ", "from", " ", "Ollama"]
+        for piece in chunks:
+            line = json.dumps(
+                {"message": {"role": "assistant", "content": piece}, "done": False}
+            )
+            await response.write((line + "\n").encode())
+            await asyncio.sleep(0.08)
+        await response.write(
+            (json.dumps({"message": {"role": "assistant", "content": ""}, "done": True}) + "\n").encode()
         )
-        await response.write((line + "\n").encode())
-        await asyncio.sleep(0.08)
-    await response.write(
-        (json.dumps({"message": {"role": "assistant", "content": ""}, "done": True}) + "\n").encode()
-    )
+    except (ConnectionError, asyncio.CancelledError):
+        pass
     return response
 
 
@@ -41,15 +44,18 @@ async def _mock_slow_chat(request):
 
     response = web.StreamResponse(status=200)
     await response.prepare(request)
-    for i in range(30):
-        line = json.dumps(
-            {"message": {"role": "assistant", "content": f"{i} "}, "done": False}
+    try:
+        for i in range(30):
+            line = json.dumps(
+                {"message": {"role": "assistant", "content": f"{i} "}, "done": False}
+            )
+            await response.write((line + "\n").encode())
+            await asyncio.sleep(0.15)
+        await response.write(
+            (json.dumps({"done": True}) + "\n").encode()
         )
-        await response.write((line + "\n").encode())
-        await asyncio.sleep(0.15)
-    await response.write(
-        (json.dumps({"done": True}) + "\n").encode()
-    )
+    except (ConnectionError, asyncio.CancelledError):
+        pass
     return response
 
 

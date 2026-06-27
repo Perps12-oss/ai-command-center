@@ -149,4 +149,15 @@ Finalize governance and acceptance evidence.
 - Completed: AppState reducers now ignore stale terminal events with request IDs when there is no active request and treat duplicate `chat.started` for the same request as idempotent.
 - Completed: Added regression tests for stale terminal-event suppression and duplicate-start idempotency.
 - Completed: Regression + governance checks (`unittest`, `verify_constitution.py`, `verify_contracts.py`) passing after each increment.
-- Remaining: Deeper Phase 3 reduction of direct event-driven chat rendering where safe, plus targeted regression coverage for those paths.
+- Completed: Deeper Phase 3 reduction — `CHAT_STARTED` direct UI handler removed; chat start is now rendered from `AppState` (`chat_status=streaming`, `active_chat_request_id`, `last_command`).
+- Completed: Added regression test `test_chat_start_projection_from_command_and_start` covering the AppState-driven chat start transition.
+- Completed: Phase 4 increment — `CHAT_ERROR` events from `ChatHandlerService` now always carry `request_id`; pending state is cleaned up for early-error paths.
+- Completed: Phase 4 increment — UI `CHAT_CHUNK` handler now filters against `AppState.active_chat_request_id` instead of local UI state for stale-request isolation.
+- Completed: Added regression tests for stale `CHAT_ERROR` suppression and ChatHandler error `request_id` attribution.
+- Completed: Phase 4 async/timeout/fallback restructuring of `ChatHandlerService` — now awaits upstream results (`memory.lookup.result`, `session.history.result`, `model.resolve.result`) before streaming, falls back to defaults after a configurable timeout, and handles `ui.chat_cancel` before stream start.
+- Completed: Added stress tests for synchronous fast path, delayed model/memory fallback, and cancellation before stream start.
+- Completed: Phase 4 — Reliability and Compatibility.
+- Completed: Phase 5 — Compliance Closeout.
+- Completed: Constitutional closeout document and ledger entry recorded.
+- Completed: All constitutional, contract, and phase gates passing.
+- Remaining: Deferred future work — retry policy for failed upstream results; stress scenarios for network-backed async upstream services if needed.
