@@ -6,11 +6,11 @@ from typing import Any, Callable
 
 from ai_command_center.core.event_bus import Event, EventBus
 from ai_command_center.core.events.topics import (
-    SETTINGS_CHANGED,
     SETTINGS_SET_REQUEST,
     SETTINGS_SNAPSHOT,
+    SETTINGS_UPDATED,
 )
-from ai_command_center.core.settings.settings_service import SettingsService as CoreSettingsService
+from ai_command_center.core.settings.settings_service import SettingsCore
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.services.base import BaseService
@@ -41,7 +41,7 @@ class SettingsService(BaseService):
         super().__init__(bus)
         self._repo = repo
         self._unsubscribers: list[Callable[[], None]] = []
-        self._core_settings = CoreSettingsService(repo=repo, bus=bus)
+        self._core_settings = SettingsCore(repo=repo)
 
     def _on_load(self) -> None:
         self._repo.ensure_defaults(_DEFAULTS)
@@ -63,10 +63,10 @@ class SettingsService(BaseService):
         self.set(str(key), value)
 
     def set(self, key: str, value: Any) -> None:
-        self._core_settings.set(key, value)
+        validated = self._core_settings.set(key, value)
         self._bus.publish(
-            SETTINGS_CHANGED,
-            {"key": key, "value": value},
+            SETTINGS_UPDATED,
+            {"key": key, "value": validated},
             source=self.name,
         )
         self._publish_snapshot()

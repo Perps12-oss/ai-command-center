@@ -14,6 +14,8 @@ from ai_command_center.core.ai.capability import (
     CapabilityRegistry,
     validate_capability_type,
 )
+from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.permission.permission_client import PermissionClient
 
 
 class AICapabilityRegistryService:
@@ -27,8 +29,8 @@ class AICapabilityRegistryService:
     - Permission checks for capability invocation
     """
 
-    def __init__(self, permission_service: Any) -> None:
-        self._permission_service = permission_service
+    def __init__(self, bus: EventBus) -> None:
+        self._permission_client = PermissionClient(bus)
         self._registry = CapabilityRegistry()
 
     def register_capability(
@@ -93,7 +95,7 @@ class AICapabilityRegistryService:
                 actor_type=actor_type,
                 actor_id=actor_id,
             )
-            if not self._permission_service.check(perm, context):
+            if not self._permission_client.check(perm, context):
                 raise PermissionError(f"Permission denied: {perm}")
         
         # Invoke the capability

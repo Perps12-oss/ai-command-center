@@ -38,8 +38,8 @@ from ai_command_center.core.events.topics import (
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     SERVICE_STATE_CHANGED,
-    SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
+    SETTINGS_UPDATED,
     SYSTEM_SNAPSHOT,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
@@ -47,7 +47,7 @@ from ai_command_center.domain.system_snapshot import SystemSnapshot
 
 APP_STATE_TOPICS: tuple[str, ...] = (
     SERVICE_STATE_CHANGED,
-    SETTINGS_CHANGED,
+    SETTINGS_UPDATED,
     SETTINGS_SNAPSHOT,
     COMMAND_ROUTED,
     CHAT_STARTED,
@@ -104,6 +104,7 @@ class WorkspaceOsSnapshot:
     entity_count: int = 0
     relationship_count: int = 0
     action_count: int = 0
+    actions: tuple[str, ...] = ()
     event_count: int = 0
     recent_events: tuple[str, ...] = ()
     entities: tuple[WorkspaceOsEntity, ...] = ()
@@ -167,7 +168,7 @@ class AppState:
     # Track 3.2 — full projection of feature catalogs
     notes_catalog: tuple[NoteItem, ...] = ()
     note_selected: NoteItem | None = None
-    note_index_status: tuple[int, int] = ()  # (files, ms)
+    note_index_status: tuple[int, int] = (0, 0)  # (files, ms)
     memory_catalog: tuple[MemoryItem, ...] = ()
     memory_selected: tuple[str, ...] = ()
     plugin_catalog: tuple[PluginItem, ...] = ()
@@ -267,8 +268,8 @@ def _reduce_service_state(state: AppState, event: Event) -> AppState:
     )
 
 
-def _reduce_settings_changed(state: AppState, event: Event) -> AppState:
-    if event.topic != SETTINGS_CHANGED:
+def _reduce_settings_updated(state: AppState, event: Event) -> AppState:
+    if event.topic != SETTINGS_UPDATED:
         return state
     return replace(
         state,
@@ -500,7 +501,12 @@ def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
     elif event.topic == EVENT_RELATIONSHIP_CREATED:
         snapshot = replace(current, relationship_count=current.relationship_count + 1)
     elif event.topic == EVENT_ACTION_REGISTERED:
-        snapshot = replace(current, action_count=current.action_count + 1)
+        action_name = str(event.payload.get("action_name", ""))
+        if action_name:
+            actions = current.actions + (action_name,)
+        else:
+            actions = current.actions
+        snapshot = replace(current, action_count=current.action_count + 1, actions=actions)
     elif event.topic == EVENT_TIMELINE_EVENT:
         recent = current.recent_events + (str(event.payload.get("event_type", event.topic)),)
         if len(recent) > 20:
@@ -691,7 +697,7 @@ def _reduce_plugin_state_changed(state: AppState, event: Event) -> AppState:
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
-    _reduce_settings_changed,
+    _reduce_settings_updated,
     _reduce_settings_snapshot,
     _reduce_command_routed,
     _reduce_chat_started,

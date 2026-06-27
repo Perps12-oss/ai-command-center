@@ -7,6 +7,7 @@ events; callers (e.g. ToolExecutorService) are responsible for EventBus I/O.
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 from ai_command_center.domain.tool_execution import ToolExecution
@@ -40,7 +41,7 @@ class ToolExecutor:
             self._status[tool_name] = execution
             return execution
 
-        start = time.time()
+        start = datetime.fromtimestamp(time.time(), tz=timezone.utc)
         running = ToolExecution(
             tool_name=tool_name,
             inputs=tuple(inputs.items()),
@@ -57,7 +58,7 @@ class ToolExecutor:
                 inputs=tuple(inputs.items()),
                 status="failed",
                 start_time=start,
-                end_time=time.time(),
+                end_time=datetime.fromtimestamp(time.time(), tz=timezone.utc),
                 error=str(exc),
             )
             self._status[tool_name] = execution
@@ -68,7 +69,7 @@ class ToolExecutor:
             inputs=tuple(inputs.items()),
             status="completed" if result.success else "failed",
             start_time=start,
-            end_time=time.time(),
+            end_time=datetime.fromtimestamp(time.time(), tz=timezone.utc),
             outputs=(result.output,) if result.output else (),
             error=result.error,
         )
@@ -82,7 +83,7 @@ class ToolExecutor:
             self._status[tool_name] = ToolExecution(
                 tool_name=tool_name,
                 start_time=execution.start_time,
-                end_time=time.time(),
+                end_time=datetime.fromtimestamp(time.time(), tz=timezone.utc),
                 status="cancelled",
                 inputs=execution.inputs,
                 outputs=execution.outputs,

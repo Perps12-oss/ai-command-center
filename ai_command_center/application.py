@@ -127,6 +127,7 @@ def create_application(
             bus,
             context_manager,
             ollama,
+            upstream_timeout_seconds=1.0,
         )
     )
 
@@ -144,13 +145,13 @@ def create_application(
         entity_service = EntityService(entity_repo, bus)
         relationship_service = RelationshipService(relationship_repo, bus)
         workspace_service = WorkspaceService(entity_service, bus)
+        permission_service = PermissionService(bus)
         action_registry = ActionRegistry(bus)
         timeline_service = TimelineService(timeline_repo, bus)
-        permission_service = PermissionService(bus)
         observability_service = ObservabilityService(bus)
         snapshot_service = SnapshotService(db, bus)
         feature_registry = FeatureRegistry()
-        ai_capability_registry_service = AICapabilityRegistryService(permission_service)
+        ai_capability_registry_service = AICapabilityRegistryService(bus)
         command_palette_service = CommandPaletteService(bus)
         search_provider = FTSSearchProvider(entity_service)
 

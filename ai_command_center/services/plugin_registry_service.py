@@ -35,12 +35,12 @@ class PluginRegistryService(BaseService):
     def __init__(
         self,
         bus,
+        repo: PluginManifestRepository,
         manifests_dir: Path | None = None,
-        repo: PluginManifestRepository | None = None,
     ) -> None:
         super().__init__(bus)
         self._manifests_dir = manifests_dir or _MANIFESTS_DIR
-        self._repo = repo or PluginManifestRepository()
+        self._repo = repo
         self._plugins: dict[str, PluginManifest] = {}
         self._unsubscribers: list[Callable[[], None]] = []
 

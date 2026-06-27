@@ -145,7 +145,7 @@ class RelationshipService:
         
         return [r.target_id for r in relationships if r.source_id == entity_id]
 
-    def traverse(self, entity_id: UUID, max_depth: int = 3) -> dict[UUID, set[UUID]]:
+    def traverse(self, entity_id: UUID, max_depth: int = 3) -> dict[int, set[UUID]]:
         """
         Traverse relationships from an entity.
         

@@ -30,7 +30,7 @@ def escape_fts_query(query: str) -> str:
     return " AND ".join(parts) if parts else '""'
 
 
-class NoteRepository:
+class NoteIndex:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 

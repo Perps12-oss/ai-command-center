@@ -4,27 +4,26 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT, SETTINGS_UPDATED
 from ai_command_center.core.settings.migration_manager import MigrationManager
 from ai_command_center.core.settings.settings_repository import SettingsRepository
 from ai_command_center.core.settings.settings_schema import SettingsSchema
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 
 
-class SettingsService:
-    """Minimal service facade around a settings repository and schema."""
+class SettingsCore:
+    """Minimal settings facade around a repository and schema.
+
+    This class intentionally does not publish EventBus events. The canonical
+    bus-facing settings service is ``ai_command_center.services.settings_service``.
+    """
 
     def __init__(
         self,
         repo: SettingsRepository,
         schema: SettingsSchema | None = None,
-        *,
-        bus: EventBus | None = None,
     ) -> None:
         self._repo = repo
         self._schema = schema or SettingsSchema()
-        self._bus = bus
         self._migration = MigrationManager()
 
     def get_snapshot(self) -> SettingsSnapshot:
@@ -50,7 +49,8 @@ class SettingsService:
             schema_version=int(payload.get("schema_version", 1)),
         )
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any) -> Any:
+        """Validate and persist a setting. Returns the validated value."""
         validated = value
         if key in self._schema.fields:
             try:
@@ -58,9 +58,7 @@ class SettingsService:
             except (TypeError, ValueError):
                 validated = self._schema.fields[key].default
         self._repo.set(key, validated)
-        if self._bus is not None:
-            self._bus.publish(SETTINGS_UPDATED, {"key": key, "value": validated}, source="settings")
-            self._bus.publish(SETTINGS_SNAPSHOT, self.get_snapshot().to_payload(), source="settings")
+        return validated
 
     def update(self, **values: Any) -> None:
         for key, value in values.items():

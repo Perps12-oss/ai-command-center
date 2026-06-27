@@ -6,7 +6,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from ai_command_center.core.plugin_manifest import PluginManifest
 

@@ -6,7 +6,7 @@ Permission checking and management following the frozen Permission contract.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 from uuid import UUID
 
 from ai_command_center.core.permission.permission import (
@@ -18,6 +18,8 @@ from ai_command_center.core.event_bus import (
     Event,
     EVENT_PERMISSION_CHECK,
     EVENT_PERMISSION_DENIED,
+    PERMISSION_CHECK_REQUEST,
+    PERMISSION_CHECK_RESULT,
 )
 
 
@@ -33,6 +35,7 @@ class PermissionService:
 
     def __init__(self, event_bus: Any) -> None:
         self._event_bus = event_bus
+        self._unsubscribe_request: Callable[[], None] | None = None
         # Default permissions for different actor types
         self._default_permissions: dict[str, set[str]] = {
             "user": {perm.value for perm in Permission},  # Users have all permissions
@@ -131,3 +134,41 @@ class PermissionService:
                 raise ValueError(f"Invalid permission: {perm}")
         
         self._agent_permissions[agent_id] = set(permissions)
+
+    def start(self) -> None:
+        """Subscribe to permission check requests."""
+        if self._unsubscribe_request is None:
+            self._unsubscribe_request = self._event_bus.subscribe(
+                PERMISSION_CHECK_REQUEST, self._on_check_request
+            )
+
+    def stop(self) -> None:
+        """Unsubscribe from permission check requests."""
+        if self._unsubscribe_request is not None:
+            self._unsubscribe_request()
+            self._unsubscribe_request = None
+
+    def _on_check_request(self, event: Event) -> None:
+        """Handle a request/response permission check from the EventBus."""
+        payload = event.payload
+        request_id = payload.get("request_id")
+        permission = str(payload.get("permission", ""))
+        raw_context = payload.get("context") or {}
+
+        try:
+            context = PermissionContext(
+                entity_id=UUID(raw_context["entity_id"]) if raw_context.get("entity_id") else None,
+                entity_type=str(raw_context.get("entity_type", "")),
+                action_id=UUID(raw_context["action_id"]) if raw_context.get("action_id") else None,
+                actor_type=str(raw_context.get("actor_type", "")),
+                actor_id=UUID(raw_context["actor_id"]) if raw_context.get("actor_id") else None,
+            )
+            allowed = self.check(permission, context)
+        except Exception:  # noqa: BLE001
+            allowed = False
+
+        self._event_bus.publish(
+            PERMISSION_CHECK_RESULT,
+            {"request_id": request_id, "allowed": allowed},
+            source="permission_service",
+        )

@@ -38,7 +38,7 @@ def get_baseline_log_path() -> Path:
 
 def get_ram_mb() -> dict[str, float]:
     """Return total and available RAM in megabytes (and GB helpers)."""
-    import psutil
+    import psutil  # type: ignore[import-untyped]
 
     vm = psutil.virtual_memory()
     total_mb = vm.total / (1024 * 1024)

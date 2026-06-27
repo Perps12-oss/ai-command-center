@@ -53,9 +53,9 @@ class ObsidianService(BaseService):
 
     name = "obsidian"
 
-    def __init__(self, bus, repo) -> None:
+    def __init__(self, bus, repo: NoteRepository) -> None:
         super().__init__(bus)
-        self._repo = self._coerce_repo(repo)
+        self._repo = repo
         self._repo_lock = threading.Lock()
         self._vault_path: Path | None = None
         self._selected_path: str | None = None
@@ -67,15 +67,6 @@ class ObsidianService(BaseService):
         self._index_in_progress = False
         self._pending_search_query: str | None = None
         self._last_vault_stats: tuple[int, int] = (0, 0)
-
-    @staticmethod
-    def _coerce_repo(repo):
-        if hasattr(repo, "set_vault_path") and hasattr(repo, "read_note") and hasattr(repo, "iter_markdown_files"):
-            return repo
-        conn = getattr(repo, "_conn", None)
-        if conn is None:
-            raise TypeError("ObsidianService requires a repository with vault file APIs")
-        return NoteRepository(conn)
 
     def _on_load(self) -> None:
         self._repo.set_vault_path(None)

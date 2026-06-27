@@ -86,10 +86,10 @@ class SnapshotService:
         snapshot = StateSnapshot(
             id=uuid4(),
             snapshot_type=snapshot_type,
-            entities={str(k): v for k, v in entities.items()},
-            relationships={str(k): v for k, v in relationships.items()},
+            entities=entities,
+            relationships=relationships,
             active_workspace_id=active_workspace_id,
-            workspace_layouts={str(k): v for k, v in (workspace_layouts or {}).items()},
+            workspace_layouts=workspace_layouts or {},
             settings=settings or {},
             created_at=datetime.utcnow(),
             description=description,

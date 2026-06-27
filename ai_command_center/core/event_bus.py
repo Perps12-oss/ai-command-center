@@ -69,6 +69,8 @@ EVENT_OBSERVABILITY_ERROR = "observability.error"
 # Permission events
 EVENT_PERMISSION_CHECK = "permission.check"
 EVENT_PERMISSION_DENIED = "permission.denied"
+PERMISSION_CHECK_REQUEST = "permission.check.request"
+PERMISSION_CHECK_RESULT = "permission.check.result"
 
 # State snapshot events
 EVENT_SNAPSHOT_CREATED = "snapshot.created"

@@ -141,7 +141,10 @@ UI_INSPECTOR_CLOSE = "ui.inspector.close"
 UI_CREATE_WORKSPACE = "ui.workspace_os.create_workspace"
 UI_CREATE_CARD = "ui.workspace_os.create_card"
 UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
+UI_UPDATE_RESOURCE = "ui.workspace_os.update_resource"
+UI_DELETE_RESOURCE = "ui.workspace_os.delete_resource"
 UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
+UI_RENAME_WORKSPACE = "ui.workspace_os.rename_workspace"
 UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"
 
 
@@ -240,6 +243,9 @@ __all__ = [
     "UI_CREATE_WORKSPACE",
     "UI_CREATE_CARD",
     "UI_CREATE_RESOURCE",
+    "UI_UPDATE_RESOURCE",
+    "UI_DELETE_RESOURCE",
     "UI_LAUNCH_RESOURCE",
+    "UI_RENAME_WORKSPACE",
     "UI_SEARCH_WORKSPACE_OS",
 ]

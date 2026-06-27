@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Iterable
+from typing import TYPE_CHECKING, Callable
 
 from ai_command_center.core.event_bus import Event, EventBus
 from ai_command_center.core.events.topics import APP_PHASE, SERVICE_RESTART_REQUEST
@@ -74,8 +74,8 @@ class ServiceManager:
         service.stop()
         service.start()
 
-    def _ordered(self) -> Iterable[BaseService]:
-        return self._services.values()
+    def _ordered(self) -> list[BaseService]:
+        return list(self._services.values())
 
     def any_ready(self) -> bool:
         return any(s.state == ServiceState.READY for s in self._services.values())

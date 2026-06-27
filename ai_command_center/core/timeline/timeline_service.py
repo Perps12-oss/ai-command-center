@@ -6,6 +6,7 @@ Timeline event management for audit, undo, analytics, and debugging.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -30,11 +31,46 @@ class TimelineService:
     - Query timeline for audit/debugging
     - Undo support via reversible events
     - Event publishing for timeline operations
+    - Subscribe to external timeline record requests via EventBus
     """
 
     def __init__(self, repository: TimelineRepository, event_bus: Any) -> None:
         self._repository = repository
         self._event_bus = event_bus
+        self._unsubscribe: Callable[[], None] | None = None
+
+    def start(self) -> None:
+        """Subscribe to external timeline events."""
+        if self._unsubscribe is None:
+            self._unsubscribe = self._event_bus.subscribe(
+                EVENT_TIMELINE_EVENT, self._on_timeline_event
+            )
+
+    def stop(self) -> None:
+        """Unsubscribe from external timeline events."""
+        if self._unsubscribe is not None:
+            self._unsubscribe()
+            self._unsubscribe = None
+
+    def _on_timeline_event(self, event: Event) -> None:
+        """Persist an externally published timeline event."""
+        # Ignore our own publication loop.
+        if event.source == "timeline_service":
+            return
+        payload = event.payload
+        entity_id = None
+        raw_entity_id = payload.get("entity_id")
+        if raw_entity_id:
+            try:
+                entity_id = UUID(raw_entity_id)
+            except ValueError:
+                pass
+        self.record(
+            event_type=payload.get("event_type", "timeline.event"),
+            entity_id=entity_id,
+            entity_type=payload.get("entity_type"),
+            payload=payload.get("payload") or {},
+        )
 
     def record(
         self,
