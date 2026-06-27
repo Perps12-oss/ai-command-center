@@ -11,13 +11,17 @@ from ai_command_center.core.clipboard_intent import (
     empty_clipboard_message,
     wants_clipboard,
 )
-from ai_command_center.core.event_bus import Event, EventBus
+from ai_command_center.core.event_bus import (
+    EVENT_TIMELINE_EVENT,
+    EVENT_WORKSPACE_CREATED,
+    Event,
+    EventBus,
+)
 from ai_command_center.core.events.topics import (
     CHAT_CHUNK,
     CHAT_EXPORT_ERROR,
     CHAT_EXPORT_RESULT,
     CHAT_HISTORY_LOADED,
-    CHAT_STARTED,
     COMMAND_HISTORY,
     COMMAND_ROUTED,
     MEMORY_ERROR,
@@ -40,6 +44,9 @@ from ai_command_center.core.events.topics import (
     SYSTEM_SNAPSHOT,
     TOOL_ERROR,
     TOOL_RESULT,
+    UI_CREATE_WORKSPACE,
+    UI_LAUNCH_RESOURCE,
+    UI_SEARCH_WORKSPACE_OS,
 )
 from ai_command_center.ui.capability_help import show_capability_help
 from ai_command_center.ui.components.command_box import CommandBox
@@ -61,10 +68,12 @@ from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
+from ai_command_center.ui.views.workspace_os_view import WorkspaceOsView
 
 
 VIEW_IDS: tuple[str, ...] = (
     "home",
+    "workspace_os",
     "chat",
     "notes",
     "memory",
@@ -89,7 +98,6 @@ class CommandPaletteApp(ctk.CTk):
         self._views: dict[str, object] = {}
         self._current_view = "home"
         self._active_request_id: str | None = None
-        self._pending_user_text: str | None = None
         self._completed_request_ids: deque[str] = deque(maxlen=32)
         self._last_terminal_chat_key: tuple[str, str] | None = None
         self._overlay_mode = "palette"
@@ -115,6 +123,7 @@ class CommandPaletteApp(ctk.CTk):
         self._wire_memory_events()
         self._wire_plugin_events()
         self._wire_navigation_events()
+        self._wire_workspace_os_events()
         self._wire_live_events()
         self._setup_keybindings()
         self.update_idletasks()
@@ -169,12 +178,15 @@ class CommandPaletteApp(ctk.CTk):
     def _setup_keybindings(self) -> None:
         self.bind("<Control-k>", lambda _: self._show_command_palette())
         self.bind("<Control-K>", lambda _: self._show_command_palette())
+        self.bind("<Control-Shift-W>", lambda _: self._navigate("workspace_os"))
+        self.bind("<Control-Shift-w>", lambda _: self._navigate("workspace_os"))
         self.bind("?", self._maybe_show_shortcuts)
 
     def _show_command_palette(self) -> None:
         commands = [
             ("⌂  Home", "Navigate to Home", lambda: self._navigate("home")),
-            ("💬  Chat", "Navigate to Chat", lambda: self._navigate("chat")),
+            ("�️  Workspace OS", "Open Workspace OS inspector", lambda: self._navigate("workspace_os")),
+            ("�  Chat", "Navigate to Chat", lambda: self._navigate("chat")),
             ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
             ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
             ("⚙  System", "System monitor", lambda: self._navigate("system")),
@@ -185,32 +197,105 @@ class CommandPaletteApp(ctk.CTk):
             ("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate),
             ("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse),
             ("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show),
+            ("+  Create Workspace", "Create a new workspace", self._show_create_workspace_dialog),
+            ("+  Create Card", "Create a card in the active workspace", self._show_create_card_dialog),
+            ("+  Create Resource", "Create a resource in the active card", self._show_create_resource_dialog),
         ]
         commands.extend(self._workspace_os_palette_commands())
         self._command_palette.show(commands)
 
     def _workspace_os_palette_commands(self) -> list[tuple[str, str, Callable[[], None]]]:
         """Build launchable Workspace OS entity commands from AppState."""
-        from ai_command_center.core.events.topics import UI_LAUNCH_RESOURCE
-
         items: list[tuple[str, str, Callable[[], None]]] = []
-        for entity in self._controller.snapshot().workspace_os.entities:
+        snap = self._controller.snapshot()
+        for entity in snap.workspace_os.entities:
             meta = dict(entity.metadata)
             resource_type = meta.get("resource_type")
             value = meta.get("url") or meta.get("path") or meta.get("command") or ""
-            if not resource_type or not value:
-                continue
-            label = f"🚀  {entity.title}"
-            desc = f"Workspace OS {entity.entity_type} ({resource_type})"
-            payload = {
-                "resource_id": entity.entity_id,
-                "resource_type": resource_type,
-                "value": value,
-            }
-            items.append(
-                (label, desc, lambda p=payload: self._bus.publish(UI_LAUNCH_RESOURCE, p, source="ui"))
-            )
+            if entity.entity_type == "workspace":
+                items.append(
+                    (
+                        f"🗂️  {entity.title}",
+                        "Workspace",
+                        lambda eid=entity.entity_id: self._open_workspace(eid),
+                    )
+                )
+            elif entity.entity_type == "card":
+                items.append(
+                    (
+                        f"🃏  {entity.title}",
+                        "Card",
+                        lambda eid=entity.entity_id: self._open_card(eid),
+                    )
+                )
+            elif entity.entity_type == "resource" and resource_type and value:
+                label = f"🚀  {entity.title}"
+                desc = f"Resource ({resource_type})"
+                payload = {
+                    "resource_id": entity.entity_id,
+                    "resource_type": resource_type,
+                    "value": value,
+                }
+                items.append(
+                    (label, desc, lambda p=payload: self._bus.publish(UI_LAUNCH_RESOURCE, p, source="ui"))
+                )
         return items
+
+    def _open_workspace(self, workspace_id: str) -> None:
+        self._navigate("workspace_os")
+        ws_view = self._workspace_os_view()
+        if ws_view is not None:
+            ws_view._select_workspace(workspace_id)
+
+    def _open_card(self, card_id: str) -> None:
+        self._navigate("workspace_os")
+        ws_view = self._workspace_os_view()
+        if ws_view is not None:
+            ws_view._select_card(card_id)
+
+    def _show_create_workspace_dialog(self) -> None:
+        dialog = ctk.CTkInputDialog(text="Workspace title:", title="Create Workspace")
+        title = dialog.get_input()
+        if title:
+            self._controller.publish_create_workspace(title.strip())
+            self._navigate("workspace_os")
+
+    def _show_create_card_dialog(self) -> None:
+        snap = self._controller.snapshot()
+        workspaces = [
+            (e.entity_id, e.title)
+            for e in snap.workspace_os.entities
+            if e.entity_type == "workspace"
+        ]
+        if not workspaces:
+            self._toast.show("Create a workspace first", kind="warning")
+            return
+        dialog = ctk.CTkInputDialog(text="Card title:", title="Create Card")
+        title = dialog.get_input()
+        if title:
+            self._controller.publish_create_card(title.strip(), workspaces[0][0])
+            self._navigate("workspace_os")
+
+    def _show_create_resource_dialog(self) -> None:
+        snap = self._controller.snapshot()
+        cards = [
+            (e.entity_id, e.title)
+            for e in snap.workspace_os.entities
+            if e.entity_type == "card"
+        ]
+        if not cards:
+            self._toast.show("Create a card first", kind="warning")
+            return
+        dialog = ctk.CTkInputDialog(text="Resource value (URL/path/command):", title="Create Resource")
+        value = dialog.get_input()
+        if value:
+            self._controller.publish_create_resource(
+                title=value.strip()[:40],
+                resource_type="url",
+                value=value.strip(),
+                card_id=cards[0][0],
+            )
+            self._navigate("workspace_os")
 
     def _maybe_show_shortcuts(self, event) -> None:
         focused = self.focus_get()
@@ -250,6 +335,18 @@ class CommandPaletteApp(ctk.CTk):
                 )
             elif view_id == "system":
                 self._views[view_id] = SystemView(self._content)
+            elif view_id == "workspace_os":
+                self._views[view_id] = WorkspaceOsView(
+                    self._content,
+                    on_create_workspace=self._controller.publish_create_workspace,
+                    on_rename_workspace=self._controller.publish_rename_workspace,
+                    on_create_card=self._controller.publish_create_card,
+                    on_create_resource=self._controller.publish_create_resource,
+                    on_update_resource=self._controller.publish_update_resource,
+                    on_delete_resource=self._controller.publish_delete_resource,
+                    on_launch_resource=self._controller.publish_launch_resource,
+                    on_search=self._controller.publish_search_workspace_os,
+                )
             elif view_id == "settings":
                 self._views[view_id] = SettingsView(
                     self._content,
@@ -289,6 +386,10 @@ class CommandPaletteApp(ctk.CTk):
     def _plugins_view(self) -> PluginsView | None:
         v = self._views.get("plugins")
         return v if isinstance(v, PluginsView) else None
+
+    def _workspace_os_view(self) -> WorkspaceOsView | None:
+        v = self._views.get("workspace_os")
+        return v if isinstance(v, WorkspaceOsView) else None
 
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:
@@ -391,16 +492,6 @@ class CommandPaletteApp(ctk.CTk):
                 self._ui_queue.enqueue(update)
                 return
 
-        if not (
-            lower.startswith("note:")
-            or lower.startswith("new note:")
-            or lower.startswith("remember:")
-            or lower.startswith("memory:")
-            or lower.startswith(">")
-            or lower.startswith("go ")
-            or lower in ("settings", "chat", "notes", "plugins", "home", "system", "memory")
-        ):
-            self._pending_user_text = text
         self._controller.publish_command(text, clipboard=clipboard)
 
     def _show_capability_help(self) -> None:
@@ -445,7 +536,18 @@ class CommandPaletteApp(ctk.CTk):
             chat.set_model(snap.settings.default_model)
             chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
             terminal_key = (str(snap.chat_status), str(snap.last_chat_request_id))
-            if snap.chat_status == "complete":
+            if snap.chat_status == "streaming":
+                start_key = str(snap.active_chat_request_id)
+                if start_key and start_key != self._active_request_id:
+                    self._navigate("chat")
+                    chat = self._chat_view()
+                    if chat:
+                        user_text = str(snap.last_command).strip()
+                        if user_text:
+                            chat.show_user_message(user_text)
+                        chat.begin_assistant(start_key)
+                    self._active_request_id = start_key
+            elif snap.chat_status == "complete":
                 if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
                     chat.finish_assistant(str(snap.last_assistant_message))
                     if snap.last_chat_request_id not in self._completed_request_ids:
@@ -484,7 +586,7 @@ class CommandPaletteApp(ctk.CTk):
         self._apply_catalog_views(snap)
 
     def _apply_catalog_views(self, snap) -> None:
-        """Render Memory, Notes, Plugins, and System views from AppState."""
+        """Render Memory, Notes, Plugins, System, and Workspace OS views from AppState."""
         memory = self._memory_view()
         if memory:
             memory.load_from_appstate(snap)
@@ -500,6 +602,10 @@ class CommandPaletteApp(ctk.CTk):
         system = self._system_view()
         if system:
             system.apply_system_snapshot(snap.system_snapshot)
+
+        workspace_os = self._workspace_os_view()
+        if workspace_os:
+            workspace_os.load_from_appstate(snap)
 
     # ── fade / show / hide ─────────────────────────────────────────────────────
 
@@ -593,9 +699,6 @@ class CommandPaletteApp(ctk.CTk):
 
     def _wire_chat_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe(CHAT_STARTED, self._on_chat_started)
-        )
-        self._bus_unsubs.append(
             self._bus.subscribe(CHAT_CHUNK, self._on_chat_chunk)
         )
         self._bus_unsubs.append(
@@ -608,26 +711,10 @@ class CommandPaletteApp(ctk.CTk):
             self._bus.subscribe(CHAT_EXPORT_ERROR, self._on_chat_export_error)
         )
 
-    def _on_chat_started(self, event: Event) -> None:
-        request_id = str(event.payload.get("request_id", ""))
-        user_text = self._pending_user_text
-        self._pending_user_text = None
-
-        def update() -> None:
-            self._navigate("chat")
-            chat = self._chat_view()
-            if chat:
-                if user_text:
-                    chat.show_user_message(user_text)
-                chat.begin_assistant(request_id)
-            self._active_request_id = request_id
-
-        self._ui_queue.enqueue(update)
-
     def _on_chat_chunk(self, event: Event) -> None:
         text = str(event.payload.get("text", ""))
         request_id = str(event.payload.get("request_id", ""))
-        if not text or request_id != self._active_request_id:
+        if not text or request_id != self._controller.snapshot().active_chat_request_id:
             return
 
         def update() -> None:
@@ -867,6 +954,41 @@ class CommandPaletteApp(ctk.CTk):
             self.attributes("-topmost", False)
             self.geometry(f"{T.WINDOW_WIDTH}x{T.WINDOW_HEIGHT}")
             self.minsize(900, 560)
+
+    def _wire_workspace_os_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe(EVENT_TIMELINE_EVENT, self._on_timeline_event)
+        )
+        self._bus_unsubs.append(
+            self._bus.subscribe(EVENT_WORKSPACE_CREATED, self._on_workspace_created)
+        )
+
+    def _on_timeline_event(self, event: Event) -> None:
+        event_type = str(event.payload.get("event_type", "Workspace OS event"))
+        entity_id = event.payload.get("entity_id")
+        detail = event.payload.get("payload") or {}
+        title = str(detail.get("title", "")) if isinstance(detail, dict) else ""
+        text = f"{event_type} {title}".strip()
+
+        def update() -> None:
+            home = self._home_view()
+            if home:
+                home.add_activity(text, "system")
+            ws_view = self._workspace_os_view()
+            if ws_view:
+                ws_view.on_workspace_event(text)
+            self._apply_state()
+
+        self._ui_queue.enqueue(update)
+
+    def _on_workspace_created(self, event: Event) -> None:
+        title = str(event.payload.get("title", ""))
+
+        def update() -> None:
+            self._toast.show(f"Created workspace: {title}", kind="success")
+            self._apply_state()
+
+        self._ui_queue.enqueue(update)
 
     def _wire_live_events(self) -> None:
         self._bus_unsubs.append(

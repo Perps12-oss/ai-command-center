@@ -7,6 +7,7 @@ from ai_command_center.ui.design_system import theme_v2 as T
 
 _SHORTCUTS: tuple[tuple[str, str], ...] = (
     ("Ctrl+K",        "Open command palette"),
+    ("Ctrl+Shift+W",  "Open Workspace OS inspector"),
     ("?",             "Show this overlay"),
     ("Alt+Space",     "Show / hide window"),
     ("Esc",           "Clear command box"),

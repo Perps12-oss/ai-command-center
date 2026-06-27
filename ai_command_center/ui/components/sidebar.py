@@ -8,6 +8,7 @@ from ai_command_center.ui.design_system import theme_v2 as T
 
 NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("home", "Home"),
+    ("workspace_os", "Workspace OS"),
     ("chat", "Chat"),
     ("notes", "Notes"),
     ("memory", "Memory"),

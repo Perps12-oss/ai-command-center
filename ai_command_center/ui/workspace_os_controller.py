@@ -7,10 +7,13 @@ from ai_command_center.core.events.topics import (
     UI_CREATE_CARD,
     UI_CREATE_RESOURCE,
     UI_CREATE_WORKSPACE,
+    UI_DELETE_RESOURCE,
     UI_INSPECTOR_CLOSE,
     UI_INSPECTOR_OPEN,
     UI_LAUNCH_RESOURCE,
+    UI_RENAME_WORKSPACE,
     UI_SEARCH_WORKSPACE_OS,
+    UI_UPDATE_RESOURCE,
 )
 
 
@@ -70,6 +73,39 @@ class WorkspaceOsUIController:
             },
             source="ui",
         )
+
+    def rename_workspace(self, workspace_id: str, title: str) -> None:
+        self._bus.publish(
+            UI_RENAME_WORKSPACE,
+            {"workspace_id": workspace_id, "title": title},
+            source="ui",
+        )
+
+    def update_resource(
+        self,
+        resource_id: str,
+        title: str,
+        resource_type: str,
+        value: str,
+        description: str = "",
+    ) -> None:
+        self._bus.publish(
+            UI_UPDATE_RESOURCE,
+            {
+                "resource_id": resource_id,
+                "title": title,
+                "resource_type": resource_type,
+                "value": value,
+                "description": description,
+            },
+            source="ui",
+        )
+
+    def delete_resource(self, resource_id: str, card_id: str = "") -> None:
+        payload: dict[str, str] = {"resource_id": resource_id}
+        if card_id:
+            payload["card_id"] = card_id
+        self._bus.publish(UI_DELETE_RESOURCE, payload, source="ui")
 
     def search(self, query: str) -> None:
         self._bus.publish(

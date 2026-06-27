@@ -532,7 +532,7 @@ class ChatView(ctk.CTkFrame):
     ─────────────────────
     • Data arrives only via the public methods below (UIQueue → main thread).
     • No EventBus, service, or backend imports.
-    • No developer logs, pipeline paths, or system telemetry.
+    • No developer logs, pipeline paths, or runtime metrics collection.
     • The view does NOT manage session persistence beyond the current conversation.
     """
 

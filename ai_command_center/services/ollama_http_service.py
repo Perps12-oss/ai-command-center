@@ -85,18 +85,40 @@ class OllamaHttpService(OllamaServiceBase):
         if self._health_task is not None:
             self._health_task.cancel()
             self._health_task = None
-        if self._loop and self._loop.is_running():
+        loop = self._loop
+        if loop is not None and loop.is_running():
             session = self._session
             self._session = None
-            asyncio.run_coroutine_threadsafe(
-                self._shutdown_loop(session), self._loop
+            shutdown_future = asyncio.run_coroutine_threadsafe(
+                self._shutdown_loop(session), loop
             )
+            try:
+                shutdown_future.result(timeout=5.0)
+            except Exception:
+                pass
         if self._thread:
             self._thread.join(timeout=5.0)
         self._loop = None
         self._thread = None
 
     async def _shutdown_loop(self, session: aiohttp.ClientSession | None) -> None:
+        try:
+            # Cancel and drain the active stream request before closing the session.
+            if self._active_future is not None:
+                self._active_future.cancel()
+                try:
+                    await asyncio.wrap_future(self._active_future)
+                except asyncio.CancelledError:
+                    pass
+            # Cancel and drain the background health check.
+            if self._health_task is not None:
+                self._health_task.cancel()
+                try:
+                    await asyncio.wrap_future(self._health_task)
+                except asyncio.CancelledError:
+                    pass
+        except Exception:
+            pass
         try:
             if session is not None:
                 await session.close()

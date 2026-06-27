@@ -8,6 +8,7 @@ from ai_command_center.core.events.topics import (
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
+    COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
 )
 
@@ -90,6 +91,40 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         self.assertEqual("streaming", second.chat_status)
         self.assertTrue(second.chat_streaming)
         self.assertEqual(first.last_event_topic, second.last_event_topic)
+
+    def test_stale_chat_error_ignored(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(CHAT_STARTED, {"request_id": "r-active"}, source="tests")
+        bus.publish(CHAT_ERROR, {"request_id": "r-stale", "message": "stale"}, source="tests")
+
+        snap = store.snapshot
+        self.assertEqual("r-active", snap.active_chat_request_id)
+        self.assertEqual("streaming", snap.chat_status)
+        self.assertFalse(snap.last_chat_error)
+
+    def test_chat_start_projection_from_command_and_start(self) -> None:
+        """UI can render a new chat start from AppState alone: last_command + active_chat_request_id."""
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(
+            COMMAND_ROUTED,
+            {"text": "hello world", "intent": "chat", "args": {"prompt": "hello world"}},
+            source="command_router",
+        )
+        snap = store.snapshot
+        self.assertEqual("hello world", snap.last_command)
+        self.assertEqual("chat", snap.last_command_intent)
+
+        bus.publish(CHAT_STARTED, {"request_id": "r5"}, source="chat_handler")
+        snap = store.snapshot
+        self.assertEqual("r5", snap.active_chat_request_id)
+        self.assertEqual("streaming", snap.chat_status)
+        self.assertTrue(snap.chat_streaming)
+        # The user prompt remains available as the source of the user message bubble.
+        self.assertEqual("hello world", snap.last_command)
 
 
 if __name__ == "__main__":

@@ -159,11 +159,24 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self._relationships_label.configure(
             text=f"Relationships: {snapshot.relationship_count}"
         )
-        self._actions_label.configure(text=f"Actions: {snapshot.action_count}")
+        self._actions_label.configure(
+            text=f"Actions: {snapshot.action_count}"
+        )
         self._events_label.configure(text=f"Events: {snapshot.event_count}")
 
         self._render_activity(snapshot.recent_events)
         self._render_entities(snapshot.entities)
+        self._render_actions(snapshot.actions)
+
+    def _render_actions(self, actions: tuple[str, ...]) -> None:
+        """Render registered actions in the entities textbox footer."""
+        if not actions:
+            return
+        self._entities_list.configure(state="normal")
+        self._entities_list.insert("end", "Registered actions:\n")
+        for name in actions:
+            self._entities_list.insert("end", f"  · {name}\n")
+        self._entities_list.configure(state="disabled")
 
     def _render_entities(self, entities: list) -> None:
         """Render the entities list with launch buttons."""
