@@ -1,10 +1,15 @@
 """
 Passive telemetry — observation only (Phase 5C+).
 
-Subscribes to EventBus topics, stores append-only SQLite log of raw bus events,
-and publishes normalized TelemetryEvent back to the EventBus. No inference,
-correlation, or behavioral classification at runtime.
+Subscribes to EventBus topics, stores an append-only SQLite log of sanitized bus
+events. No inference, correlation, or behavioral classification at runtime;
+no EventBus publication.
 Derived metrics: telemetry_summary.py (offline only).
+
+Sanitization:
+- Prompts, chat content, note bodies, clipboard content, and shell output are
+  redacted to ``[REDACTED]`` before storage.
+- Credential-like keys (api_key, token, secret, password, etc.) are redacted.
 """
 
 from __future__ import annotations
@@ -28,7 +33,6 @@ from ai_command_center.core.events.topics import (
     NOTE_ERROR,
     NOTE_SEARCH_RESULTS,
     OLLAMA_STATUS,
-    TELEMETRY_EVENT,
     TOOL_ERROR,
     TOOL_RESULT,
     UI_COMMAND,
@@ -36,11 +40,33 @@ from ai_command_center.core.events.topics import (
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
 )
-from ai_command_center.db.telemetry_repository import TelemetryRepository
-from ai_command_center.domain.telemetry_event import TelemetryEvent
+from ai_command_center.repositories.telemetry_repository import TelemetryRepository
 from ai_command_center.services.base import BaseService
 
 _HANDLER_SLOW_MS = 5.0
+
+# Keys whose values must never be stored in telemetry.
+# Matching is case-insensitive.
+_SENSITIVE_KEYS = {
+    "prompt",
+    "query",
+    "content",
+    "message",
+    "chunk",
+    "clipboard",
+    "body",
+    "notes",
+    "note",
+    "stdout",
+    "stderr",
+    "api_key",
+    "token",
+    "secret",
+    "password",
+    "auth",
+    "authorization",
+    "key",
+}
 
 # Explicit topic subscriptions only — no wildcard taps in production.
 _BUS_TOPICS = (
@@ -65,8 +91,36 @@ _BUS_TOPICS = (
 )
 
 
+def _sanitize_list(value: list[Any]) -> list[Any]:
+    """Recursively sanitize a list payload value."""
+    out: list[Any] = []
+    for item in value:
+        if isinstance(item, dict):
+            out.append(_sanitize_payload(item))
+        elif isinstance(item, list):
+            out.append(_sanitize_list(item))
+        else:
+            out.append(item)
+    return out
+
+
+def _sanitize_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of the payload with sensitive values redacted."""
+    sanitized: dict[str, Any] = {}
+    for key, value in payload.items():
+        if key.lower() in _SENSITIVE_KEYS:
+            sanitized[key] = "[REDACTED]"
+        elif isinstance(value, dict):
+            sanitized[key] = _sanitize_payload(value)
+        elif isinstance(value, list):
+            sanitized[key] = _sanitize_list(value)
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
 class TelemetryService(BaseService):
-    """Dumb camera: bus event → normalized TelemetryEvent → EventBus + SQLite."""
+    """Dumb camera: bus event → sanitized TelemetryEvent → SQLite only."""
 
     name = "telemetry"
 
@@ -98,27 +152,13 @@ class TelemetryService(BaseService):
 
     def _on_bus_event(self, event: Event) -> None:
         started = time.perf_counter()
-        payload = {
+        raw_payload = {
             "bus_source": event.source,
             "bus_event_id": event.event_id,
             **dict(event.payload),
         }
+        payload = _sanitize_payload(raw_payload)
         self._record(event.topic, payload, timestamp=event.timestamp)
-        normalized = TelemetryEvent(
-            event_type=event.topic,
-            payload=tuple(payload.items()),
-            emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
-        )
-        self._bus.publish(
-            TELEMETRY_EVENT,
-            {
-                "event_type": normalized.event_type,
-                "payload": dict(normalized.payload),
-                "emitted_at": normalized.timestamp,
-                "session_id": self._session_id,
-            },
-            source=self.name,
-        )
         handler_ms = (time.perf_counter() - started) * 1000.0
         if handler_ms >= _HANDLER_SLOW_MS:
             self._record(

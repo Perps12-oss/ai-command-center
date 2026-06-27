@@ -8,8 +8,10 @@ the new services without modifying the existing service architecture.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from ai_command_center.core.event_bus import EVENT_TIMELINE_EVENT
+from ai_command_center.core.permission.permission_client import PermissionClient
 from ai_command_center.services.base import BaseService
 
 if TYPE_CHECKING:
@@ -66,6 +68,7 @@ class WorkspaceOsService(BaseService):
         self.action_registry = action_registry
         self.timeline_service = timeline_service
         self.permission_service = permission_service
+        self._permission_client = PermissionClient(bus)
         self.observability_service = observability_service
         self.snapshot_service = snapshot_service
         self.feature_registry = feature_registry
@@ -92,8 +95,11 @@ class WorkspaceOsService(BaseService):
             UI_CREATE_CARD,
             UI_CREATE_RESOURCE,
             UI_CREATE_WORKSPACE,
+            UI_DELETE_RESOURCE,
             UI_LAUNCH_RESOURCE,
+            UI_RENAME_WORKSPACE,
             UI_SEARCH_WORKSPACE_OS,
+            UI_UPDATE_RESOURCE,
         )
         from ai_command_center.core.feature.feature import (
             Feature,
@@ -110,12 +116,17 @@ class WorkspaceOsService(BaseService):
             metadata={"track": "workspace_os_phase2"},
         )
         register_workspace_os_actions(self.action_registry)
+        self.timeline_service.start()
+        self.permission_service.start()
 
         self._unsubs = [
             self._bus.subscribe(UI_CREATE_WORKSPACE, self._on_create_workspace),
             self._bus.subscribe(UI_CREATE_CARD, self._on_create_card),
             self._bus.subscribe(UI_CREATE_RESOURCE, self._on_create_resource),
+            self._bus.subscribe(UI_UPDATE_RESOURCE, self._on_update_resource),
+            self._bus.subscribe(UI_DELETE_RESOURCE, self._on_delete_resource),
             self._bus.subscribe(UI_LAUNCH_RESOURCE, self._on_launch_resource),
+            self._bus.subscribe(UI_RENAME_WORKSPACE, self._on_rename_workspace),
             self._bus.subscribe(UI_SEARCH_WORKSPACE_OS, self._on_search),
         ]
 
@@ -124,13 +135,22 @@ class WorkspaceOsService(BaseService):
         for unsub in getattr(self, "_unsubs", []):
             unsub()
         self._unsubs.clear()
+        self.timeline_service.stop()
+        self.permission_service.stop()
+        self._permission_client.close()
 
     def _on_create_workspace(self, event: Any) -> None:
         """Handle UI_CREATE_WORKSPACE event."""
         payload = event.payload
-        self.workspace_service.create(
+        workspace = self.workspace_service.create(
             title=payload["title"],
             description=payload.get("description", ""),
+        )
+        self.timeline_service.record(
+            event_type="Created Workspace",
+            entity_id=workspace.id,
+            entity_type="workspace",
+            payload={"title": workspace.title},
         )
 
     def _on_create_card(self, event: Any) -> None:
@@ -146,6 +166,12 @@ class WorkspaceOsService(BaseService):
         self.workspace_service.add_entity(
             workspace_id=UUID(payload["workspace_id"]),
             entity_id=card.id,
+        )
+        self.timeline_service.record(
+            event_type="Created Card",
+            entity_id=card.id,
+            entity_type="card",
+            payload={"title": card.title, "workspace_id": payload["workspace_id"]},
         )
 
     def _on_create_resource(self, event: Any) -> None:
@@ -183,6 +209,93 @@ class WorkspaceOsService(BaseService):
             target_id=resource.id,
             relationship_type=RelationshipType.CONTAINS,
         )
+        self.timeline_service.record(
+            event_type="Created Resource",
+            entity_id=resource.id,
+            entity_type="resource",
+            payload={"title": resource.title, "resource_type": resource_type},
+        )
+
+    def _on_rename_workspace(self, event: Any) -> None:
+        """Handle UI_RENAME_WORKSPACE event."""
+        from uuid import UUID
+
+        payload = event.payload
+        workspace_id = UUID(payload["workspace_id"])
+        title = payload["title"]
+        updated = self.workspace_service.get(workspace_id)
+        if updated is None:
+            raise ValueError(f"Workspace not found: {workspace_id}")
+        old_title = updated.title
+        self.entity_service.update(
+            entity_id=workspace_id,
+            title=title,
+            metadata=updated.metadata,
+        )
+        self.timeline_service.record(
+            event_type="Renamed Workspace",
+            entity_id=workspace_id,
+            entity_type="workspace",
+            payload={"old_title": old_title, "new_title": title},
+        )
+
+    def _on_update_resource(self, event: Any) -> None:
+        """Handle UI_UPDATE_RESOURCE event."""
+        from uuid import UUID
+
+        from ai_command_center.core.entity.entity import (
+            RESOURCE_TYPE_COMMAND,
+            RESOURCE_TYPE_FOLDER,
+            RESOURCE_TYPE_URL,
+        )
+
+        payload = event.payload
+        resource_id = UUID(payload["resource_id"])
+        resource_type = payload["resource_type"]
+        value_key = {
+            RESOURCE_TYPE_URL: "url",
+            RESOURCE_TYPE_FOLDER: "path",
+            RESOURCE_TYPE_COMMAND: "command",
+        }.get(resource_type, "value")
+        resource = self.entity_service.get(resource_id)
+        if resource is None:
+            raise ValueError(f"Resource not found: {resource_id}")
+        metadata = {**dict(resource.metadata), "resource_type": resource_type, value_key: payload["value"]}
+        self.entity_service.update(
+            entity_id=resource_id,
+            title=payload["title"],
+            description=payload.get("description", ""),
+            metadata=metadata,
+        )
+        self.timeline_service.record(
+            event_type="Updated Resource",
+            entity_id=resource_id,
+            entity_type="resource",
+            payload={"title": payload["title"], "resource_type": resource_type},
+        )
+
+    def _on_delete_resource(self, event: Any) -> None:
+        """Handle UI_DELETE_RESOURCE event."""
+        from uuid import UUID
+
+        payload = event.payload
+        resource_id = UUID(payload["resource_id"])
+        resource = self.entity_service.get(resource_id)
+        if resource is None:
+            raise ValueError(f"Resource not found: {resource_id}")
+        self.entity_service.delete(resource_id)
+        card_id = payload.get("card_id")
+        if card_id:
+            self.relationship_service.delete_between(
+                source_id=UUID(card_id),
+                target_id=resource_id,
+            )
+        self.timeline_service.record(
+            event_type="Deleted Resource",
+            entity_id=resource_id,
+            entity_type="resource",
+            payload={"title": resource.title},
+        )
 
     def _on_launch_resource(self, event: Any) -> None:
         """Handle UI_LAUNCH_RESOURCE event."""
@@ -192,11 +305,44 @@ class WorkspaceOsService(BaseService):
             RESOURCE_TYPE_COMMAND,
             RESOURCE_TYPE_FOLDER,
         )
+        from ai_command_center.core.permission.permission import (
+            Permission,
+            PermissionContext,
+        )
 
         payload = event.payload
         resource_type = payload["resource_type"]
         value = payload["value"]
         resource_id = UUID(payload["resource_id"])
+
+        permission = (
+            Permission.LAUNCH_TOOL.value
+            if resource_type == RESOURCE_TYPE_COMMAND
+            else Permission.EXECUTE_ACTION.value
+        )
+        context = PermissionContext(
+            entity_id=resource_id,
+            entity_type="resource",
+            action_id=None,
+            actor_type="user",
+            actor_id=None,
+        )
+        if not self._permission_client.check(permission, context):
+            self._bus.publish(
+                EVENT_TIMELINE_EVENT,
+                {
+                    "event_type": "Permission Denied",
+                    "entity_id": str(resource_id),
+                    "entity_type": "resource",
+                    "payload": {
+                        "permission": permission,
+                        "resource_type": resource_type,
+                        "reason": "launch_resource",
+                    },
+                },
+                source=self.name,
+            )
+            return
 
         action_name = {
             RESOURCE_TYPE_FOLDER: "Open Folder",

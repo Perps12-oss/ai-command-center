@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from typing import Callable
 
@@ -20,19 +21,96 @@ from ai_command_center.tools.tool_executor import ToolExecutor
 from ai_command_center.tools.tool_registry import ToolRegistry
 
 
+def _parse_command(command: str) -> list[str] | None:
+    """Parse a command string into a list of arguments for shell=False execution.
+
+    ``shlex.split(posix=False)`` is used to preserve Windows backslashes in paths.
+    Outer quotes are stripped because shlex with ``posix=False`` keeps them.
+    """
+    try:
+        args = shlex.split(command, posix=False)
+    except ValueError:
+        return None
+    return [arg.strip("\"'") for arg in args]
+
+
+# Windows CMD shell builtins that have no standalone executable.
+_WINDOWS_SHELL_BUILTINS: frozenset[str] = frozenset(
+    {
+        "echo",
+        "dir",
+        "cd",
+        "type",
+        "cls",
+        "copy",
+        "del",
+        "erase",
+        "md",
+        "mkdir",
+        "rd",
+        "rmdir",
+        "ren",
+        "rename",
+        "move",
+        "set",
+        "path",
+        "prompt",
+        "ver",
+        "vol",
+        "date",
+        "time",
+        "start",
+        "exit",
+        "pause",
+        "goto",
+        "if",
+        "for",
+        "call",
+    }
+)
+
+
+def _is_windows_builtin(token: str) -> bool:
+    return token.lower() in _WINDOWS_SHELL_BUILTINS
+
+
 def _run_shell_command(args: dict) -> ToolResult:
     command = str(args.get("command", "")).strip()
     if not command:
         return ToolResult(success=False, output="", error="empty shell command")
-    try:
-        completed = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
+    cmd_args = _parse_command(command)
+    if cmd_args is None:
+        return ToolResult(
+            success=False,
+            output="",
+            error="invalid command syntax",
         )
+    if not cmd_args:
+        return ToolResult(
+            success=False,
+            output="",
+            error="empty command after parsing",
+        )
+    use_shell = _is_windows_builtin(cmd_args[0])
+    try:
+        if use_shell:
+            completed = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        else:
+            completed = subprocess.run(
+                cmd_args,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
         stdout = (completed.stdout or "").strip()
         stderr = (completed.stderr or "").strip()
         output = stdout or stderr
