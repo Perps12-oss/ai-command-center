@@ -16,21 +16,19 @@ REQUIRED_FILES = [
     "PROJECT_CONSTITUTION_V4.md",
     "AGENTS.md",
     "docs/ARCHITECTURE.md",
-    "docs/CONTRACTS.md",
-    "docs/PHASE_LEDGER.md",
+    "docs/ARCHITECTURE_ENFORCEMENT.md",
     "governance/constitutional_preflight.md",
     "governance/constitutional_review.md",
     "governance/aer_template.md",
     "governance/amendment_template.md",
     "governance/CONSTITUTIONAL_LEDGER.md",
+    "ai_command_center/core/contracts.py",
+    "ai_command_center/core/events/topics.py",
 ]
 
 # Domains that should have exactly one canonical owner document.
 SOURCE_OF_TRUTH_DOCS = {
-    "contracts": ["docs/CONTRACTS.md"],
-    "event_topics": ["docs/event_topics.md"],
     "architecture": ["docs/ARCHITECTURE.md"],
-    "phase_ledger": ["docs/PHASE_LEDGER.md"],
 }
 
 
@@ -44,10 +42,7 @@ def _find_duplicate_authority_docs() -> list[str]:
 
     # Heuristic duplicate checks for common source-of-truth names.
     duplicate_patterns = {
-        "contracts": re.compile(r"(^|/)contracts\.md$", re.IGNORECASE),
-        "event_topics": re.compile(r"(^|/)event_topics\.md$", re.IGNORECASE),
         "architecture": re.compile(r"(^|/)architecture\.md$", re.IGNORECASE),
-        "phase_ledger": re.compile(r"(^|/)phase_ledger\.md$", re.IGNORECASE),
     }
 
     for domain, pattern in duplicate_patterns.items():

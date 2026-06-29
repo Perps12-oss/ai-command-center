@@ -88,9 +88,13 @@ class OllamaHttpService(OllamaServiceBase):
         if self._loop and self._loop.is_running():
             session = self._session
             self._session = None
-            asyncio.run_coroutine_threadsafe(
+            shutdown_future = asyncio.run_coroutine_threadsafe(
                 self._shutdown_loop(session), self._loop
             )
+            try:
+                shutdown_future.result(timeout=5.0)
+            except Exception:
+                pass
         if self._thread:
             self._thread.join(timeout=5.0)
         self._loop = None

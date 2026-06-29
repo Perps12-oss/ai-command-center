@@ -99,8 +99,6 @@ bundle = context_manager.build_context(
 # OllamaService receives bundle.prompt only
 ```
 
-See [PHASE3.md](PHASE3.md) for scope bans and [PHASE4.md](PHASE4.md) for Phase 4 modules.
-
 Phase 4D adds `conversation_summary` compression and `graph_snippets` opt-in.
 
 ---
@@ -263,31 +261,72 @@ Rationale: wildcard listeners cause performance and debugging nightmares as plug
 
 ---
 
-## Phase 2 approval checklist
+## Event topic registry
 
-| # | Requirement | Status |
-|---|-------------|--------|
-| 1 | Repository access policy documented | This document |
-| 2 | `settings.snapshot` event + AppState reducer | Implemented |
-| 3 | Service vs AppState ownership documented | This document |
-| 4 | Wildcard EventBus restricted | `debug_mode` gate |
+Canonical topic constants live in `ai_command_center/core/events/topics.py`.
+
+| Topic | Producer | Consumers | Payload |
+|-------|----------|-----------|---------|
+| `settings.updated` | SettingsService | AppState, UI | `{"key": str, "value": Any}` |
+| `settings.snapshot` | SettingsService | AppState, ObsidianService, UI | full settings projection |
+| `service.started` | BaseService | AppState, telemetry | `{"service": str}` |
+| `service.ready` | BaseService | AppState, telemetry | `{"service": str}` |
+| `service.stopped` | BaseService | AppState, telemetry | `{"service": str}` |
+| `service.error` | BaseService | AppState, telemetry | `{"service": str, "detail": str}` |
+| `service.state_changed` | BaseService | AppState | `{"name": str, "state": str, "detail": str}` |
+| `tool.started` | ToolExecutorService | UI, telemetry | `{"tool": str, "invoke_id": str}` |
+| `tool.completed` | ToolExecutorService | UI, telemetry | `{"tool": str, "invoke_id": str}` |
+| `tool.failed` | ToolExecutorService | UI, telemetry | tool failure payload |
+| `telemetry.event` | TelemetryService | future UI/analytics | normalized telemetry event |
+| `system.snapshot` | SystemSnapshotBuilder | AppState | canonical system snapshot |
 
 ---
 
-## Risk register (architecture)
+## Roadmap status
 
-| Risk | Status |
-|------|--------|
-| Event Bus | Healthy |
-| AppState | Healthy |
-| Service Manager | Healthy |
-| Repository leakage | Mitigated — policy + private composition |
-| Settings state | Fixed — `settings.snapshot` |
-| Dual state ownership | Documented — operational vs presentation |
-| Bootstrap lifecycle | Accepted exception |
-| Wildcard events | Restricted |
-| UI isolation | `UIController(bus, state_store)` — no ApplicationCore in UI |
-| Command routing | `CommandRouterService` skeleton → `command.routed` |
-| Hotkey | Official: **Alt+Space** |
-| AI integration | Not started |
-| Scope creep | None detected |
+Full ownership stack (Tracks 1–3, 4–5, 6.3): **complete**.
+
+| Track | Goal | Status |
+|-------|------|--------|
+| 1 | Foundation — domain models, settings layer, repositories | ✅ |
+| 2 | Runtime engine — EventBus topics, service lifecycle, tool runtime | ✅ |
+| 3 | State & observability — AppState projection, telemetry, snapshots | ✅ |
+| 4 | UI contract compliance — isolation, chat, memory/notes/plugins/Workspace OS | ✅ |
+| 5 | Feature completion — Workspace OS, markdown, memory/notes/plugins/settings polish | ✅ |
+| 6.1–6.3 | Component gallery, design tokens, plugin framework v2 | ✅ |
+| 6.4 | Vector search / memory graph enhancements | ⏳ next |
+| 6.5 | Multi-agent runtime | ⏳ gated — see `docs/ARCHITECTURE_REVIEW_MULTI_AGENT.md` |
+
+**Residual risks:**
+- `core/settings/settings_repository.py` re-export vs `repositories/settings_repository.py` may confuse contributors.
+- `app.py` still subscribes to many EventBus topics directly; replace with AppState subscriptions as projection grows.
+- `tools/tool_executor.py` is a stub — execution happens inside `ToolExecutorService`.
+
+---
+
+## Gate history
+
+Current phase: **Phase 6 — IN PROGRESS**
+Previous snapshot: Phase 5 complete at commit `3970aa5` / tag `phase-5-complete-20260620`
+
+| Gate | Script | Result |
+|------|--------|--------|
+| Phase 1–3D | `verify_phase*.py` | PASS |
+| Contracts | `verify_contracts.py` | PASS |
+| Phase 4A | `verify_phase4a.py` | PASS |
+| Phase 4B | `verify_phase4b.py` | PASS |
+| Phase 4C | `verify_phase4c.py` | PASS |
+| Phase 4D | `verify_phase4d_compression.py` | PASS |
+| Phase 4E | `verify_phase4e.py` | PASS |
+| Phase 4F | `verify_phase4f.py` | PASS |
+| Phase 5A | `verify_phase5a.py` | PASS |
+| Phase 5B | `verify_phase5b.py` | PASS |
+| Phase 5C preflight | `verify_phase5c_preflight.py` | PASS |
+| Phase 5C gate | `verify_phase5c.py` | PASS |
+| Phase 5C+ telemetry | `verify_phase5c_telemetry.py` | PASS |
+| Capability completion | `verify_capability_completion.py` | PASS |
+| Note audits | `audit_note_integration.py` | PASS |
+| Daily driver | `run_daily_driver.py` | PASS |
+| Constitution | `verify_constitution.py` | PASS |
+
+UCGS v3: **STRICT** | Phase: 6 | Verdict: `IN_PROGRESS`

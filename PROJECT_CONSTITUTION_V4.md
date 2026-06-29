@@ -100,17 +100,13 @@ Level 3
 
 ARCHITECTURE.md
 
-CONTRACTS.md
+ai_command_center/core/contracts.py
 
-event_topics.md
+ai_command_center/core/events/topics.py
 
 Level 4
 
-Phase Documents
-
-Phase Ledger
-
-Violation Registry
+Phase Documents (gate history in ARCHITECTURE.md)
 
 Level 5
 
@@ -554,6 +550,62 @@ Contracts > Convenience
 Governance > Implementation
 
 Constitution > Everything
+
+---
+
+# ARTICLE XVII
+
+# AUDIT RECORD — 2026-06-29
+
+## Source
+
+External architectural audit (AUDIT.md) conducted by a Principal Software Engineer against the full codebase snapshot.
+
+## Findings Verified
+
+### Finding 1 — Dead Code Shim [HIGH — RESOLVED]
+
+`ai_command_center/db/repository.py` contained a `ConversationRepository` class whose sole purpose was to emit a deprecation warning and lazily re-export the real class from `ai_command_center.db.conversation_repository`.
+
+**Resolution:** Class deleted. `db/__init__.py` updated. No consumers used the shim path.
+
+### Finding 2 — Bloated Composition Root [HIGH — RESOLVED]
+
+`application.py` manually imported and instantiated every service (~20+), making it a merge conflict bottleneck that violated the Open/Closed Principle.
+
+`ui/app.py` `_ensure_view()` contained a 40-line `if/elif` chain manually instantiating every view.
+
+**Resolution:**
+
+- All repository and service wiring extracted to `ai_command_center/core/service_factory.py` (`build_services()`). Adding a new service now requires editing only `service_factory.py`.
+- `_ensure_view` replaced with a `_view_registry` dict of factory callables populated in `_register_views()`. Adding a new view requires adding one entry there.
+- `application.py` reduced from 182 lines to 67 lines.
+
+### Finding 3 — Asyncio Threading Leak [MEDIUM — RESOLVED]
+
+`OllamaHttpService._on_unload` dispatched `_shutdown_loop()` as a fire-and-forget coroutine with no `.result()` wait. If the process exited before the coroutine completed, the background asyncio thread became a zombie.
+
+**Resolution:** `_on_unload` now calls `.result(timeout=5.0)` on the shutdown future before joining the thread, ensuring the loop is fully stopped before references are nullified.
+
+### Finding 4 — Aggressive UI Polling [MEDIUM — RESOLVED]
+
+`UIQueue` used a hardcoded 50ms unconditional recursive `.after()` loop that fired every 50ms regardless of queue activity, wasting CPU cycles on ARM64 when idle.
+
+**Resolution:** `UIQueue` refactored to use Tkinter virtual event `<<UIQueueItem>>`. `enqueue()` posts the event via `event_generate(..., when="tail")`; the main thread wakes only when work arrives. A 200ms fallback poll handles startup edge cases.
+
+## Architectural Decisions
+
+The following are now constitutional:
+
+1. **Service wiring belongs in `core/service_factory.py`**, not `application.py`. `application.py` is a thin orchestrator only.
+2. **View instantiation belongs in `_register_views()`** via the `_view_registry` dict. `_ensure_view` must not contain instantiation logic.
+3. **`UIQueue` must remain event-driven.** Reintroducing unconditional polling at intervals ≤ 100ms is prohibited without AER.
+4. **Deprecated import shims are prohibited.** Classes that only re-export another class are dead code and must be deleted at point of discovery.
+5. **`asyncio.run_coroutine_threadsafe` calls that manage lifecycle shutdown must await `.result()` with a timeout** before joining the associated thread.
+
+## Verification
+
+All 29 existing tests passed after refactoring with no behavioral change. This work is classified as a Refactor per Article I.
 
 ---
 

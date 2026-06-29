@@ -83,7 +83,7 @@ def main() -> int:
         print("FAIL:")
         for item in failures:
             print(f"  - {item}")
-        print("\nProtocol: docs/PHASE5C_STRESS_TEST.md")
+        print("\nGate history: docs/ARCHITECTURE.md#gate-history")
         return 1
 
     print("PASS: Phase 5C — daily driver stress test gold standard met")
