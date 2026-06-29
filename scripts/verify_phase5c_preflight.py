@@ -73,7 +73,7 @@ def main() -> int:
             print(f"  - {item}")
         return 1
 
-    print("\nPREFLIGHT PASS — safe to run manual stress test (docs/PHASE5C_STRESS_TEST.md)")
+    print("\nPREFLIGHT PASS — safe to run manual stress test (see docs/ARCHITECTURE.md#gate-history)")
     return 0
 
 

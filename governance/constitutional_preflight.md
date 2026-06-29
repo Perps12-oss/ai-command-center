@@ -8,7 +8,7 @@ Files Reviewed:
 - AGENTS.md
 - docs/ARCHITECTURE_ENFORCEMENT.md
 - docs/ARCHITECTURE.md
-- docs/CONTRACTS.md
+- ai_command_center/core/contracts.py
 - governance/constitutional_preflight.md
 - governance/constitutional_review.md
 - ai_command_center/ui/views/chat_view.py
@@ -18,7 +18,7 @@ Files Reviewed:
 Authorities Reviewed:
 - Level 1: PROJECT_CONSTITUTION_V4.md
 - Level 2: AGENTS.md, docs/ARCHITECTURE_ENFORCEMENT.md
-- Level 3: docs/ARCHITECTURE.md, docs/CONTRACTS.md
+- Level 3: docs/ARCHITECTURE.md, ai_command_center/core/contracts.py
 
 Protected Assets Impacted:
 - EventBus Architecture (Tier A)
@@ -29,7 +29,7 @@ Protected Assets Impacted:
 Sources of Truth Impacted:
 - Chat runtime flow source of truth in services + EventBus topics
 - Presentation state source of truth in AppState
-- Contract source of truth in core/contracts.py + docs/CONTRACTS.md
+- Contract source of truth in ai_command_center/core/contracts.py
 
 Architectural Invariants Impacted:
 - Invariant 1 Ownership Flow (must remain UI -> AppState -> EventBus -> Services -> Repositories -> Storage)

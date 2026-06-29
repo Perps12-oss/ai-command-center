@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Any
 
 
 class SettingsRepository:
@@ -41,17 +40,3 @@ class SettingsRepository:
     def get_all(self) -> dict[str, str]:
         """Compatibility alias for core settings service."""
         return self.all_settings()
-
-
-class ConversationRepository:
-    """Deprecated import path — use db.conversation_repository."""
-
-    def __init__(self, conn: sqlite3.Connection) -> None:
-        from ai_command_center.db.conversation_repository import (
-            ConversationRepository as _Repo,
-        )
-
-        self._repo = _Repo(conn)
-
-    def count(self) -> int:
-        return self._repo.message_count()

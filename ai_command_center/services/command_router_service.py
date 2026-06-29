@@ -48,7 +48,6 @@ class CommandRouterService(BaseService):
     Intent detection + routing only.
 
     MUST NOT: plan, reason, orchestrate, or run multi-step agent loops.
-    See docs/PHASE3.md.
     """
 
     name = "command_router"

@@ -56,7 +56,6 @@ Architecture: `Services → Events → AppState → UI`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for repository policy, state ownership, and EventBus rules.
 
-**Phase 3:** [docs/PHASE3.md](docs/PHASE3.md) — scope, build order, review gates. Run `scripts/verify_context_manager.py` before Ollama code.
 
 | Module | Role |
 |--------|------|
@@ -109,4 +108,4 @@ python tools/ucgs_runner.py
 python tools/ucgs_ci_gate.py .ucgs_last.yaml
 ```
 
-Pre-commit hook installed via `ucgs-init.py`. Config: `ucgs.config.yaml`. See `docs/PHASE_LEDGER.md` for phase verdicts.
+Pre-commit hook installed via `ucgs-init.py`. Config: `ucgs.config.yaml`. See `docs/ARCHITECTURE.md` for gate history and phase verdicts.

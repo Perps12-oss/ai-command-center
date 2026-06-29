@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from collections import deque
+from collections.abc import Callable
 
 import customtkinter as ctk
 
@@ -63,6 +64,8 @@ from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
 
 
+ViewFactory = Callable[[], object]
+
 VIEW_IDS: tuple[str, ...] = (
     "home",
     "chat",
@@ -87,6 +90,7 @@ class CommandPaletteApp(ctk.CTk):
         self._ui_queue = UIQueue(self)
         self._visible = False
         self._views: dict[str, object] = {}
+        self._view_registry: dict[str, ViewFactory] = {}
         self._current_view = "home"
         self._active_request_id: str | None = None
         self._pending_user_text: str | None = None
@@ -107,6 +111,7 @@ class CommandPaletteApp(ctk.CTk):
         self.minsize(900, 560)
 
         self.withdraw()
+        self._register_views()
         self._build_layout()
         self._wire_chat_events()
         self._wire_note_events()
@@ -127,6 +132,41 @@ class CommandPaletteApp(ctk.CTk):
             alpha=snap.settings.window_alpha,
         )
         self._visible = False
+
+    def _register_views(self) -> None:
+        """Register all view factories. Add new views here only."""
+        self._view_registry["home"] = lambda: HomeView(
+            self._content,
+            on_command=self._on_command,
+        )
+        self._view_registry["chat"] = lambda: ChatView(
+            self._content,
+            on_cancel=self._controller.publish_chat_cancel,
+            on_export=self._on_chat_export,
+            on_regenerate=self._on_chat_regenerate,
+            on_send=self._on_command,
+        )
+        self._view_registry["notes"] = lambda: NotesView(
+            self._content,
+            on_select=self._on_note_select,
+            on_search=lambda q: self._on_command(f"note: {q}"),
+            on_create=self._on_note_create,
+        )
+        self._view_registry["memory"] = lambda: MemoryView(
+            self._content,
+            on_delete=self._on_memory_delete,
+            on_add=self._on_memory_add,
+        )
+        self._view_registry["system"] = lambda: SystemView(self._content)
+        self._view_registry["settings"] = lambda: SettingsView(
+            self._content,
+            on_save=self._on_settings_save,
+        )
+        self._view_registry["plugins"] = lambda: PluginsView(
+            self._content,
+            on_toggle=self._controller.publish_plugin_toggle,
+        )
+        self._view_registry["gallery"] = lambda: ComponentGalleryView(self._content)
 
     def _build_layout(self) -> None:
         self._top = TopBar(
@@ -222,46 +262,9 @@ class CommandPaletteApp(ctk.CTk):
 
     def _ensure_view(self, view_id: str) -> object:
         if view_id not in self._views:
-            if view_id == "home":
-                self._views[view_id] = HomeView(
-                    self._content,
-                    on_command=self._on_command,
-                )
-            elif view_id == "chat":
-                self._views[view_id] = ChatView(
-                    self._content,
-                    on_cancel=self._controller.publish_chat_cancel,
-                    on_export=self._on_chat_export,
-                    on_regenerate=self._on_chat_regenerate,
-                    on_send=self._on_command,
-                )
-            elif view_id == "notes":
-                self._views[view_id] = NotesView(
-                    self._content,
-                    on_select=self._on_note_select,
-                    on_search=lambda q: self._on_command(f"note: {q}"),
-                    on_create=self._on_note_create,
-                )
-            elif view_id == "memory":
-                self._views[view_id] = MemoryView(
-                    self._content,
-                    on_delete=self._on_memory_delete,
-                    on_add=self._on_memory_add,
-                )
-            elif view_id == "system":
-                self._views[view_id] = SystemView(self._content)
-            elif view_id == "settings":
-                self._views[view_id] = SettingsView(
-                    self._content,
-                    on_save=self._on_settings_save,
-                )
-            elif view_id == "plugins":
-                self._views[view_id] = PluginsView(
-                    self._content,
-                    on_toggle=self._controller.publish_plugin_toggle,
-                )
-            elif view_id == "gallery":
-                self._views[view_id] = ComponentGalleryView(self._content)
+            factory = self._view_registry.get(view_id)
+            if factory is not None:
+                self._views[view_id] = factory()
             else:
                 self._views[view_id] = PlaceholderView(self._content, view_id)
         return self._views[view_id]

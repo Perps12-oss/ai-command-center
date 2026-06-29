@@ -79,7 +79,7 @@ def _prompt_score(label: str) -> int:
 def cmd_record() -> int:
     data = _load()
     print("=== Phase 5C Scorecard ===\n")
-    print("Score each category 1–5 (see docs/PHASE5C_STRESS_TEST.md).\n")
+    print("Score each category 1–5 (1=fail, 3=acceptable, 5=excellent).\n")
 
     data["date"] = date.today().isoformat()
     data["tester"] = input("Tester name: ").strip() or data.get("tester", "")

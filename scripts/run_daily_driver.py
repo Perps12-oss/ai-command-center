@@ -2,7 +2,7 @@
 """
 Daily-driver automation — headless Tests A & C against live Ollama.
 
-UI steps (Alt+Space, friction/usability scores) remain manual; see docs/DAILY_DRIVER.md.
+UI steps (Alt+Space, friction/usability scores) remain manual; see docs/ARCHITECTURE.md#gate-history.
 """
 
 from __future__ import annotations
