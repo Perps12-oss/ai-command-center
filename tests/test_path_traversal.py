@@ -8,6 +8,7 @@ input.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -17,12 +18,17 @@ from tests.support import CommandSandbox, SecurityError
 
 pytestmark = pytest.mark.security
 
+# Forward-slash separators escape the vault on every OS.
 TRAVERSAL_PATHS = [
     "../../../../Windows/System32/config",
     "../../etc/passwd",
-    "..\\..\\..\\Windows\\System32\\drivers\\etc\\hosts",
     "notes/../../../secret.txt",
 ]
+
+# Backslash is only a path separator on Windows; on POSIX it is a literal
+# filename char and is safely contained, so this case is Windows-only.
+if sys.platform == "win32":
+    TRAVERSAL_PATHS.append("..\\..\\..\\Windows\\System32\\drivers\\etc\\hosts")
 
 
 @pytest.fixture
