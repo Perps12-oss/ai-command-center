@@ -1,6 +1,7 @@
 """Home dashboard — live status, activity feed, quick stats, quick actions."""
 from __future__ import annotations
 
+import datetime
 import time
 from collections import deque
 
@@ -228,11 +229,21 @@ class HomeView(ctk.CTkFrame):
       set_last_command(text)       (legacy compat)
     """
 
+    @staticmethod
+    def _greeting() -> str:
+        hour = datetime.datetime.now().hour
+        if hour < 12:
+            return "Good morning ◇"
+        if hour < 17:
+            return "Good afternoon ◇"
+        return "Good evening ◇"
+
     def __init__(self, master, *, on_command=None, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_command = on_command
         self._memory_count = 0
         self._note_count = 0
+        self._msg_count = 0
         self._build()
 
     def _build(self) -> None:
@@ -243,28 +254,28 @@ class HomeView(ctk.CTkFrame):
         hero = GlassCard(scroll)
         hero.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
         hero_inner = ctk.CTkFrame(hero, fg_color="transparent")
-        hero_inner.pack(fill="x", padx=T.PAD, pady=14)
-        ctk.CTkLabel(
+        hero_inner.pack(fill="x", padx=T.PAD, pady=(14, 4))
+        self._greeting_lbl = ctk.CTkLabel(
             hero_inner,
-            text="\u25c7  AI Command Center",
+            text=self._greeting(),
             font=T.FONT_TITLE,
             text_color=T.TEXT_PRIMARY,
-        ).pack(side="left")
+        )
+        self._greeting_lbl.pack(side="left")
         ctk.CTkLabel(
             hero_inner,
             text="Alt+Space to toggle  ·  Ctrl+K for commands  ·  ? for shortcuts",
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
         ).pack(side="right")
-        ctk.CTkLabel(
+        self._summary_lbl = ctk.CTkLabel(
             hero,
-            text="Your local AI assistant \u2014 ask questions, search notes, run shell commands, remember facts.",
+            text="Loading…",
             font=T.FONT_BODY,
-            text_color=T.TEXT_SECONDARY,
-            wraplength=900,
-            justify="left",
+            text_color=T.TEXT_MUTED,
             anchor="w",
-        ).pack(fill="x", padx=T.PAD, pady=(0, 14))
+        )
+        self._summary_lbl.pack(fill="x", padx=T.PAD, pady=(0, 14))
 
         # Quick stats strip
         ctk.CTkLabel(
@@ -300,6 +311,28 @@ class HomeView(ctk.CTkFrame):
                 row=i // 3, column=i % 3, sticky="nsew", padx=4, pady=4
             )
 
+        # Pinned commands
+        pin_hdr_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        pin_hdr_row.pack(fill="x", padx=T.PAD + 2, pady=(8, 4))
+        ctk.CTkLabel(
+            pin_hdr_row, text="PINNED COMMANDS", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w"
+        ).pack(side="left")
+        ctk.CTkButton(
+            pin_hdr_row,
+            text="+ Pin",
+            width=52, height=20,
+            font=(T.FONT_FAMILY, 10),
+            fg_color=T.BG_GLASS,
+            hover_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_MUTED,
+            corner_radius=T.SMALL_RADIUS,
+            command=self._show_pin_dialog,
+        ).pack(side="right")
+        self._pins_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        self._pins_frame.pack(fill="x", padx=T.PAD, pady=(0, 8))
+        self._pinned_commands: list[str] = []
+        self._render_pins()
+
         # Recent activity feed
         ctk.CTkLabel(
             scroll, text="RECENT ACTIVITY", font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w"
@@ -308,6 +341,99 @@ class HomeView(ctk.CTkFrame):
         activity_card.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
         self._activity_feed = _ActivityFeed(activity_card)
         self._activity_feed.pack(fill="x", pady=(4, 8))
+
+    # ── pin management ─────────────────────────────────────────────────────────
+
+    def _render_pins(self) -> None:
+        for w in self._pins_frame.winfo_children():
+            w.destroy()
+        if not self._pinned_commands:
+            ctk.CTkLabel(
+                self._pins_frame,
+                text="No pins yet — click + Pin to add a command shortcut.",
+                font=T.FONT_SMALL,
+                text_color=T.TEXT_MUTED,
+                anchor="w",
+            ).pack(fill="x", pady=2)
+            return
+        for cmd in self._pinned_commands:
+            chip = ctk.CTkFrame(
+                self._pins_frame,
+                fg_color=T.BG_GLASS,
+                border_color=T.BG_GLASS_BORDER,
+                border_width=1,
+                corner_radius=T.SMALL_RADIUS,
+            )
+            chip.pack(side="left", padx=(0, 6), pady=2)
+            label = (cmd[:28] + "…") if len(cmd) > 28 else cmd
+            ctk.CTkLabel(
+                chip, text=label, font=T.FONT_SMALL, text_color=T.TEXT_SECONDARY, anchor="w"
+            ).pack(side="left", padx=(8, 2), pady=4)
+            ctk.CTkButton(
+                chip, text="✕",
+                width=16, height=16,
+                font=(T.FONT_FAMILY, 9),
+                fg_color="transparent",
+                hover_color=T.BG_GLASS_BORDER,
+                text_color=T.TEXT_MUTED,
+                corner_radius=4,
+                command=lambda c=cmd: self.remove_pin(c),
+            ).pack(side="right", padx=(0, 4))
+            chip.bind("<Button-1>", lambda _e, c=cmd: self._publish_command(c))
+            for child in chip.winfo_children():
+                if hasattr(child, "cget") and child.cget("text") not in ("✕",):
+                    child.bind("<Button-1>", lambda _e, c=cmd: self._publish_command(c))
+
+    def _show_pin_dialog(self) -> None:
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Pin a command")
+        dialog.configure(fg_color=T.BG_PANEL)
+        dialog.geometry("400x160")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(
+            dialog, text="Command text to pin",
+            font=T.FONT_SMALL, text_color=T.TEXT_MUTED, anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 2))
+        entry = ctk.CTkEntry(
+            dialog, font=T.FONT_BODY,
+            fg_color=T.BG_INPUT, border_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY, placeholder_text="e.g. note: weekly review",
+        )
+        entry.pack(fill="x", padx=T.PAD)
+        entry.focus_set()
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(padx=T.PAD, pady=(12, 0))
+
+        def _ok() -> None:
+            text = entry.get().strip()
+            if text:
+                self.add_pin(text)
+            dialog.destroy()
+
+        ctk.CTkButton(
+            btn_row, text="Cancel", font=T.FONT_SMALL,
+            fg_color=T.BG_GLASS, hover_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY, command=dialog.destroy,
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            btn_row, text="Pin", font=T.FONT_SMALL,
+            fg_color=T.ACCENT_DEFAULT, hover_color=T.ACCENT_HOVER,
+            text_color="white", command=_ok,
+        ).pack(side="left")
+        entry.bind("<Return>", lambda _e: _ok())
+
+    def add_pin(self, command: str) -> None:
+        if command not in self._pinned_commands:
+            self._pinned_commands.append(command)
+            self._render_pins()
+
+    def remove_pin(self, command: str) -> None:
+        if command in self._pinned_commands:
+            self._pinned_commands.remove(command)
+            self._render_pins()
 
     # ── public API ─────────────────────────────────────────────────────────────
 
@@ -327,6 +453,7 @@ class HomeView(ctk.CTkFrame):
             self._pill_vault.set_busy("Indexing\u2026", f"{files} files so far")
         elif files > 0:
             self._pill_vault.set_ok(f"{files} notes indexed", f"{ms} ms" if ms else "")
+            self._refresh_summary()
         else:
             self._pill_vault.set_unknown("Not configured", "Set vault path in Settings")
 
@@ -343,9 +470,23 @@ class HomeView(ctk.CTkFrame):
             self._pill_memory.set_unknown("No memories", "Use \u201cremember:\u201d to store facts")
         else:
             self._pill_memory.set_ok(f"{count} memor{'y' if count == 1 else 'ies'} stored")
+        self._refresh_summary()
+
+    def _refresh_summary(self) -> None:
+        parts: list[str] = []
+        if self._msg_count:
+            parts.append(f"{self._msg_count} message{'s' if self._msg_count != 1 else ''}")
+        if self._memory_count:
+            parts.append(f"{self._memory_count} memor{'ies' if self._memory_count != 1 else 'y'}")
+        if self._note_count:
+            parts.append(f"{self._note_count} note{'s' if self._note_count != 1 else ''} indexed")
+        text = " · ".join(parts) if parts else "No activity yet — start typing above."
+        self._summary_lbl.configure(text=text, text_color=T.TEXT_SECONDARY if parts else T.TEXT_MUTED)
 
     def update_stats(self, messages: int = 0, memories: int = 0, notes: int = 0) -> None:
+        self._msg_count = messages
         self._stats.update(messages, memories, notes)
+        self._refresh_summary()
 
     def add_activity(self, text: str, kind: str = "system") -> None:
         self._activity_feed.add(text, kind)

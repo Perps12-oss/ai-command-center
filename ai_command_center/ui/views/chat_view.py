@@ -23,6 +23,17 @@ _LINE_H         = 22
 _PLACEHOLDER    = "Message…"
 _HINT_TEXT      = "⏎ send  ·  Shift+⏎ new line  ·  Ctrl+K  ·  ?"
 
+_PROMPT_TEMPLATES: list[tuple[str, str, str]] = [
+    ("Summarise",        "Summarise the following: ",             "Condense into key points"),
+    ("Explain simply",   "Explain this like I'm 5: ",             "Plain-language explanation"),
+    ("Bullet points",    "Give me bullet points for: ",           "List format"),
+    ("Pros & cons",      "List the pros and cons of: ",           "Balanced analysis"),
+    ("Action items",     "Extract action items from: ",           "Task extraction"),
+    ("Write email",      "Write a professional email about: ",    "Email draft"),
+    ("Debug help",       "Help me debug this issue: ",            "Code / logic debugging"),
+    ("Compare",          "Compare and contrast: ",                "Side-by-side comparison"),
+]
+
 # Fader palette — for non-intrusive action elements
 _CLR_META      = "#404060"   # timestamps, copy icon at rest
 _CLR_REGEN     = "#3A3A5A"   # regenerate text at rest
@@ -357,6 +368,75 @@ class _SessionBar(ctk.CTkFrame):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Prompt templates overlay
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _TemplatesOverlay(ctk.CTkFrame):
+    """Floating chip grid of prompt templates — shown/hidden above the input pill."""
+
+    def __init__(self, master, on_select: Callable[[str], None]) -> None:
+        super().__init__(
+            master,
+            fg_color=T.BG_PANEL,
+            border_color=T.BG_GLASS_BORDER,
+            border_width=1,
+            corner_radius=T.CARD_RADIUS,
+        )
+        self._on_select = on_select
+        self._visible = False
+        ctk.CTkLabel(
+            self,
+            text="PROMPT TEMPLATES",
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(8, 4))
+        grid = ctk.CTkFrame(self, fg_color="transparent")
+        grid.pack(fill="x", padx=8, pady=(0, 8))
+        for col in range(2):
+            grid.columnconfigure(col, weight=1)
+        for i, (label, prefix, hint) in enumerate(_PROMPT_TEMPLATES):
+            chip = ctk.CTkFrame(
+                grid,
+                fg_color=T.BG_GLASS,
+                border_color=T.BG_GLASS_BORDER,
+                border_width=1,
+                corner_radius=T.SMALL_RADIUS,
+            )
+            chip.grid(row=i // 2, column=i % 2, sticky="ew", padx=4, pady=2)
+            ctk.CTkLabel(
+                chip, text=label, font=T.FONT_SMALL, text_color=T.TEXT_PRIMARY, anchor="w"
+            ).pack(side="left", padx=(8, 4), pady=4)
+            ctk.CTkLabel(
+                chip, text=hint, font=(T.FONT_FAMILY, 9), text_color=T.TEXT_MUTED, anchor="e"
+            ).pack(side="right", padx=(0, 8), pady=4)
+            chip.bind("<Button-1>", lambda _e, p=prefix: self._pick(p))
+            for w in chip.winfo_children():
+                w.bind("<Button-1>", lambda _e, p=prefix: self._pick(p))
+
+    def _pick(self, prefix: str) -> None:
+        self._on_select(prefix)
+        self.hide()
+
+    def show_above(self, anchor_widget) -> None:
+        if self._visible:
+            self.hide()
+            return
+        self._visible = True
+        self.place(
+            in_=anchor_widget,
+            relx=0.0, rely=0.0,
+            anchor="sw",
+            bordermode="outside",
+        )
+        self.lift()
+
+    def hide(self) -> None:
+        self._visible = False
+        self.place_forget()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Input pill  (multi-line growing textbox + hint + send/stop)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -387,17 +467,19 @@ class _InputPill(ctk.CTkFrame):
         )
         pill.pack(fill="x", padx=16, pady=(10, 4))
 
-        # Attachment icon
-        ctk.CTkButton(
-            pill, text="⊕",
+        # Templates toggle button
+        self._tmpl_btn = ctk.CTkButton(
+            pill, text="⊞",
             width=34, height=34,
             font=(T.FONT_FAMILY, 16),
             fg_color="transparent",
             hover_color=T.BG_GLASS_BORDER,
             text_color=_CLR_META,
             corner_radius=17,
-            command=lambda: None,
-        ).pack(side="left", padx=(8, 0), pady=5)
+            command=self._toggle_templates,
+        )
+        self._tmpl_btn.pack(side="left", padx=(8, 0), pady=5)
+        self._templates_overlay: _TemplatesOverlay | None = None
 
         # Growing textbox
         self._tb = ctk.CTkTextbox(
@@ -520,6 +602,85 @@ class _InputPill(ctk.CTkFrame):
         self._tb.focus_set()
         self._focus_in()
 
+    def set_templates_overlay(self, overlay: "_TemplatesOverlay") -> None:
+        self._templates_overlay = overlay
+
+    def _toggle_templates(self) -> None:
+        if self._templates_overlay:
+            self._templates_overlay.show_above(self._tmpl_btn)
+
+    def insert_template(self, prefix: str) -> None:
+        self._focus_in()
+        current = self._tb.get("1.0", "end-1c")
+        self._tb.delete("1.0", "end")
+        self._tb.insert("1.0", prefix + current)
+        self._tb.mark_set("insert", "end")
+        self._tb.focus_set()
+        self._grow()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  In-conversation search bar
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _SearchBar(ctk.CTkFrame):
+    """Slide-in search bar for finding text in chat history (Ctrl+F)."""
+
+    def __init__(self, master, on_search: Callable[[str], None], on_close: Callable) -> None:
+        super().__init__(
+            master,
+            fg_color=T.BG_PANEL,
+            border_color=T.BG_GLASS_BORDER,
+            border_width=1,
+            corner_radius=0,
+            height=38,
+        )
+        self.pack_propagate(False)
+        self._on_search = on_search
+        self._on_close = on_close
+
+        self._entry = ctk.CTkEntry(
+            self,
+            placeholder_text="Search messages…",
+            font=T.FONT_BODY,
+            height=26,
+            fg_color=T.BG_INPUT,
+            border_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+            width=220,
+        )
+        self._entry.pack(side="left", padx=(12, 4), pady=6)
+        self._entry.bind("<KeyRelease>", lambda _e: self._on_search(self._entry.get()))
+        self._entry.bind("<Escape>", lambda _e: self._on_close())
+
+        self._count_lbl = ctk.CTkLabel(
+            self, text="", font=T.FONT_SMALL, text_color=T.TEXT_MUTED
+        )
+        self._count_lbl.pack(side="left", padx=4)
+
+        ctk.CTkButton(
+            self, text="✕", width=24, height=24,
+            font=T.FONT_SMALL,
+            fg_color="transparent", hover_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_MUTED, corner_radius=T.SMALL_RADIUS,
+            command=self._on_close,
+        ).pack(side="right", padx=8)
+
+    def focus(self) -> None:
+        self._entry.focus_set()
+        self._entry.select_range(0, "end")
+
+    def set_count(self, found: int, total: int) -> None:
+        if total == 0:
+            self._count_lbl.configure(text="No matches", text_color=T.STATUS_ERROR)
+        else:
+            self._count_lbl.configure(
+                text=f"{found}/{total}", text_color=T.TEXT_MUTED
+            )
+
+    def get_query(self) -> str:
+        return self._entry.get()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  ChatView  (public)
@@ -558,6 +719,7 @@ class ChatView(ctk.CTkFrame):
         self._flush_pending:    bool                    = False
         self._history:          list[dict]              = []   # current conversation
         self._model:            str                     = ""
+        self._search_visible:   bool                    = False
 
         # In-memory session store (owner is the view, but could be moved)
         self._sessions:         dict[str, list[dict]]   = {}
@@ -584,6 +746,17 @@ class ChatView(ctk.CTkFrame):
             on_stop=self._handle_stop,
         )
         self._pill.pack(fill="x", side="bottom")
+
+        # Prompt templates overlay (parented to ChatView for correct z-order)
+        self._templates_overlay = _TemplatesOverlay(self, on_select=self._pill.insert_template)
+        self._pill.set_templates_overlay(self._templates_overlay)
+
+        # Search bar (hidden by default, shown with Ctrl+F)
+        self._search_bar = _SearchBar(self, on_search=self._do_search, on_close=self._close_search)
+
+        # Keybinding: Ctrl+F opens search
+        self.bind_all("<Control-f>", lambda _e: self._toggle_search(), add="+")
+        self.bind_all("<Control-F>", lambda _e: self._toggle_search(), add="+")
 
         # ③ Middle: history panel + scroll area
         middle = ctk.CTkFrame(self, fg_color="transparent")
@@ -633,17 +806,73 @@ class ChatView(ctk.CTkFrame):
         for event in ("<MouseWheel>", "<Button-4>", "<Button-5>", "<Configure>"):
             canvas.bind(event, self._on_canvas_scroll, add="+")
 
-        # Context bar: sources · token estimate (AppState-driven)
+        # Context bar: sources · token budget (AppState-driven)
+        ctx_frame = ctk.CTkFrame(self, fg_color="transparent")
+        ctx_frame.pack(fill="x", side="bottom", padx=16, pady=(0, 4))
+
         self._context_bar = ctk.CTkLabel(
-            self,
+            ctx_frame,
             text="Sources: — · Tokens: —",
             font=(T.FONT_FAMILY, 10),
             text_color=_CLR_META,
             anchor="w",
         )
-        self._context_bar.pack(fill="x", side="bottom", padx=20, pady=(0, 4))
+        self._context_bar.pack(side="left", fill="x", expand=True)
+
+        self._token_bar = ctk.CTkProgressBar(
+            ctx_frame,
+            width=120,
+            height=4,
+            corner_radius=2,
+            fg_color=T.BG_GLASS,
+            progress_color=T.STATUS_READY,
+        )
+        self._token_bar.set(0)
+        self._token_bar.pack(side="right", padx=(8, 0))
 
         self._refresh_session_bar()
+
+    # ── in-conversation search ────────────────────────────────────────────────
+
+    def _toggle_search(self) -> None:
+        if self._search_visible:
+            self._close_search()
+        else:
+            self._search_visible = True
+            self._search_bar.pack(fill="x", side="top", after=self._session_bar)
+            self._search_bar.focus()
+
+    def _close_search(self) -> None:
+        self._search_visible = False
+        self._search_bar.pack_forget()
+        self._do_search("")
+
+    def _do_search(self, query: str) -> None:
+        q = query.strip().lower()
+        if not q:
+            self._search_bar.set_count(0, 0)
+            return
+        matches = sum(
+            1 for msg in self._history
+            if q in str(msg.get("content", "")).lower()
+        )
+        self._search_bar.set_count(matches, matches)
+        # Scroll to first visible child whose text matches
+        for widget in self._scroll.winfo_children():
+            if not hasattr(widget, "winfo_children"):
+                continue
+            for child in widget.winfo_children():
+                for grandchild in child.winfo_children():
+                    if isinstance(grandchild, ctk.CTkTextbox):
+                        try:
+                            txt = grandchild.get("1.0", "end-1c").lower()
+                            if q in txt:
+                                self._scroll._parent_canvas.yview_moveto(
+                                    widget.winfo_y() / max(self._scroll.winfo_height(), 1)
+                                )
+                                return
+                        except Exception:
+                            pass
 
     # ── history toggle ────────────────────────────────────────────────────────
 
@@ -787,8 +1016,7 @@ class ChatView(ctk.CTkFrame):
         return bubble
 
     def _finalize_meta(self, bubble: _AssistantBubble) -> None:
-        """Attach copy · timestamp · ↺ Regenerate row below completed bubble."""
-        # Retrieve the outer frame stored on the bubble
+        """Attach copy · timestamp · ↺ Regenerate · 👍/👎 row below completed bubble."""
         outer = getattr(bubble, "_outer", None)
         if outer is None:
             return
@@ -818,6 +1046,32 @@ class ChatView(ctk.CTkFrame):
                 command=self._on_regenerate,
             ).pack(side="left", padx=(10, 0))
 
+        # Reaction buttons — purely local visual feedback + send marker if needed
+        for emoji, rating in (("👍", "up"), ("👎", "down")):
+            btn = ctk.CTkButton(
+                mrow,
+                text=emoji,
+                width=24, height=18,
+                font=(T.FONT_FAMILY, 10),
+                fg_color="transparent",
+                hover_color=T.BG_GLASS,
+                text_color=_CLR_META,
+                corner_radius=4,
+                command=lambda r=rating, b=bubble, bt=None: self._rate_message(b, r),
+            )
+            btn.pack(side="right", padx=(2, 0))
+
+    def _rate_message(self, bubble: _AssistantBubble, rating: str) -> None:
+        """Visual-only reaction — colour the bubble border and publish a rating marker."""
+        color = T.STATUS_READY if rating == "up" else T.STATUS_ERROR
+        try:
+            bubble.configure(border_width=1, border_color=color)
+        except Exception:
+            pass
+        if self._on_send:
+            snippet = bubble.get_raw_text()[:60].replace("\n", " ")
+            self._on_send(f".rating:{rating} \"{snippet}\"")
+
     # ── public API ─────────────────────────────────────────────────────────────
 
     def set_model(self, name: str) -> None:
@@ -827,15 +1081,26 @@ class ChatView(ctk.CTkFrame):
     def focus_input(self) -> None:
         self._pill.focus_input()
 
+    _TOKEN_BUDGET = 4096
+
     def update_context_bar(self, sources: list[str], tokens: int) -> None:
         if not sources:
             self._context_bar.configure(text=f"Sources: — · Tokens: {tokens}")
-            return
-        names = [s.split("_")[-1].split("/")[-1][:18] for s in sources]
-        summary = ", ".join(names)
-        if len(summary) > 50:
-            summary = summary[:47] + "…"
-        self._context_bar.configure(text=f"Sources: {summary} · Tokens: {tokens}")
+        else:
+            names = [s.split("_")[-1].split("/")[-1][:18] for s in sources]
+            summary = ", ".join(names)
+            if len(summary) > 50:
+                summary = summary[:47] + "…"
+            self._context_bar.configure(text=f"Sources: {summary} · Tokens: {tokens}")
+        frac = min(1.0, tokens / self._TOKEN_BUDGET) if tokens > 0 else 0.0
+        if frac >= 0.85:
+            color = T.STATUS_ERROR
+        elif frac >= 0.6:
+            color = T.STATUS_BUSY
+        else:
+            color = T.STATUS_READY
+        self._token_bar.configure(progress_color=color)
+        self._token_bar.set(frac)
 
     def load_history(self, messages: list[dict]) -> None:
         self._clear_ui()

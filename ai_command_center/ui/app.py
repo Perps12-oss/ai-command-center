@@ -37,6 +37,7 @@ from ai_command_center.core.events.topics import (
     OVERLAY_SHOW,
     PLUGIN_CATALOG,
     PLUGIN_ERROR,
+    SERVICE_STATE_CHANGED,
     SYSTEM_EVENTS,
     SYSTEM_SNAPSHOT,
     TOOL_ERROR,
@@ -44,6 +45,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.ui.capability_help import show_capability_help
 from ai_command_center.ui.components.command_box import CommandBox
+from ai_command_center.ui.components.command_history_drawer import CommandHistoryDrawer
 from ai_command_center.ui.design_system.command import CommandPalette
 from ai_command_center.ui.design_system.shortcut import ShortcutOverlay
 from ai_command_center.ui.components.sidebar import Sidebar
@@ -206,9 +208,17 @@ class CommandPaletteApp(ctk.CTk):
         self._command_palette = CommandPalette(self)
         self._shortcut_overlay = ShortcutOverlay(self)
 
+        # Command history drawer (parented to body so it slides over content)
+        self._history_drawer = CommandHistoryDrawer(
+            body,
+            on_rerun=self._on_command,
+        )
+
     def _setup_keybindings(self) -> None:
         self.bind("<Control-k>", lambda _: self._show_command_palette())
         self.bind("<Control-K>", lambda _: self._show_command_palette())
+        self.bind("<Control-h>", lambda _: self._history_drawer.toggle())
+        self.bind("<Control-H>", lambda _: self._history_drawer.toggle())
         self.bind("?", self._maybe_show_shortcuts)
 
     def _show_command_palette(self) -> None:
@@ -224,6 +234,7 @@ class CommandPaletteApp(ctk.CTk):
             ("⬇  Export Chat", "Save conversation to markdown", self._on_chat_export_request),
             ("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate),
             ("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse),
+            ("⏱  Command History", "Browse recent commands (Ctrl+H)", self._history_drawer.toggle),
             ("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show),
         ]
         commands.extend(self._workspace_os_palette_commands())
@@ -342,8 +353,20 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_chat_export_result(self, event: Event) -> None:
         path = str(event.payload.get("path", ""))
+
+        def _open_file(p: str = path) -> None:
+            try:
+                os.startfile(p)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
         self._ui_queue.enqueue(
-            lambda: self._toast.show(f"Saved to {path}", kind="success")
+            lambda: self._toast.show(
+                f"Saved to {path}",
+                kind="success",
+                duration=6000,
+                action=("Open", _open_file),
+            )
         )
 
     def _on_chat_export_error(self, event: Event) -> None:
@@ -378,6 +401,9 @@ class CommandPaletteApp(ctk.CTk):
         if lower in ("?", "help"):
             self._show_capability_help()
             return
+
+        if not text.startswith(".rating:"):
+            self._history_drawer.push(text.strip())
 
         clipboard: str | None = None
         if wants_clipboard(text):
@@ -705,7 +731,11 @@ class CommandPaletteApp(ctk.CTk):
 
         def update() -> None:
             self._note_count = files
-            self._toast.show(f"Indexed {files} notes ({ms} ms)", kind="success")
+            self._toast.show(
+                f"Indexed {files} notes ({ms} ms)",
+                kind="success",
+                action=("View", lambda: self._navigate("notes")),
+            )
             home = self._home_view()
             if home:
                 home.update_vault(indexing=False, files=files, ms=ms)
@@ -746,7 +776,11 @@ class CommandPaletteApp(ctk.CTk):
         self._memory_count += 1
 
         def update() -> None:
-            self._toast.show(f"Remembered: {label}", kind="success")
+            self._toast.show(
+                f"Remembered: {label}",
+                kind="success",
+                action=("View", lambda: self._navigate("memory")),
+            )
             home = self._home_view()
             if home:
                 home.update_memory(self._memory_count)
@@ -905,6 +939,9 @@ class CommandPaletteApp(ctk.CTk):
         self._bus_unsubs.append(
             self._bus.subscribe(MODEL_SELECTED, self._on_model_selected)
         )
+        self._bus_unsubs.append(
+            self._bus.subscribe(SERVICE_STATE_CHANGED, self._on_service_state_changed)
+        )
 
     def _on_system_snapshot(self, event: Event) -> None:
         """System snapshot is projected into AppState; view renders from there."""
@@ -941,6 +978,19 @@ class CommandPaletteApp(ctk.CTk):
             if home:
                 home.apply_command_history(payload)
             self._apply_state()
+
+        self._ui_queue.enqueue(update)
+
+    def _on_service_state_changed(self, event: Event) -> None:
+        service = str(event.payload.get("service", ""))
+        state = str(event.payload.get("state", ""))
+        if not service or not state:
+            return
+
+        def update() -> None:
+            system = self._system_view()
+            if system:
+                system.push_service_state(service, state)
 
         self._ui_queue.enqueue(update)
 
