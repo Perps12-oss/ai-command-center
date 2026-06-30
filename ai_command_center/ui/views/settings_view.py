@@ -113,6 +113,45 @@ class SettingsView(ctk.CTkFrame):
             sw.pack(side="left", padx=(0, 16))
             self._swatches[name] = sw
 
+        # Custom accent colour
+        ctk.CTkLabel(
+            appear,
+            text="Custom accent colour  (hex, e.g. #FF6B00)",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+        ).pack(anchor="w", padx=T.PAD, pady=(12, 0))
+        accent_row = ctk.CTkFrame(appear, fg_color="transparent")
+        accent_row.pack(fill="x", padx=T.PAD, pady=(4, 8))
+        self._accent_entry = ctk.CTkEntry(
+            accent_row,
+            placeholder_text="#3B82F6",
+            font=T.FONT_BODY,
+            height=30,
+            width=140,
+            fg_color=T.BG_INPUT,
+            border_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_PRIMARY,
+        )
+        self._accent_entry.pack(side="left")
+        self._accent_preview = ctk.CTkFrame(
+            accent_row, width=30, height=30,
+            fg_color=T.ACCENT_DEFAULT,
+            corner_radius=T.SMALL_RADIUS,
+        )
+        self._accent_preview.pack(side="left", padx=(6, 0))
+        self._accent_entry.bind("<KeyRelease>", self._on_accent_key)
+        ctk.CTkButton(
+            accent_row,
+            text="Apply",
+            width=60, height=30,
+            font=T.FONT_SMALL,
+            fg_color=T.ACCENT_DEFAULT,
+            hover_color=T.ACCENT_HOVER,
+            text_color="#FFFFFF",
+            corner_radius=T.SMALL_RADIUS,
+            command=self._apply_custom_accent,
+        ).pack(side="left", padx=(6, 0))
+
         # Opacity slider
         ctk.CTkLabel(
             appear,
@@ -200,6 +239,33 @@ class SettingsView(ctk.CTkFrame):
         entry.insert(0, default)
         entry.pack(anchor="w", padx=16, pady=(4, 4))
         return entry
+
+    @staticmethod
+    def _valid_hex(color: str) -> bool:
+        c = color.strip()
+        if not c.startswith("#"):
+            return False
+        rest = c[1:]
+        return len(rest) in (3, 6) and all(ch in "0123456789abcdefABCDEF" for ch in rest)
+
+    def _on_accent_key(self, _event=None) -> None:
+        color = self._accent_entry.get().strip()
+        if self._valid_hex(color):
+            try:
+                self._accent_preview.configure(fg_color=color)
+            except Exception:
+                pass
+
+    def _apply_custom_accent(self) -> None:
+        color = self._accent_entry.get().strip()
+        if not self._valid_hex(color):
+            self._status.configure(
+                text="Invalid hex colour. Use format #RRGGBB.", text_color=T.STATUS_ERROR
+            )
+            return
+        theme_manager.set_accent(color)
+        self._on_save("accent_color", color)
+        self._status.configure(text=f"Accent colour applied: {color}", text_color=T.STATUS_READY)
 
     def _on_theme_select(self, name: str) -> None:
         for n, sw in self._swatches.items():

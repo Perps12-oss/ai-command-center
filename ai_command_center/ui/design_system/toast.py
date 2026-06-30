@@ -1,6 +1,8 @@
 """Toast notification system — ToastManager stacks dismissible bubbles top-right."""
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
@@ -20,7 +22,14 @@ _KIND_ICON = {
 
 
 class _ToastBubble(ctk.CTkFrame):
-    def __init__(self, master, message: str, kind: str, on_dismiss) -> None:
+    def __init__(
+        self,
+        master,
+        message: str,
+        kind: str,
+        on_dismiss,
+        action: tuple[str, Callable] | None = None,
+    ) -> None:
         color = _KIND_COLOR.get(kind, T.ACCENT_DEFAULT)
         super().__init__(
             master,
@@ -28,7 +37,7 @@ class _ToastBubble(ctk.CTkFrame):
             border_color=color,
             border_width=1,
             corner_radius=T.CARD_RADIUS,
-            width=300,
+            width=320,
         )
         self._on_dismiss = on_dismiss
 
@@ -62,6 +71,21 @@ class _ToastBubble(ctk.CTkFrame):
             command=self._dismiss,
         ).pack(side="right", padx=(4, 0))
 
+        if action:
+            action_label, action_cb = action
+            ctk.CTkButton(
+                inner,
+                text=action_label,
+                height=20,
+                width=54,
+                font=(T.FONT_FAMILY, 10),
+                fg_color=color,
+                hover_color=T.BG_GLASS_BORDER,
+                text_color="#FFFFFF",
+                corner_radius=T.SMALL_RADIUS,
+                command=lambda: (action_cb(), self._dismiss()),
+            ).pack(side="right", padx=(4, 0))
+
     def schedule_dismiss(self, ms: int) -> None:
         self.after(ms, self._dismiss)
 
@@ -83,8 +107,9 @@ class ToastManager:
         *,
         kind: str = "info",
         duration: int = 3000,
+        action: tuple[str, Callable] | None = None,
     ) -> None:
-        toast = _ToastBubble(self._master, message, kind, self._dismiss)
+        toast = _ToastBubble(self._master, message, kind, self._dismiss, action=action)
         self._toasts.append(toast)
         self._reposition()
         toast.schedule_dismiss(duration)

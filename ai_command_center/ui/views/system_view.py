@@ -78,6 +78,81 @@ class _EventLogCard(ctk.CTkFrame):
             ctk.CTkLabel(row, text=ts, font=T.FONT_MONO, text_color=T.TEXT_MUTED, width=68, anchor="w").pack(side="left")
             ctk.CTkLabel(row, text=text, font=T.FONT_SMALL, text_color=color, anchor="w", wraplength=480, justify="left").pack(side="left", fill="x", expand=True)
 
+_SERVICE_STATE_COLOR = {
+    "ready":    "#22C55E",
+    "starting": "#EAB308",
+    "degraded": "#EAB308",
+    "error":    "#EF4444",
+    "stopped":  "#3A3A5A",
+    "stopping": "#3A3A5A",
+}
+_SERVICE_SLOTS = 60
+
+
+class _ServiceHealthTimeline(ctk.CTkFrame):
+    """Compact per-service sparkline of state transitions (last 60 ticks)."""
+
+    def __init__(self, master) -> None:
+        super().__init__(
+            master,
+            fg_color=T.BG_GLASS,
+            border_color=T.BG_GLASS_BORDER,
+            border_width=1,
+            corner_radius=T.CARD_RADIUS,
+        )
+        ctk.CTkLabel(
+            self, text="SERVICE HEALTH TIMELINE",
+            font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(8, 4))
+
+        self._rows: dict[str, tuple[ctk.CTkCanvas, ctk.CTkLabel]] = {}
+        self._history: dict[str, deque[str]] = {}
+        self._body = ctk.CTkFrame(self, fg_color="transparent")
+        self._body.pack(fill="x", padx=T.PAD, pady=(0, 8))
+
+    def _ensure_row(self, service: str) -> None:
+        if service in self._rows:
+            return
+        self._history[service] = deque(["stopped"] * _SERVICE_SLOTS, maxlen=_SERVICE_SLOTS)
+        row = ctk.CTkFrame(self._body, fg_color="transparent")
+        row.pack(fill="x", pady=(2, 0))
+        name_lbl = ctk.CTkLabel(
+            row, text=service[:22], font=T.FONT_MONO, text_color=T.TEXT_SECONDARY,
+            width=140, anchor="w",
+        )
+        name_lbl.pack(side="left")
+        canvas = ctk.CTkCanvas(row, height=12, bg=T.BG_DEEP, highlightthickness=0)
+        canvas.pack(side="left", fill="x", expand=True, padx=(4, 0))
+        state_lbl = ctk.CTkLabel(
+            row, text="stopped", font=(T.FONT_FAMILY, 10),
+            text_color=T.TEXT_MUTED, width=60, anchor="e",
+        )
+        state_lbl.pack(side="right", padx=(4, 0))
+        self._rows[service] = (canvas, state_lbl)
+
+    def push_service_state(self, service: str, state: str) -> None:
+        self._ensure_row(service)
+        self._history[service].append(state.lower())
+        canvas, state_lbl = self._rows[service]
+        color = _SERVICE_STATE_COLOR.get(state.lower(), T.TEXT_MUTED)
+        state_lbl.configure(text=state.lower(), text_color=color)
+        self._redraw(service)
+
+    def _redraw(self, service: str) -> None:
+        canvas, _ = self._rows[service]
+        canvas.update_idletasks()
+        w = canvas.winfo_width() or 300
+        h = 12
+        canvas.delete("all")
+        slots = list(self._history[service])
+        slot_w = max(1, w / _SERVICE_SLOTS)
+        for i, state in enumerate(slots):
+            x0 = int(i * slot_w)
+            x1 = max(x0 + 1, int((i + 1) * slot_w) - 1)
+            color = _SERVICE_STATE_COLOR.get(state, T.BG_GLASS_BORDER)
+            canvas.create_rectangle(x0, 1, x1, h - 1, fill=color, outline="")
+
+
 try:
     import psutil as _psutil
     _PSUTIL = True
@@ -402,6 +477,10 @@ class SystemView(ctk.CTkFrame):
         self._top_table = _ProcessTable(top_card)
         self._top_table.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
+        # ── Service health timeline ─────────────────────────────────────────
+        self._service_timeline = _ServiceHealthTimeline(scroll)
+        self._service_timeline.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
         # ── Tool execution log ──────────────────────────────────────────────
         self._tool_log = _EventLogCard(
             scroll, "TOOL EXECUTION LOG", "No tool runs yet."
@@ -540,6 +619,10 @@ class SystemView(ctk.CTkFrame):
         self._proc_lbl.configure(
             text=f"System phase: {phase.title()}  ·  Source: SystemSnapshot"
         )
+
+    def push_service_state(self, service: str, state: str) -> None:
+        """Record a service state tick on the health timeline."""
+        self._service_timeline.push_service_state(service, state)
 
     def push_tool_event(self, text: str, is_error: bool = False) -> None:
         """Append a tool run entry. Called from app.py via UIQueue."""

@@ -11,6 +11,7 @@ from ai_command_center.ui.design_system import theme_v2 as T
 
 _active_name: str = "VS Dark"
 _active_alpha: float = T.WINDOW_ALPHA
+_custom_accent: str | None = None
 
 
 def theme_names() -> list[str]:
@@ -26,7 +27,16 @@ def active_alpha() -> float:
 
 
 def active_accent() -> str:
+    if _custom_accent:
+        return _custom_accent
     return T.THEMES.get(_active_name, {}).get("accent", T.ACCENT_DEFAULT)
+
+
+def set_accent(color: str) -> None:
+    """Override the runtime accent colour. Mutates the theme token in-process."""
+    global _custom_accent
+    _custom_accent = color
+    T.ACCENT_DEFAULT = color  # type: ignore[assignment]
 
 
 def _normalize_theme(name: str) -> str:
