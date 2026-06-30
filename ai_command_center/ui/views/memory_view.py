@@ -105,6 +105,9 @@ class MemoryView(ctk.CTkFrame):
         )
         self._count_lbl.pack(side="left", pady=10)
 
+        self._injection_frame = ctk.CTkFrame(header, fg_color="transparent")
+        self._injection_frame.pack(side="right", padx=(0, T.PAD), pady=6)
+
         if self._on_add is not None:
             ctk.CTkButton(
                 header,
@@ -141,6 +144,43 @@ class MemoryView(ctk.CTkFrame):
         self._scroll.columnconfigure(0, weight=1)
 
         self._render()
+
+    def update_injection_indicator(self, selected: tuple[str, ...]) -> None:
+        """Show badges for memories currently injected into context."""
+        for w in self._injection_frame.winfo_children():
+            w.destroy()
+        if not selected:
+            ctk.CTkLabel(
+                self._injection_frame,
+                text="No memories in context",
+                font=(T.FONT_FAMILY, 10),
+                text_color=T.TEXT_MUTED,
+            ).pack(side="left")
+            return
+        ctk.CTkLabel(
+            self._injection_frame,
+            text="In context:",
+            font=(T.FONT_FAMILY, 10),
+            text_color=T.TEXT_MUTED,
+        ).pack(side="left", padx=(0, 4))
+        for label in selected[:4]:
+            ctk.CTkLabel(
+                self._injection_frame,
+                text=label[:24],
+                font=(T.FONT_FAMILY, 10),
+                text_color=T.STATUS_READY,
+                fg_color=T.BG_GLASS,
+                corner_radius=T.SMALL_RADIUS,
+                padx=6,
+                pady=2,
+            ).pack(side="left", padx=2)
+        if len(selected) > 4:
+            ctk.CTkLabel(
+                self._injection_frame,
+                text=f"+{len(selected) - 4}",
+                font=(T.FONT_FAMILY, 10),
+                text_color=T.TEXT_MUTED,
+            ).pack(side="left", padx=2)
 
     def load_memories(self, items: list[dict]) -> None:
         """Replace the displayed list. items: list of {text, timestamp, id}."""

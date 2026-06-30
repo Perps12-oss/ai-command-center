@@ -491,6 +491,7 @@ class CommandPaletteApp(ctk.CTk):
         memory = self._memory_view()
         if memory:
             memory.load_from_appstate(snap)
+            memory.update_injection_indicator(snap.memory_selected)
 
         notes = self._notes_view()
         if notes:
@@ -503,6 +504,16 @@ class CommandPaletteApp(ctk.CTk):
         system = self._system_view()
         if system:
             system.apply_system_snapshot(snap.system_snapshot)
+            if snap.errors:
+                system.load_errors(snap.errors)
+
+        home = self._home_view()
+        if home and snap.chat_history_count:
+            home.update_stats(
+                messages=snap.chat_history_count,
+                memories=self._memory_count,
+                notes=self._note_count,
+            )
 
     # ── fade / show / hide ─────────────────────────────────────────────────────
 
@@ -773,11 +784,15 @@ class CommandPaletteApp(ctk.CTk):
     def _on_tool_result(self, event: Event) -> None:
         tool = str(event.payload.get("tool", ""))
         output = str(event.payload.get("output", ""))
+        summary = output[:120] + ("…" if len(output) > 120 else "")
 
         def update() -> None:
             chat = self._chat_view()
             if chat:
                 chat.show_tool_output(tool, output, success=True)
+            system = self._system_view()
+            if system:
+                system.push_tool_event(f"{tool}: {summary}")
             self._apply_state()
 
         self._ui_queue.enqueue(update)
@@ -790,6 +805,9 @@ class CommandPaletteApp(ctk.CTk):
             chat = self._chat_view()
             if chat:
                 chat.show_tool_output(tool, error, success=False)
+            system = self._system_view()
+            if system:
+                system.push_tool_event(f"{tool}: {error[:120]}", is_error=True)
             self._toast.show(f"Tool error: {tool}", kind="error")
 
         self._ui_queue.enqueue(update)
@@ -928,11 +946,13 @@ class CommandPaletteApp(ctk.CTk):
 
     def _on_model_selected(self, event: Event) -> None:
         model = str(event.payload.get("model", ""))
+        resolved_by = str(event.payload.get("resolved_by", ""))
+        indicator = f"{model} (routed)" if resolved_by == "model_router" else model
 
         def update() -> None:
-            self._top.update_status("ready", model)
+            self._top.update_status("ready", indicator)
             chat = self._chat_view()
             if chat:
-                chat.set_model(model)
+                chat.set_model(indicator)
 
         self._ui_queue.enqueue(update)

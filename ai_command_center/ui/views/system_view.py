@@ -1,13 +1,82 @@
-"""System monitor — CPU/RAM/Disk/Net meters, sparkline, top processes."""
+"""System monitor — CPU/RAM/Disk/Net meters, sparkline, top processes, tool log, error log."""
 from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
+
+_MAX_LOG_ROWS = 50
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Generic scrollable event-log card (shared by tool log + error log)
+# ──────────────────────────────────────────────────────────────────────────────
+
+class _EventLogCard(ctk.CTkFrame):
+    """Scrollable list of timestamped log entries with optional colour coding."""
+
+    def __init__(self, master, title: str, empty_msg: str, max_rows: int = _MAX_LOG_ROWS) -> None:
+        super().__init__(master, fg_color=T.BG_GLASS, border_color=T.BG_GLASS_BORDER, border_width=1, corner_radius=T.CARD_RADIUS)
+        self._max_rows = max_rows
+        self._empty_msg = empty_msg
+        self._entries: deque[tuple[str, str, str]] = deque(maxlen=max_rows)  # (ts, text, color)
+
+        hdr = ctk.CTkFrame(self, fg_color="transparent")
+        hdr.pack(fill="x", padx=T.PAD, pady=(8, 4))
+        ctk.CTkLabel(hdr, text=title, font=T.FONT_ROLE, text_color=T.TEXT_MUTED, anchor="w").pack(side="left")
+        self._count_lbl = ctk.CTkLabel(hdr, text="", font=T.FONT_SMALL, text_color=T.TEXT_MUTED, anchor="e")
+        self._count_lbl.pack(side="right")
+
+        btn_row = ctk.CTkFrame(self, fg_color="transparent")
+        btn_row.pack(fill="x", padx=T.PAD, pady=(0, 4))
+        ctk.CTkButton(
+            btn_row, text="Clear", width=54, height=22,
+            font=T.FONT_SMALL, fg_color=T.BG_GLASS, hover_color=T.BG_GLASS_BORDER,
+            text_color=T.TEXT_MUTED, corner_radius=T.SMALL_RADIUS,
+            command=self.clear,
+        ).pack(side="right")
+
+        self._scroll = ctk.CTkScrollableFrame(self, fg_color=T.BG_DEEP, corner_radius=0, height=140)
+        self._scroll.pack(fill="x", padx=0, pady=(0, 0))
+        self._render()
+
+    def push(self, text: str, color: str | None = None) -> None:
+        ts = time.strftime("%H:%M:%S")
+        self._entries.appendleft((ts, text, color or T.TEXT_SECONDARY))
+        self._render()
+
+    def clear(self) -> None:
+        self._entries.clear()
+        self._render()
+
+    def load_errors(self, errors: tuple[str, ...]) -> None:
+        """Bulk-load from AppState.errors — replaces current contents."""
+        self._entries.clear()
+        for msg in reversed(errors):
+            self._entries.appendleft(("—", msg, T.STATUS_ERROR))
+        self._render()
+
+    def _render(self) -> None:
+        for w in self._scroll.winfo_children():
+            w.destroy()
+        count = len(self._entries)
+        self._count_lbl.configure(text=f"{count}" if count else "")
+        if not self._entries:
+            ctk.CTkLabel(
+                self._scroll, text=self._empty_msg,
+                font=T.FONT_SMALL, text_color=T.TEXT_MUTED, anchor="w",
+            ).pack(fill="x", padx=T.PAD, pady=6)
+            return
+        for ts, text, color in self._entries:
+            row = ctk.CTkFrame(self._scroll, fg_color="transparent")
+            row.pack(fill="x", padx=T.PAD, pady=(1, 1))
+            ctk.CTkLabel(row, text=ts, font=T.FONT_MONO, text_color=T.TEXT_MUTED, width=68, anchor="w").pack(side="left")
+            ctk.CTkLabel(row, text=text, font=T.FONT_SMALL, text_color=color, anchor="w", wraplength=480, justify="left").pack(side="left", fill="x", expand=True)
 
 try:
     import psutil as _psutil
@@ -333,6 +402,18 @@ class SystemView(ctk.CTkFrame):
         self._top_table = _ProcessTable(top_card)
         self._top_table.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
+        # ── Tool execution log ──────────────────────────────────────────────
+        self._tool_log = _EventLogCard(
+            scroll, "TOOL EXECUTION LOG", "No tool runs yet."
+        )
+        self._tool_log.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
+        # ── App error log ───────────────────────────────────────────────────
+        self._error_log = _EventLogCard(
+            scroll, "APP ERROR LOG", "No errors recorded.", max_rows=20
+        )
+        self._error_log.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
         self._start_polling()
 
     def _start_polling(self) -> None:
@@ -459,6 +540,15 @@ class SystemView(ctk.CTkFrame):
         self._proc_lbl.configure(
             text=f"System phase: {phase.title()}  ·  Source: SystemSnapshot"
         )
+
+    def push_tool_event(self, text: str, is_error: bool = False) -> None:
+        """Append a tool run entry. Called from app.py via UIQueue."""
+        color = T.STATUS_ERROR if is_error else T.STATUS_READY
+        self._tool_log.push(text, color)
+
+    def load_errors(self, errors: tuple[str, ...]) -> None:
+        """Sync error log from AppState.errors. Called from _apply_catalog_views."""
+        self._error_log.load_errors(errors)
 
     def on_hide(self) -> None:
         self._active = False
