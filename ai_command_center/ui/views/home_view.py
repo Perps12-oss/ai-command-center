@@ -9,6 +9,7 @@ import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.widget_utils import clear_children
 
 _QUICK_ACTIONS: tuple[tuple[str, str, str, str], ...] = (
     ("\u2318  Ask AI",        "Type any question in the command box below",                  "accent",    "What can you help me with?"),
@@ -345,8 +346,7 @@ class HomeView(ctk.CTkFrame):
     # ── pin management ─────────────────────────────────────────────────────────
 
     def _render_pins(self) -> None:
-        for w in self._pins_frame.winfo_children():
-            w.destroy()
+        clear_children(self._pins_frame)
         if not self._pinned_commands:
             ctk.CTkLabel(
                 self._pins_frame,

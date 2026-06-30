@@ -8,6 +8,7 @@ from collections import deque
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.ui.widget_utils import clear_children
 from ai_command_center.ui.design_system import theme_v2 as T
 
 _MAX_LOG_ROWS = 50
@@ -62,8 +63,7 @@ class _EventLogCard(ctk.CTkFrame):
         self._render()
 
     def _render(self) -> None:
-        for w in self._scroll.winfo_children():
-            w.destroy()
+        clear_children(self._scroll)
         count = len(self._entries)
         self._count_lbl.configure(text=f"{count}" if count else "")
         if not self._entries:
@@ -368,8 +368,7 @@ class _ProcessTable(ctk.CTkFrame):
         self._render()
 
     def _render(self) -> None:
-        for w in self._rows.winfo_children():
-            w.destroy()
+        clear_children(self._rows)
 
         shown = [p for p in self._procs if self._filter in p[3].lower()]
         shown.sort(key=self._SORT_KEY[self._sort_col], reverse=self._sort_desc)

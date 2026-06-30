@@ -7,6 +7,7 @@ from collections import deque
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.widget_utils import clear_children
 
 _MAX_HISTORY = 50
 
@@ -150,8 +151,7 @@ class CommandHistoryDrawer(ctk.CTkFrame):
         self._render()
 
     def _render(self) -> None:
-        for w in self._scroll.winfo_children():
-            w.destroy()
+        clear_children(self._scroll)
         if not self._entries:
             ctk.CTkLabel(
                 self._scroll,

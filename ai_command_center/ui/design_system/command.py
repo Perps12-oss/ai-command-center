@@ -5,6 +5,8 @@ from typing import Callable
 
 import customtkinter as ctk
 
+from ai_command_center.ui.widget_utils import clear_children
+
 from ai_command_center.ui.design_system import theme_v2 as T
 
 Command = tuple[str, str, Callable[[], None]]
@@ -122,8 +124,7 @@ class CommandPalette(ctk.CTkToplevel):
         self._render_list()
 
     def _render_list(self) -> None:
-        for w in self._list_frame.winfo_children():
-            w.destroy()
+        clear_children(self._list_frame)
 
         if not self._filtered:
             ctk.CTkLabel(
