@@ -5,6 +5,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.widget_utils import clear_children
 
 
 class PluginsView(ctk.CTkFrame):
@@ -57,8 +58,7 @@ class PluginsView(ctk.CTkFrame):
         self.show_catalog(plugins)
 
     def show_catalog(self, plugins: list[dict]) -> None:
-        for child in self._list.winfo_children():
-            child.destroy()
+        clear_children(self._list)
         self._rows.clear()
 
         if not plugins:

@@ -6,6 +6,7 @@ import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.widget_utils import clear_children
 
 
 class NotesView(ctk.CTkFrame):
@@ -129,8 +130,7 @@ class NotesView(ctk.CTkFrame):
             self.show_preview(selected.path, selected.title, selected.snippet)
 
     def show_results(self, query: str, results: list[dict]) -> None:
-        for child in self._scroll.winfo_children():
-            child.destroy()
+        clear_children(self._scroll)
 
         if not results:
             self._status.configure(

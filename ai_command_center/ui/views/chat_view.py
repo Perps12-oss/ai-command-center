@@ -12,6 +12,7 @@ from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
 from ai_command_center.ui.markdown_plain import format_assistant_markdown
 from ai_command_center.ui.markdown_view import parse_markdown
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.widget_utils import clear_children
 
 # ── Layout constants ───────────────────────────────────────────────────────────
 _BUBBLE_RADIUS  = T.BUBBLE_RADIUS
@@ -1207,8 +1208,7 @@ class ChatView(ctk.CTkFrame):
 
     def _clear_ui(self) -> None:
         """Destroy all message widgets but keep the history data intact."""
-        for child in self._scroll.winfo_children():
-            child.destroy()
+        clear_children(self._scroll)
         self._streaming_bubble = None
         self._streaming = False
         # Recreate empty state

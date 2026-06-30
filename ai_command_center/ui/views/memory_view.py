@@ -7,6 +7,7 @@ import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.widget_utils import clear_children
 
 
 class _MemoryRow(ctk.CTkFrame):
@@ -147,8 +148,7 @@ class MemoryView(ctk.CTkFrame):
 
     def update_injection_indicator(self, selected: tuple[str, ...]) -> None:
         """Show badges for memories currently injected into context."""
-        for w in self._injection_frame.winfo_children():
-            w.destroy()
+        clear_children(self._injection_frame)
         if not selected:
             ctk.CTkLabel(
                 self._injection_frame,
@@ -333,8 +333,7 @@ class MemoryView(ctk.CTkFrame):
         return [it for it in self._items if q in it.get("text", "").lower()]
 
     def _render(self) -> None:
-        for w in self._scroll.winfo_children():
-            w.destroy()
+        clear_children(self._scroll)
 
         shown = self._visible_items()
         count = len(shown)
