@@ -780,9 +780,10 @@ class ChatView(ctk.CTkFrame):
         # Search bar (hidden by default, shown with Ctrl+F)
         self._search_bar = _SearchBar(self, on_search=self._do_search, on_close=self._close_search)
 
-        # Keybinding: Ctrl+F opens search
-        self.bind_all("<Control-f>", lambda _e: self._toggle_search(), add="+")
-        self.bind_all("<Control-F>", lambda _e: self._toggle_search(), add="+")
+        # Keybinding: Ctrl+F opens search — bind on root window (bind_all banned by CTk)
+        root = self.winfo_toplevel()
+        root.bind("<Control-f>", lambda _e: self._toggle_search(), add="+")
+        root.bind("<Control-F>", lambda _e: self._toggle_search(), add="+")
 
         # ③ Middle: history panel + scroll area — must come LAST (expand=True)
         middle = ctk.CTkFrame(self, fg_color="transparent")
