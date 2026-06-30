@@ -192,3 +192,8 @@ These are **real findings** the suite intentionally tracks (not test bugs):
    `test_production_pipeline_should_refuse_dangerous_command`. Promote
    `tests/support/sandbox.py::CommandSandbox` into `ToolExecutorService` to close
    the gap (the xfail will then xpass — flip it to a normal assertion).
+3. **`services/base.py`** — `BaseService.start()`/`stop()` have no internal
+   locking, so concurrent `load`/`unload` calls can race past the state guards
+   (risk #5). The chaos test tolerates this (it asserts UI responsiveness and
+   no-crash, not exact transitions); add a per-service lock around the lifecycle
+   transitions to close the gap.
