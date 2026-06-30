@@ -739,7 +739,33 @@ class ChatView(ctk.CTkFrame):
         )
         self._session_bar.pack(fill="x", side="top")
 
-        # ② Input pill (bottom, full width)
+        # ② Bottom chrome — must all be packed before the expand=True middle frame
+
+        # Context bar: sources · token budget (AppState-driven)
+        ctx_frame = ctk.CTkFrame(self, fg_color="transparent")
+        ctx_frame.pack(fill="x", side="bottom", padx=16, pady=(0, 4))
+
+        self._context_bar = ctk.CTkLabel(
+            ctx_frame,
+            text="Sources: — · Tokens: —",
+            font=(T.FONT_FAMILY, 10),
+            text_color=_CLR_META,
+            anchor="w",
+        )
+        self._context_bar.pack(side="left", fill="x", expand=True)
+
+        self._token_bar = ctk.CTkProgressBar(
+            ctx_frame,
+            width=120,
+            height=4,
+            corner_radius=2,
+            fg_color=T.BG_GLASS,
+            progress_color=T.STATUS_READY,
+        )
+        self._token_bar.set(0)
+        self._token_bar.pack(side="right", padx=(8, 0))
+
+        # Input pill
         self._pill = _InputPill(
             self,
             on_send=self._on_send,
@@ -758,7 +784,7 @@ class ChatView(ctk.CTkFrame):
         self.bind_all("<Control-f>", lambda _e: self._toggle_search(), add="+")
         self.bind_all("<Control-F>", lambda _e: self._toggle_search(), add="+")
 
-        # ③ Middle: history panel + scroll area
+        # ③ Middle: history panel + scroll area — must come LAST (expand=True)
         middle = ctk.CTkFrame(self, fg_color="transparent")
         middle.pack(fill="both", expand=True)
 
@@ -805,30 +831,6 @@ class ChatView(ctk.CTkFrame):
         canvas = self._scroll._parent_canvas
         for event in ("<MouseWheel>", "<Button-4>", "<Button-5>", "<Configure>"):
             canvas.bind(event, self._on_canvas_scroll, add="+")
-
-        # Context bar: sources · token budget (AppState-driven)
-        ctx_frame = ctk.CTkFrame(self, fg_color="transparent")
-        ctx_frame.pack(fill="x", side="bottom", padx=16, pady=(0, 4))
-
-        self._context_bar = ctk.CTkLabel(
-            ctx_frame,
-            text="Sources: — · Tokens: —",
-            font=(T.FONT_FAMILY, 10),
-            text_color=_CLR_META,
-            anchor="w",
-        )
-        self._context_bar.pack(side="left", fill="x", expand=True)
-
-        self._token_bar = ctk.CTkProgressBar(
-            ctx_frame,
-            width=120,
-            height=4,
-            corner_radius=2,
-            fg_color=T.BG_GLASS,
-            progress_color=T.STATUS_READY,
-        )
-        self._token_bar.set(0)
-        self._token_bar.pack(side="right", padx=(8, 0))
 
         self._refresh_session_bar()
 
