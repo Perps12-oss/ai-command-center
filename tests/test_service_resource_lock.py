@@ -71,6 +71,9 @@ class LockingService(BaseService):
         import threading
 
         self._release_gate = threading.Event()
+        # Serialises release so the (daemon) unload thread and force_release()
+        # cannot both close the same fd.
+        self._release_lock_guard = threading.Lock()
 
     def _on_load(self) -> None:
         self._fd = os.open(str(self._lock_path), os.O_RDWR | os.O_CREAT)
@@ -89,23 +92,25 @@ class LockingService(BaseService):
         self._release_lock()
 
     def _release_lock(self) -> None:
-        if self._fd is None:
-            return
-        try:
-            if sys.platform == "win32":
-                import msvcrt
-
-                try:
-                    msvcrt.locking(self._fd, msvcrt.LK_UNLCK, 1)
-                except OSError:
-                    pass
-            else:
-                import fcntl
-
-                fcntl.flock(self._fd, fcntl.LOCK_UN)
-        finally:
-            os.close(self._fd)
+        with self._release_lock_guard:
+            fd = self._fd
+            if fd is None:
+                return
             self._fd = None
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
+
+                    try:
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
+                else:
+                    import fcntl
+
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
 
     def force_release(self) -> None:
         self._release_gate.set()
