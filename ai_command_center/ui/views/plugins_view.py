@@ -29,16 +29,16 @@ class PluginsView(ctk.CTkFrame):
             justify="left",
         ).pack(anchor="w", padx=T.PAD, pady=(0, 12))
 
-        self._list = ctk.CTkScrollableFrame(self, fg_color=T.BG_GLASS, corner_radius=T.CORNER_RADIUS)
-        self._list.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
-
         self._status = ctk.CTkLabel(
             self,
             text="Loading catalog…",
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
         )
-        self._status.pack(anchor="w", padx=T.PAD, pady=(0, T.PAD))
+        self._status.pack(anchor="w", padx=T.PAD, pady=(0, 4))
+
+        self._list = ctk.CTkScrollableFrame(self, fg_color=T.BG_GLASS, corner_radius=T.CORNER_RADIUS)
+        self._list.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
 
     def load_from_appstate(self, snap) -> None:
         """Render plugin catalog from AppState projection."""
