@@ -797,10 +797,9 @@ class ChatView(ctk.CTkFrame):
         )
         self._history_panel.pack(fill="y", side="left")
 
-        # Vertical divider
-        ctk.CTkFrame(
-            middle, width=1, fg_color=T.BG_GLASS_BORDER
-        ).pack(fill="y", side="left")
+        # Vertical divider — stored so _toggle_history can reorder it
+        self._divider = ctk.CTkFrame(middle, width=1, fg_color=T.BG_GLASS_BORDER)
+        self._divider.pack(fill="y", side="left")
 
         self._scroll = ctk.CTkScrollableFrame(
             middle, fg_color=T.BG_DEEP, corner_radius=0
@@ -882,7 +881,12 @@ class ChatView(ctk.CTkFrame):
     def _toggle_history(self) -> None:
         self._history_open = not self._history_open
         if self._history_open:
-            self._history_panel.pack(fill="y", side="left", before=self._scroll)
+            # Re-pack in correct order: panel (left) then divider then scroll (expand)
+            self._scroll.pack_forget()
+            self._divider.pack_forget()
+            self._history_panel.pack(fill="y", side="left")
+            self._divider.pack(fill="y", side="left")
+            self._scroll.pack(fill="both", expand=True)
         else:
             self._history_panel.pack_forget()
         self._refresh_session_bar()
