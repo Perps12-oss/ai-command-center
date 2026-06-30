@@ -1,0 +1,30 @@
+# Bandit configuration for the AI Command Center.
+# Risk area #3 - flag dangerous shell/eval/exec usage.
+#
+# This is an INI-style config, so pass it with --ini (not -c, which is YAML):
+#   bandit -r ai_command_center --ini .bandit
+#
+# Pre-commit / CI fail on NEW high-severity findings (known ones are baselined):
+#   bandit -r ai_command_center --ini .bandit \
+#          --baseline tests/bandit_baseline.json --severity-level high
+#
+# Bandit reads the [bandit] INI section from this file.
+
+[bandit]
+# Directories that contain only tests/fixtures or generated assets.
+exclude = /tests,/.venv,/venv,/build,/dist,/scripts
+
+# Tests we explicitly care about (kept enabled - listed for documentation):
+#   B602  subprocess_popen_with_shell_equals_true
+#   B603  subprocess_without_shell_equals_true
+#   B604  any_other_function_with_shell_equals_true
+#   B605  start_process_with_a_shell
+#   B606  start_process_with_no_shell
+#   B607  start_process_with_partial_path
+#   B102  exec_used
+#   B307  eval
+#   B608  hardcoded_sql_expressions
+tests = B102,B307,B602,B603,B604,B605,B606,B607,B608
+
+# Do not silence anything by default; the suite wants these surfaced.
+skips =
