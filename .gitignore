@@ -59,3 +59,9 @@ scripts/*.db
 # UCGS generated reports (local)
 .ucgs_last.yaml
 ucgs_report.yaml
+
+# Test / coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
