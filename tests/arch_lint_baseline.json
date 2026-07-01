@@ -1,0 +1,16 @@
+{
+  "violations": [
+    {
+      "rule": "R1",
+      "file": "ai_command_center/ui/components/hero_panel.py",
+      "line": 9,
+      "message": "UI module imports forbidden layer 'ai_command_center.services.asset_service'; route through EventBus / AppState instead"
+    },
+    {
+      "rule": "R2",
+      "file": "ai_command_center/ui/components/hero_panel.py",
+      "line": 21,
+      "message": "service class 'AssetService' instantiated outside services/ or composition root"
+    }
+  ]
+}

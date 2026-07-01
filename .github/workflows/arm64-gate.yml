@@ -1,0 +1,42 @@
+name: ARM64 Native Gate
+
+# Hard ARM64 gate for risk area #1. Hosted x64 runners would always fail the PE
+# machine-type scan, so this workflow targets a native Windows ARM64 runner.
+#
+# Trigger it manually (workflow_dispatch) or wire `runs-on` to your self-hosted
+# ARM64 runner / GitHub `windows-11-arm` runner and enable the push/PR triggers.
+on:
+  workflow_dispatch:
+  # Uncomment once an ARM64 runner is available to gate every PR:
+  # pull_request:
+  # push:
+  #   branches: [main]
+
+jobs:
+  arm64-gate:
+    name: Native ARM64 verification
+    # Change to your ARM64 runner label, e.g. [self-hosted, windows, ARM64]
+    # or the GitHub-hosted `windows-11-arm` image.
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python (native ARM64)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: arm64
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Confirm interpreter is native ARM64
+        run: python -c "import platform,sys; m=platform.machine().upper(); print(m); sys.exit(0 if m=='ARM64' else 1)"
+
+      - name: HARD GATE - no x64 / emulated binaries
+        run: python scripts/check_arm64_binaries.py
+
+      - name: Run full suite incl. ARM64-only tests
+        run: python -m pytest -p no:cacheprovider
