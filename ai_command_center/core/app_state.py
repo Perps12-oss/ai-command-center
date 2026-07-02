@@ -913,7 +913,10 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
     workspace_id = str(
         payload.get("workspace_id") or (existing.workspace_id if existing else "")
     )
-    error = str(payload.get("error") or (existing.error if existing else ""))
+    if event.topic == AGENT_TERMINATED:
+        error = str(payload.get("error", ""))
+    else:
+        error = str(payload.get("error") or (existing.error if existing else ""))
 
     if event.topic == AGENT_SPAWNED:
         run_state = str(payload.get("state", "spawning"))
@@ -996,7 +999,12 @@ def _reduce_workflow_run(state: AppState, event: Event) -> AppState:
         payload.get("index"),
         existing.current_step_index if existing else 0,
     )
-    error = str(payload.get("error") or (existing.error if existing else ""))
+    if event.topic == WORKFLOW_COMPLETED:
+        error = str(payload.get("error", ""))
+    elif event.topic == WORKFLOW_FAILED:
+        error = str(payload.get("error") or (existing.error if existing else ""))
+    else:
+        error = str(payload.get("error") or (existing.error if existing else ""))
 
     if event.topic == WORKFLOW_STARTED:
         item = WorkflowRunItem(
