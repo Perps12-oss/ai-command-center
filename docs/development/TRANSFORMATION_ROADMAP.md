@@ -108,6 +108,7 @@ gantt
 | Field | Value |
 |-------|-------|
 | **Objective** | Reduce god classes; eliminate UI→repo violations |
+| **Status** | In progress — hero_panel, layout compiler, controller bus routing fixed |
 | **Tasks** | Refactor hero_panel, layout/compiler; dedupe db/repositories; split app.py bus handlers |
 | **Dependencies** | Track 1, Track 2 Stage 2 |
 | **Risks** | UI regression |
@@ -122,6 +123,7 @@ gantt
 | Field | Value |
 |-------|-------|
 | **Objective** | Packaging, paths, cross-platform abstractions |
+| **Status** | In progress — HotkeyProvider abstraction added |
 | **Tasks** | PLATFORM_STRATEGY phases P0–P1; HotkeyProvider; MSI build |
 | **Dependencies** | Track 5 |
 | **Effort** | L |
@@ -135,6 +137,7 @@ gantt
 | Field | Value |
 |-------|-------|
 | **Objective** | Bus-native supervised agents |
+| **Status** | A1 skeleton — AgentRuntimeService registered |
 | **Tasks** | AGENT_FRAMEWORK phases A0–A2; AgentRuntimeService |
 | **Dependencies** | Track 5, MODEL_ORCHESTRATION M1 |
 | **Risks** | Runaway loops |
@@ -149,6 +152,7 @@ gantt
 | Field | Value |
 |-------|-------|
 | **Objective** | Multi-step automation on EventBus |
+| **Status** | W1 skeleton — WorkflowEngineService registered |
 | **Tasks** | WORKFLOW_ENGINE W0–W2; WorkflowRepository |
 | **Dependencies** | Track 7 A1, Tool runtime stable |
 | **Effort** | XL |

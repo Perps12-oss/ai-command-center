@@ -1,10 +1,10 @@
 # UCGS v5 project configuration
-# Copy/adapt per project. Run: python tools/ucgs_init.py --profile default
+# Run: python tools/ucgs_runner.py
 
 ucgs_version: v5
-profile: default
-phase: "bootstrap"
-enforcement_mode: warn  # warn (Phase 1) | block (Phase 2/3)
+profile: ai-command-center
+phase: "transformation"
+enforcement_mode: warn  # warn (Stage 1-2) | block (Stage 3)
 
 rules:
   large_commit:

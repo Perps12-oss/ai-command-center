@@ -146,6 +146,21 @@ UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
 UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
 UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"
 
+# Agent framework (Track 7 — A0/A1)
+AGENT_SPAWN_REQUEST = "agent.spawn.request"
+AGENT_SPAWNED = "agent.spawned"
+AGENT_TASK_REQUEST = "agent.task.request"
+AGENT_TASK_COMPLETE = "agent.task.complete"
+AGENT_TERMINATED = "agent.terminated"
+AGENT_CANCEL_REQUEST = "agent.cancel.request"
+
+# Workflow engine (Track 8 — W0/W1)
+WORKFLOW_START = "workflow.start"
+WORKFLOW_STEP_STARTED = "workflow.step.started"
+WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
+WORKFLOW_COMPLETED = "workflow.completed"
+WORKFLOW_FAILED = "workflow.failed"
+
 
 __all__ = [
     "TOPIC_VERSION",
@@ -246,4 +261,15 @@ __all__ = [
     "UI_CREATE_RESOURCE",
     "UI_LAUNCH_RESOURCE",
     "UI_SEARCH_WORKSPACE_OS",
+    "AGENT_SPAWN_REQUEST",
+    "AGENT_SPAWNED",
+    "AGENT_TASK_REQUEST",
+    "AGENT_TASK_COMPLETE",
+    "AGENT_TERMINATED",
+    "AGENT_CANCEL_REQUEST",
+    "WORKFLOW_START",
+    "WORKFLOW_STEP_STARTED",
+    "WORKFLOW_STEP_COMPLETED",
+    "WORKFLOW_COMPLETED",
+    "WORKFLOW_FAILED",
 ]

@@ -43,6 +43,7 @@ from ai_command_center.repositories.plugin_manifest_repository import (
 )
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from ai_command_center.services.agent_runtime_service import AgentRuntimeService
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -58,6 +59,7 @@ from ai_command_center.services.system_monitor_service import SystemMonitorServi
 from ai_command_center.services.telemetry_service import TelemetryService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
+from ai_command_center.services.workflow_engine_service import WorkflowEngineService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
 
@@ -106,6 +108,8 @@ def build_services(
     chat_export = ChatExportService(bus)
 
     model_router = ModelRouterService(bus)
+    agent_runtime = AgentRuntimeService(bus)
+    workflow_engine = WorkflowEngineService(bus)
 
     for svc in (
         telemetry,
@@ -116,12 +120,14 @@ def build_services(
         model_router,
         tool_registry,
         tool_executor,
+        workflow_engine,
         ShellToolService(bus),
         plugins,
         ollama,
         obsidian,
         memory_graph,
         session,
+        agent_runtime,
         ChatHandlerService(bus, context_manager, ollama),
     ):
         services.register(svc)

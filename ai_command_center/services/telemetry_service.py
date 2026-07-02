@@ -35,7 +35,7 @@ from ai_command_center.core.events.topics import (
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
 )
-from ai_command_center.db.telemetry_repository import TelemetryRepository
+from ai_command_center.repositories.telemetry_repository import TelemetryRepository
 from ai_command_center.domain.telemetry_event import TelemetryEvent
 from ai_command_center.services.base import BaseService
 
