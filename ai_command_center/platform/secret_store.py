@@ -22,7 +22,10 @@ def resolve_openai_api_key(stored: str = "") -> str:
             return value.strip()
     except Exception:
         pass
-    return str(stored or "").strip()
+    cleaned = str(stored or "").strip()
+    if cleaned in {"", "********"}:
+        return ""
+    return cleaned
 
 
 def store_openai_api_key(value: str) -> str:
