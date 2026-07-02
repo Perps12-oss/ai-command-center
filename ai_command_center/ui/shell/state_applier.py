@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai_command_center.platform.secret_store import openai_api_key_configured
 from ai_command_center.ui.design_system import theme_manager
 
 
@@ -13,7 +14,17 @@ class StateApplierMixin:
 
     def _apply_state(self) -> None:
         snap = self._controller.snapshot()
-        self._top.update_status(snap.phase, snap.settings.default_model)
+        extra = dict(snap.system_snapshot.extra)
+        openai_online = bool(extra.get("openai_online", False))
+        openai_configured = openai_api_key_configured(snap.settings.openai_api_key)
+        self._top.update_llm_status(
+            provider=snap.settings.provider,
+            phase=snap.phase,
+            model=snap.settings.default_model,
+            ollama_online=snap.system_snapshot.ollama_online,
+            openai_online=openai_online,
+            openai_configured=openai_configured,
+        )
         if snap.chat_status == "streaming":
             self._last_terminal_chat_key = None
         self._overlay_mode = snap.settings.overlay_mode

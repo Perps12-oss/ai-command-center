@@ -6,6 +6,11 @@ from pathlib import Path
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.platform.secret_store import (
+    openai_api_key_configured,
+    openai_api_key_source,
+)
+from ai_command_center.providers.defaults import default_model_for_provider
 from ai_command_center.ui.design_system import theme_manager
 from ai_command_center.ui.design_system import theme_v2 as T
 
@@ -223,6 +228,16 @@ class SettingsView(ctk.CTkFrame):
             "https://api.openai.com/v1",
         )
         self._openai_api_key = self._field(self._openai_frame, "API key", "", show="*")
+        self._openai_key_hint = ctk.CTkLabel(
+            self._openai_frame,
+            text="Leave blank to keep an existing key. OPENAI_API_KEY env var overrides.",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            wraplength=420,
+            justify="left",
+        )
+        self._openai_key_hint.pack(anchor="w", padx=16, pady=(0, 4))
 
         self._hotkey = self._field(form, "Hotkey", "alt+space")
         self._vault = self._field(
@@ -271,6 +286,9 @@ class SettingsView(ctk.CTkFrame):
 
     def _on_provider_change(self, value: str) -> None:
         self._update_provider_fields(value)
+        model = default_model_for_provider(value.strip())
+        self._set_entry(self._default_model, model)
+        self._set_entry(self._summarize_model, model)
         if not self._building:
             self._on_save("provider", value.strip())
 
@@ -337,7 +355,22 @@ class SettingsView(ctk.CTkFrame):
         openai_base = getattr(settings, "openai_base_url", "https://api.openai.com/v1")
         self._set_entry(self._openai_base_url, openai_base)
         openai_key = getattr(settings, "openai_api_key", "")
-        self._set_entry(self._openai_api_key, openai_key)
+        if openai_api_key_configured(openai_key):
+            self._set_entry(self._openai_api_key, "")
+            source = openai_api_key_source(openai_key)
+            source_labels = {
+                "env": "API key active from OPENAI_API_KEY environment variable.",
+                "keyring": "API key stored in OS keyring.",
+                "settings": "API key stored in local settings.",
+            }
+            self._openai_key_hint.configure(
+                text=source_labels.get(source, "API key configured.")
+            )
+        else:
+            self._set_entry(self._openai_api_key, openai_key)
+            self._openai_key_hint.configure(
+                text="Leave blank to keep an existing key. OPENAI_API_KEY env var overrides."
+            )
         self._update_provider_fields(provider)
         self._set_entry(self._hotkey, settings.hotkey)
         vault = getattr(settings, "obsidian_vault_path", "")

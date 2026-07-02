@@ -8,7 +8,7 @@ from collections import deque
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.topics import COMMAND_HISTORY, COMMAND_ROUTED, OLLAMA_STATUS, SYSTEM_EVENTS, SYSTEM_SNAPSHOT, UI_COMMAND
+from ai_command_center.core.events.topics import COMMAND_HISTORY, COMMAND_ROUTED, OLLAMA_STATUS, OPENAI_STATUS, SYSTEM_EVENTS, SYSTEM_SNAPSHOT, UI_COMMAND
 from ai_command_center.services.base import BaseService
 
 _POLL_INTERVAL_S = 2.0
@@ -38,7 +38,11 @@ class SystemMonitorService(BaseService):
         self._unsubs.append(
             self._bus.subscribe(OLLAMA_STATUS, self._on_ollama_status)
         )
+        self._unsubs.append(
+            self._bus.subscribe(OPENAI_STATUS, self._on_openai_status)
+        )
         self._ollama_online = False
+        self._openai_online = False
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._poll_loop, name="system-monitor", daemon=True
@@ -57,6 +61,9 @@ class SystemMonitorService(BaseService):
 
     def _on_ollama_status(self, event: Event) -> None:
         self._ollama_online = bool(event.payload.get("online"))
+
+    def _on_openai_status(self, event: Event) -> None:
+        self._openai_online = bool(event.payload.get("online"))
 
     def _on_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
@@ -134,6 +141,7 @@ class SystemMonitorService(BaseService):
                 "ollama_online": self._ollama_online,
                 "cpu_delta": round(cpu - self._prev_cpu, 1),
                 "ram_delta": round(ram - self._prev_ram, 1),
+                "extra": {"openai_online": self._openai_online},
             },
             source=self.name,
         )

@@ -12,6 +12,8 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.core.settings.settings_service import SettingsService as CoreSettingsService
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
+from ai_command_center.platform.secret_store import store_openai_api_key
+from ai_command_center.providers.defaults import default_model_for_provider
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.services.base import BaseService
 
@@ -66,7 +68,16 @@ class SettingsService(BaseService):
         self.set(str(key), value)
 
     def set(self, key: str, value: Any) -> None:
-        self._core_settings.set(key, value)
+        if key == "openai_api_key":
+            value = store_openai_api_key(str(value))
+        if key == "provider":
+            provider = str(value).strip() or "ollama"
+            model = default_model_for_provider(provider)
+            self._core_settings.set("provider", provider)
+            self._core_settings.set("default_model", model)
+            self._core_settings.set("summarize_model", model)
+        else:
+            self._core_settings.set(key, value)
         self._bus.publish(
             SETTINGS_CHANGED,
             {"key": key, "value": value},
