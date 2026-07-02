@@ -7,6 +7,7 @@ import customtkinter as ctk
 from ai_command_center.ui.design_system import theme_v2 as T
 
 NAV_ITEMS: tuple[tuple[str, str], ...] = (
+    ("workspace", "Workspace"),
     ("home", "Home"),
     ("chat", "Chat"),
     ("notes", "Notes"),

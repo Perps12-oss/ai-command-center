@@ -9,12 +9,10 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime
-from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from ai_command_center.core.timeline.timeline_event import (
     TimelineEvent,
-    TIMELINE_EVENT_SCHEMA_VERSION,
 )
 
 

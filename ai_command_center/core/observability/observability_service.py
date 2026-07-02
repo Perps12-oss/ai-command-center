@@ -15,7 +15,6 @@ from ai_command_center.core.observability.metric import (
     validate_metric_type,
 )
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_OBSERVABILITY_METRIC,
     EVENT_OBSERVABILITY_ERROR,
 )

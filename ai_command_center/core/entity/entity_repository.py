@@ -9,12 +9,10 @@ from __future__ import annotations
 import sqlite3
 import json
 from datetime import datetime
-from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from ai_command_center.core.entity.entity import (
     Entity,
-    ENTITY_SCHEMA_VERSION,
     validate_entity_type,
 )
 

@@ -1,11 +1,17 @@
-﻿"""Layout compiler - validates design JSON and resolves page trees."""
+"""Layout compiler - validates design JSON and resolves page trees."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from ai_command_center.repositories.spatial_repository import SpatialRepository
 from ai_command_center.core.events.topics import NOTE_INDEX_COMPLETE
+from ai_command_center.core.layout.spatial_config import (
+    load_background_layer,
+    load_layout_schema,
+    load_motion_bindings,
+    load_spatial_map,
+    load_style_lock,
+)
 
 APPROVED_LAYOUTS = frozenset(
     {
@@ -32,26 +38,6 @@ HYBRID_HOME_ZONES = frozenset({
 
 class LayoutValidationError(Exception):
     pass
-
-
-def load_style_lock() -> dict[str, Any]:
-    return SpatialRepository().load_style_lock()
-
-
-def load_layout_schema() -> dict[str, Any]:
-    return SpatialRepository().load_layout_schema()
-
-
-def load_motion_bindings() -> dict[str, Any]:
-    return SpatialRepository().load_motion_bindings()
-
-
-def load_background_layer() -> dict[str, Any]:
-    return SpatialRepository().load_background_layer()
-
-
-def load_spatial_map() -> dict[str, Any]:
-    return SpatialRepository().load_spatial_map()
 
 
 class LayoutCompiler:
@@ -242,4 +228,3 @@ class LayoutCompiler:
             children = node.get("children", [])
             if children:
                 self._walk_tree(children, errors, path=f"{path}.{comp}", spatial=spatial)
-

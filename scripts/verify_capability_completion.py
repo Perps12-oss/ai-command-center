@@ -64,8 +64,8 @@ def main() -> int:
     import tempfile
     from ai_command_center.core.context_manager import ContextManager
     from ai_command_center.db.connection import connect, init_database
-    from ai_command_center.db.conversation_repository import ConversationRepository
-    from ai_command_center.db.repository import SettingsRepository
+    from ai_command_center.repositories.conversation_repository import ConversationRepository
+    from ai_command_center.repositories.settings_repository import SettingsRepository
     from ai_command_center.services.chat_handler_service import ChatHandlerService
     from ai_command_center.services.ollama_http_service import OllamaHttpService
     from ai_command_center.services.session_service import SessionService
@@ -80,7 +80,7 @@ def main() -> int:
         settings = SettingsService(bus2, SettingsRepository(db))
         session = SessionService(bus2, ConversationRepository(db))
         ollama = OllamaHttpService(bus2)
-        handler = ChatHandlerService(bus2, ContextManager(), ollama, session=session)
+        handler = ChatHandlerService(bus2, ContextManager(), session=session)
         for svc in (settings, session, ollama, handler):
             svc.load()
         bus2.publish(

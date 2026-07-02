@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from ai_command_center.providers.defaults import provider_display_name
 from ai_command_center.ui.components.status_pill import StatusPill
 from ai_command_center.ui.design_system import theme_v2 as T
 
@@ -43,7 +44,7 @@ class TopBar(ctk.CTkFrame):
 
         self._provider_label = ctk.CTkLabel(
             center,
-            text="Local Ollama",
+            text="Ollama (local)",
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
         )
@@ -87,19 +88,49 @@ class TopBar(ctk.CTkFrame):
         ).pack(side="right", padx=4)
 
     def update_status(self, phase: str, model: str) -> None:
-        if phase in {"starting", "busy"}:
-            self._pill.set_state("Busy", "busy")
-        elif phase in {"error", "stopped"}:
-            self._pill.set_state("Error", "error")
-        else:
-            self._pill.set_state("Connected", "ready")
         if model:
             self._model_label.configure(text=model)
 
+    def update_llm_status(
+        self,
+        *,
+        provider: str,
+        phase: str,
+        model: str,
+        ollama_online: bool,
+        openai_online: bool,
+        openai_configured: bool,
+    ) -> None:
+        """Reflect active provider, model, and connection health in the top bar."""
+        self.update_status(phase, model)
+        self._provider_label.configure(text=provider_display_name(provider))
+
+        if phase in {"starting", "busy"}:
+            self._pill.set_state("Busy", "busy")
+            return
+        if phase in {"error", "stopped"}:
+            self._pill.set_state("Error", "error")
+            return
+
+        if provider == "openai":
+            if not openai_configured:
+                self._pill.set_state("No API key", "offline")
+            elif openai_online:
+                self._pill.set_state("Connected", "ready")
+            else:
+                self._pill.set_state("Offline", "offline")
+            return
+
+        if ollama_online:
+            self._pill.set_state("Connected", "ready")
+        else:
+            self._pill.set_state("Offline", "offline")
+
     def set_ollama_online(self, online: bool) -> None:
+        """Backward-compatible hook for legacy Ollama-only updates."""
         if online:
             self._pill.set_state("Connected", "ready")
-            self._provider_label.configure(text="Local Ollama")
+            self._provider_label.configure(text=provider_display_name("ollama"))
         else:
             self._pill.set_state("Offline", "offline")
             self._provider_label.configure(text="Ollama offline")

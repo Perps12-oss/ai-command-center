@@ -6,18 +6,15 @@ Workspace lifecycle management for operating environments.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from ai_command_center.core.entity.entity import (
     Entity,
     ENTITY_TYPE_WORKSPACE,
-    ENTITY_SCHEMA_VERSION,
 )
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_WORKSPACE_CREATED,
     EVENT_WORKSPACE_ACTIVATED,
     EVENT_WORKSPACE_DEACTIVATED,

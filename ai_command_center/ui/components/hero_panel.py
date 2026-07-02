@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import customtkinter as ctk
 
-from ai_command_center.services.asset_service import AssetService
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_ASSET = (
-    Path(__file__).resolve().parents[1]
-    / "assets"
-    / "hero_core.png"
-)
 
 
 class HeroPanel(ctk.CTkFrame):
-    def __init__(self, master, **kwargs) -> None:
-        self._assets = AssetService()
+    """Hero strip. Pass ``hero_image`` from composition root — no service/repository access."""
+
+    def __init__(
+        self,
+        master,
+        *,
+        hero_image: ctk.CTkImage | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(
             master,
             height=200,
@@ -33,16 +31,8 @@ class HeroPanel(ctk.CTkFrame):
         inner = ctk.CTkFrame(self, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=T.PAD, pady=T.PAD)
 
-        if _ASSET.is_file():
-            try:
-                from PIL import Image
-
-                pil = self._assets.load_image(_ASSET)
-                pil = pil.resize((320, 80), Image.Resampling.LANCZOS)
-                img = ctk.CTkImage(light_image=pil, dark_image=pil, size=(320, 80))
-                ctk.CTkLabel(inner, text="", image=img).pack(pady=(8, 4))
-            except Exception:
-                self._draw_battery(inner)
+        if hero_image is not None:
+            ctk.CTkLabel(inner, text="", image=hero_image).pack(pady=(8, 4))
         else:
             self._draw_battery(inner)
 

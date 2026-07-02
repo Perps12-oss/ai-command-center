@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Any
 
 from ai_command_center.db.note_repository import NoteHit, NoteRepository as DbNoteRepository
 from ai_command_center.repositories.vault_repository import VaultRepository

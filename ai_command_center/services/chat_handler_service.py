@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 from ai_command_center.core.clipboard_intent import (
     empty_clipboard_message,
@@ -13,18 +13,17 @@ from ai_command_center.core.clipboard_intent import (
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
-    APP_ERROR,
     APP_WARNING,
     CHAT_ERROR,
     COMMAND_ROUTED,
     CONTEXT_OVER_BUDGET,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_TRIMMED,
+    LLM_REQUEST,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
     MODEL_RESOLVE_REQUEST,
     MODEL_RESOLVE_RESULT,
-    NOTE_CONTEXT_REQUEST,
     NOTE_CONTEXT_RESULT,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
@@ -35,8 +34,7 @@ from ai_command_center.platform.model_registry import model_warning
 from ai_command_center.services.base import BaseService
 from ai_command_center.services.command_router_service import INTENT_CHAT
 
-if TYPE_CHECKING:
-    from ai_command_center.services.ollama_service import OllamaServiceBase
+logger = logging.getLogger(__name__)
 
 
 class ChatHandlerService(BaseService):
@@ -52,16 +50,15 @@ class ChatHandlerService(BaseService):
         self,
         bus,
         context_manager: ContextManager,
-        ollama: OllamaServiceBase,
         obsidian=None,
         session=None,
     ) -> None:
         super().__init__(bus)
         self._context_manager = context_manager
-        self._ollama = ollama
         self._obsidian = obsidian
         self._session = session
         self._default_model = "llama3.2:3b"
+        self._provider = "ollama"
         self._unsubscribers: list[Callable[[], None]] = []
         self._pending: dict[str, dict[str, object]] = {}
 
@@ -82,6 +79,7 @@ class ChatHandlerService(BaseService):
         self._default_model = str(
             event.payload.get("default_model", self._default_model)
         )
+        self._provider = str(event.payload.get("provider", self._provider)).strip() or "ollama"
 
     def _request_result(self, request_id: str) -> dict[str, object]:
         entry = self._pending.setdefault(request_id, {})
@@ -137,6 +135,7 @@ class ChatHandlerService(BaseService):
 
         request_id = uuid.uuid4().hex
         self._pending[request_id] = {}
+        logger.info("chat.request_started request_id=%s query_len=%d", request_id, len(query))
 
         notes_raw = args.get("notes")
         notes: list[str] = []
@@ -226,27 +225,16 @@ class ChatHandlerService(BaseService):
             source=self.name,
         )
 
-        try:
-            self._ollama.stream_chat(
-                bundle,
-                model=model,
-                request_id=request_id,
-            )
-        except Exception as exc:
-            self._bus.publish(
-                CHAT_ERROR,
-                {
-                    "request_id": request_id,
-                    "message": str(exc),
-                },
-                source=self.name,
-            )
-            self._bus.publish(
-                APP_ERROR,
-                {"message": f"Chat failed: {exc}"},
-                source=self.name,
-            )
-        finally:
-            self._pending.pop(request_id, None)
+        self._bus.publish(
+            LLM_REQUEST,
+            {
+                "request_id": request_id,
+                "model": model,
+                "provider": self._provider,
+                "bundle": bundle,
+            },
+            source=self.name,
+        )
+        self._pending.pop(request_id, None)
 
 

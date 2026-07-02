@@ -37,7 +37,7 @@ def main() -> int:
     from ai_command_center.core.context_manager import ContextBundle, ContextManager
     from ai_command_center.core.event_bus import EventBus
     from ai_command_center.db.connection import connect, init_database
-    from ai_command_center.db.conversation_repository import ConversationRepository
+    from ai_command_center.repositories.conversation_repository import ConversationRepository
     from ai_command_center.services.chat_handler_service import ChatHandlerService
     from ai_command_center.services.command_router_service import CommandRouterService
     from ai_command_center.services.ollama_service import StubOllamaService
@@ -70,7 +70,7 @@ def main() -> int:
             router = CommandRouterService(bus)
             ollama = RecordingStub(bus)
             handler = ChatHandlerService(
-                bus, ContextManager(), ollama, session=session
+                bus, ContextManager(), session=session
             )
             for svc in (session, router, ollama, handler):
                 svc.load()
@@ -116,7 +116,7 @@ def main() -> int:
             router2 = CommandRouterService(bus2)
             ollama2 = RecordingStub(bus2)
             handler2 = ChatHandlerService(
-                bus2, ContextManager(), ollama2, session=session2
+                bus2, ContextManager(), session=session2
             )
             for svc in (session2, router2, ollama2, handler2):
                 svc.load()

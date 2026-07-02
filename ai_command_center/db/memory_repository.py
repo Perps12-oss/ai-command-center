@@ -1,4 +1,8 @@
-"""Explicit memory graph — SQLite entity/relationship store (Phase 4E)."""
+"""Explicit memory graph — SQLite entity/relationship store (Phase 4E).
+
+.. deprecated::
+    Import ``MemoryRepository`` from ``ai_command_center.repositories`` instead.
+"""
 
 from __future__ import annotations
 

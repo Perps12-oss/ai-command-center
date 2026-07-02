@@ -12,5 +12,8 @@ class MigrationManager:
         schema_version = int(payload.get("schema_version", 1))
         if schema_version < 2:
             payload = dict(payload)
-            payload.setdefault("schema_version", 2)
+            payload.setdefault("provider", "ollama")
+            payload.setdefault("openai_base_url", "https://api.openai.com/v1")
+            payload.setdefault("openai_api_key", "")
+            payload["schema_version"] = 2
         return payload

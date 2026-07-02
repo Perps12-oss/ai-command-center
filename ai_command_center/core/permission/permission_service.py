@@ -15,7 +15,6 @@ from ai_command_center.core.permission.permission import (
     validate_permission,
 )
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_PERMISSION_CHECK,
     EVENT_PERMISSION_DENIED,
 )

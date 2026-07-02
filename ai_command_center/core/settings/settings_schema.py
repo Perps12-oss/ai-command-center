@@ -23,6 +23,10 @@ class SettingsSchema:
         self.fields = {
             "model_name": SettingsField("model_name", str, "llama3.2:3b"),
             "provider": SettingsField("provider", str, "ollama", ("ollama", "openai")),
+            "openai_base_url": SettingsField(
+                "openai_base_url", str, "https://api.openai.com/v1"
+            ),
+            "openai_api_key": SettingsField("openai_api_key", str, ""),
             "vault_path": SettingsField("vault_path", Path, Path("")),
             "obsidian_vault_path": SettingsField("obsidian_vault_path", str, ""),
             "theme": SettingsField("theme", str, "dark"),

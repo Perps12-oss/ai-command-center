@@ -45,7 +45,7 @@ def main() -> int:
         failures.append("UI must not import telemetry modules")
 
     from ai_command_center.application import create_application
-    from ai_command_center.db.telemetry_repository import TelemetryRepository
+    from ai_command_center.repositories.telemetry_repository import TelemetryRepository
     from ai_command_center.services.telemetry_summary import compute_session_summary
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -56,7 +56,7 @@ def main() -> int:
         init_database(db)
 
         from ai_command_center.core.event_bus import EventBus
-        from ai_command_center.db.repository import SettingsRepository
+        from ai_command_center.repositories.settings_repository import SettingsRepository
         from ai_command_center.services.command_router_service import CommandRouterService
         from ai_command_center.services.telemetry_service import TelemetryService
         from ai_command_center.services.settings_service import SettingsService
