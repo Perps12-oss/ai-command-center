@@ -10,6 +10,7 @@ from ai_command_center.core.events.topics import (
     UI_INSPECTOR_CLOSE,
     UI_INSPECTOR_OPEN,
     UI_LAUNCH_RESOURCE,
+    UI_OPEN_CHAT,
     UI_SEARCH_WORKSPACE_OS,
 )
 
@@ -67,6 +68,17 @@ class WorkspaceOsUIController:
                 "resource_id": resource_id,
                 "resource_type": resource_type,
                 "value": value,
+            },
+            source="ui",
+        )
+
+    def open_chat(self, entity_id: str, entity_type: str, title: str) -> None:
+        self._bus.publish(
+            UI_OPEN_CHAT,
+            {
+                "entity_id": entity_id,
+                "entity_type": entity_type,
+                "title": title,
             },
             source="ui",
         )

@@ -149,6 +149,7 @@ UI_CREATE_WORKSPACE = "ui.workspace_os.create_workspace"
 UI_CREATE_CARD = "ui.workspace_os.create_card"
 UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
 UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
+UI_OPEN_CHAT = "ui.workspace_os.open_chat"
 UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"
 
 # Agent framework (Track 7 — A0/A1)
@@ -270,6 +271,7 @@ __all__ = [
     "UI_CREATE_CARD",
     "UI_CREATE_RESOURCE",
     "UI_LAUNCH_RESOURCE",
+    "UI_OPEN_CHAT",
     "UI_SEARCH_WORKSPACE_OS",
     "AGENT_SPAWN_REQUEST",
     "AGENT_SPAWNED",

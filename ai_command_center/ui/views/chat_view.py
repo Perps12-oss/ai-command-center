@@ -341,6 +341,15 @@ class _SessionBar(ctk.CTkFrame):
         )
         self._count_lbl.pack(side="left", padx=(6, 0), pady=9)
 
+        self._entity_lbl = ctk.CTkLabel(
+            self,
+            text="",
+            font=(T.FONT_FAMILY, 10),
+            text_color=T.ACCENT_DEFAULT,
+            anchor="w",
+        )
+        self._entity_lbl.pack(side="left", padx=(8, 0), pady=9)
+
         if on_export:
             ctk.CTkButton(
                 self,
@@ -365,6 +374,13 @@ class _SessionBar(ctk.CTkFrame):
             text="◧" if history_open else "▣",
             text_color=T.ACCENT_DEFAULT if history_open else T.TEXT_MUTED,
         )
+
+    def update_entity(self, entity_type: str, title: str) -> None:
+        if entity_type and title:
+            icon = {"workspace": "◈", "card": "▢", "resource": "🔗"}.get(entity_type, "•")
+            self._entity_lbl.configure(text=f"{icon}  {entity_type.title()}: {title}")
+        else:
+            self._entity_lbl.configure(text="")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -719,6 +735,8 @@ class ChatView(ctk.CTkFrame):
         self._flush_pending:    bool                    = False
         self._history:          list[dict]              = []   # current conversation
         self._model:            str                     = ""
+        self._entity_type:      str                     = ""
+        self._entity_title:     str                     = ""
         self._search_visible:   bool                    = False
 
         # In-memory session store (owner is the view, but could be moved)
@@ -977,6 +995,7 @@ class ChatView(ctk.CTkFrame):
     def _refresh_session_bar(self) -> None:
         count = len(self._history)   # total messages, not just user prompts
         self._session_bar.update(self._model, count, self._history_open)
+        self._session_bar.update_entity(self._entity_type, self._entity_title)
 
     # ── row helpers ───────────────────────────────────────────────────────────
 
@@ -1083,6 +1102,15 @@ class ChatView(ctk.CTkFrame):
 
     def set_model(self, name: str) -> None:
         self._model = name
+        self._refresh_session_bar()
+
+    def update_entity_context(self, entity_id: str, entity_type: str, title: str) -> None:
+        if entity_id:
+            self._entity_type = entity_type
+            self._entity_title = title
+        else:
+            self._entity_type = ""
+            self._entity_title = ""
         self._refresh_session_bar()
 
     def focus_input(self) -> None:

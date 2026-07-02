@@ -25,6 +25,7 @@ from ai_command_center.core.events.topics import (
     UI_COMMAND,
     UI_LAUNCH_RESOURCE,
     UI_NAVIGATE,
+    UI_OPEN_CHAT,
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
 )
@@ -56,10 +57,26 @@ class UIController:
     def snapshot(self):
         return self._state_store.snapshot
 
-    def publish_command(self, text: str, *, clipboard: str | None = None) -> None:
+    def publish_command(
+        self,
+        text: str,
+        *,
+        clipboard: str | None = None,
+        workspace_entity: dict[str, str] | None = None,
+    ) -> None:
         payload: dict[str, str] = {"text": text}
         if clipboard:
             payload["clipboard"] = clipboard
+        if workspace_entity:
+            entity_id = str(workspace_entity.get("entity_id", "")).strip()
+            if entity_id:
+                payload["workspace_entity_id"] = entity_id
+                payload["workspace_entity_type"] = str(
+                    workspace_entity.get("entity_type", "")
+                )
+                payload["workspace_entity_title"] = str(
+                    workspace_entity.get("entity_title", "")
+                )
         self._bus.publish(
             UI_COMMAND,
             payload,
@@ -114,6 +131,22 @@ class UIController:
 
     def publish_launch_resource(self, payload: dict[str, object]) -> None:
         self._bus.publish(UI_LAUNCH_RESOURCE, payload, source="ui")
+
+    def publish_open_chat(
+        self,
+        entity_id: str,
+        entity_type: str,
+        title: str,
+    ) -> None:
+        self._bus.publish(
+            UI_OPEN_CHAT,
+            {
+                "entity_id": entity_id,
+                "entity_type": entity_type,
+                "title": title,
+            },
+            source="ui",
+        )
 
     def publish_note_select(self, path: str) -> None:
         self._bus.publish(
