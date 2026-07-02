@@ -239,7 +239,9 @@ class SettingsView(ctk.CTkFrame):
         )
         self._openai_key_hint.pack(anchor="w", padx=16, pady=(0, 4))
 
-        self._hotkey = self._field(form, "Hotkey", "alt+space")
+        self._hotkey_frame = ctk.CTkFrame(form, fg_color="transparent")
+        self._hotkey_frame.pack(fill="x")
+        self._hotkey = self._field(self._hotkey_frame, "Hotkey", "alt+space")
         self._vault = self._field(
             form,
             "Obsidian vault path (folder containing your .md notes)",
@@ -295,10 +297,10 @@ class SettingsView(ctk.CTkFrame):
     def _update_provider_fields(self, provider: str) -> None:
         if provider == "openai":
             self._ollama_frame.pack_forget()
-            self._openai_frame.pack(fill="x", before=self._hotkey)
+            self._openai_frame.pack(fill="x", before=self._hotkey_frame)
         else:
             self._openai_frame.pack_forget()
-            self._ollama_frame.pack(fill="x", before=self._hotkey)
+            self._ollama_frame.pack(fill="x", before=self._hotkey_frame)
 
     @staticmethod
     def _valid_hex(color: str) -> bool:
