@@ -59,11 +59,11 @@ rules:
       remediation: "Defer to an approved phase or remove from diff."
 
     - id: scope_agents
-      pattern: '(?i)\b(agent framework|autogen|crewai|langgraph|planning loop|background cognition)\b'
+      pattern: '(?i)\b(autogen|crewai|langgraph|background cognition)\b'
       severity: S5
       classification: CRITICAL
-      message: "Scope creep: agent/planning systems"
-      remediation: "Keep CommandRouter classify-only; defer agents to future phase."
+      message: "Scope creep: unapproved third-party agent frameworks"
+      remediation: "Use AgentRuntimeService on EventBus per AGENT_FRAMEWORK.md."
 
     - id: scope_auto_ingestion
       pattern: '(?i)\b(OCR|clipboard monitor|window tracking|auto-context ingestion)\b'

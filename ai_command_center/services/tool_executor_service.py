@@ -135,6 +135,8 @@ class ToolExecutorService(BaseService):
         if not isinstance(args, dict):
             args = {}
         invoke_id = str(payload.get("invoke_id", ""))
+        run_id = payload.get("run_id")
+        step_id = payload.get("step_id")
 
         self._bus.publish(
             TOOL_STARTED,
@@ -152,6 +154,10 @@ class ToolExecutorService(BaseService):
                     "invoke_id": invoke_id,
                     "tool": tool_name,
                     "message": error,
+                    "run_id": run_id,
+                    "step_id": step_id,
+                    "success": False,
+                    "error": error,
                 },
                 source=self.name,
             )
@@ -167,6 +173,8 @@ class ToolExecutorService(BaseService):
                 "success": True,
                 "output": output,
                 "error": execution.error,
+                "run_id": run_id,
+                "step_id": step_id,
             },
             source=self.name,
         )

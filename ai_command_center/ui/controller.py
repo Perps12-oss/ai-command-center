@@ -13,6 +13,7 @@ from ai_command_center.core.events.topics import (
     CLIPBOARD_CONTENT,
     CLIPBOARD_REQUEST,
     MEMORY_DELETE_REQUEST,
+    MEMORY_REMEMBER,
     NOTE_SELECT,
     OVERLAY_ANCHOR,
     OVERLAY_HIDE,
@@ -22,6 +23,7 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_COMMAND,
+    UI_LAUNCH_RESOURCE,
     UI_NAVIGATE,
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
@@ -42,7 +44,14 @@ class UIController:
     ) -> None:
         self._bus = bus
         self._state_store = state_store
-        self._state_store.subscribe(lambda _s: on_state())
+        self._on_state = on_state
+        self._unsub_state: Callable[[], None] | None = None
+        self._unsub_state = self._state_store.subscribe(lambda _s: on_state())
+
+    def close(self) -> None:
+        if self._unsub_state is not None:
+            self._unsub_state()
+            self._unsub_state = None
 
     def snapshot(self):
         return self._state_store.snapshot
@@ -95,6 +104,16 @@ class UIController:
             {"request_id": request_id},
             source="ui",
         )
+
+    def publish_memory_remember(self, label: str, content: str) -> None:
+        self._bus.publish(
+            MEMORY_REMEMBER,
+            {"label": label, "content": content},
+            source="ui",
+        )
+
+    def publish_launch_resource(self, payload: dict[str, object]) -> None:
+        self._bus.publish(UI_LAUNCH_RESOURCE, payload, source="ui")
 
     def publish_note_select(self, path: str) -> None:
         self._bus.publish(

@@ -22,7 +22,6 @@ from ai_command_center.core.events.topics import (
     COMMAND_HISTORY,
     COMMAND_ROUTED,
     MEMORY_ERROR,
-    MEMORY_REMEMBER,
     MEMORY_SELECTED,
     MEMORY_STORED,
     MODEL_SELECTED,
@@ -242,8 +241,6 @@ class CommandPaletteApp(ctk.CTk):
 
     def _workspace_os_palette_commands(self) -> list[tuple[str, str, Callable[[], None]]]:
         """Build launchable Workspace OS entity commands from AppState."""
-        from ai_command_center.core.events.topics import UI_LAUNCH_RESOURCE
-
         items: list[tuple[str, str, Callable[[], None]]] = []
         for entity in self._controller.snapshot().workspace_os.entities:
             meta = dict(entity.metadata)
@@ -259,7 +256,7 @@ class CommandPaletteApp(ctk.CTk):
                 "value": value,
             }
             items.append(
-                (label, desc, lambda p=payload: self._bus.publish(UI_LAUNCH_RESOURCE, p, source="ui"))
+                (label, desc, lambda p=payload: self._controller.publish_launch_resource(p))
             )
         return items
 
@@ -395,11 +392,7 @@ class CommandPaletteApp(ctk.CTk):
             self._controller.publish_memory_delete(memory_id)
 
     def _on_memory_add(self, label: str, content: str) -> None:
-        self._bus.publish(
-            MEMORY_REMEMBER,
-            {"label": label, "content": content},
-            source="ui",
-        )
+        self._controller.publish_memory_remember(label, content)
 
     # ── command input ──────────────────────────────────────────────────────────
 
@@ -612,6 +605,7 @@ class CommandPaletteApp(ctk.CTk):
             except Exception:
                 pass
         self._bus_unsubs.clear()
+        self._controller.close()
         super().destroy()
 
     def tray_phase(self) -> str:
