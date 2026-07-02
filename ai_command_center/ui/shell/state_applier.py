@@ -119,6 +119,7 @@ class StateApplierMixin:
             system.apply_system_snapshot(snap.system_snapshot)
             if snap.errors:
                 system.load_errors(snap.errors)
+            system.load_from_appstate(snap)
 
         workspace = self._workspace_view()
         if workspace:

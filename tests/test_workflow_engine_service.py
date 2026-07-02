@@ -9,6 +9,7 @@ from ai_command_center.core.events.topics import (
     TOOL_RESULT,
     WORKFLOW_COMPLETED,
     WORKFLOW_START,
+    WORKFLOW_STARTED,
 )
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.services.tool_executor_service import ToolExecutorService
@@ -70,3 +71,24 @@ def test_two_step_tool_workflow_completes() -> None:
     assert len(invokes) == 2
     assert completed
     assert completed[0]["run_id"] == "run-1"
+
+
+def test_workflow_start_publishes_started() -> None:
+    bus = EventBus()
+    started: list[dict] = []
+    bus.subscribe(WORKFLOW_STARTED, lambda e: started.append(dict(e.payload)))
+    WorkflowEngineService(bus).start()
+
+    bus.publish(
+        WORKFLOW_START,
+        {
+            "run_id": "run-started",
+            "workflow_id": "demo",
+            "steps": [{"id": "a", "type": "tool", "tool": "shell"}],
+        },
+        source="test",
+    )
+
+    assert started
+    assert started[0]["run_id"] == "run-started"
+    assert started[0]["total_steps"] == 1

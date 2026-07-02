@@ -162,6 +162,7 @@ AGENT_CANCEL_REQUEST = "agent.cancel.request"
 
 # Workflow engine (Track 8 — W0/W1)
 WORKFLOW_START = "workflow.start"
+WORKFLOW_STARTED = "workflow.started"
 WORKFLOW_STEP_STARTED = "workflow.step.started"
 WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
 WORKFLOW_COMPLETED = "workflow.completed"
@@ -280,6 +281,7 @@ __all__ = [
     "AGENT_TERMINATED",
     "AGENT_CANCEL_REQUEST",
     "WORKFLOW_START",
+    "WORKFLOW_STARTED",
     "WORKFLOW_STEP_STARTED",
     "WORKFLOW_STEP_COMPLETED",
     "WORKFLOW_COMPLETED",
