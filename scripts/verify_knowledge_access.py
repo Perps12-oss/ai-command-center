@@ -103,7 +103,8 @@ def main() -> int:
     bus = EventBus(debug_mode=True)
     errors: list[dict] = []
     bus.subscribe("chat.error", lambda e: errors.append(dict(e.payload)))
-    handler = ChatHandlerService(bus, ContextManager(), OllamaHttpService(bus))
+    handler = ChatHandlerService(bus, ContextManager())
+    ollama = OllamaHttpService(bus)
     handler.load()
     bus.publish(
         "command.routed",

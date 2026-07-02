@@ -70,7 +70,7 @@ def _wire_stack(db_path: Path):
     ollama = OllamaHttpService(bus)
     obsidian = ObsidianService(bus, NoteRepository(db))
     session = SessionService(bus, ConversationRepository(db))
-    handler = ChatHandlerService(bus, ContextManager(), ollama, obsidian, session)
+    handler = ChatHandlerService(bus, ContextManager(), obsidian, session)
     services = (settings, router, ollama, obsidian, session, handler)
     for svc in services:
         svc.load()

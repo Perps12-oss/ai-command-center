@@ -74,7 +74,7 @@ def _wire(
     obsidian = ObsidianService(bus, NoteRepository(db), settings_repo)
     conv_repo = ConversationRepository(db)
     session = SessionService(bus, conv_repo)
-    handler = ChatHandlerService(bus, ContextManager(), ollama, obsidian, session)
+    handler = ChatHandlerService(bus, ContextManager(), obsidian, session)
     services = (settings, router, ollama, obsidian, session, handler)
     for svc in services:
         svc.load()

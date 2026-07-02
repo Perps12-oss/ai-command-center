@@ -6,14 +6,17 @@ import uuid
 from abc import abstractmethod
 
 from ai_command_center.core.context_manager import ContextBundle
+from ai_command_center.core.event_bus import Event
 from ai_command_center.core.contracts import OLLAMA_SERVICE_API_VERSION
 from ai_command_center.core.events.topics import (
     CHAT_CANCELLED,
     CHAT_CHUNK,
     CHAT_COMPLETE,
     CHAT_STARTED,
+    LLM_REQUEST,
     OLLAMA_MODEL_LOADED,
     OLLAMA_MODEL_UNLOADED,
+    UI_CHAT_CANCEL,
 )
 from ai_command_center.services.base import BaseService
 
@@ -87,9 +90,32 @@ class StubOllamaService(OllamaServiceBase):
         self._loaded_model: str | None = None
         self._active_request_id: str | None = None
         self._cancelled = False
+        self._unsubscribers: list = []
 
     def _on_load(self) -> None:
-        pass
+        self._unsubscribers.append(self._bus.subscribe(LLM_REQUEST, self._on_llm_request))
+        self._unsubscribers.append(
+            self._bus.subscribe(UI_CHAT_CANCEL, self._on_cancel_request)
+        )
+
+    def _on_unload(self) -> None:
+        for unsub in self._unsubscribers:
+            unsub()
+        self._unsubscribers.clear()
+
+    def _on_llm_request(self, event: Event) -> None:
+        bundle = event.payload.get("bundle")
+        if not isinstance(bundle, ContextBundle):
+            return
+        self.stream_chat(
+            bundle,
+            model=str(event.payload.get("model", "llama3.2:3b")),
+            request_id=str(event.payload.get("request_id", uuid.uuid4().hex)),
+        )
+
+    def _on_cancel_request(self, event: Event) -> None:
+        rid = event.payload.get("request_id")
+        self.cancel(str(rid) if rid else None)
 
     def load_model(self, model: str) -> None:
         self._loaded_model = model

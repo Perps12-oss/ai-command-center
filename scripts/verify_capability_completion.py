@@ -80,7 +80,7 @@ def main() -> int:
         settings = SettingsService(bus2, SettingsRepository(db))
         session = SessionService(bus2, ConversationRepository(db))
         ollama = OllamaHttpService(bus2)
-        handler = ChatHandlerService(bus2, ContextManager(), ollama, session=session)
+        handler = ChatHandlerService(bus2, ContextManager(), session=session)
         for svc in (settings, session, ollama, handler):
             svc.load()
         bus2.publish(

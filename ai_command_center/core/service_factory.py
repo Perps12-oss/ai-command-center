@@ -128,7 +128,7 @@ def build_services(
         memory_graph,
         session,
         agent_runtime,
-        ChatHandlerService(bus, context_manager, ollama),
+        ChatHandlerService(bus, context_manager),
     ):
         services.register(svc)
 

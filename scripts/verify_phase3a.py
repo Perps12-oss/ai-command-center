@@ -109,7 +109,7 @@ def main() -> int:
 
     router = CommandRouterService(bus)
     ollama = StubOllamaService(bus)
-    handler = ChatHandlerService(bus, ContextManager(), ollama)
+    handler = ChatHandlerService(bus, ContextManager())
     router.load()
     ollama.load()
     handler.load()
@@ -117,8 +117,8 @@ def main() -> int:
     bus.publish("settings.snapshot", {"default_model": "llama3.2:3b"}, source="test")
     bus.publish("ui.command", {"text": "Hello from gate test"}, source="test")
 
-    if "command.routed" not in events:
-        failures.append("expected command.routed after ui.command")
+    if "llm.request" not in events:
+        failures.append("expected llm.request from chat_handler")
     if "chat.started" not in events:
         failures.append("expected chat.started")
     if "chat.complete" not in events:
@@ -131,7 +131,7 @@ def main() -> int:
     events.clear()
     slow = StubOllamaService(bus)
     slow.load()
-    handler2 = ChatHandlerService(bus, ContextManager(), slow)
+    handler2 = ChatHandlerService(bus, ContextManager())
     handler2.load()
 
     class SlowStub(StubOllamaService):
@@ -147,7 +147,7 @@ def main() -> int:
 
     slow2 = SlowStub(bus)
     slow2.load()
-    handler3 = ChatHandlerService(bus, ContextManager(), slow2)
+    handler3 = ChatHandlerService(bus, ContextManager())
     handler3.load()
     bus.publish("ui.command", {"text": "cancel me"}, source="test")
     if "chat.cancelled" not in events and "chat.complete" not in events:

@@ -70,7 +70,7 @@ def main() -> int:
             router = CommandRouterService(bus)
             ollama = RecordingStub(bus)
             handler = ChatHandlerService(
-                bus, ContextManager(), ollama, session=session
+                bus, ContextManager(), session=session
             )
             for svc in (session, router, ollama, handler):
                 svc.load()
@@ -116,7 +116,7 @@ def main() -> int:
             router2 = CommandRouterService(bus2)
             ollama2 = RecordingStub(bus2)
             handler2 = ChatHandlerService(
-                bus2, ContextManager(), ollama2, session=session2
+                bus2, ContextManager(), session=session2
             )
             for svc in (session2, router2, ollama2, handler2):
                 svc.load()
