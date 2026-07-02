@@ -24,9 +24,11 @@ from ai_command_center.core.events.topics import (
     LLM_COMPLETE,
     LLM_ERROR,
     LLM_REQUEST,
+    OPENAI_STATUS,
     SETTINGS_SNAPSHOT,
     UI_CHAT_CANCEL,
 )
+from ai_command_center.platform.secret_store import resolve_openai_api_key
 from ai_command_center.services.base import BaseService
 
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
@@ -54,6 +56,7 @@ class OpenAIHttpService(BaseService):
         self._session: aiohttp.ClientSession | None = None
         self._active_request_id: str | None = None
         self._active_future: asyncio.Future[Any] | None = None
+        self._health_task: asyncio.Future[Any] | None = None
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -70,12 +73,22 @@ class OpenAIHttpService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(LLM_REQUEST, self._on_llm_request)
         )
+        self._health_task = asyncio.run_coroutine_threadsafe(
+            self._delayed_health_check(), self._loop
+        )
+
+    async def _delayed_health_check(self) -> None:
+        await asyncio.sleep(1)
+        await self._health_check()
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
         self.cancel()
+        if self._health_task is not None:
+            self._health_task.cancel()
+            self._health_task = None
         if self._loop and self._loop.is_running():
             session = self._session
             self._session = None
@@ -109,7 +122,8 @@ class OpenAIHttpService(BaseService):
         base = str(event.payload.get("openai_base_url", self._base_url)).strip()
         if base:
             self._base_url = base.rstrip("/")
-        self._api_key = str(event.payload.get("openai_api_key", "")).strip()
+        stored_key = str(event.payload.get("openai_api_key", ""))
+        self._api_key = resolve_openai_api_key(stored_key)
 
     def _on_cancel_request(self, event: Event) -> None:
         rid = event.payload.get("request_id")
@@ -184,6 +198,49 @@ class OpenAIHttpService(BaseService):
             connect=_CONNECT_TIMEOUT_S,
         )
         return aiohttp.ClientSession(timeout=timeout)
+
+    async def _health_check(self) -> None:
+        while True:
+            online = False
+            detail = ""
+            configured = bool(self._api_key)
+            if not configured:
+                detail = "api key not configured"
+            else:
+                try:
+                    session = self._session
+                    if session is None:
+                        break
+                    async with session.get(
+                        f"{self._base_url}/models",
+                        headers=self._auth_headers(),
+                    ) as resp:
+                        online = resp.status == 200
+                        if not online:
+                            detail = f"HTTP {resp.status}"
+                except aiohttp.ClientConnectorError:
+                    detail = "connection refused"
+                except asyncio.TimeoutError:
+                    detail = "timeout"
+                except asyncio.CancelledError:
+                    break
+                except Exception as exc:
+                    detail = str(exc)
+
+            self._bus.publish(
+                OPENAI_STATUS,
+                {
+                    "online": online and configured,
+                    "configured": configured,
+                    "detail": detail,
+                    "url": self._base_url,
+                },
+                source=self.name,
+            )
+            try:
+                await asyncio.sleep(30)
+            except asyncio.CancelledError:
+                break
 
     def _auth_headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}

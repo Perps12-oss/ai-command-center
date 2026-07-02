@@ -1,0 +1,65 @@
+"""Secure resolution and storage for provider API keys."""
+
+from __future__ import annotations
+
+import os
+
+_SERVICE_NAME = "ai-command-center"
+_OPENAI_KEY_NAME = "openai_api_key"
+_OPENAI_ENV_VAR = "OPENAI_API_KEY"
+
+
+def resolve_openai_api_key(stored: str = "") -> str:
+    """Resolve OpenAI API key: env var → OS keyring → SQLite settings."""
+    env = os.environ.get(_OPENAI_ENV_VAR, "").strip()
+    if env:
+        return env
+    try:
+        import keyring
+
+        value = keyring.get_password(_SERVICE_NAME, _OPENAI_KEY_NAME)
+        if value:
+            return value.strip()
+    except Exception:
+        pass
+    return str(stored or "").strip()
+
+
+def store_openai_api_key(value: str) -> str:
+    """Persist API key off SQLite when possible; return value for settings repo."""
+    cleaned = str(value or "").strip()
+    if not cleaned:
+        try:
+            import keyring
+
+            keyring.delete_password(_SERVICE_NAME, _OPENAI_KEY_NAME)
+        except Exception:
+            pass
+        return ""
+    try:
+        import keyring
+
+        keyring.set_password(_SERVICE_NAME, _OPENAI_KEY_NAME, cleaned)
+        return ""
+    except Exception:
+        return cleaned
+
+
+def openai_api_key_configured(stored: str = "") -> bool:
+    return bool(resolve_openai_api_key(stored))
+
+
+def openai_api_key_source(stored: str = "") -> str:
+    """Return where the active key comes from: env, keyring, settings, or none."""
+    if os.environ.get(_OPENAI_ENV_VAR, "").strip():
+        return "env"
+    try:
+        import keyring
+
+        if keyring.get_password(_SERVICE_NAME, _OPENAI_KEY_NAME):
+            return "keyring"
+    except Exception:
+        pass
+    if str(stored or "").strip():
+        return "settings"
+    return "none"

@@ -86,6 +86,7 @@ CLIPBOARD_REQUEST = "clipboard.request"
 CLIPBOARD_CONTENT = "clipboard.content"
 
 OLLAMA_STATUS = "ollama.status"
+OPENAI_STATUS = "openai.status"
 OLLAMA_MODEL_LOADED = "ollama.model_loaded"
 OLLAMA_MODEL_UNLOADED = "ollama.model_unloaded"
 
@@ -216,6 +217,7 @@ __all__ = [
     "CLIPBOARD_REQUEST",
     "CLIPBOARD_CONTENT",
     "OLLAMA_STATUS",
+    "OPENAI_STATUS",
     "OLLAMA_MODEL_LOADED",
     "OLLAMA_MODEL_UNLOADED",
     "MODEL_SELECTED",
