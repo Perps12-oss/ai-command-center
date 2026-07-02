@@ -49,8 +49,10 @@ from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
 from ai_command_center.services.model_router_service import ModelRouterService
+from ai_command_center.providers.provider_registry import ProviderRegistry, build_default_registry
 from ai_command_center.services.obsidian_service import ObsidianService
 from ai_command_center.services.ollama_http_service import OllamaHttpService
+from ai_command_center.services.openai_http_service import OpenAIHttpService
 from ai_command_center.services.plugin_registry_service import PluginRegistryService
 from ai_command_center.services.session_service import SessionService
 from ai_command_center.services.settings_service import SettingsService
@@ -69,6 +71,7 @@ class WiredServices:
 
     services: ServiceManager
     ollama: OllamaHttpService
+    provider_registry: ProviderRegistry = field(default_factory=build_default_registry)
     workspace_os: WorkspaceOsService | None = field(default=None)
 
 
@@ -94,7 +97,9 @@ def build_services(
     # ── shared singletons ─────────────────────────────────────────────────────
     context_manager = ContextManager()
     shared_tool_registry = ToolRegistry()
+    provider_registry = build_default_registry()
     ollama = OllamaHttpService(bus)
+    openai = OpenAIHttpService(bus)
 
     # ── core services ─────────────────────────────────────────────────────────
     tool_registry = ToolRegistryService(bus, registry=shared_tool_registry)
@@ -124,6 +129,7 @@ def build_services(
         ShellToolService(bus),
         plugins,
         ollama,
+        openai,
         obsidian,
         memory_graph,
         session,
@@ -169,4 +175,9 @@ def build_services(
         )
         services.register(workspace_os)
 
-    return WiredServices(services=services, ollama=ollama, workspace_os=workspace_os)
+    return WiredServices(
+        services=services,
+        ollama=ollama,
+        provider_registry=provider_registry,
+        workspace_os=workspace_os,
+    )

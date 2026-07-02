@@ -195,9 +195,35 @@ class SettingsView(ctk.CTkFrame):
             anchor="w",
         ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
 
+        ctk.CTkLabel(form, text="LLM provider", text_color=T.TEXT_MUTED).pack(
+            anchor="w", padx=16, pady=(8, 0)
+        )
+        self._provider = ctk.CTkComboBox(
+            form,
+            values=["ollama", "openai"],
+            width=280,
+            command=self._on_provider_change,
+        )
+        self._provider.set("ollama")
+        self._provider.pack(anchor="w", padx=16, pady=(4, 8))
+
         self._default_model = self._field(form, "Default model", "llama3.2:3b")
         self._summarize_model = self._field(form, "Summarize model", "llama3.2:3b")
-        self._ollama_url = self._field(form, "Ollama URL", "http://localhost:11434")
+
+        self._ollama_frame = ctk.CTkFrame(form, fg_color="transparent")
+        self._ollama_frame.pack(fill="x")
+        self._ollama_url = self._field(
+            self._ollama_frame, "Ollama URL", "http://localhost:11434"
+        )
+
+        self._openai_frame = ctk.CTkFrame(form, fg_color="transparent")
+        self._openai_base_url = self._field(
+            self._openai_frame,
+            "OpenAI-compatible base URL",
+            "https://api.openai.com/v1",
+        )
+        self._openai_api_key = self._field(self._openai_frame, "API key", "", show="*")
+
         self._hotkey = self._field(form, "Hotkey", "alt+space")
         self._vault = self._field(
             form,
@@ -229,16 +255,32 @@ class SettingsView(ctk.CTkFrame):
             justify="left",
         )
         self._status.pack(anchor="w", padx=T.PAD, pady=(0, T.PAD))
+        self._update_provider_fields("ollama")
         self._building = False
 
-    def _field(self, parent, label: str, default: str) -> ctk.CTkEntry:
+    def _field(
+        self, parent, label: str, default: str, *, show: str | None = None
+    ) -> ctk.CTkEntry:
         ctk.CTkLabel(parent, text=label, text_color=T.TEXT_MUTED).pack(
             anchor="w", padx=16, pady=(8, 0)
         )
-        entry = ctk.CTkEntry(parent, width=420)
+        entry = ctk.CTkEntry(parent, width=420, show=show or "")
         entry.insert(0, default)
         entry.pack(anchor="w", padx=16, pady=(4, 4))
         return entry
+
+    def _on_provider_change(self, value: str) -> None:
+        self._update_provider_fields(value)
+        if not self._building:
+            self._on_save("provider", value.strip())
+
+    def _update_provider_fields(self, provider: str) -> None:
+        if provider == "openai":
+            self._ollama_frame.pack_forget()
+            self._openai_frame.pack(fill="x", before=self._hotkey)
+        else:
+            self._openai_frame.pack_forget()
+            self._ollama_frame.pack(fill="x", before=self._hotkey)
 
     @staticmethod
     def _valid_hex(color: str) -> bool:
@@ -288,7 +330,15 @@ class SettingsView(ctk.CTkFrame):
         self._set_entry(self._default_model, settings.default_model)
         summarize = getattr(settings, "summarize_model", settings.default_model)
         self._set_entry(self._summarize_model, summarize)
+        provider = getattr(settings, "provider", "ollama")
+        provider = provider if provider in ("ollama", "openai") else "ollama"
+        self._provider.set(provider)
         self._set_entry(self._ollama_url, settings.ollama_url)
+        openai_base = getattr(settings, "openai_base_url", "https://api.openai.com/v1")
+        self._set_entry(self._openai_base_url, openai_base)
+        openai_key = getattr(settings, "openai_api_key", "")
+        self._set_entry(self._openai_api_key, openai_key)
+        self._update_provider_fields(provider)
         self._set_entry(self._hotkey, settings.hotkey)
         vault = getattr(settings, "obsidian_vault_path", "")
         self._set_entry(self._vault, vault)
@@ -351,9 +401,12 @@ class SettingsView(ctk.CTkFrame):
             return
 
         pairs = {
+            "provider": self._provider.get().strip(),
             "default_model": self._default_model.get().strip(),
             "summarize_model": self._summarize_model.get().strip(),
             "ollama_url": self._ollama_url.get().strip(),
+            "openai_base_url": self._openai_base_url.get().strip(),
+            "openai_api_key": self._openai_api_key.get().strip(),
             "hotkey": self._hotkey.get().strip(),
             "obsidian_vault_path": vault,
             "overlay_mode": self._overlay_mode.get().strip(),

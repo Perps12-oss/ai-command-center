@@ -29,6 +29,9 @@ _DEFAULTS: dict[str, str] = {
     "window_alpha": "0.95",
     "obsidian_vault_path": "",
     "overlay_mode": "palette",
+    "provider": "ollama",
+    "openai_base_url": "https://api.openai.com/v1",
+    "openai_api_key": "",
 }
 
 

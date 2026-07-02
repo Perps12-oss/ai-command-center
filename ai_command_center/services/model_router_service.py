@@ -25,6 +25,7 @@ class ModelRouterService(BaseService):
         super().__init__(bus)
         self._default_model = "llama3.2:3b"
         self._summarize_model = "llama3.2:3b"
+        self._provider = "ollama"
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -47,6 +48,9 @@ class ModelRouterService(BaseService):
         summarize = str(event.payload.get("summarize_model", "")).strip()
         if summarize:
             self._summarize_model = summarize
+        provider = str(event.payload.get("provider", "")).strip()
+        if provider:
+            self._provider = provider
 
     def _on_resolve_request(self, event: Event) -> None:
         intent = str(event.payload.get("intent", "chat"))
@@ -76,6 +80,7 @@ class ModelRouterService(BaseService):
                 "model": model,
                 "intent": intent,
                 "reason": reason,
+                "provider": self._provider,
                 "tier": classify_model(model).value,
             },
             source=self.name,

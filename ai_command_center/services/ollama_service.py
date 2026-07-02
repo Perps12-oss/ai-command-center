@@ -90,6 +90,7 @@ class StubOllamaService(OllamaServiceBase):
         self._loaded_model: str | None = None
         self._active_request_id: str | None = None
         self._cancelled = False
+        self._active_provider = "ollama"
         self._unsubscribers: list = []
 
     def _on_load(self) -> None:
@@ -104,6 +105,9 @@ class StubOllamaService(OllamaServiceBase):
         self._unsubscribers.clear()
 
     def _on_llm_request(self, event: Event) -> None:
+        provider = str(event.payload.get("provider", self._active_provider)).strip()
+        if provider != "ollama":
+            return
         bundle = event.payload.get("bundle")
         if not isinstance(bundle, ContextBundle):
             return

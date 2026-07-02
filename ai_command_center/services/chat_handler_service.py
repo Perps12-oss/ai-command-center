@@ -58,6 +58,7 @@ class ChatHandlerService(BaseService):
         self._obsidian = obsidian
         self._session = session
         self._default_model = "llama3.2:3b"
+        self._provider = "ollama"
         self._unsubscribers: list[Callable[[], None]] = []
         self._pending: dict[str, dict[str, object]] = {}
 
@@ -78,6 +79,7 @@ class ChatHandlerService(BaseService):
         self._default_model = str(
             event.payload.get("default_model", self._default_model)
         )
+        self._provider = str(event.payload.get("provider", self._provider)).strip() or "ollama"
 
     def _request_result(self, request_id: str) -> dict[str, object]:
         entry = self._pending.setdefault(request_id, {})
@@ -228,6 +230,7 @@ class ChatHandlerService(BaseService):
             {
                 "request_id": request_id,
                 "model": model,
+                "provider": self._provider,
                 "bundle": bundle,
             },
             source=self.name,

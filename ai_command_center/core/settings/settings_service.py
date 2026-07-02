@@ -44,6 +44,10 @@ class SettingsService:
             overlay_mode=str(payload.get("overlay_mode", "palette")),
             model_name=str(payload.get("model_name", "llama3.2:3b")),
             provider=str(payload.get("provider", "ollama")),
+            openai_base_url=str(
+                payload.get("openai_base_url", "https://api.openai.com/v1")
+            ),
+            openai_api_key=str(payload.get("openai_api_key", "")),
             vault_path=payload.get("vault_path", ""),
             overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
             telemetry_enabled=bool(payload.get("telemetry_enabled", True)),
