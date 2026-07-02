@@ -8,8 +8,12 @@ from ai_command_center.core.events.topics import (
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
+    COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    UI_COMMAND,
+    UI_OPEN_CHAT,
 )
+from ai_command_center.services.command_router_service import CommandRouterService
 
 
 class ChatWorkspaceV15StateTests(unittest.TestCase):
@@ -90,6 +94,54 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         self.assertEqual("streaming", second.chat_status)
         self.assertTrue(second.chat_streaming)
         self.assertEqual(first.last_event_topic, second.last_event_topic)
+
+    def test_open_chat_entity_projection(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(
+            UI_OPEN_CHAT,
+            {"entity_id": "card-1", "entity_type": "card", "title": "Roadmap"},
+            source="tests",
+        )
+        snap = store.snapshot
+        self.assertEqual("card-1", snap.chat_workspace_entity_id)
+        self.assertEqual("card", snap.chat_workspace_entity_type)
+        self.assertEqual("Roadmap", snap.chat_workspace_entity_title)
+
+        bus.publish(UI_OPEN_CHAT, {"entity_id": ""}, source="tests")
+        cleared = store.snapshot
+        self.assertEqual("", cleared.chat_workspace_entity_id)
+        self.assertEqual("", cleared.chat_workspace_entity_type)
+        self.assertEqual("", cleared.chat_workspace_entity_title)
+
+    def test_command_router_forwards_workspace_entity(self) -> None:
+        bus = EventBus()
+        router = CommandRouterService(bus)
+        router.load()
+        routed: list[dict] = []
+
+        def capture(event) -> None:
+            if event.topic == COMMAND_ROUTED and event.source == "command_router":
+                routed.append(dict(event.payload))
+
+        bus.subscribe(COMMAND_ROUTED, capture)
+        bus.publish(
+            UI_COMMAND,
+            {
+                "text": "Summarize this card",
+                "workspace_entity_id": "card-9",
+                "workspace_entity_type": "card",
+                "workspace_entity_title": "Sprint",
+            },
+            source="tests",
+        )
+        router.unload()
+        self.assertEqual(1, len(routed))
+        args = routed[0].get("args") or {}
+        self.assertEqual("card-9", args.get("workspace_entity_id"))
+        self.assertEqual("card", args.get("workspace_entity_type"))
+        self.assertEqual("Sprint", args.get("workspace_entity_title"))
 
 
 if __name__ == "__main__":

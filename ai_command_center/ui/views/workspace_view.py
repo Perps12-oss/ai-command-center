@@ -38,6 +38,7 @@ class _EntityTile(GlassCard):
         entity_type: str,
         subtitle: str,
         on_launch: Callable[[], None] | None = None,
+        on_chat: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(master)
         icon = _TYPE_ICON.get(entity_type, "•")
@@ -65,16 +66,33 @@ class _EntityTile(GlassCard):
                 wraplength=220,
                 justify="left",
             ).pack(fill="x", padx=12, pady=(2, 0))
-        if on_launch is not None:
-            ctk.CTkButton(
-                self,
-                text="Launch",
-                height=28,
-                font=T.FONT_SMALL,
-                fg_color=T.ACCENT_DEFAULT,
-                hover_color=T.ACCENT_HOVER,
-                command=on_launch,
-            ).pack(anchor="w", padx=12, pady=(8, 10))
+        if on_launch is not None or on_chat is not None:
+            btn_row = ctk.CTkFrame(self, fg_color="transparent")
+            btn_row.pack(anchor="w", padx=12, pady=(8, 10))
+            if on_chat is not None:
+                ctk.CTkButton(
+                    btn_row,
+                    text="Chat",
+                    width=72,
+                    height=28,
+                    font=T.FONT_SMALL,
+                    fg_color=T.BG_GLASS,
+                    hover_color=T.LIGHT_GLASS,
+                    border_width=1,
+                    border_color=T.BG_GLASS_BORDER,
+                    command=on_chat,
+                ).pack(side="left", padx=(0, 6))
+            if on_launch is not None:
+                ctk.CTkButton(
+                    btn_row,
+                    text="Launch",
+                    width=72,
+                    height=28,
+                    font=T.FONT_SMALL,
+                    fg_color=T.ACCENT_DEFAULT,
+                    hover_color=T.ACCENT_HOVER,
+                    command=on_launch,
+                ).pack(side="left")
         else:
             ctk.CTkFrame(self, fg_color="transparent", height=8).pack()
 
@@ -87,11 +105,13 @@ class WorkspaceView(ctk.CTkFrame):
         master,
         *,
         on_launch: Callable[[dict], None],
+        on_open_chat: Callable[[dict], None],
         on_command: Callable[[str], None],
         ws_controller: WorkspaceOsUIController,
     ) -> None:
         super().__init__(master, fg_color="transparent")
         self._on_launch = on_launch
+        self._on_open_chat = on_open_chat
         self._on_command = on_command
         self._ws = ws_controller
         self._entities: tuple = ()
@@ -315,6 +335,7 @@ class WorkspaceView(ctk.CTkFrame):
             resource_type = meta.get("resource_type")
             value = meta.get("url") or meta.get("path") or meta.get("command") or ""
             launch: Callable[[], None] | None = None
+            chat: Callable[[], None] | None = None
             if entity.entity_type == "resource" and resource_type and value:
                 payload = {
                     "resource_id": entity.entity_id,
@@ -326,6 +347,17 @@ class WorkspaceView(ctk.CTkFrame):
                     self._on_launch(p)
 
                 launch = _launch_handler
+
+            chat_payload = {
+                "entity_id": entity.entity_id,
+                "entity_type": entity.entity_type,
+                "title": entity.title or entity.entity_id,
+            }
+
+            def _chat_handler(p: dict = chat_payload) -> None:
+                self._on_open_chat(p)
+
+            chat = _chat_handler
             row, col = divmod(index, columns)
             tile = _EntityTile(
                 grid,
@@ -333,6 +365,7 @@ class WorkspaceView(ctk.CTkFrame):
                 entity_type=entity.entity_type,
                 subtitle=str(subtitle)[:120],
                 on_launch=launch,
+                on_chat=chat,
             )
             tile.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
         for col in range(columns):

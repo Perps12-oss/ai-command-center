@@ -42,6 +42,7 @@ from ai_command_center.core.events.topics import (
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
     SYSTEM_SNAPSHOT,
+    UI_OPEN_CHAT,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -80,6 +81,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     EVENT_ENTITY_UPDATED,
     EVENT_ENTITY_DELETED,
     EVENT_ENTITY_RELATIONSHIPS_CHANGED,
+    UI_OPEN_CHAT,
 )
 
 
@@ -165,6 +167,9 @@ class AppState:
     last_assistant_message: str = ""
     chat_history_count: int = 0
     last_chat_error: str = ""
+    chat_workspace_entity_id: str = ""
+    chat_workspace_entity_type: str = ""
+    chat_workspace_entity_title: str = ""
     errors: tuple[str, ...] = ()
 
     # Track 3.2 — full projection of feature catalogs
@@ -462,6 +467,30 @@ def _reduce_system_snapshot(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_chat_workspace_entity(state: AppState, event: Event) -> AppState:
+    """Project workspace-attached chat entity from ui.workspace_os.open_chat."""
+    if event.topic != UI_OPEN_CHAT:
+        return state
+    entity_id = str(event.payload.get("entity_id", "")).strip()
+    if not entity_id:
+        return replace(
+            state,
+            chat_workspace_entity_id="",
+            chat_workspace_entity_type="",
+            chat_workspace_entity_title="",
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    return replace(
+        state,
+        chat_workspace_entity_id=entity_id,
+        chat_workspace_entity_type=str(event.payload.get("entity_type", "")),
+        chat_workspace_entity_title=str(event.payload.get("title", "")),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
     """Update Workspace OS counters, recent events, and entity list."""
     current = state.workspace_os
@@ -708,6 +737,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_error,
     _reduce_phase,
     _reduce_system_snapshot,
+    _reduce_chat_workspace_entity,
     _reduce_workspace_os_event,
     _reduce_note_results,
     _reduce_note_selected,
