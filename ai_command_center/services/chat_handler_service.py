@@ -152,6 +152,15 @@ class ChatHandlerService(BaseService):
         history = pending.get("history")
         model = str(pending.get("model", self._default_model))
 
+        workspace_entity_id = str(args.get("workspace_entity_id", "")).strip()
+        if workspace_entity_id:
+            entity_type = str(args.get("workspace_entity_type", "entity"))
+            entity_title = str(args.get("workspace_entity_title", workspace_entity_id))
+            graph_snippets.insert(
+                0,
+                f"Workspace {entity_type}: {entity_title} (entity_id={workspace_entity_id})",
+            )
+
         bundle = self._context_manager.build_context(
             query,
             clipboard=clipboard_text,

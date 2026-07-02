@@ -74,6 +74,14 @@ class CommandRouterService(BaseService):
         clipboard = event.payload.get("clipboard")
         if clipboard and intent == INTENT_CHAT:
             args = {**args, "clipboard": str(clipboard)}
+        workspace_entity_id = str(event.payload.get("workspace_entity_id", "")).strip()
+        if workspace_entity_id and intent == INTENT_CHAT:
+            args = {
+                **args,
+                "workspace_entity_id": workspace_entity_id,
+                "workspace_entity_type": str(event.payload.get("workspace_entity_type", "")),
+                "workspace_entity_title": str(event.payload.get("workspace_entity_title", "")),
+            }
         self._bus.publish(
             COMMAND_ROUTED,
             {

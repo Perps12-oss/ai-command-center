@@ -103,6 +103,20 @@ class ApplicationShellMixin:
             meta = dict(entity.metadata)
             resource_type = meta.get("resource_type")
             value = meta.get("url") or meta.get("path") or meta.get("command") or ""
+            chat_payload = {
+                "entity_id": entity.entity_id,
+                "entity_type": entity.entity_type,
+                "title": entity.title or entity.entity_id,
+            }
+            chat_label = f"💬  Chat: {entity.title or entity.entity_id}"
+            chat_desc = f"Open chat attached to {entity.entity_type}"
+            items.append(
+                (
+                    chat_label,
+                    chat_desc,
+                    lambda p=chat_payload: self._on_open_chat_from_workspace(p),
+                )
+            )
             if not resource_type or not value:
                 continue
             label = f"🚀  {entity.title}"
@@ -171,9 +185,17 @@ class ApplicationShellMixin:
     def _on_chat_regenerate(self) -> None:
         chat = self._chat_view()
         if chat and chat._history:
+            snap = self._controller.snapshot()
+            entity: dict[str, str] | None = None
+            if snap.chat_workspace_entity_id:
+                entity = {
+                    "entity_id": snap.chat_workspace_entity_id,
+                    "entity_type": snap.chat_workspace_entity_type,
+                    "entity_title": snap.chat_workspace_entity_title,
+                }
             for msg in reversed(chat._history):
                 if msg.get("role") == "user":
-                    self._on_command(msg.get("content", ""))
+                    self._on_command(msg.get("content", ""), workspace_entity=entity)
                     return
 
     def _on_memory_delete(self, memory_id: str | None, text: str = "") -> None:
@@ -183,7 +205,7 @@ class ApplicationShellMixin:
     def _on_memory_add(self, label: str, content: str) -> None:
         self._controller.publish_memory_remember(label, content)
 
-    def _on_command(self, text: str) -> None:
+    def _on_command(self, text: str, *, workspace_entity: dict[str, str] | None = None) -> None:
         lower = text.strip().lower()
         if lower in ("?", "help"):
             self._show_capability_help()
@@ -217,7 +239,7 @@ class ApplicationShellMixin:
             or lower in ("settings", "chat", "notes", "plugins", "home", "workspace", "system", "memory")
         ):
             self._pending_user_text = text
-        self._controller.publish_command(text, clipboard=clipboard)
+        self._controller.publish_command(text, clipboard=clipboard, workspace_entity=workspace_entity)
 
     def _show_capability_help(self) -> None:
         show_capability_help(self)

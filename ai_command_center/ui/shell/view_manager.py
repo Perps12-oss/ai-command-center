@@ -40,6 +40,7 @@ class ViewManagerMixin:
         self._view_registry["workspace"] = lambda: WorkspaceView(
             self._content,
             on_launch=self._controller.publish_launch_resource,
+            on_open_chat=self._on_open_chat_from_workspace,
             on_command=self._on_command,
             ws_controller=ws_controller,
         )
@@ -52,7 +53,7 @@ class ViewManagerMixin:
             on_cancel=self._controller.publish_chat_cancel,
             on_export=self._on_chat_export,
             on_regenerate=self._on_chat_regenerate,
-            on_send=self._on_command,
+            on_send=self._on_chat_send,
         )
         self._view_registry["notes"] = lambda: NotesView(
             self._content,
@@ -147,3 +148,22 @@ class ViewManagerMixin:
 
     def _on_note_create(self, title: str, content: str) -> None:
         self._on_command(f"new note: {title} | {content}")
+
+    def _on_open_chat_from_workspace(self, payload: dict) -> None:
+        self._controller.publish_open_chat(
+            str(payload.get("entity_id", "")),
+            str(payload.get("entity_type", "")),
+            str(payload.get("title", "")),
+        )
+        self._navigate("chat")
+
+    def _on_chat_send(self, text: str) -> None:
+        snap = self._controller.snapshot()
+        entity: dict[str, str] | None = None
+        if snap.chat_workspace_entity_id:
+            entity = {
+                "entity_id": snap.chat_workspace_entity_id,
+                "entity_type": snap.chat_workspace_entity_type,
+                "entity_title": snap.chat_workspace_entity_title,
+            }
+        self._on_command(text, workspace_entity=entity)
