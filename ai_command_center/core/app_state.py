@@ -20,6 +20,10 @@ from ai_command_center.core.event_bus import (
     EventBus,
 )
 from ai_command_center.core.events.topics import (
+    AGENT_SPAWNED,
+    AGENT_TASK_COMPLETE,
+    AGENT_TASK_REQUEST,
+    AGENT_TERMINATED,
     APP_ERROR,
     APP_PHASE,
     CHAT_CANCELLED,
@@ -43,6 +47,11 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SNAPSHOT,
     SYSTEM_SNAPSHOT,
     UI_OPEN_CHAT,
+    WORKFLOW_COMPLETED,
+    WORKFLOW_FAILED,
+    WORKFLOW_STARTED,
+    WORKFLOW_STEP_COMPLETED,
+    WORKFLOW_STEP_STARTED,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -82,6 +91,16 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     EVENT_ENTITY_DELETED,
     EVENT_ENTITY_RELATIONSHIPS_CHANGED,
     UI_OPEN_CHAT,
+    # Agent / workflow runs (Track R7)
+    AGENT_SPAWNED,
+    AGENT_TASK_REQUEST,
+    AGENT_TASK_COMPLETE,
+    AGENT_TERMINATED,
+    WORKFLOW_STARTED,
+    WORKFLOW_STEP_STARTED,
+    WORKFLOW_STEP_COMPLETED,
+    WORKFLOW_COMPLETED,
+    WORKFLOW_FAILED,
 )
 
 
@@ -145,6 +164,33 @@ class PluginItem:
 
 
 @dataclass(frozen=True, slots=True)
+class AgentRunItem:
+    """Projection of an agent run for UI rendering."""
+
+    agent_id: str = ""
+    request_id: str = ""
+    state: str = "spawning"
+    task: str = ""
+    error: str = ""
+    steps: int = 0
+    workspace_id: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class WorkflowRunItem:
+    """Projection of a workflow run for UI rendering."""
+
+    run_id: str = ""
+    workflow_id: str = ""
+    state: str = "pending"
+    current_step_id: str = ""
+    current_step_index: int = 0
+    total_steps: int = 0
+    error: str = ""
+
+
+_MAX_RUN_FEED = 20
+@dataclass(frozen=True, slots=True)
 class AppState:
     """Immutable snapshot of application state."""
 
@@ -180,7 +226,11 @@ class AppState:
     memory_selected: tuple[str, ...] = ()
     plugin_catalog: tuple[PluginItem, ...] = ()
 
-
+    # Track R7 — agent / workflow run projections
+    agent_runs: tuple[AgentRunItem, ...] = ()
+    workflow_runs: tuple[WorkflowRunItem, ...] = ()
+    active_agent_run_id: str = ""
+    active_workflow_run_id: str = ""
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -723,6 +773,197 @@ def _reduce_plugin_state_changed(state: AppState, event: Event) -> AppState:
     )
 
 
+def _find_agent_run(runs: tuple[AgentRunItem, ...], agent_id: str) -> AgentRunItem | None:
+    for run in runs:
+        if run.agent_id == agent_id:
+            return run
+    return None
+
+
+def _upsert_agent_run(runs: tuple[AgentRunItem, ...], item: AgentRunItem) -> tuple[AgentRunItem, ...]:
+    filtered = tuple(r for r in runs if r.agent_id != item.agent_id)
+    updated = (item,) + filtered
+    if len(updated) > _MAX_RUN_FEED:
+        updated = updated[:_MAX_RUN_FEED]
+    return updated
+
+
+def _find_workflow_run(runs: tuple[WorkflowRunItem, ...], run_id: str) -> WorkflowRunItem | None:
+    for run in runs:
+        if run.run_id == run_id:
+            return run
+    return None
+
+
+def _upsert_workflow_run(
+    runs: tuple[WorkflowRunItem, ...], item: WorkflowRunItem
+) -> tuple[WorkflowRunItem, ...]:
+    filtered = tuple(r for r in runs if r.run_id != item.run_id)
+    updated = (item,) + filtered
+    if len(updated) > _MAX_RUN_FEED:
+        updated = updated[:_MAX_RUN_FEED]
+    return updated
+
+
+def _reduce_agent_run(state: AppState, event: Event) -> AppState:
+    """Project agent lifecycle events into agent_runs feed."""
+    if event.topic not in {
+        AGENT_SPAWNED,
+        AGENT_TASK_REQUEST,
+        AGENT_TASK_COMPLETE,
+        AGENT_TERMINATED,
+    }:
+        return state
+
+    payload = event.payload
+    agent_id = str(payload.get("agent_id", ""))
+    if not agent_id:
+        return state
+
+    existing = _find_agent_run(state.agent_runs, agent_id)
+    request_id = str(payload.get("request_id") or (existing.request_id if existing else ""))
+    task = str(payload.get("task") or (existing.task if existing else ""))
+    steps = _coerce_int(payload.get("steps"), existing.steps if existing else 0)
+    workspace_id = str(
+        payload.get("workspace_id") or (existing.workspace_id if existing else "")
+    )
+    error = str(payload.get("error") or (existing.error if existing else ""))
+
+    if event.topic == AGENT_SPAWNED:
+        run_state = str(payload.get("state", "spawning"))
+        item = AgentRunItem(
+            agent_id=agent_id,
+            request_id=request_id,
+            state=run_state,
+            task=task,
+            workspace_id=workspace_id,
+        )
+        return replace(
+            state,
+            agent_runs=_upsert_agent_run(state.agent_runs, item),
+            active_agent_run_id=agent_id,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    if existing is None:
+        existing = AgentRunItem(agent_id=agent_id, request_id=request_id)
+
+    if event.topic == AGENT_TASK_REQUEST:
+        run_state = "running"
+        steps = existing.steps + 1
+    elif event.topic == AGENT_TASK_COMPLETE:
+        run_state = "waiting"
+    elif event.topic == AGENT_TERMINATED:
+        run_state = "failed" if error else "terminated"
+    else:
+        run_state = existing.state
+
+    item = AgentRunItem(
+        agent_id=agent_id,
+        request_id=request_id,
+        state=run_state,
+        task=task or existing.task,
+        error=error,
+        steps=steps if steps else existing.steps,
+        workspace_id=workspace_id or existing.workspace_id,
+    )
+    active_id = state.active_agent_run_id
+    if event.topic == AGENT_TERMINATED and active_id == agent_id:
+        active_id = ""
+
+    return replace(
+        state,
+        agent_runs=_upsert_agent_run(state.agent_runs, item),
+        active_agent_run_id=active_id,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_workflow_run(state: AppState, event: Event) -> AppState:
+    """Project workflow lifecycle events into workflow_runs feed."""
+    if event.topic not in {
+        WORKFLOW_STARTED,
+        WORKFLOW_STEP_STARTED,
+        WORKFLOW_STEP_COMPLETED,
+        WORKFLOW_COMPLETED,
+        WORKFLOW_FAILED,
+    }:
+        return state
+
+    payload = event.payload
+    run_id = str(payload.get("run_id", ""))
+    if not run_id:
+        return state
+
+    existing = _find_workflow_run(state.workflow_runs, run_id)
+    workflow_id = str(
+        payload.get("workflow_id") or (existing.workflow_id if existing else "")
+    )
+    total_steps = _coerce_int(
+        payload.get("total_steps"),
+        existing.total_steps if existing else 0,
+    )
+    step_id = str(payload.get("step_id") or (existing.current_step_id if existing else ""))
+    step_index = _coerce_int(
+        payload.get("index"),
+        existing.current_step_index if existing else 0,
+    )
+    error = str(payload.get("error") or (existing.error if existing else ""))
+
+    if event.topic == WORKFLOW_STARTED:
+        item = WorkflowRunItem(
+            run_id=run_id,
+            workflow_id=workflow_id,
+            state="running",
+            total_steps=total_steps,
+        )
+        return replace(
+            state,
+            workflow_runs=_upsert_workflow_run(state.workflow_runs, item),
+            active_workflow_run_id=run_id,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    if existing is None:
+        existing = WorkflowRunItem(run_id=run_id, workflow_id=workflow_id, state="running")
+
+    if event.topic == WORKFLOW_STEP_STARTED:
+        run_state = "running"
+    elif event.topic == WORKFLOW_STEP_COMPLETED:
+        run_state = "running"
+        step_index = step_index + 1
+    elif event.topic == WORKFLOW_COMPLETED:
+        run_state = "completed"
+    elif event.topic == WORKFLOW_FAILED:
+        run_state = "failed"
+    else:
+        run_state = existing.state
+
+    item = WorkflowRunItem(
+        run_id=run_id,
+        workflow_id=workflow_id or existing.workflow_id,
+        state=run_state,
+        current_step_id=step_id or existing.current_step_id,
+        current_step_index=step_index,
+        total_steps=total_steps or existing.total_steps,
+        error=error,
+    )
+    active_id = state.active_workflow_run_id
+    if event.topic in {WORKFLOW_COMPLETED, WORKFLOW_FAILED} and active_id == run_id:
+        active_id = ""
+
+    return replace(
+        state,
+        workflow_runs=_upsert_workflow_run(state.workflow_runs, item),
+        active_workflow_run_id=active_id,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
     _reduce_settings_changed,
@@ -748,6 +989,8 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_cleared,
     _reduce_plugin_catalog,
     _reduce_plugin_state_changed,
+    _reduce_agent_run,
+    _reduce_workflow_run,
 )
 
 

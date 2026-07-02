@@ -16,6 +16,7 @@ from ai_command_center.core.events.topics import (
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
     WORKFLOW_START,
+    WORKFLOW_STARTED,
     WORKFLOW_STEP_COMPLETED,
     WORKFLOW_STEP_STARTED,
 )
@@ -59,8 +60,18 @@ class WorkflowEngineService(BaseService):
                 source=self.name,
             )
             return
-        self._runs[run_id] = {"steps": steps, "index": 0, "workflow_id": event.payload.get("workflow_id")}
+        workflow_id = str(event.payload.get("workflow_id") or "")
+        self._runs[run_id] = {"steps": steps, "index": 0, "workflow_id": workflow_id}
         _logger.info("workflow.start run_id=%s steps=%d", run_id, len(steps))
+        self._bus.publish(
+            WORKFLOW_STARTED,
+            {
+                "run_id": run_id,
+                "workflow_id": workflow_id,
+                "total_steps": len(steps),
+            },
+            source=self.name,
+        )
         self._dispatch_step(run_id)
 
     def _dispatch_step(self, run_id: str) -> None:
