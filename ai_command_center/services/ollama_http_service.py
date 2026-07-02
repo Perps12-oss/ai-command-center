@@ -19,6 +19,10 @@ from ai_command_center.core.events.topics import (
     CHAT_CHUNK,
     CHAT_ERROR,
     CHAT_STARTED,
+    LLM_CANCEL,
+    LLM_CHUNK,
+    LLM_COMPLETE,
+    LLM_ERROR,
     LLM_REQUEST,
     OLLAMA_STATUS,
     SETTINGS_SNAPSHOT,
@@ -349,33 +353,31 @@ class OllamaHttpService(OllamaServiceBase):
                     chunk = str(data.get("message", {}).get("content", ""))
                     if chunk:
                         full_text.append(chunk)
+                        chunk_payload = {
+                            "request_id": request_id,
+                            "text": chunk,
+                        }
                         self._bus.publish(
                             CHAT_CHUNK,
-                            {
-                                "request_id": request_id,
-                                "text": chunk,
-                            },
+                            chunk_payload,
                             source=self.name,
                         )
+                        self._bus.publish(LLM_CHUNK, chunk_payload, source=self.name)
                     if data.get("done"):
                         break
 
             text = "".join(full_text)
-            self._bus.publish(
-                CHAT_COMPLETE,
-                {
-                    "request_id": request_id,
-                    "text": text,
-                    "model": model,
-                },
-                source=self.name,
-            )
+            complete_payload = {
+                "request_id": request_id,
+                "text": text,
+                "model": model,
+            }
+            self._bus.publish(CHAT_COMPLETE, complete_payload, source=self.name)
+            self._bus.publish(LLM_COMPLETE, complete_payload, source=self.name)
         except asyncio.CancelledError:
-            self._bus.publish(
-                CHAT_CANCELLED,
-                {"request_id": request_id},
-                source=self.name,
-            )
+            cancel_payload = {"request_id": request_id}
+            self._bus.publish(CHAT_CANCELLED, cancel_payload, source=self.name)
+            self._bus.publish(LLM_CANCEL, cancel_payload, source=self.name)
         except aiohttp.ClientConnectorError:
             self._publish_offline(request_id)
         except asyncio.TimeoutError:
@@ -404,4 +406,5 @@ class OllamaHttpService(OllamaServiceBase):
         if request_id:
             payload["request_id"] = request_id
         self._bus.publish(CHAT_ERROR, payload, source=self.name)
+        self._bus.publish(LLM_ERROR, payload, source=self.name)
         self._bus.publish(APP_ERROR, {"message": message}, source=self.name)

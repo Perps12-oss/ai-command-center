@@ -165,7 +165,7 @@ def test_context_pollution() -> dict:
             router = CommandRouterService(bus)
             obsidian = ObsidianService(bus, NoteRepository(db))
             ollama = RecordingStub(bus)
-            handler = ChatHandlerService(bus, ContextManager(), ollama, obsidian)
+            handler = ChatHandlerService(bus, ContextManager(), obsidian)
             for svc in (router, obsidian, ollama, handler):
                 svc.load()
 

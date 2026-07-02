@@ -84,7 +84,7 @@ def main() -> int:
         router = CommandRouterService(bus)
         obsidian = ObsidianService(bus, repo)
         ollama = StubOllamaService(bus)
-        handler = ChatHandlerService(bus, ContextManager(), ollama, obsidian)
+        handler = ChatHandlerService(bus, ContextManager(), obsidian)
         for svc in (router, obsidian, ollama, handler):
             svc.load()
 

@@ -133,6 +133,10 @@ PLUGIN_STATE_CHANGED = "plugin.state_changed"
 PLUGIN_ERROR = "plugin.error"
 
 LLM_REQUEST = "llm.request"
+LLM_CHUNK = "llm.chunk"
+LLM_COMPLETE = "llm.complete"
+LLM_ERROR = "llm.error"
+LLM_CANCEL = "llm.cancel"
 
 SYSTEM_EVENTS = "system.events"
 COMMAND_HISTORY = "command.history"
@@ -252,6 +256,10 @@ __all__ = [
     "PLUGIN_STATE_CHANGED",
     "PLUGIN_ERROR",
     "LLM_REQUEST",
+    "LLM_CHUNK",
+    "LLM_COMPLETE",
+    "LLM_ERROR",
+    "LLM_CANCEL",
     "SYSTEM_EVENTS",
     "COMMAND_HISTORY",
     "UI_INSPECTOR_OPEN",
