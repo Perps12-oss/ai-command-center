@@ -54,6 +54,11 @@ class StateApplierMixin:
         chat = self._chat_view()
         if chat:
             chat.set_model(snap.settings.default_model)
+            chat.update_entity_context(
+                snap.chat_workspace_entity_id,
+                snap.chat_workspace_entity_type,
+                snap.chat_workspace_entity_title,
+            )
             chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
             terminal_key = (str(snap.chat_status), str(snap.last_chat_request_id))
             if snap.chat_status == "complete":
