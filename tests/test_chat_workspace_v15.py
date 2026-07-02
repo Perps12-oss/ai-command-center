@@ -4,6 +4,7 @@ from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     CHAT_CANCELLED,
+    CHAT_CHUNK,
     CHAT_COMPLETE,
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
@@ -94,6 +95,63 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         self.assertEqual("streaming", second.chat_status)
         self.assertTrue(second.chat_streaming)
         self.assertEqual(first.last_event_topic, second.last_event_topic)
+
+    def test_chat_chunk_buffer_projection(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(CHAT_STARTED, {"request_id": "r5"}, source="tests")
+        bus.publish(CHAT_CHUNK, {"request_id": "r5", "text": "Hel"}, source="tests")
+        bus.publish(CHAT_CHUNK, {"request_id": "r5", "text": "lo"}, source="tests")
+        snap = store.snapshot
+        self.assertEqual("Hello", snap.chat_stream_buffer)
+        self.assertEqual(3, snap.chat_stream_revision)
+
+        bus.publish(CHAT_CHUNK, {"request_id": "stale", "text": "ignored"}, source="tests")
+        self.assertEqual("Hello", store.snapshot.chat_stream_buffer)
+
+        bus.publish(CHAT_COMPLETE, {"request_id": "r5", "text": "Hello"}, source="tests")
+        cleared = store.snapshot
+        self.assertEqual("", cleared.chat_stream_buffer)
+        self.assertFalse(cleared.chat_streaming)
+
+    def test_pending_user_text_projection(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(COMMAND_ROUTED, {"text": "What is Python?"}, source="command_router")
+        self.assertEqual("What is Python?", store.snapshot.chat_pending_user_text)
+
+        bus.publish(COMMAND_ROUTED, {"text": "note: daily log"}, source="command_router")
+        self.assertEqual("", store.snapshot.chat_pending_user_text)
+
+        bus.publish(COMMAND_ROUTED, {"text": "Explain async"}, source="command_router")
+        bus.publish(CHAT_STARTED, {"request_id": "r6"}, source="tests")
+        snap = store.snapshot
+        self.assertEqual("", snap.chat_pending_user_text)
+        self.assertEqual("Explain async", snap.chat_started_user_text)
+
+    def test_history_messages_projection(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(
+            CHAT_HISTORY_LOADED,
+            {
+                "messages": [
+                    {"role": "user", "content": "Hi"},
+                    {"role": "assistant", "content": "Hello"},
+                ]
+            },
+            source="tests",
+        )
+        snap = store.snapshot
+        self.assertEqual(2, snap.chat_history_count)
+        self.assertEqual(1, snap.chat_history_revision)
+        self.assertEqual("user", snap.chat_history_messages[0].role)
+        self.assertEqual("Hi", snap.chat_history_messages[0].content)
+        self.assertEqual("assistant", snap.chat_history_messages[1].role)
+        self.assertEqual("Hello", snap.chat_history_messages[1].content)
 
     def test_open_chat_entity_projection(self) -> None:
         bus = EventBus()

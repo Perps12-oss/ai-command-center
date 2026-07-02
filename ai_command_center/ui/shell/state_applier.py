@@ -60,13 +60,48 @@ class StateApplierMixin:
                 snap.chat_workspace_entity_title,
             )
             chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
+
+            if snap.chat_history_revision != self._last_chat_history_revision:
+                messages = [
+                    {"role": item.role, "content": item.content}
+                    for item in snap.chat_history_messages
+                ]
+                chat.load_history(messages)
+                self._last_chat_history_revision = snap.chat_history_revision
+
+            if (
+                snap.chat_streaming
+                and snap.active_chat_request_id
+                and snap.active_chat_request_id != self._last_started_request_id
+            ):
+                self._navigate("chat")
+                chat = self._chat_view()
+                if chat:
+                    if snap.chat_started_user_text:
+                        chat.show_user_message(snap.chat_started_user_text)
+                    chat.begin_assistant(snap.active_chat_request_id)
+                    self._last_started_request_id = snap.active_chat_request_id
+                    self._last_stream_buffer_len = 0
+
+            if (
+                snap.chat_streaming
+                and chat
+                and snap.active_chat_request_id == self._last_started_request_id
+            ):
+                buffer_len = len(snap.chat_stream_buffer)
+                if buffer_len > self._last_stream_buffer_len:
+                    delta = snap.chat_stream_buffer[self._last_stream_buffer_len :]
+                    chat.append_chunk(delta)
+                    self._last_stream_buffer_len = buffer_len
+
             terminal_key = (str(snap.chat_status), str(snap.last_chat_request_id))
             if snap.chat_status == "complete":
                 if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
                     chat.finish_assistant(str(snap.last_assistant_message))
                     if snap.last_chat_request_id not in self._completed_request_ids:
                         self._completed_request_ids.append(snap.last_chat_request_id)
-                    self._active_request_id = None
+                    self._last_started_request_id = None
+                    self._last_stream_buffer_len = 0
                     self._top.update_status("ready", snap.settings.default_model)
                     self._last_terminal_chat_key = terminal_key
             elif snap.chat_status == "cancelled":
@@ -74,7 +109,8 @@ class StateApplierMixin:
                     chat.show_cancelled()
                     if snap.last_chat_request_id not in self._completed_request_ids:
                         self._completed_request_ids.append(snap.last_chat_request_id)
-                    self._active_request_id = None
+                    self._last_started_request_id = None
+                    self._last_stream_buffer_len = 0
                     self._last_terminal_chat_key = terminal_key
             elif snap.chat_status == "error":
                 if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
@@ -84,7 +120,8 @@ class StateApplierMixin:
                         chat.show_error(str(snap.last_chat_error or "Unknown error"))
                     if snap.last_chat_request_id not in self._completed_request_ids:
                         self._completed_request_ids.append(snap.last_chat_request_id)
-                    self._active_request_id = None
+                    self._last_started_request_id = None
+                    self._last_stream_buffer_len = 0
                     self._top.update_status("error", snap.settings.default_model)
                     self._last_terminal_chat_key = terminal_key
 
