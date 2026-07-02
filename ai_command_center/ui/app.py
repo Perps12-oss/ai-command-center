@@ -307,11 +307,18 @@ class CommandPaletteApp(ctk.CTk):
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:
             view_id = "home"
+        prev_id = self._current_view
+        if prev_id and prev_id in self._views:
+            prev = self._views[prev_id]
+            if hasattr(prev, "on_hide"):
+                prev.on_hide()
         self._current_view = view_id
         for view in self._views.values():
             view.pack_forget()
         view = self._ensure_view(view_id)
         view.pack(fill="both", expand=True)
+        if hasattr(view, "on_show"):
+            view.on_show()
         self._sidebar.set_active(view_id)
         if view_id == "settings":
             settings_view = self._views.get("settings")

@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_COMMAND_PALETTE_OPENED,
     EVENT_COMMAND_PALETTE_SEARCH,
     EVENT_COMMAND_PALETTE_ITEM_SELECTED,

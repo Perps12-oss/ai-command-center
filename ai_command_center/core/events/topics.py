@@ -60,6 +60,7 @@ SYSTEM_SNAPSHOT = "system.snapshot"
 APP_PHASE = "app.phase"
 APP_ERROR = "app.error"
 APP_WARNING = "app.warning"
+BUS_HANDLER_ERROR = "bus.handler_error"
 COMMAND_ROUTED = "command.routed"
 UI_COMMAND = "ui.command"
 UI_NAVIGATE = "ui.navigate"
@@ -173,6 +174,7 @@ __all__ = [
     "APP_PHASE",
     "APP_ERROR",
     "APP_WARNING",
+    "BUS_HANDLER_ERROR",
     "COMMAND_ROUTED",
     "UI_COMMAND",
     "UI_NAVIGATE",

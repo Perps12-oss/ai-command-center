@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
@@ -13,6 +14,8 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.platform.model_registry import classify_model
 from ai_command_center.services.base import BaseService
+
+logger = logging.getLogger(__name__)
 
 
 class ModelRouterService(BaseService):
@@ -66,6 +69,7 @@ class ModelRouterService(BaseService):
         else:
             model = self._default_model
             reason = "default"
+        logger.info("model.resolve intent=%s model=%s reason=%s", intent, model, reason)
         self._bus.publish(
             MODEL_SELECTED,
             {

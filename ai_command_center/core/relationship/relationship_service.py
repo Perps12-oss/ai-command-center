@@ -13,15 +13,12 @@ from uuid import UUID, uuid4
 from ai_command_center.core.relationship.relationship import (
     Relationship,
     RelationshipType,
-    RELATIONSHIP_SCHEMA_VERSION,
     validate_relationship_type,
 )
 from ai_command_center.core.relationship.relationship_repository import RelationshipRepository
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_RELATIONSHIP_CREATED,
     EVENT_RELATIONSHIP_DELETED,
-    EVENT_RELATIONSHIP_QUERY_REQUEST,
 )
 
 

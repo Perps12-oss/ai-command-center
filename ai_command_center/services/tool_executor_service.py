@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+import shlex
 import subprocess
+import sys
 from typing import Callable
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
@@ -19,20 +22,46 @@ from ai_command_center.services.base import BaseService
 from ai_command_center.tools.tool_executor import ToolExecutor
 from ai_command_center.tools.tool_registry import ToolRegistry
 
+logger = logging.getLogger(__name__)
+
+# Shell execution policy: prefer argv splitting without shell=True.
+# shell=True is retained only as a fallback when shlex.split yields a single token
+# that may contain shell metacharacters (pipes, redirects).
+_SHELL_METACHAR_RE = frozenset("|&;<>$`")
+
+
+def _needs_shell(command: str) -> bool:
+    return any(ch in command for ch in _SHELL_METACHAR_RE)
+
 
 def _run_shell_command(args: dict) -> ToolResult:
     command = str(args.get("command", "")).strip()
     if not command:
         return ToolResult(success=False, output="", error="empty shell command")
     try:
-        completed = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
+        use_shell = _needs_shell(command)
+        if use_shell:
+            logger.warning("shell tool using shell=True for metachar command: %r", command[:80])
+            completed = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        else:
+            argv = shlex.split(command, posix=(sys.platform != "win32"))
+            if not argv:
+                return ToolResult(success=False, output="", error="empty shell command")
+            completed = subprocess.run(
+                argv,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
         stdout = (completed.stdout or "").strip()
         stderr = (completed.stderr or "").strip()
         output = stdout or stderr

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -24,7 +25,6 @@ from ai_command_center.core.events.topics import (
     MEMORY_LOOKUP_RESULT,
     MODEL_RESOLVE_REQUEST,
     MODEL_RESOLVE_RESULT,
-    NOTE_CONTEXT_REQUEST,
     NOTE_CONTEXT_RESULT,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
@@ -37,6 +37,8 @@ from ai_command_center.services.command_router_service import INTENT_CHAT
 
 if TYPE_CHECKING:
     from ai_command_center.services.ollama_service import OllamaServiceBase
+
+logger = logging.getLogger(__name__)
 
 
 class ChatHandlerService(BaseService):
@@ -137,6 +139,7 @@ class ChatHandlerService(BaseService):
 
         request_id = uuid.uuid4().hex
         self._pending[request_id] = {}
+        logger.info("chat.request_started request_id=%s query_len=%d", request_id, len(query))
 
         notes_raw = args.get("notes")
         notes: list[str] = []

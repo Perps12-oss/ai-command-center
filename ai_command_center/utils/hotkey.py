@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from typing import Any
 
 _hotkey_thread: threading.Thread | None = None
 _registered = False
@@ -29,7 +28,7 @@ def register_hotkey(combo: str, callback: Callable[[], None]) -> tuple[bool, str
             keyboard.add_hotkey(combo, callback, suppress=False)
             _hook_ok = True
             keyboard.wait()
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             _hook_ok = False
 
     _hotkey_thread = threading.Thread(target=_run, name="hotkey-listener", daemon=True)

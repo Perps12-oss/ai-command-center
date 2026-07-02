@@ -10,13 +10,6 @@ from ai_command_center.core.event_bus import (
     EVENT_TIMELINE_EVENT,
     EventBus,
 )
-from ai_command_center.core.events.topics import (
-    UI_CREATE_CARD,
-    UI_CREATE_RESOURCE,
-    UI_CREATE_WORKSPACE,
-    UI_LAUNCH_RESOURCE,
-    UI_SEARCH_WORKSPACE_OS,
-)
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 
@@ -138,11 +131,16 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
     def _wire_events(self) -> None:
         """Subscribe to EventBus events that affect the inspector."""
         self._unsubs.append(
-            self._bus.subscribe(EVENT_ENTITY_CREATED, lambda _event: self._refresh())
+            self._bus.subscribe(EVENT_ENTITY_CREATED, lambda _event: self._schedule_refresh())
         )
         self._unsubs.append(
-            self._bus.subscribe(EVENT_TIMELINE_EVENT, lambda _event: self._refresh())
+            self._bus.subscribe(EVENT_TIMELINE_EVENT, lambda _event: self._schedule_refresh())
         )
+
+    def _schedule_refresh(self) -> None:
+        """Marshal UI refresh onto the Tk main thread."""
+        if self.winfo_exists():
+            self.after(0, self._refresh)
 
     def _on_close(self) -> None:
         """Close the inspector and clean up subscriptions."""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -44,6 +45,8 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
+
+logger = logging.getLogger(__name__)
 
 APP_STATE_TOPICS: tuple[str, ...] = (
     SERVICE_STATE_CHANGED,
@@ -764,8 +767,19 @@ class AppStateStore:
         for listener in listeners:
             try:
                 listener(new_state)
-            except Exception:
-                continue
+            except Exception as exc:
+                logger.exception("AppState listener failed for topic=%s", event.topic)
+                try:
+                    self._bus.publish(
+                        APP_ERROR,
+                        {
+                            "message": f"AppState listener failed: {exc}",
+                            "topic": event.topic,
+                        },
+                        source="app_state",
+                    )
+                except Exception:
+                    logger.exception("Failed to publish app.error for listener failure")
 
     def close(self) -> None:
         for unsub in self._unsubscribers:
