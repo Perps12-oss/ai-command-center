@@ -29,15 +29,22 @@ class CommandPaletteApp(
 ):
     """1100x700 command palette - fade-in, glass shell, theme, toasts."""
 
-    def __init__(self, bus: EventBus, state_store: AppStateStore) -> None:
+    def __init__(
+        self,
+        bus: EventBus,
+        state_store: AppStateStore,
+        *,
+        workspace_os_enabled: bool = True,
+    ) -> None:
         super().__init__()
+        self._default_view = "workspace" if workspace_os_enabled else "home"
         self._bus = bus
         self._controller = UIController(bus, state_store, self._queue_state_refresh)
         self._ui_queue = UIQueue(self)
         self._visible = False
         self._views: dict[str, object] = {}
         self._view_registry: dict[str, object] = {}
-        self._current_view = "home"
+        self._current_view = self._default_view
         self._active_request_id: str | None = None
         self._pending_user_text: str | None = None
         self._completed_request_ids: deque[str] = deque(maxlen=32)

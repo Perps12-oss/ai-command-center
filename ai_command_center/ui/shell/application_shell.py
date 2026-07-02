@@ -58,7 +58,7 @@ class ApplicationShellMixin:
         self._content = ctk.CTkFrame(right, fg_color="transparent")
         self._content.pack(fill="both", expand=True)
 
-        self._show_view("home")
+        self._show_view(self._default_view)
 
         self._toast = ToastManager(self)
         self._command_palette = CommandPalette(self)
@@ -78,7 +78,8 @@ class ApplicationShellMixin:
 
     def _show_command_palette(self) -> None:
         commands = [
-            ("⌂  Home", "Navigate to Home", lambda: self._navigate("home")),
+            ("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace")),
+            ("⌂  Home", "Dashboard and quick actions", lambda: self._navigate("home")),
             ("💬  Chat", "Navigate to Chat", lambda: self._navigate("chat")),
             ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
             ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
@@ -213,7 +214,7 @@ class ApplicationShellMixin:
             or lower.startswith("memory:")
             or lower.startswith(">")
             or lower.startswith("go ")
-            or lower in ("settings", "chat", "notes", "plugins", "home", "system", "memory")
+            or lower in ("settings", "chat", "notes", "plugins", "home", "workspace", "system", "memory")
         ):
             self._pending_user_text = text
         self._controller.publish_command(text, clipboard=clipboard)

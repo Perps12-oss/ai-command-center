@@ -25,7 +25,9 @@ _VIEW_ALIASES: dict[str, str] = {
     "notes": "notes",
     "plugins": "plugins",
     "home": "home",
+    "workspace": "workspace",
     "system": "system",
+    "memory": "memory",
 }
 
 # Obvious shell verbs when user omits the ">" prefix.

@@ -24,7 +24,11 @@ def main() -> int:
     core = create_application()
     core.startup()
 
-    app = CommandPaletteApp(core.bus, core.state_store)
+    app = CommandPaletteApp(
+        core.bus,
+        core.state_store,
+        workspace_os_enabled=core.workspace_os is not None and core.workspace_os.enabled,
+    )
     shutting_down = False
     inspector: WorkspaceOsInspector | None = None
 
