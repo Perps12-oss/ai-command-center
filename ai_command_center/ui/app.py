@@ -45,10 +45,11 @@ class CommandPaletteApp(
         self._views: dict[str, object] = {}
         self._view_registry: dict[str, object] = {}
         self._current_view = self._default_view
-        self._active_request_id: str | None = None
-        self._pending_user_text: str | None = None
         self._completed_request_ids: deque[str] = deque(maxlen=32)
         self._last_terminal_chat_key: tuple[str, str] | None = None
+        self._last_started_request_id: str | None = None
+        self._last_stream_buffer_len: int = 0
+        self._last_chat_history_revision: int = 0
         self._overlay_mode = "palette"
         self._bus_unsubs: list = []
         self._memory_count = 0
