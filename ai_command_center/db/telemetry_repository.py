@@ -1,4 +1,8 @@
-"""Passive telemetry persistence — append-only event log."""
+"""Passive telemetry persistence — append-only event log.
+
+.. deprecated::
+    Import ``TelemetryRepository`` from ``ai_command_center.repositories`` instead.
+"""
 
 from __future__ import annotations
 

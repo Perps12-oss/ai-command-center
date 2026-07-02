@@ -39,7 +39,7 @@ def main() -> int:
 
     from ai_command_center.core.event_bus import EventBus
     from ai_command_center.db.connection import connect, init_database
-    from ai_command_center.db.memory_repository import MemoryRepository
+    from ai_command_center.repositories.memory_repository import MemoryRepository
     from ai_command_center.services.command_router_service import CommandRouterService
     from ai_command_center.services.memory_graph_service import MemoryGraphService
     from ai_command_center.services.model_router_service import ModelRouterService
