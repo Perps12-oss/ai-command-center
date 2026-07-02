@@ -13,10 +13,12 @@ from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
+from ai_command_center.ui.views.workspace_view import WorkspaceView
 
 ViewFactory = Callable[[], object]
 
 VIEW_IDS: tuple[str, ...] = (
+    "workspace",
     "home",
     "chat",
     "notes",
@@ -33,6 +35,11 @@ class ViewManagerMixin:
 
     def _register_views(self) -> None:
         """Register all view factories. Add new views here only."""
+        self._view_registry["workspace"] = lambda: WorkspaceView(
+            self._content,
+            on_launch=self._controller.publish_launch_resource,
+            on_command=self._on_command,
+        )
         self._view_registry["home"] = lambda: HomeView(
             self._content,
             on_command=self._on_command,
@@ -98,6 +105,10 @@ class ViewManagerMixin:
     def _plugins_view(self) -> PluginsView | None:
         v = self._views.get("plugins")
         return v if isinstance(v, PluginsView) else None
+
+    def _workspace_view(self) -> WorkspaceView | None:
+        v = self._views.get("workspace")
+        return v if isinstance(v, WorkspaceView) else None
 
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:

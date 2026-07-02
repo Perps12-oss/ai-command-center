@@ -104,6 +104,10 @@ class StateApplierMixin:
             if snap.errors:
                 system.load_errors(snap.errors)
 
+        workspace = self._workspace_view()
+        if workspace:
+            workspace.load_from_appstate(snap)
+
         home = self._home_view()
         if home and snap.chat_history_count:
             home.update_stats(
