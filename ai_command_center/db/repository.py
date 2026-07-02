@@ -1,4 +1,8 @@
-"""Data access layer."""
+"""Data access layer.
+
+.. deprecated::
+    Import ``SettingsRepository`` from ``ai_command_center.repositories`` instead.
+"""
 
 from __future__ import annotations
 

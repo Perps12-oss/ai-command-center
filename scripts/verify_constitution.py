@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import ast
 import re
-import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +43,14 @@ SHELL_TRUE_ALLOWLIST = {
     "ai_command_center/services/tool_executor_service.py",
     "ai_command_center/core/workspace_os_actions.py",
 }
+
+FORBIDDEN_SERVICE_DB_IMPORTS = (
+    "ai_command_center.db.conversation_repository",
+    "ai_command_center.db.note_repository",
+    "ai_command_center.db.memory_repository",
+    "ai_command_center.db.telemetry_repository",
+    "ai_command_center.db.repository",
+)
 
 
 def _exists(rel_path: str) -> bool:
@@ -101,6 +108,29 @@ def _check_shell_true() -> list[str]:
     return failures
 
 
+def _check_services_db_imports() -> list[str]:
+    failures: list[str] = []
+    services_root = PROJECT_ROOT / "ai_command_center" / "services"
+    for path in services_root.rglob("*.py"):
+        rel = path.relative_to(PROJECT_ROOT).as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+        except SyntaxError as exc:
+            failures.append(f"services import check parse error: {rel}: {exc}")
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    mod = alias.name
+                    if mod in FORBIDDEN_SERVICE_DB_IMPORTS:
+                        failures.append(f"service layer violation: {rel} imports {mod}")
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                mod = node.module
+                if mod in FORBIDDEN_SERVICE_DB_IMPORTS:
+                    failures.append(f"service layer violation: {rel} imports from {mod}")
+    return failures
+
+
 def main() -> int:
     print("=== Constitution Governance Gate ===")
     failures: list[str] = []
@@ -112,6 +142,7 @@ def main() -> int:
     failures.extend(_find_duplicate_authority_docs())
     failures.extend(_check_ui_layer_imports())
     failures.extend(_check_shell_true())
+    failures.extend(_check_services_db_imports())
 
     if failures:
         print("FAIL:")

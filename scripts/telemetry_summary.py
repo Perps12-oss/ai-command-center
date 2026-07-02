@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from ai_command_center.db.connection import connect
-from ai_command_center.db.telemetry_repository import TelemetryRepository
+from ai_command_center.repositories.telemetry_repository import TelemetryRepository
 from ai_command_center.services.telemetry_summary import (
     compute_session_summary,
     format_session_summary,
