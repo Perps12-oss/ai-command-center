@@ -6,11 +6,8 @@ import os
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
-    CHAT_CHUNK,
     CHAT_EXPORT_ERROR,
     CHAT_EXPORT_RESULT,
-    CHAT_HISTORY_LOADED,
-    CHAT_STARTED,
     COMMAND_HISTORY,
     COMMAND_ROUTED,
     MEMORY_ERROR,
@@ -72,59 +69,11 @@ class EventCoordinatorMixin:
 
     def _wire_chat_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe(CHAT_STARTED, self._on_chat_started)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe(CHAT_CHUNK, self._on_chat_chunk)
-        )
-        self._bus_unsubs.append(
-            self._bus.subscribe(CHAT_HISTORY_LOADED, self._on_chat_history_loaded)
-        )
-        self._bus_unsubs.append(
             self._bus.subscribe(CHAT_EXPORT_RESULT, self._on_chat_export_result)
         )
         self._bus_unsubs.append(
             self._bus.subscribe(CHAT_EXPORT_ERROR, self._on_chat_export_error)
         )
-
-    def _on_chat_started(self, event: Event) -> None:
-        request_id = str(event.payload.get("request_id", ""))
-        user_text = self._pending_user_text
-        self._pending_user_text = None
-
-        def update() -> None:
-            self._navigate("chat")
-            chat = self._chat_view()
-            if chat:
-                if user_text:
-                    chat.show_user_message(user_text)
-                chat.begin_assistant(request_id)
-            self._active_request_id = request_id
-
-        self._ui_queue.enqueue(update)
-
-    def _on_chat_chunk(self, event: Event) -> None:
-        text = str(event.payload.get("text", ""))
-        request_id = str(event.payload.get("request_id", ""))
-        if not text or request_id != self._active_request_id:
-            return
-
-        def update() -> None:
-            chat = self._chat_view()
-            if chat:
-                chat.append_chunk(text)
-
-        self._ui_queue.enqueue(update)
-
-    def _on_chat_history_loaded(self, event: Event) -> None:
-        messages = event.payload.get("messages") or []
-
-        def update() -> None:
-            chat = self._chat_view()
-            if chat:
-                chat.load_history(messages)
-
-        self._ui_queue.enqueue(update)
 
     def _wire_note_events(self) -> None:
         self._bus_unsubs.append(

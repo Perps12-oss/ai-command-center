@@ -23,6 +23,7 @@ from ai_command_center.core.events.topics import (
     APP_ERROR,
     APP_PHASE,
     CHAT_CANCELLED,
+    CHAT_CHUNK,
     CHAT_COMPLETE,
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
@@ -55,6 +56,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     SETTINGS_SNAPSHOT,
     COMMAND_ROUTED,
     CHAT_STARTED,
+    CHAT_CHUNK,
     CHAT_COMPLETE,
     CHAT_CANCELLED,
     CHAT_ERROR,
@@ -132,6 +134,14 @@ class MemoryItem:
 
 
 @dataclass(frozen=True, slots=True)
+class ChatHistoryMessage:
+    """Projection of a persisted chat message."""
+
+    role: str = ""
+    content: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class PluginItem:
     """Projection of a plugin catalog entry."""
 
@@ -162,10 +172,16 @@ class AppState:
     last_chat_request_id: str = ""
     chat_status: str = "idle"
     chat_streaming: bool = False
+    chat_stream_buffer: str = ""
+    chat_stream_revision: int = 0
+    chat_pending_user_text: str = ""
+    chat_started_user_text: str = ""
     chat_context_sources: tuple[str, ...] = ()
     chat_token_estimate: int = 0
     last_assistant_message: str = ""
     chat_history_count: int = 0
+    chat_history_messages: tuple[ChatHistoryMessage, ...] = ()
+    chat_history_revision: int = 0
     last_chat_error: str = ""
     chat_workspace_entity_id: str = ""
     chat_workspace_entity_type: str = ""
@@ -299,13 +315,40 @@ def _reduce_settings_snapshot(state: AppState, event: Event) -> AppState:
     )
 
 
+def _is_pending_chat_user_text(text: str) -> bool:
+    """Mirror shell logic: only plain chat prompts become pending user bubbles."""
+    stripped = text.strip()
+    if not stripped:
+        return False
+    lower = stripped.lower()
+    if lower.startswith(
+        ("note:", "new note:", "remember:", "memory:", ">", "go ")
+    ):
+        return False
+    if lower in (
+        "settings",
+        "chat",
+        "notes",
+        "plugins",
+        "home",
+        "workspace",
+        "system",
+        "memory",
+    ):
+        return False
+    return True
+
+
 def _reduce_command_routed(state: AppState, event: Event) -> AppState:
     if event.topic != COMMAND_ROUTED:
         return state
+    text = str(event.payload.get("text", ""))
+    pending = text if _is_pending_chat_user_text(text) else ""
     return replace(
         state,
-        last_command=str(event.payload.get("text", "")),
+        last_command=text,
         last_command_intent=str(event.payload.get("intent", "")),
+        chat_pending_user_text=pending,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -323,7 +366,29 @@ def _reduce_chat_started(state: AppState, event: Event) -> AppState:
         last_chat_request_id=request_id,
         chat_status="streaming",
         chat_streaming=True,
+        chat_stream_buffer="",
+        chat_stream_revision=state.chat_stream_revision + 1,
+        chat_started_user_text=state.chat_pending_user_text,
+        chat_pending_user_text="",
         last_chat_error="",
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_chat_chunk(state: AppState, event: Event) -> AppState:
+    if event.topic != CHAT_CHUNK:
+        return state
+    request_id = str(event.payload.get("request_id", ""))
+    if request_id and request_id != state.active_chat_request_id:
+        return state
+    text = str(event.payload.get("text", ""))
+    if not text:
+        return state
+    return replace(
+        state,
+        chat_stream_buffer=state.chat_stream_buffer + text,
+        chat_stream_revision=state.chat_stream_revision + 1,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -343,6 +408,9 @@ def _reduce_chat_complete(state: AppState, event: Event) -> AppState:
         active_chat_request_id="",
         chat_status="complete",
         chat_streaming=False,
+        chat_stream_buffer="",
+        chat_stream_revision=state.chat_stream_revision + 1,
+        chat_started_user_text="",
         last_assistant_message=str(event.payload.get("text", "")),
         last_event_topic=event.topic,
         last_event_source=event.source,
@@ -363,6 +431,9 @@ def _reduce_chat_cancelled(state: AppState, event: Event) -> AppState:
         active_chat_request_id="",
         chat_status="cancelled",
         chat_streaming=False,
+        chat_stream_buffer="",
+        chat_stream_revision=state.chat_stream_revision + 1,
+        chat_started_user_text="",
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -382,6 +453,9 @@ def _reduce_chat_error(state: AppState, event: Event) -> AppState:
         active_chat_request_id="",
         chat_status="error",
         chat_streaming=False,
+        chat_stream_buffer="",
+        chat_stream_revision=state.chat_stream_revision + 1,
+        chat_started_user_text="",
         last_chat_error=str(event.payload.get("message", "Unknown error")),
         last_event_topic=event.topic,
         last_event_source=event.source,
@@ -391,11 +465,23 @@ def _reduce_chat_error(state: AppState, event: Event) -> AppState:
 def _reduce_chat_history_loaded(state: AppState, event: Event) -> AppState:
     if event.topic != CHAT_HISTORY_LOADED:
         return state
-    messages = event.payload.get("messages")
-    count = len(messages) if isinstance(messages, list) else state.chat_history_count
+    raw_messages = event.payload.get("messages")
+    items: list[ChatHistoryMessage] = []
+    if isinstance(raw_messages, list):
+        for item in raw_messages:
+            if not isinstance(item, dict):
+                continue
+            items.append(
+                ChatHistoryMessage(
+                    role=str(item.get("role", "")),
+                    content=str(item.get("content", "")),
+                )
+            )
     return replace(
         state,
-        chat_history_count=count,
+        chat_history_count=len(items),
+        chat_history_messages=tuple(items),
+        chat_history_revision=state.chat_history_revision + 1,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -729,6 +815,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_settings_snapshot,
     _reduce_command_routed,
     _reduce_chat_started,
+    _reduce_chat_chunk,
     _reduce_chat_complete,
     _reduce_chat_cancelled,
     _reduce_chat_error,
