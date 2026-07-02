@@ -47,6 +47,7 @@ from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
+from ai_command_center.services.model_router_service import ModelRouterService
 from ai_command_center.services.obsidian_service import ObsidianService
 from ai_command_center.services.ollama_http_service import OllamaHttpService
 from ai_command_center.services.plugin_registry_service import PluginRegistryService
@@ -104,12 +105,15 @@ def build_services(
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
 
+    model_router = ModelRouterService(bus)
+
     for svc in (
         telemetry,
         chat_export,
         system_monitor,
         SettingsService(bus, settings_repo),
         CommandRouterService(bus),
+        model_router,
         tool_registry,
         tool_executor,
         ShellToolService(bus),

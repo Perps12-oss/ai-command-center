@@ -411,6 +411,7 @@ class SystemView(ctk.CTkFrame):
     def __init__(self, master, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._active        = False
+        self._poll_in_flight = False
         self._prev_disk     = None
         self._prev_net      = None
         self._prev_ts       = None
@@ -492,15 +493,18 @@ class SystemView(ctk.CTkFrame):
         )
         self._error_log.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
-        self._start_polling()
-
     def _start_polling(self) -> None:
-        self._active = True
-        self.after(100, self._poll)
+        if not self._active:
+            self._active = True
+            self.after(100, self._poll)
 
     def _poll(self) -> None:
         if not _PSUTIL or not self._active:
             return
+        if getattr(self, "_poll_in_flight", False):
+            self.after(self._POLL_MS, self._poll)
+            return
+        self._poll_in_flight = True
         threading.Thread(target=self._collect, daemon=True).start()
 
     def _collect(self) -> None:
@@ -557,7 +561,10 @@ class SystemView(ctk.CTkFrame):
             ))
         except Exception:
             pass
-        self.after(self._POLL_MS, self._poll)
+        finally:
+            self._poll_in_flight = False
+        if self._active:
+            self.after(self._POLL_MS, self._poll)
 
     def _update_ui(
         self,
@@ -636,6 +643,4 @@ class SystemView(ctk.CTkFrame):
         self._active = False
 
     def on_show(self) -> None:
-        if not self._active:
-            self._active = True
-            self._poll()
+        self._start_polling()

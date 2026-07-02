@@ -11,7 +11,6 @@ DO NOT MODIFY without constitutional amendment.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
 from uuid import UUID
 
 from ai_command_center.core.workflow.workflow import (

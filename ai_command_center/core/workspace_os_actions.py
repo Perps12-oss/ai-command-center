@@ -12,7 +12,9 @@ DO NOT MODIFY without constitutional amendment.
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
+import sys
 import webbrowser
 from typing import TYPE_CHECKING
 
@@ -80,13 +82,25 @@ def _execute_command(parameters: dict) -> dict:
     command = parameters.get("command")
     if not command:
         raise ValueError("No command provided")
-    result = subprocess.run(
-        command,
-        shell=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    command = str(command).strip()
+    use_shell = any(ch in command for ch in "|&;<>$`")
+    if use_shell:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    else:
+        argv = shlex.split(command, posix=(sys.platform != "win32"))
+        result = subprocess.run(
+            argv,
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
     return {
         "command": command,
         "success": result.returncode == 0,

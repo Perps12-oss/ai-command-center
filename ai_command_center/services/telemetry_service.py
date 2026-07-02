@@ -27,7 +27,6 @@ from ai_command_center.core.events.topics import (
     NOTE_CREATED,
     NOTE_ERROR,
     NOTE_SEARCH_RESULTS,
-    OLLAMA_STATUS,
     TELEMETRY_EVENT,
     TOOL_ERROR,
     TOOL_RESULT,

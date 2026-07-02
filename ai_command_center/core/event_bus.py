@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
+import traceback
 import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+
+from ai_command_center.core.events.topics import BUS_HANDLER_ERROR
+
+logger = logging.getLogger(__name__)
 
 WILDCARD_TOPIC = "*"
 
@@ -157,8 +163,26 @@ class EventBus:
         for handler in handlers:
             try:
                 handler(event)
-            except Exception:
-                continue
+            except Exception as exc:
+                logger.exception(
+                    "EventBus handler failed for topic=%s source=%s",
+                    topic,
+                    event.source,
+                )
+                if topic != BUS_HANDLER_ERROR:
+                    try:
+                        self.publish(
+                            BUS_HANDLER_ERROR,
+                            {
+                                "topic": topic,
+                                "source": event.source,
+                                "error": str(exc),
+                                "traceback": traceback.format_exc(limit=5),
+                            },
+                            source="event_bus",
+                        )
+                    except Exception:
+                        logger.exception("Failed to publish bus.handler_error")
         return event
 
     def dispatch(self, event: Event) -> None:

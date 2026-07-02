@@ -11,11 +11,9 @@ from uuid import UUID, uuid4
 
 from ai_command_center.core.action.action import (
     Action,
-    ACTION_SCHEMA_VERSION,
     validate_action_type,
 )
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_ACTION_REGISTERED,
     EVENT_ACTION_INVOKED,
     EVENT_ACTION_COMPLETED,
