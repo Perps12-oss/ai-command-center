@@ -481,6 +481,12 @@ class SystemView(ctk.CTkFrame):
         self._service_timeline = _ServiceHealthTimeline(scroll)
         self._service_timeline.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
+        # ── Agent / workflow runs (AppState projection) ─────────────────────
+        self._runs_log = _EventLogCard(
+            scroll, "AGENT & WORKFLOW RUNS", "No agent or workflow runs yet.", max_rows=20
+        )
+        self._runs_log.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
         # ── Tool execution log ──────────────────────────────────────────────
         self._tool_log = _EventLogCard(
             scroll, "TOOL EXECUTION LOG", "No tool runs yet."
@@ -638,6 +644,39 @@ class SystemView(ctk.CTkFrame):
     def load_errors(self, errors: tuple[str, ...]) -> None:
         """Sync error log from AppState.errors. Called from _apply_catalog_views."""
         self._error_log.load_errors(errors)
+
+    def load_from_appstate(self, snap) -> None:
+        """Render agent and workflow run feeds from AppState projections."""
+        if not hasattr(self, "_runs_log"):
+            return
+        self._runs_log.clear()
+        active_agent = str(getattr(snap, "active_agent_run_id", "") or "")
+        active_workflow = str(getattr(snap, "active_workflow_run_id", "") or "")
+
+        for run in getattr(snap, "agent_runs", ()):
+            marker = " *" if run.agent_id == active_agent else ""
+            task = f" — {run.task[:40]}" if run.task else ""
+            err = f" ({run.error})" if run.error else ""
+            text = f"agent {run.agent_id[:8]} [{run.state}]{task}{err}{marker}"
+            color = T.STATUS_ERROR if run.state in {"failed", "terminated"} and run.error else T.TEXT_SECONDARY
+            if run.state in {"spawning", "running", "waiting"}:
+                color = T.STATUS_BUSY
+            self._runs_log.push(text, color)
+
+        for run in getattr(snap, "workflow_runs", ()):
+            marker = " *" if run.run_id == active_workflow else ""
+            progress = ""
+            if run.total_steps:
+                progress = f" step {run.current_step_index}/{run.total_steps}"
+            err = f" ({run.error})" if run.error else ""
+            wf = run.workflow_id or run.run_id[:8]
+            text = f"workflow {wf} [{run.state}]{progress}{err}{marker}"
+            color = T.STATUS_ERROR if run.state == "failed" else T.TEXT_SECONDARY
+            if run.state in {"pending", "running"}:
+                color = T.STATUS_BUSY
+            if run.state == "completed":
+                color = T.STATUS_READY
+            self._runs_log.push(text, color)
 
     def on_hide(self) -> None:
         self._active = False
