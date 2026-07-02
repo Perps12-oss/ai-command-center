@@ -229,16 +229,6 @@ class ApplicationShellMixin:
                 self._ui_queue.enqueue(update)
                 return
 
-        if not (
-            lower.startswith("note:")
-            or lower.startswith("new note:")
-            or lower.startswith("remember:")
-            or lower.startswith("memory:")
-            or lower.startswith(">")
-            or lower.startswith("go ")
-            or lower in ("settings", "chat", "notes", "plugins", "home", "workspace", "system", "memory")
-        ):
-            self._pending_user_text = text
         self._controller.publish_command(text, clipboard=clipboard, workspace_entity=workspace_entity)
 
     def _show_capability_help(self) -> None:
