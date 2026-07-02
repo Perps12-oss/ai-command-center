@@ -36,9 +36,9 @@ def _wire(
     from ai_command_center.core.context_manager import ContextManager
     from ai_command_center.core.event_bus import EventBus
     from ai_command_center.db.connection import connect, init_database
-    from ai_command_center.db.conversation_repository import ConversationRepository
-    from ai_command_center.db.note_repository import NoteRepository
-    from ai_command_center.db.repository import SettingsRepository
+    from ai_command_center.repositories.conversation_repository import ConversationRepository
+    from ai_command_center.repositories.note_repository import NoteRepository
+    from ai_command_center.repositories.settings_repository import SettingsRepository
     from ai_command_center.services.chat_handler_service import ChatHandlerService
     from ai_command_center.services.command_router_service import CommandRouterService
     from ai_command_center.services.obsidian_service import ObsidianService
@@ -74,7 +74,7 @@ def _wire(
     obsidian = ObsidianService(bus, NoteRepository(db), settings_repo)
     conv_repo = ConversationRepository(db)
     session = SessionService(bus, conv_repo)
-    handler = ChatHandlerService(bus, ContextManager(), ollama, obsidian, session)
+    handler = ChatHandlerService(bus, ContextManager(), obsidian, session)
     services = (settings, router, ollama, obsidian, session, handler)
     for svc in services:
         svc.load()

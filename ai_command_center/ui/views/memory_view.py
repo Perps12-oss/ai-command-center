@@ -5,7 +5,6 @@ from typing import Callable
 
 import customtkinter as ctk
 
-from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.widget_utils import clear_children
 

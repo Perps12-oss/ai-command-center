@@ -18,7 +18,7 @@ from ai_command_center.core.events.topics import (
     MEMORY_STORED,
     MEMORY_SELECTED,
 )
-from ai_command_center.db.memory_repository import MemoryRepository
+from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.services.base import BaseService
 from ai_command_center.services.command_router_service import (
     INTENT_MEMORY_REMEMBER,

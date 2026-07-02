@@ -16,7 +16,6 @@ from ai_command_center.core.timeline.timeline_event import (
 )
 from ai_command_center.core.timeline.timeline_repository import TimelineRepository
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_TIMELINE_EVENT,
 )
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -44,6 +45,8 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
+
+logger = logging.getLogger(__name__)
 
 APP_STATE_TOPICS: tuple[str, ...] = (
     SERVICE_STATE_CHANGED,
@@ -243,6 +246,8 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         overlay_mode=str(payload.get("overlay_mode", "palette")),
         model_name=str(payload.get("model_name", "llama3.2:3b")),
         provider=str(payload.get("provider", "ollama")),
+        openai_base_url=str(payload.get("openai_base_url", "https://api.openai.com/v1")),
+        openai_api_key=str(payload.get("openai_api_key", "")),
         vault_path=str(payload.get("vault_path", "")),
         overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
         telemetry_enabled=_coerce_bool(payload.get("telemetry_enabled", True)),
@@ -764,8 +769,19 @@ class AppStateStore:
         for listener in listeners:
             try:
                 listener(new_state)
-            except Exception:
-                continue
+            except Exception as exc:
+                logger.exception("AppState listener failed for topic=%s", event.topic)
+                try:
+                    self._bus.publish(
+                        APP_ERROR,
+                        {
+                            "message": f"AppState listener failed: {exc}",
+                            "topic": event.topic,
+                        },
+                        source="app_state",
+                    )
+                except Exception:
+                    logger.exception("Failed to publish app.error for listener failure")
 
     def close(self) -> None:
         for unsub in self._unsubscribers:

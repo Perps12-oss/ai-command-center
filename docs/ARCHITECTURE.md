@@ -2,6 +2,114 @@
 
 See [ARCHITECTURE_ENFORCEMENT.md](ARCHITECTURE_ENFORCEMENT.md) for the implementation directives that coding agents must follow when modifying this repository.
 
+## Authority hierarchy
+
+```text
+PROJECT_CONSTITUTION_V4.md
+  → AGENTS.md / ARCHITECTURE_ENFORCEMENT.md
+    → ARCHITECTURE.md (this document)
+      → core/contracts.py, core/events/topics.py
+        → Phase gate history (below)
+          → Implementation
+```
+
+This document **expands** runtime architecture; it does not supersede the Constitution.
+
+---
+
+## Mission summary
+
+AI Command Center is a **Workspace OS** — an ambient desktop command surface where workspace entities, knowledge, tools, and intelligence converge. Chat is one tool among many, not the product identity.
+
+**North star:** [architecture/WORKSPACE_VISION.md](architecture/WORKSPACE_VISION.md)
+
+**Transformation program:**
+
+| Document | Purpose |
+|----------|---------|
+| [development/TRANSFORMATION_AUDIT.md](development/TRANSFORMATION_AUDIT.md) | Evidence-based baseline audit |
+| [development/TRANSFORMATION_ROADMAP.md](development/TRANSFORMATION_ROADMAP.md) | Tracks 0–9 execution plan |
+| [development/ENFORCEMENT_ROADMAP.md](development/ENFORCEMENT_ROADMAP.md) | UCGS warn → CI block stages |
+| [development/STABILIZATION_LOG.md](development/STABILIZATION_LOG.md) | P0/P1 fix record |
+
+---
+
+## Workspace-first direction
+
+Current UX is chat-forward; target UX is **workspace-first**:
+
+- **Now:** CustomTkinter shell; Workspace OS walking skeleton; inspector (Ctrl+Shift+W)
+- **Next:** Workspace canvas as default home; chat as card-attached tool
+- **Long-term:** Agents, workflows, and plugins orbit workspace entities
+
+Constitutional ownership flow is unchanged:
+
+```text
+UI → AppState → EventBus → Services → Repositories → Storage
+```
+
+---
+
+## Subsystem map
+
+```mermaid
+flowchart TB
+    subgraph Presentation
+        UI[CustomTkinter UI]
+        AS[AppStateStore]
+    end
+    subgraph Backbone
+        BUS[EventBus]
+    end
+    subgraph Services
+        CR[CommandRouter]
+        CH[ChatHandler]
+        MR[ModelRouter]
+        TE[ToolExecutor]
+        WS[WorkspaceOsService]
+        PL[PluginRegistry]
+        TL[Telemetry]
+    end
+    subgraph Persistence
+        REPO[Repositories]
+        SQL[(SQLite)]
+    end
+    UI --> AS
+    UI --> BUS
+    BUS --> AS
+    BUS --> Services
+    Services --> BUS
+    Services --> REPO
+    REPO --> SQL
+```
+
+| Subsystem | Module roots | Spec |
+|-----------|--------------|------|
+| Workspace OS | `core/workspace/`, `core/entity/`, `core/workspace_os_service.py` | [WORKSPACE_VISION.md](architecture/WORKSPACE_VISION.md) |
+| Model routing | `services/model_router_service.py`, `platform/model_registry.py` | [MODEL_ORCHESTRATION.md](architecture/MODEL_ORCHESTRATION.md) |
+| Agents (planned) | topics in `core/event_bus.py` | [AGENT_FRAMEWORK.md](architecture/AGENT_FRAMEWORK.md) |
+| Workflows (planned) | `core/workflow/` | [WORKFLOW_ENGINE.md](architecture/WORKFLOW_ENGINE.md) |
+| Chat | `services/chat_handler_service.py`, `ui/views/chat_view.py` | [CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md) |
+| Platform | `platform/`, `utils/hotkey.py` | [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md) |
+| Tools | `tools/`, `services/tool_executor_service.py` | Phase 4B flow below |
+| Settings | `repositories/settings_repository.py`, `services/settings_service.py` | Settings section below |
+| Plugins | `services/plugin_registry_service.py` | Plugin registry below |
+
+---
+
+## Long-term direction (3-year)
+
+1. **Workspace canvas default** — entities, layouts, resources as primary surface
+2. **Model orchestration** — tiered routing, multi-provider adapters ([MODEL_ORCHESTRATION.md](architecture/MODEL_ORCHESTRATION.md))
+3. **Agent runtime** — supervised bus-native agents ([AGENT_FRAMEWORK.md](architecture/AGENT_FRAMEWORK.md))
+4. **Workflow engine** — declarative multi-step automation ([WORKFLOW_ENGINE.md](architecture/WORKFLOW_ENGINE.md))
+5. **Cross-platform packaging** — Windows now; macOS/Linux per [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md)
+6. **Chat renaissance** — AppState-first, workspace-attached chat ([CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md))
+
+Gate history and phase verification scripts remain authoritative for **completed** work; new work follows transformation tracks.
+
+---
+
 ## Data flow (target)
 
 ```text
@@ -279,6 +387,8 @@ Canonical topic constants live in `ai_command_center/core/events/topics.py`.
 | `tool.failed` | ToolExecutorService | UI, telemetry | tool failure payload |
 | `telemetry.event` | TelemetryService | future UI/analytics | normalized telemetry event |
 | `system.snapshot` | SystemSnapshotBuilder | AppState | canonical system snapshot |
+| `bus.handler_error` | EventBus | observability, AppState | `{topic, source, error, traceback}` |
+| `model.selected` | ModelRouterService | AppState, telemetry | `{model, intent, reason, tier}` |
 
 ---
 
@@ -301,6 +411,8 @@ Full ownership stack (Tracks 1–3, 4–5, 6.3): **complete**.
 - `core/settings/settings_repository.py` re-export vs `repositories/settings_repository.py` may confuse contributors.
 - `app.py` still subscribes to many EventBus topics directly; replace with AppState subscriptions as projection grows.
 - `tools/tool_executor.py` is a stub — execution happens inside `ToolExecutorService`.
+- UI violations: `hero_panel.py` (AssetService), `layout/compiler.py` (SpatialRepository) — see TRANSFORMATION_AUDIT.md.
+- Transformation tracks 5–9 pending; vision docs define target state.
 
 ---
 

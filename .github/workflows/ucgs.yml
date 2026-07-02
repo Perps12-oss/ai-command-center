@@ -33,6 +33,18 @@ jobs:
       - name: Evaluate Verdict
         run: python tools/ucgs_ci_gate.py ucgs_report.yaml
 
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+          pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Ruff check
+        run: python -m ruff check ai_command_center
+
+      - name: Pytest
+        run: python -m pytest tests -q
+
       - name: Upload UCGS report
         uses: actions/upload-artifact@v4
         with:

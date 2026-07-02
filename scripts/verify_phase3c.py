@@ -51,7 +51,7 @@ def main() -> int:
     from ai_command_center.core.context_manager import ContextManager
     from ai_command_center.core.event_bus import EventBus
     from ai_command_center.db.connection import connect, init_database
-    from ai_command_center.db.note_repository import NoteRepository
+    from ai_command_center.repositories.note_repository import NoteRepository
     from ai_command_center.services.chat_handler_service import ChatHandlerService
     from ai_command_center.services.command_router_service import CommandRouterService
     from ai_command_center.services.obsidian_service import ObsidianService
@@ -84,7 +84,7 @@ def main() -> int:
         router = CommandRouterService(bus)
         obsidian = ObsidianService(bus, repo)
         ollama = StubOllamaService(bus)
-        handler = ChatHandlerService(bus, ContextManager(), ollama, obsidian)
+        handler = ChatHandlerService(bus, ContextManager(), obsidian)
         for svc in (router, obsidian, ollama, handler):
             svc.load()
 

@@ -7,7 +7,9 @@ Add new services there; this file only orchestrates startup/shutdown.
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
@@ -16,6 +18,7 @@ from ai_command_center.core.service_manager import ServiceManager
 from ai_command_center.core.state.system_snapshot_builder import SystemSnapshotBuilder
 from ai_command_center.core.workspace_os_service import WorkspaceOsService
 from ai_command_center.db.connection import init_database
+from ai_command_center.platform.hero_assets import load_hero_ctk_image
 
 
 @dataclass
@@ -30,6 +33,7 @@ class ApplicationCore:
     services: ServiceManager
     db: sqlite3.Connection
     workspace_os: WorkspaceOsService | None = None
+    hero_image: ctk.CTkImage | None = field(default=None, repr=False)
 
     def startup(self) -> None:
         self.bus.publish("app.phase", {"phase": "starting"}, source="application")
@@ -62,5 +66,6 @@ def create_application(
         services=wired.services,
         db=db,
         workspace_os=wired.workspace_os,
+        hero_image=load_hero_ctk_image(),
     )
 

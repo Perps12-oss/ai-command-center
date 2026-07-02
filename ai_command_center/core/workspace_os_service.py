@@ -8,7 +8,7 @@ the new services without modifying the existing service architecture.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ai_command_center.services.base import BaseService
 

@@ -17,7 +17,6 @@ from ai_command_center.core.entity.entity import (
 )
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_ENTITY_CREATED,
     EVENT_ENTITY_UPDATED,
     EVENT_ENTITY_DELETED,

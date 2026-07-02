@@ -1,4 +1,8 @@
-"""Single-session conversation persistence (Phase 3D)."""
+"""Single-session conversation persistence (Phase 3D).
+
+.. deprecated::
+    Import ``ConversationRepository`` from ``ai_command_center.repositories`` instead.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,8 @@
-"""Obsidian vault note index — FTS5 keyword search (no embeddings)."""
+"""Obsidian vault note index — FTS5 keyword search (no embeddings).
+
+.. deprecated::
+    Import ``NoteRepository`` and ``NoteHit`` from ``ai_command_center.repositories`` instead.
+"""
 
 from __future__ import annotations
 

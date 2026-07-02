@@ -14,7 +14,7 @@ from ai_command_center.core.events.topics import (
     SESSION_UPDATE_REQUEST,
     SESSION_UPDATE_RESULT,
 )
-from ai_command_center.db.conversation_repository import (
+from ai_command_center.repositories.conversation_repository import (
     CONTEXT_HISTORY_LIMIT,
     ConversationRepository,
 )

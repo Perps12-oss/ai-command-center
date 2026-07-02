@@ -60,6 +60,7 @@ SYSTEM_SNAPSHOT = "system.snapshot"
 APP_PHASE = "app.phase"
 APP_ERROR = "app.error"
 APP_WARNING = "app.warning"
+BUS_HANDLER_ERROR = "bus.handler_error"
 COMMAND_ROUTED = "command.routed"
 UI_COMMAND = "ui.command"
 UI_NAVIGATE = "ui.navigate"
@@ -85,6 +86,7 @@ CLIPBOARD_REQUEST = "clipboard.request"
 CLIPBOARD_CONTENT = "clipboard.content"
 
 OLLAMA_STATUS = "ollama.status"
+OPENAI_STATUS = "openai.status"
 OLLAMA_MODEL_LOADED = "ollama.model_loaded"
 OLLAMA_MODEL_UNLOADED = "ollama.model_unloaded"
 
@@ -132,6 +134,10 @@ PLUGIN_STATE_CHANGED = "plugin.state_changed"
 PLUGIN_ERROR = "plugin.error"
 
 LLM_REQUEST = "llm.request"
+LLM_CHUNK = "llm.chunk"
+LLM_COMPLETE = "llm.complete"
+LLM_ERROR = "llm.error"
+LLM_CANCEL = "llm.cancel"
 
 SYSTEM_EVENTS = "system.events"
 COMMAND_HISTORY = "command.history"
@@ -144,6 +150,21 @@ UI_CREATE_CARD = "ui.workspace_os.create_card"
 UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
 UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
 UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"
+
+# Agent framework (Track 7 — A0/A1)
+AGENT_SPAWN_REQUEST = "agent.spawn.request"
+AGENT_SPAWNED = "agent.spawned"
+AGENT_TASK_REQUEST = "agent.task.request"
+AGENT_TASK_COMPLETE = "agent.task.complete"
+AGENT_TERMINATED = "agent.terminated"
+AGENT_CANCEL_REQUEST = "agent.cancel.request"
+
+# Workflow engine (Track 8 — W0/W1)
+WORKFLOW_START = "workflow.start"
+WORKFLOW_STEP_STARTED = "workflow.step.started"
+WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
+WORKFLOW_COMPLETED = "workflow.completed"
+WORKFLOW_FAILED = "workflow.failed"
 
 
 __all__ = [
@@ -173,6 +194,7 @@ __all__ = [
     "APP_PHASE",
     "APP_ERROR",
     "APP_WARNING",
+    "BUS_HANDLER_ERROR",
     "COMMAND_ROUTED",
     "UI_COMMAND",
     "UI_NAVIGATE",
@@ -195,6 +217,7 @@ __all__ = [
     "CLIPBOARD_REQUEST",
     "CLIPBOARD_CONTENT",
     "OLLAMA_STATUS",
+    "OPENAI_STATUS",
     "OLLAMA_MODEL_LOADED",
     "OLLAMA_MODEL_UNLOADED",
     "MODEL_SELECTED",
@@ -235,6 +258,10 @@ __all__ = [
     "PLUGIN_STATE_CHANGED",
     "PLUGIN_ERROR",
     "LLM_REQUEST",
+    "LLM_CHUNK",
+    "LLM_COMPLETE",
+    "LLM_ERROR",
+    "LLM_CANCEL",
     "SYSTEM_EVENTS",
     "COMMAND_HISTORY",
     "UI_INSPECTOR_OPEN",
@@ -244,4 +271,15 @@ __all__ = [
     "UI_CREATE_RESOURCE",
     "UI_LAUNCH_RESOURCE",
     "UI_SEARCH_WORKSPACE_OS",
+    "AGENT_SPAWN_REQUEST",
+    "AGENT_SPAWNED",
+    "AGENT_TASK_REQUEST",
+    "AGENT_TASK_COMPLETE",
+    "AGENT_TERMINATED",
+    "AGENT_CANCEL_REQUEST",
+    "WORKFLOW_START",
+    "WORKFLOW_STEP_STARTED",
+    "WORKFLOW_STEP_COMPLETED",
+    "WORKFLOW_COMPLETED",
+    "WORKFLOW_FAILED",
 ]

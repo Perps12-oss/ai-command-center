@@ -18,7 +18,6 @@ from ai_command_center.core.snapshot.snapshot import (
     validate_snapshot_type,
 )
 from ai_command_center.core.event_bus import (
-    Event,
     EVENT_SNAPSHOT_CREATED,
     EVENT_SNAPSHOT_RESTORED,
 )
