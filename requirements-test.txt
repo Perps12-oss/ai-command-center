@@ -1,0 +1,20 @@
+# Test + CI tooling for the AI Command Center risk-area suite.
+# Install with:  pip install -r requirements-test.txt
+#
+# Runtime dependencies (requirements.txt) are NOT duplicated here; install both
+# when running the full end-to-end smoke tests.
+
+pytest>=7.4
+pytest-cov>=4.1
+pytest-timeout>=2.2
+
+# Static / binary analysis used by pre-commit hooks and dedicated tests.
+bandit>=1.7.5
+pefile>=2023.2.7          # PE machine-type validation (ARM64 vs x64)
+pyyaml>=6.0
+
+# Process / memory introspection (soak + subprocess architecture checks).
+psutil>=5.9.0
+
+# Windows-only helpers (no-op / skipped automatically on other platforms).
+pywin32>=311; sys_platform == "win32"

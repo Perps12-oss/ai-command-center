@@ -1,0 +1,145 @@
+"""Reference command sandbox for prompt-injection / shell-execution tests.
+
+Why this lives in the test tree
+-------------------------------
+The production tool pipeline (``ai_command_center/services/tool_executor_service.py``
+and ``ai_command_center/core/workspace_os_actions.py``) currently shells out with
+``subprocess.run(..., shell=True)`` and performs **no** validation of the command
+string. That is exactly the risk area #3 the suite is meant to expose.
+
+This module provides a small, dependency-free *reference* guard that demonstrates
+the contract the production pipeline should satisfy: dangerous / injected
+commands must be rejected with a :class:`SecurityError` **before** any subprocess
+is spawned. The security tests:
+
+  * prove this guard rejects a corpus of adversarial LLM outputs, and
+  * assert (via an audit test + bandit) that the real pipeline does not yet
+    apply such a guard, so the gap is tracked rather than hidden.
+
+Promote this validator (or an equivalent) into the production
+``ToolExecutorService`` to close the gap.
+"""
+
+from __future__ import annotations
+
+import re
+import shlex
+from pathlib import Path
+
+
+class SecurityError(Exception):
+    """Raised when a command/path is rejected by the sandbox."""
+
+
+# Substrings / patterns that should never appear in an auto-approved command.
+# Kept intentionally strict — the sandbox denies by default.
+_DANGEROUS_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\brm\b\s+-[a-z]*r", re.IGNORECASE),   # rm -rf and friends
+    re.compile(r"\bdel\b\s+/[a-z]", re.IGNORECASE),    # del /f /s /q
+    re.compile(r"\brmdir\b\s+/s", re.IGNORECASE),
+    re.compile(r"\bformat\b\s+[a-z]:", re.IGNORECASE),
+    re.compile(r"\bmkfs\b", re.IGNORECASE),
+    re.compile(r":\s*\(\s*\)\s*\{", re.IGNORECASE),    # fork bomb :(){ :|:& };:
+    re.compile(r"\bshutdown\b", re.IGNORECASE),
+    re.compile(r"\breg\b\s+delete", re.IGNORECASE),
+    re.compile(r"\bcurl\b.*\|\s*(sh|bash|powershell)", re.IGNORECASE),
+    re.compile(r"\bInvoke-Expression\b|\biex\b", re.IGNORECASE),
+)
+
+# Shell metacharacters that enable chaining/injection. Their mere presence in an
+# LLM-generated command is treated as hostile (deny by default).
+_SHELL_METACHARS = set(";&|`$><\n\r")
+
+# Commands explicitly allowed when invoked as the first token.
+_DEFAULT_ALLOWLIST = frozenset(
+    {"echo", "cat", "type", "ls", "dir", "whoami", "hostname", "python", "git"}
+)
+
+
+class CommandSandbox:
+    """Validates command strings and vault paths before execution.
+
+    Parameters
+    ----------
+    allowlist:
+        First-token commands permitted to run. ``None`` uses a conservative
+        default. An empty set means "deny everything".
+    vault_root:
+        If provided, :meth:`resolve_in_vault` confirms a path stays within it.
+    """
+
+    def __init__(
+        self,
+        allowlist: frozenset[str] | set[str] | None = None,
+        *,
+        vault_root: str | Path | None = None,
+    ) -> None:
+        self._allowlist = frozenset(
+            _DEFAULT_ALLOWLIST if allowlist is None else allowlist
+        )
+        self._vault_root = Path(vault_root).resolve() if vault_root else None
+
+    # ── command validation ────────────────────────────────────────────────
+    def validate_command(self, command: str) -> list[str]:
+        """Return safe argv for ``command`` or raise :class:`SecurityError`.
+
+        The returned argv is intended for ``subprocess.run(argv, shell=False)``.
+        """
+        if not isinstance(command, str) or not command.strip():
+            raise SecurityError("empty or non-string command rejected")
+
+        if any(ch in _SHELL_METACHARS for ch in command):
+            raise SecurityError(
+                f"command contains shell metacharacters and is rejected: {command!r}"
+            )
+
+        for pattern in _DANGEROUS_PATTERNS:
+            if pattern.search(command):
+                raise SecurityError(
+                    f"command matches dangerous pattern {pattern.pattern!r}: {command!r}"
+                )
+
+        try:
+            argv = shlex.split(command, posix=False)
+        except ValueError as exc:
+            raise SecurityError(f"command could not be parsed safely: {exc}") from exc
+        if not argv:
+            raise SecurityError("command produced no executable token")
+
+        program = Path(argv[0]).name.lower()
+        program = program[:-4] if program.endswith(".exe") else program
+        if program not in self._allowlist:
+            raise SecurityError(
+                f"command {program!r} is not in the sandbox allowlist {sorted(self._allowlist)}"
+            )
+        return argv
+
+    def is_safe(self, command: str) -> bool:
+        """Boolean convenience wrapper around :meth:`validate_command`."""
+        try:
+            self.validate_command(command)
+            return True
+        except SecurityError:
+            return False
+
+    # ── path validation ───────────────────────────────────────────────────
+    def resolve_in_vault(self, rel_path: str | Path) -> Path:
+        """Resolve ``rel_path`` inside the vault root or raise.
+
+        Mirrors the production ``VaultRepository.resolve_path`` contract but
+        raises instead of returning ``None`` so callers must handle traversal.
+        """
+        if self._vault_root is None:
+            raise SecurityError("no vault root configured for path validation")
+        candidate = Path(rel_path)
+        if candidate.is_absolute():
+            resolved = candidate.resolve()
+        else:
+            resolved = (self._vault_root / candidate).resolve()
+        try:
+            resolved.relative_to(self._vault_root)
+        except ValueError as exc:
+            raise SecurityError(
+                f"path {str(rel_path)!r} escapes vault root {self._vault_root}"
+            ) from exc
+        return resolved

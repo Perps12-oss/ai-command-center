@@ -6,3 +6,30 @@ repos:
     entry: python scripts/verify_constitution.py
     language: system
     pass_filenames: false
+
+  # ── Risk area #1: no x64 / emulated binaries in the environment ────────────
+  - id: arm64-binary-scan
+    name: ARM64 binary scan (PE machine type)
+    entry: python scripts/check_arm64_binaries.py
+    language: system
+    pass_filenames: false
+    always_run: true
+
+  # ── Risk area #2: architecture boundary enforcement (ratchet vs baseline) ──
+  - id: arch-lint
+    name: Architecture boundary lint (UI/AppState/Service)
+    entry: python scripts/arch_lint.py --baseline tests/arch_lint_baseline.json
+    language: system
+    pass_filenames: false
+    files: ^ai_command_center/.*\.py$
+
+  # ── Risk area #3: dangerous shell/eval/exec usage (fail on NEW high sev) ───
+  - id: bandit
+    name: Bandit security scan (high severity)
+    entry: >-
+      bandit -r ai_command_center --ini .bandit
+      --baseline tests/bandit_baseline.json --severity-level high -q
+    language: python
+    additional_dependencies: ["bandit>=1.7.5"]
+    pass_filenames: false
+    files: ^ai_command_center/.*\.py$

@@ -1,0 +1,61 @@
+name: Risk-Area Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Architecture boundary lint (risk #2)
+        run: python scripts/arch_lint.py --baseline tests/arch_lint_baseline.json
+
+      - name: Bandit security scan (risk #3, fail on NEW high severity)
+        # The baseline is recorded with Windows path separators (this is a
+        # Windows-only app), so run the gate on Windows runners.
+        if: runner.os == 'Windows'
+        run: >-
+          bandit -r ai_command_center --ini .bandit
+          --baseline tests/bandit_baseline.json --severity-level high
+
+      - name: Run risk-area test suite (incl. slow soak/chaos)
+        run: python -m pytest -p no:cacheprovider
+
+      - name: ARM64 binary scan (informational on x64 runners)
+        # Hosted runners are x64; this is a hard gate only on native ARM64
+        # (see arm64-gate.yml). Here it is informational so x64 does not block.
+        continue-on-error: true
+        run: python scripts/check_arm64_binaries.py
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: ignore
