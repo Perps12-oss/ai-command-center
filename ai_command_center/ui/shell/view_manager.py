@@ -14,6 +14,7 @@ from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
+from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 
 ViewFactory = Callable[[], object]
 
@@ -35,10 +36,12 @@ class ViewManagerMixin:
 
     def _register_views(self) -> None:
         """Register all view factories. Add new views here only."""
+        ws_controller = WorkspaceOsUIController(self._bus)
         self._view_registry["workspace"] = lambda: WorkspaceView(
             self._content,
             on_launch=self._controller.publish_launch_resource,
             on_command=self._on_command,
+            ws_controller=ws_controller,
         )
         self._view_registry["home"] = lambda: HomeView(
             self._content,
