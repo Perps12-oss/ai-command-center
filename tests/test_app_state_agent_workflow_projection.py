@@ -134,3 +134,21 @@ class AgentWorkflowAppStateProjectionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_agent_clean_terminate_does_not_inherit_stale_error(self) -> None:
+        self._publish(
+            AGENT_SPAWNED,
+            {"agent_id": "a3", "request_id": "r3", "state": "running"},
+        )
+        self._publish(
+            AGENT_TASK_REQUEST,
+            {"agent_id": "a3", "request_id": "r3", "task": "x", "error": "transient"},
+        )
+        self._publish(
+            AGENT_TERMINATED,
+            {"agent_id": "a3", "request_id": "r3"},
+        )
+        run = self.store.snapshot.agent_runs[0]
+        self.assertEqual(run.state, "terminated")
+        self.assertEqual(run.error, "")
+
