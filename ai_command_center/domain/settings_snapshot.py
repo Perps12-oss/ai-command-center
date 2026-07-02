@@ -27,6 +27,8 @@ class SettingsSnapshot:
     # Additional fields used by the architecture enforcement spec.
     model_name: str = "llama3.2:3b"
     provider: str = "ollama"
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_api_key: str = ""
     vault_path: str | Path = ""
     overlay_hotkey: str = "alt+space"
     telemetry_enabled: bool = True
@@ -48,6 +50,8 @@ class SettingsSnapshot:
             "overlay_mode": self.overlay_mode,
             "model_name": self.model_name,
             "provider": self.provider,
+            "openai_base_url": self.openai_base_url,
+            "openai_api_key": self.openai_api_key,
             "vault_path": str(self.vault_path),
             "overlay_hotkey": self.overlay_hotkey,
             "telemetry_enabled": self.telemetry_enabled,
