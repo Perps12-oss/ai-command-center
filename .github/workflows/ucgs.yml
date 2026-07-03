@@ -10,7 +10,9 @@ jobs:
   ucgs-check:
     runs-on: ubuntu-latest
     env:
-      UCGS_ENFORCEMENT: warn
+      # Track 2 Stage 3 (UCGS Phase 3): block merges on FAIL / S4 / S5.
+      # Draft PR escape hatch: set UCGS_ENFORCEMENT=warn in workflow_dispatch override only.
+      UCGS_ENFORCEMENT: block
 
     steps:
       - name: Checkout repository
