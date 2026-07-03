@@ -161,6 +161,12 @@ AGENT_TASK_COMPLETE = "agent.task.complete"
 AGENT_TERMINATED = "agent.terminated"
 AGENT_CANCEL_REQUEST = "agent.cancel.request"
 
+# Agent orchestration pipeline (Track 7 — A4)
+AGENT_PIPELINE_STARTED = "agent.pipeline.started"
+AGENT_PIPELINE_STAGE = "agent.pipeline.stage"
+AGENT_PIPELINE_PLANNED = "agent.pipeline.planned"
+AGENT_PIPELINE_COMPLETE = "agent.pipeline.complete"
+
 # Permission gate (Track 7 — supervised agent pre-flight)
 PERMISSION_CHECK_REQUEST = "permission.check.request"
 PERMISSION_CHECK_RESULT = "permission.check.result"
@@ -286,6 +292,10 @@ __all__ = [
     "AGENT_TASK_COMPLETE",
     "AGENT_TERMINATED",
     "AGENT_CANCEL_REQUEST",
+    "AGENT_PIPELINE_STARTED",
+    "AGENT_PIPELINE_STAGE",
+    "AGENT_PIPELINE_PLANNED",
+    "AGENT_PIPELINE_COMPLETE",
     "PERMISSION_CHECK_REQUEST",
     "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",

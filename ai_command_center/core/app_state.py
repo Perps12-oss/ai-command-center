@@ -24,6 +24,10 @@ from ai_command_center.core.events.topics import (
     AGENT_TASK_COMPLETE,
     AGENT_TASK_REQUEST,
     AGENT_TERMINATED,
+    AGENT_PIPELINE_COMPLETE,
+    AGENT_PIPELINE_PLANNED,
+    AGENT_PIPELINE_STAGE,
+    AGENT_PIPELINE_STARTED,
     APP_ERROR,
     APP_PHASE,
     PERMISSION_CHECK_REQUEST,
@@ -102,6 +106,10 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     AGENT_TASK_REQUEST,
     AGENT_TASK_COMPLETE,
     AGENT_TERMINATED,
+    AGENT_PIPELINE_STARTED,
+    AGENT_PIPELINE_STAGE,
+    AGENT_PIPELINE_PLANNED,
+    AGENT_PIPELINE_COMPLETE,
     WORKFLOW_STARTED,
     WORKFLOW_STEP_STARTED,
     WORKFLOW_STEP_COMPLETED,
@@ -271,6 +279,9 @@ class AppState:
     workflow_runs: tuple[WorkflowRunItem, ...] = ()
     active_agent_run_id: str = ""
     active_agent_run_ids: tuple[str, ...] = ()
+    active_agent_pipeline_id: str = ""
+    agent_pipeline_stage: str = ""
+    agent_pipeline_planned_tools: tuple[str, ...] = ()
     active_workflow_run_id: str = ""
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
@@ -1046,6 +1057,62 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_agent_pipeline(state: AppState, event: Event) -> AppState:
+    """Project agent pipeline orchestration events (Track 7 A4)."""
+    if event.topic not in {
+        AGENT_PIPELINE_STARTED,
+        AGENT_PIPELINE_STAGE,
+        AGENT_PIPELINE_PLANNED,
+        AGENT_PIPELINE_COMPLETE,
+    }:
+        return state
+
+    payload = event.payload
+    pipeline_id = str(payload.get("pipeline_id", ""))
+    stage = str(payload.get("stage", ""))
+    planned_raw = payload.get("planned_tools") or ()
+    planned_tools = tuple(str(item) for item in planned_raw) if planned_raw else ()
+
+    if event.topic == AGENT_PIPELINE_STARTED:
+        return replace(
+            state,
+            active_agent_pipeline_id=pipeline_id,
+            agent_pipeline_stage=stage or "starting",
+            agent_pipeline_planned_tools=planned_tools,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    if event.topic == AGENT_PIPELINE_PLANNED:
+        return replace(
+            state,
+            agent_pipeline_planned_tools=planned_tools or state.agent_pipeline_planned_tools,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    if event.topic == AGENT_PIPELINE_STAGE:
+        return replace(
+            state,
+            active_agent_pipeline_id=pipeline_id or state.active_agent_pipeline_id,
+            agent_pipeline_stage=stage,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    if event.topic == AGENT_PIPELINE_COMPLETE:
+        return replace(
+            state,
+            active_agent_pipeline_id="",
+            agent_pipeline_stage="complete",
+            agent_pipeline_planned_tools=(),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    return state
+
+
 def _reduce_workflow_run(state: AppState, event: Event) -> AppState:
     """Project workflow lifecycle events into workflow_runs feed."""
     if event.topic not in {
@@ -1204,6 +1271,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_plugin_catalog,
     _reduce_plugin_state_changed,
     _reduce_agent_run,
+    _reduce_agent_pipeline,
     _reduce_workflow_run,
     _reduce_permission_check,
 )

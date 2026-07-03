@@ -1,6 +1,6 @@
 # Async EventBus Policy & Design (R4)
 
-**Status:** R4b implemented (optional dispatch queue); R4c deferred  
+**Status:** R4b implemented (optional dispatch queue); R4c implemented (per-handler async adapters, bounded queue)  
 **Authority:** Subordinate to [PROJECT_CONSTITUTION_V4.md](../../PROJECT_CONSTITUTION_V4.md)  
 **Runtime reference:** `ai_command_center/core/event_bus.py`  
 **Topic registry:** `ai_command_center/core/events/topics.py`  
@@ -162,10 +162,10 @@ Sync services remain sync; the bridge is **opt-in per service**, not a global as
 
 ### R4c — Full async adapters
 
-- Per-handler registration metadata: `sync | async_queue | asyncio_bridge`
-- Metrics: handler duration histogram, queue depth, dropped events
-- Optional backpressure (see below)
-- Deprecate ad-hoc per-service queues where central dispatch subsumes them
+- [x] Per-handler registration metadata: `sync | async_queue | asyncio_bridge`
+- [x] Metrics: handler duration via `observability.metric` on budget exceed; `EventBus.get_handler_metrics()`
+- [x] Optional bounded queue backpressure (`EVENTBUS_QUEUE_MAX_DEPTH`, telemetry drop policy)
+- [ ] Deprecate ad-hoc per-service queues where central dispatch subsumes them
 
 ---
 
