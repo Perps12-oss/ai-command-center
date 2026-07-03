@@ -651,13 +651,18 @@ class SystemView(ctk.CTkFrame):
             return
         self._runs_log.clear()
         active_agent = str(getattr(snap, "active_agent_run_id", "") or "")
+        active_agents = set(getattr(snap, "active_agent_run_ids", ()) or ())
         active_workflow = str(getattr(snap, "active_workflow_run_id", "") or "")
 
         for run in getattr(snap, "agent_runs", ()):
-            marker = " *" if run.agent_id == active_agent else ""
+            marker = " *" if run.agent_id in active_agents or run.agent_id == active_agent else ""
+            role = f" ({run.spawn_role})" if getattr(run, "spawn_role", "") else ""
+            scope = ""
+            if getattr(run, "workspace_id", ""):
+                scope = f" ws={run.workspace_id[:8]}"
             task = f" — {run.task[:40]}" if run.task else ""
             err = f" ({run.error})" if run.error else ""
-            text = f"agent {run.agent_id[:8]} [{run.state}]{task}{err}{marker}"
+            text = f"agent {run.agent_id[:8]}{role} [{run.state}]{scope}{task}{err}{marker}"
             color = T.STATUS_ERROR if run.state in {"failed", "terminated"} and run.error else T.TEXT_SECONDARY
             if run.state in {"spawning", "running", "waiting"}:
                 color = T.STATUS_BUSY
