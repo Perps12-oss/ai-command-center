@@ -17,6 +17,7 @@ INTENT_NOTE_NEW = "note_new"
 INTENT_NAVIGATE = "navigate"
 INTENT_MEMORY_REMEMBER = "memory_remember"
 INTENT_MEMORY_SELECT = "memory_select"
+INTENT_AGENT = "agent"
 INTENT_UNKNOWN = "unknown"
 
 _VIEW_ALIASES: dict[str, str] = {
@@ -117,6 +118,10 @@ class CommandRouterService(BaseService):
             return INTENT_MEMORY_REMEMBER, {"body": text[9:].strip()}
         if lower.startswith("memory:"):
             return INTENT_MEMORY_SELECT, {"query": text[7:].strip()}
+        if lower.startswith("agent:"):
+            return INTENT_AGENT, {"task": text[6:].strip() or "demo"}
+        if lower in {"agent demo", "supervised agent demo"}:
+            return INTENT_AGENT, {"task": "demo"}
         for verb in _SHELL_VERBS:
             if lower == verb.strip() or lower.startswith(verb):
                 return INTENT_SHELL, {"command": stripped}
