@@ -110,7 +110,7 @@ class WorkspaceOsService(BaseService):
             metadata={"track": "workspace_os_phase2"},
         )
         register_workspace_os_actions(self.action_registry)
-        self.permission_service.wire_bus_handlers()
+        # PermissionService bus handlers are wired once in service_factory.
 
         self._unsubs = [
             self._bus.subscribe(UI_CREATE_WORKSPACE, self._on_create_workspace),
@@ -122,7 +122,6 @@ class WorkspaceOsService(BaseService):
 
     def _on_unload(self) -> None:
         """Unsubscribe from UI command topics on shutdown."""
-        self.permission_service.unwire_bus_handlers()
         for unsub in getattr(self, "_unsubs", []):
             unsub()
         self._unsubs.clear()
