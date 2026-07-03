@@ -1,0 +1,47 @@
+name: Windows Package Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "packaging/**"
+      - "scripts/build_windows.py"
+      - "ai_command_center/platform/runtime_paths.py"
+      - "main.py"
+      - "requirements.txt"
+      - ".github/workflows/package-windows-smoke.yml"
+
+concurrency:
+  group: package-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pyinstaller-smoke:
+    name: PyInstaller one-folder build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-test.txt pyinstaller
+
+      - name: Build one-folder artifact
+        run: python scripts/build_windows.py
+
+      - name: Verify artifact directory
+        shell: bash
+        run: test -f dist/AICommandCenter/AICommandCenter.exe
+
+      - name: Upload unsigned artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AICommandCenter-windows-unsigned
+          path: dist/AICommandCenter/
+          retention-days: 7
