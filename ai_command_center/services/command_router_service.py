@@ -82,6 +82,10 @@ class CommandRouterService(BaseService):
                 "workspace_entity_type": str(event.payload.get("workspace_entity_type", "")),
                 "workspace_entity_title": str(event.payload.get("workspace_entity_title", "")),
             }
+            for key in ("workspace_entity_description", "workspace_entity_url", "workspace_entity_path"):
+                value = str(event.payload.get(key, "")).strip()
+                if value:
+                    args[key] = value
         self._bus.publish(
             COMMAND_ROUTED,
             {

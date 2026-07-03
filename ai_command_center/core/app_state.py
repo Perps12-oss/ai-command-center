@@ -48,6 +48,7 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SNAPSHOT,
     SYSTEM_SNAPSHOT,
     UI_OPEN_CHAT,
+    UI_CHAT_NEW_SESSION,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
     WORKFLOW_STARTED,
@@ -93,6 +94,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     EVENT_ENTITY_DELETED,
     EVENT_ENTITY_RELATIONSHIPS_CHANGED,
     UI_OPEN_CHAT,
+    UI_CHAT_NEW_SESSION,
     # Agent / workflow runs (Track R7)
     AGENT_SPAWNED,
     AGENT_TASK_REQUEST,
@@ -232,6 +234,10 @@ class AppState:
     chat_workspace_entity_id: str = ""
     chat_workspace_entity_type: str = ""
     chat_workspace_entity_title: str = ""
+    chat_workspace_entity_description: str = ""
+    chat_workspace_entity_url: str = ""
+    chat_workspace_entity_path: str = ""
+    chat_active_session_key: str = "default"
     errors: tuple[str, ...] = ()
 
     # Track 3.2 — full projection of feature catalogs
@@ -603,28 +609,52 @@ def _reduce_system_snapshot(state: AppState, event: Event) -> AppState:
     )
 
 
+def _entity_session_key(entity_type: str, entity_id: str) -> str:
+    return f"entity:{entity_type}:{entity_id}"
+
+
+def _clear_chat_entity_fields(state: AppState, event: Event) -> AppState:
+    return replace(
+        state,
+        chat_workspace_entity_id="",
+        chat_workspace_entity_type="",
+        chat_workspace_entity_title="",
+        chat_workspace_entity_description="",
+        chat_workspace_entity_url="",
+        chat_workspace_entity_path="",
+        chat_active_session_key="default",
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_chat_workspace_entity(state: AppState, event: Event) -> AppState:
     """Project workspace-attached chat entity from ui.workspace_os.open_chat."""
     if event.topic != UI_OPEN_CHAT:
         return state
     entity_id = str(event.payload.get("entity_id", "")).strip()
     if not entity_id:
-        return replace(
-            state,
-            chat_workspace_entity_id="",
-            chat_workspace_entity_type="",
-            chat_workspace_entity_title="",
-            last_event_topic=event.topic,
-            last_event_source=event.source,
-        )
+        return _clear_chat_entity_fields(state, event)
+    entity_type = str(event.payload.get("entity_type", ""))
     return replace(
         state,
         chat_workspace_entity_id=entity_id,
-        chat_workspace_entity_type=str(event.payload.get("entity_type", "")),
+        chat_workspace_entity_type=entity_type,
         chat_workspace_entity_title=str(event.payload.get("title", "")),
+        chat_workspace_entity_description=str(event.payload.get("description", "")),
+        chat_workspace_entity_url=str(event.payload.get("url", "")),
+        chat_workspace_entity_path=str(event.payload.get("path", "")),
+        chat_active_session_key=_entity_session_key(entity_type, entity_id),
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
+
+
+def _reduce_ui_chat_new_session(state: AppState, event: Event) -> AppState:
+    """Clear sticky workspace entity context when user starts a fresh chat."""
+    if event.topic != UI_CHAT_NEW_SESSION:
+        return state
+    return _clear_chat_entity_fields(state, event)
 
 
 def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
@@ -1074,6 +1104,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_phase,
     _reduce_system_snapshot,
     _reduce_chat_workspace_entity,
+    _reduce_ui_chat_new_session,
     _reduce_workspace_os_event,
     _reduce_note_results,
     _reduce_note_selected,
