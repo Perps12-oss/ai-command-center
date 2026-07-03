@@ -126,6 +126,7 @@ class ChatView(ctk.CTkFrame):
         on_export:     Callable[[list[dict]], None] | None = None,
         on_regenerate: Callable[[], None]            | None = None,
         on_send:       Callable[[str], None]         | None = None,
+        on_new_session: Callable[[], None]           | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -133,6 +134,7 @@ class ChatView(ctk.CTkFrame):
         self._on_export     = on_export
         self._on_regenerate = on_regenerate
         self._on_send       = on_send
+        self._on_new_session = on_new_session
 
         self._request_id:       str | None              = None
         self._streaming:        bool                    = False
@@ -271,6 +273,16 @@ class ChatView(ctk.CTkFrame):
         )
 
     def _new_session(self) -> None:
+        if self._on_new_session:
+            self._on_new_session()
+            return
+        self._save_current_session()
+        self._store.start_new_session()
+        self._clear_ui()
+        self._refresh_session_bar()
+
+    def reset_local_session(self) -> None:
+        """Reset in-memory session UI after bus-driven new-session events."""
         self._save_current_session()
         self._store.start_new_session()
         self._clear_ui()

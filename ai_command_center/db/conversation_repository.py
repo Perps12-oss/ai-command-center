@@ -1,4 +1,4 @@
-"""Single-session conversation persistence (Phase 3D).
+"""Single- and per-entity conversation persistence (Phase 3D + Track 9 C3).
 
 .. deprecated::
     Import ``ConversationRepository`` from ``ai_command_center.repositories`` instead.
@@ -15,43 +15,68 @@ DEFAULT_CONVERSATION_ID = "default"
 CONTEXT_HISTORY_LIMIT = 6
 
 
+def entity_conversation_id(entity_type: str, entity_id: str) -> str:
+    """Stable conversation key for a workspace entity chat session."""
+    return f"entity:{entity_type}:{entity_id}"
+
+
 class ConversationRepository:
-    """One active conversation row — no multi-chat in Phase 3."""
+    """Conversation rows keyed by id — default plus per-entity sessions."""
 
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
-    def ensure_default(self, *, model: str = "") -> str:
+    def ensure_conversation(
+        self,
+        conversation_id: str,
+        *,
+        model: str = "",
+        title: str = "Session",
+    ) -> str:
         row = self._conn.execute(
             "SELECT id FROM conversations WHERE id = ?",
-            (DEFAULT_CONVERSATION_ID,),
+            (conversation_id,),
         ).fetchone()
         if row is None:
             self._conn.execute(
                 "INSERT INTO conversations (id, title, model, created_at) VALUES (?, ?, ?, ?)",
-                (DEFAULT_CONVERSATION_ID, "Session", model, time.time()),
+                (conversation_id, title, model, time.time()),
             )
             self._conn.commit()
         elif model:
             self._conn.execute(
                 "UPDATE conversations SET model = ? WHERE id = ?",
-                (model, DEFAULT_CONVERSATION_ID),
+                (model, conversation_id),
             )
             self._conn.commit()
-        return DEFAULT_CONVERSATION_ID
+        return conversation_id
 
-    def append_message(self, role: str, content: str) -> None:
-        self.ensure_default()
+    def ensure_default(self, *, model: str = "") -> str:
+        return self.ensure_conversation(DEFAULT_CONVERSATION_ID, model=model)
+
+    def append_message(
+        self,
+        role: str,
+        content: str,
+        *,
+        conversation_id: str | None = None,
+    ) -> None:
+        cid = conversation_id or DEFAULT_CONVERSATION_ID
+        self.ensure_conversation(cid)
         self._conn.execute(
             """
             INSERT INTO messages (conversation_id, role, content, created_at)
             VALUES (?, ?, ?, ?)
             """,
-            (DEFAULT_CONVERSATION_ID, role, content.strip(), time.time()),
+            (cid, role, content.strip(), time.time()),
         )
         self._conn.commit()
 
-    def list_messages(self) -> list[ConversationMessage]:
+    def list_messages(
+        self,
+        conversation_id: str | None = None,
+    ) -> list[ConversationMessage]:
+        cid = conversation_id or DEFAULT_CONVERSATION_ID
         rows = self._conn.execute(
             """
             SELECT role, content, created_at
@@ -59,7 +84,7 @@ class ConversationRepository:
             WHERE conversation_id = ?
             ORDER BY id ASC
             """,
-            (DEFAULT_CONVERSATION_ID,),
+            (cid,),
         ).fetchall()
         return [
             ConversationMessage(
@@ -70,7 +95,13 @@ class ConversationRepository:
             for r in rows
         ]
 
-    def get_history_pairs(self, limit: int = CONTEXT_HISTORY_LIMIT) -> list[tuple[str, str]]:
+    def get_history_pairs(
+        self,
+        limit: int = CONTEXT_HISTORY_LIMIT,
+        *,
+        conversation_id: str | None = None,
+    ) -> list[tuple[str, str]]:
+        cid = conversation_id or DEFAULT_CONVERSATION_ID
         rows = self._conn.execute(
             """
             SELECT role, content
@@ -79,13 +110,23 @@ class ConversationRepository:
             ORDER BY id DESC
             LIMIT ?
             """,
-            (DEFAULT_CONVERSATION_ID, limit),
+            (cid, limit),
         ).fetchall()
         return [(str(r["role"]), str(r["content"])) for r in reversed(rows)]
 
-    def message_count(self) -> int:
+    def message_count(self, conversation_id: str | None = None) -> int:
+        cid = conversation_id or DEFAULT_CONVERSATION_ID
         row = self._conn.execute(
             "SELECT COUNT(*) AS c FROM messages WHERE conversation_id = ?",
-            (DEFAULT_CONVERSATION_ID,),
+            (cid,),
         ).fetchone()
         return int(row["c"]) if row else 0
+
+    def clear_messages(self, conversation_id: str) -> None:
+        """Remove all messages for a conversation row (row itself is kept)."""
+        self.ensure_conversation(conversation_id)
+        self._conn.execute(
+            "DELETE FROM messages WHERE conversation_id = ?",
+            (conversation_id,),
+        )
+        self._conn.commit()

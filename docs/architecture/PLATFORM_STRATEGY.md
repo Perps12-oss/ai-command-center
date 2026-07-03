@@ -54,6 +54,8 @@ quadrantChart
 
 ## Packaging
 
+Detailed P0 pipeline (PyInstaller → WiX MSI, paths, CI smoke): [PACKAGING_MSI_DESIGN.md](PACKAGING_MSI_DESIGN.md).
+
 | Stage | Format | Notes |
 |-------|--------|-------|
 | Dev | `python main.py` | Current |

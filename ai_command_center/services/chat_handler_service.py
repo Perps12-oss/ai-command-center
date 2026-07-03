@@ -156,10 +156,19 @@ class ChatHandlerService(BaseService):
         if workspace_entity_id:
             entity_type = str(args.get("workspace_entity_type", "entity"))
             entity_title = str(args.get("workspace_entity_title", workspace_entity_id))
-            graph_snippets.insert(
-                0,
+            lines = [
                 f"Workspace {entity_type}: {entity_title} (entity_id={workspace_entity_id})",
-            )
+            ]
+            description = str(args.get("workspace_entity_description", "")).strip()
+            url = str(args.get("workspace_entity_url", "")).strip()
+            path = str(args.get("workspace_entity_path", "")).strip()
+            if description:
+                lines.append(f"Description: {description}")
+            if url:
+                lines.append(f"URL: {url}")
+            if path:
+                lines.append(f"Path: {path}")
+            graph_snippets.insert(0, "\n".join(lines))
 
         bundle = self._context_manager.build_context(
             query,
