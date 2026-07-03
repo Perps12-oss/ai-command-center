@@ -67,6 +67,7 @@ UI_NAVIGATE = "ui.navigate"
 UI_PALETTE_OPEN = "ui.palette_open"
 UI_PALETTE_CLOSE = "ui.palette_close"
 UI_CHAT_CANCEL = "ui.chat_cancel"
+UI_CHAT_NEW_SESSION = "ui.chat.new_session"
 OVERLAY_SHOW = "overlay.show"
 OVERLAY_HIDE = "overlay.hide"
 OVERLAY_ANCHOR = "overlay.anchor"
@@ -203,6 +204,7 @@ __all__ = [
     "UI_PALETTE_OPEN",
     "UI_PALETTE_CLOSE",
     "UI_CHAT_CANCEL",
+    "UI_CHAT_NEW_SESSION",
     "OVERLAY_SHOW",
     "OVERLAY_HIDE",
     "OVERLAY_ANCHOR",
