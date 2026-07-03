@@ -160,6 +160,10 @@ AGENT_TASK_COMPLETE = "agent.task.complete"
 AGENT_TERMINATED = "agent.terminated"
 AGENT_CANCEL_REQUEST = "agent.cancel.request"
 
+# Permission gate (Track 7 — supervised agent pre-flight)
+PERMISSION_CHECK_REQUEST = "permission.check.request"
+PERMISSION_CHECK_RESULT = "permission.check.result"
+
 # Workflow engine (Track 8 — W0/W1)
 WORKFLOW_START = "workflow.start"
 WORKFLOW_STARTED = "workflow.started"
@@ -280,6 +284,8 @@ __all__ = [
     "AGENT_TASK_COMPLETE",
     "AGENT_TERMINATED",
     "AGENT_CANCEL_REQUEST",
+    "PERMISSION_CHECK_REQUEST",
+    "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",
     "WORKFLOW_STARTED",
     "WORKFLOW_STEP_STARTED",
