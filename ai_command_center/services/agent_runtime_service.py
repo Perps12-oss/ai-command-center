@@ -35,6 +35,14 @@ _logger = logging.getLogger(__name__)
 _DEMO_TASKS = frozenset({"demo", "supervised demo", "supervised-agent-demo"})
 _DEMO_TOOL_COMMAND = "echo supervised-agent-demo-ok"
 _MAX_DEMO_TOOLS = 3
+_MULTI_DEMO_ROLES: tuple[tuple[str, str], ...] = (
+    ("research", "demo: echo research-agent-ok"),
+    ("review", "demo: echo review-agent-ok"),
+)
+_SPAWN_ROLE_TASKS: dict[str, str] = {
+    "research": "demo: echo research-agent-ok",
+    "review": "demo: echo review-agent-ok",
+}
 
 
 class AgentRuntimeService(BaseService):
@@ -109,6 +117,21 @@ class AgentRuntimeService(BaseService):
             return [body]
         return [_DEMO_TOOL_COMMAND]
 
+    @staticmethod
+    def _resolve_spawn_task(task: str, *, spawn_role: str = "") -> str:
+        role_key = (spawn_role or task).strip().lower()
+        mapped = _SPAWN_ROLE_TASKS.get(role_key)
+        if mapped:
+            return mapped
+        return task.strip()
+
+    @staticmethod
+    def _is_multi_demo_task(task: str, spawn_mode: str = "") -> bool:
+        normalized = task.strip().lower()
+        if spawn_mode == "multi":
+            return normalized in {"", "multi-demo", "multi", "demo"}
+        return normalized in {"multi-demo", "multi agent demo", "multi-agent demo"}
+
     def _on_command_routed(self, event: Event) -> None:
         if event.source != "command_router":
             return
@@ -116,23 +139,60 @@ class AgentRuntimeService(BaseService):
             return
         args = event.payload.get("args") or {}
         task = str(args.get("task", "demo")).strip() or "demo"
+        spawn_mode = str(args.get("spawn_mode", "single"))
         request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
         workspace_id = args.get("workspace_id")
+        workspace_entity_id = args.get("workspace_entity_id")
+        if self._is_multi_demo_task(task, spawn_mode):
+            self._publish_multi_spawn(request_id, workspace_id, workspace_entity_id)
+            return
+        spawn_role = str(args.get("spawn_role", "")).strip()
+        resolved_task = self._resolve_spawn_task(task, spawn_role=spawn_role)
+        agent_id = ""
+        if spawn_role:
+            agent_id = f"{spawn_role.lower()}-{uuid.uuid4().hex[:8]}"
         self._bus.publish(
             AGENT_SPAWN_REQUEST,
             {
-                "task": task,
+                "task": resolved_task,
                 "request_id": request_id,
                 "workspace_id": workspace_id,
+                "workspace_entity_id": workspace_entity_id,
+                "spawn_role": spawn_role,
+                **({"agent_id": agent_id} if agent_id else {}),
             },
             source=self.name,
         )
+
+    def _publish_multi_spawn(
+        self,
+        request_id: str,
+        workspace_id: object,
+        workspace_entity_id: object,
+    ) -> None:
+        for role, role_task in _MULTI_DEMO_ROLES:
+            agent_id = f"{role}-{uuid.uuid4().hex[:8]}"
+            self._bus.publish(
+                AGENT_SPAWN_REQUEST,
+                {
+                    "agent_id": agent_id,
+                    "task": role_task,
+                    "request_id": f"{request_id}-{role}",
+                    "workspace_id": workspace_id,
+                    "workspace_entity_id": workspace_entity_id,
+                    "spawn_role": role,
+                },
+                source=self.name,
+            )
 
     def _on_spawn_request(self, event: Event) -> None:
         agent_id = str(event.payload.get("agent_id") or uuid.uuid4().hex)
         request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
         workspace_id = event.payload.get("workspace_id")
+        workspace_entity_id = event.payload.get("workspace_entity_id")
+        spawn_role = str(event.payload.get("spawn_role", "")).strip()
         task = str(event.payload.get("task", "")).strip()
+        task = self._resolve_spawn_task(task, spawn_role=spawn_role)
         check_id = uuid.uuid4().hex
         permissions = [Permission.USE_AI.value]
         if self._is_demo_task(task):
@@ -141,6 +201,8 @@ class AgentRuntimeService(BaseService):
             "agent_id": agent_id,
             "request_id": request_id,
             "workspace_id": workspace_id,
+            "workspace_entity_id": workspace_entity_id,
+            "spawn_role": spawn_role,
             "task": task,
         }
         self._bus.publish(
@@ -186,6 +248,8 @@ class AgentRuntimeService(BaseService):
         agent_id = str(pending.get("agent_id", ""))
         request_id = str(pending.get("request_id", ""))
         workspace_id = pending.get("workspace_id")
+        workspace_entity_id = pending.get("workspace_entity_id")
+        spawn_role = str(pending.get("spawn_role", "")).strip()
         task = str(pending.get("task", "")).strip()
         demo_mode = self._is_demo_task(task)
         self._active[agent_id] = {
@@ -196,15 +260,24 @@ class AgentRuntimeService(BaseService):
             "demo_mode": demo_mode,
             "demo_commands": self._demo_tool_commands(task) if demo_mode else [],
             "demo_index": 0,
+            "workspace_id": workspace_id,
+            "workspace_entity_id": workspace_entity_id,
+            "spawn_role": spawn_role,
         }
+        spawned_payload: dict[str, object] = {
+            "agent_id": agent_id,
+            "request_id": request_id,
+            "workspace_id": workspace_id,
+            "task": task,
+            "state": AgentState.SPAWNING.value,
+        }
+        if workspace_entity_id:
+            spawned_payload["workspace_entity_id"] = workspace_entity_id
+        if spawn_role:
+            spawned_payload["spawn_role"] = spawn_role
         self._bus.publish(
             AGENT_SPAWNED,
-            {
-                "agent_id": agent_id,
-                "request_id": request_id,
-                "workspace_id": workspace_id,
-                "state": AgentState.SPAWNING.value,
-            },
+            spawned_payload,
             source=self.name,
         )
         _logger.info("agent.spawned agent_id=%s request_id=%s", agent_id, request_id)
