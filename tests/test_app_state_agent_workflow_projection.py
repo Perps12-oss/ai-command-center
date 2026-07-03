@@ -131,9 +131,28 @@ class AgentWorkflowAppStateProjectionTest(unittest.TestCase):
         self.assertEqual(snap.workflow_runs[0].state, "failed")
         self.assertEqual(snap.workflow_runs[0].error, "tool step failed")
 
+    def test_multi_agent_active_ids_tracked(self) -> None:
+        self._publish(
+            AGENT_SPAWNED,
+            {"agent_id": "agent-a", "request_id": "r-a", "state": "running", "spawn_role": "research"},
+        )
+        self._publish(
+            AGENT_SPAWNED,
+            {"agent_id": "agent-b", "request_id": "r-b", "state": "running", "spawn_role": "review"},
+        )
+        snap = self.store.snapshot
+        self.assertEqual(len(snap.active_agent_run_ids), 2)
+        self.assertIn("agent-a", snap.active_agent_run_ids)
+        self.assertIn("agent-b", snap.active_agent_run_ids)
+        self.assertEqual(snap.active_agent_run_id, "agent-b")
 
-if __name__ == "__main__":
-    unittest.main()
+        self._publish(
+            AGENT_TERMINATED,
+            {"agent_id": "agent-a", "request_id": "r-a", "state": "terminated"},
+        )
+        snap = self.store.snapshot
+        self.assertEqual(snap.active_agent_run_ids, ("agent-b",))
+        self.assertEqual(snap.active_agent_run_id, "agent-b")
 
     def test_agent_clean_terminate_does_not_inherit_stale_error(self) -> None:
         self._publish(
@@ -151,4 +170,8 @@ if __name__ == "__main__":
         run = self.store.snapshot.agent_runs[0]
         self.assertEqual(run.state, "terminated")
         self.assertEqual(run.error, "")
+
+
+if __name__ == "__main__":
+    unittest.main()
 
