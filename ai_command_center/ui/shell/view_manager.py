@@ -54,6 +54,7 @@ class ViewManagerMixin:
             on_export=self._on_chat_export,
             on_regenerate=self._on_chat_regenerate,
             on_send=self._on_chat_send,
+            on_new_session=self._on_chat_new_session,
         )
         self._view_registry["notes"] = lambda: NotesView(
             self._content,
@@ -139,7 +140,12 @@ class ViewManagerMixin:
             if chat:
                 chat.focus_input()
 
-    def _navigate(self, view_id: str) -> None:
+    def _on_sidebar_navigate(self, view_id: str) -> None:
+        self._navigate(view_id, clear_chat_entity=(view_id == "chat"))
+
+    def _navigate(self, view_id: str, *, clear_chat_entity: bool = False) -> None:
+        if view_id == "chat" and clear_chat_entity:
+            self._controller.publish_clear_chat_entity()
         self._show_view(view_id)
         self._controller.publish_navigate(view_id)
 
@@ -154,8 +160,17 @@ class ViewManagerMixin:
             str(payload.get("entity_id", "")),
             str(payload.get("entity_type", "")),
             str(payload.get("title", "")),
+            description=str(payload.get("description", "")),
+            url=str(payload.get("url", "")),
+            path=str(payload.get("path", "")),
         )
         self._navigate("chat")
+
+    def _on_chat_new_session(self) -> None:
+        self._controller.publish_chat_new_session()
+        chat = self._chat_view()
+        if chat:
+            chat.reset_local_session()
 
     def _on_chat_send(self, text: str) -> None:
         snap = self._controller.snapshot()
@@ -166,4 +181,10 @@ class ViewManagerMixin:
                 "entity_type": snap.chat_workspace_entity_type,
                 "entity_title": snap.chat_workspace_entity_title,
             }
+            if snap.chat_workspace_entity_description:
+                entity["description"] = snap.chat_workspace_entity_description
+            if snap.chat_workspace_entity_url:
+                entity["url"] = snap.chat_workspace_entity_url
+            if snap.chat_workspace_entity_path:
+                entity["path"] = snap.chat_workspace_entity_path
         self._on_command(text, workspace_entity=entity)

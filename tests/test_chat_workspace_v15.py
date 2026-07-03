@@ -11,9 +11,11 @@ from ai_command_center.core.events.topics import (
     CHAT_STARTED,
     COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    UI_CHAT_NEW_SESSION,
     UI_COMMAND,
     UI_OPEN_CHAT,
 )
+from ai_command_center.repositories.conversation_repository import entity_conversation_id
 from ai_command_center.services.command_router_service import CommandRouterService
 
 
@@ -172,6 +174,63 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         self.assertEqual("", cleared.chat_workspace_entity_id)
         self.assertEqual("", cleared.chat_workspace_entity_type)
         self.assertEqual("", cleared.chat_workspace_entity_title)
+        self.assertEqual("default", cleared.chat_active_session_key)
+
+    def test_open_chat_entity_metadata_projection(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(
+            UI_OPEN_CHAT,
+            {
+                "entity_id": "res-1",
+                "entity_type": "resource",
+                "title": "Docs",
+                "description": "API reference",
+                "url": "https://example.com/docs",
+            },
+            source="tests",
+        )
+        snap = store.snapshot
+        self.assertEqual("API reference", snap.chat_workspace_entity_description)
+        self.assertEqual("https://example.com/docs", snap.chat_workspace_entity_url)
+        self.assertEqual(
+            entity_conversation_id("resource", "res-1"),
+            snap.chat_active_session_key,
+        )
+
+    def test_entity_session_switch_updates_session_key(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(
+            UI_OPEN_CHAT,
+            {"entity_id": "card-1", "entity_type": "card", "title": "A"},
+            source="tests",
+        )
+        first_key = store.snapshot.chat_active_session_key
+        bus.publish(
+            UI_OPEN_CHAT,
+            {"entity_id": "card-2", "entity_type": "card", "title": "B"},
+            source="tests",
+        )
+        second = store.snapshot
+        self.assertNotEqual(first_key, second.chat_active_session_key)
+        self.assertEqual("card-2", second.chat_workspace_entity_id)
+
+    def test_new_session_clears_entity_context(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+
+        bus.publish(
+            UI_OPEN_CHAT,
+            {"entity_id": "card-1", "entity_type": "card", "title": "Roadmap"},
+            source="tests",
+        )
+        bus.publish(UI_CHAT_NEW_SESSION, {}, source="tests")
+        snap = store.snapshot
+        self.assertEqual("", snap.chat_workspace_entity_id)
+        self.assertEqual("default", snap.chat_active_session_key)
 
     def test_command_router_forwards_workspace_entity(self) -> None:
         bus = EventBus()
@@ -200,6 +259,34 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         self.assertEqual("card-9", args.get("workspace_entity_id"))
         self.assertEqual("card", args.get("workspace_entity_type"))
         self.assertEqual("Sprint", args.get("workspace_entity_title"))
+
+    def test_command_router_forwards_workspace_entity_metadata(self) -> None:
+        bus = EventBus()
+        router = CommandRouterService(bus)
+        router.load()
+        routed: list[dict] = []
+
+        def capture(event) -> None:
+            if event.topic == COMMAND_ROUTED and event.source == "command_router":
+                routed.append(dict(event.payload))
+
+        bus.subscribe(COMMAND_ROUTED, capture)
+        bus.publish(
+            UI_COMMAND,
+            {
+                "text": "Summarize resource",
+                "workspace_entity_id": "res-3",
+                "workspace_entity_type": "resource",
+                "workspace_entity_title": "Handbook",
+                "workspace_entity_description": "Team wiki",
+                "workspace_entity_url": "https://wiki.example/handbook",
+            },
+            source="tests",
+        )
+        router.unload()
+        args = routed[0].get("args") or {}
+        self.assertEqual("Team wiki", args.get("workspace_entity_description"))
+        self.assertEqual("https://wiki.example/handbook", args.get("workspace_entity_url"))
 
 
 if __name__ == "__main__":

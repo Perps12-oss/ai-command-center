@@ -93,13 +93,24 @@ gantt
 | Field | Value |
 |-------|-------|
 | **Objective** | Expand ARCHITECTURE.md; align subsystem map with vision |
-| **Status** | In progress (this PR expands, does not replace) |
+| **Status** | In progress |
 | **Tasks** | Mission summary; subsystem map; long-term direction section |
 | **Dependencies** | Track 3 |
 | **Risks** | Authority hierarchy drift |
 | **Effort** | S |
 | **Exit criteria** | Single ARCHITECTURE.md source of truth preserved |
 | **Acceptance** | No duplicate architecture authority files |
+
+### R4 — Async EventBus (engineering backlog)
+
+| Field | Value |
+|-------|-------|
+| **Objective** | Policy and phased design for non-blocking dispatch without breaking ownership flow |
+| **Status** | **Design complete (R4a)** — implementation deferred to follow-up PR |
+| **Deliverables** | [ASYNC_EVENTBUS_POLICY.md](../architecture/ASYNC_EVENTBUS_POLICY.md); `core/events/dispatch_policy.py` |
+| **Next PR** | R4b optional central dispatch queue behind feature flag |
+| **Dependencies** | Track 1 stabilization; Phase 4A vault index pattern |
+| **Acceptance** | No `publish()` semantic change until R4b; verify_phase4a remains PASS |
 
 ---
 
@@ -123,12 +134,13 @@ gantt
 | Field | Value |
 |-------|-------|
 | **Objective** | Packaging, paths, cross-platform abstractions |
-| **Status** | In progress — HotkeyProvider abstraction added |
-| **Tasks** | PLATFORM_STRATEGY phases P0–P1; HotkeyProvider; MSI build |
+| **Status** | **P0 design complete** — HotkeyProvider + runtime_paths in place; MSI build implementation next |
+| **Tasks** | [PACKAGING_MSI_DESIGN.md](../architecture/PACKAGING_MSI_DESIGN.md); PyInstaller spec; CI smoke; WiX MSI |
 | **Dependencies** | Track 5 |
 | **Effort** | L |
 | **Exit criteria** | Signed Windows installer smoke test |
 | **Acceptance** | No hardcoded Windows paths outside platform/ |
+| **Next PR** | P0 PyInstaller build + unsigned CI artifact; MSI follows |
 
 ---
 
@@ -198,6 +210,6 @@ flowchart TD
 
 - [ ] Workspace canvas is default home view
 - [ ] All tracks 0–4 complete; 5–9 in flight with clear owners
-- [ ] CI enforcement Stage 3 active
+- [x] CI enforcement Stage 3 active
 - [ ] No P0 audit items open
 - [ ] 29+ pytest tests; daily driver PASS

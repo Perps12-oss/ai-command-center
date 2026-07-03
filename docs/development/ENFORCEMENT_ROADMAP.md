@@ -57,18 +57,19 @@ Progress from advisory governance (warn-only) to merge-blocking constitutional e
 
 ---
 
-## Stage 3 — CI Block (Target: Q4 2026)
+## Stage 3 — CI Block (Active: Track 2 Stage 3)
 
 **Changes:**
 
-1. `.github/workflows/ucgs.yml` → `UCGS_ENFORCEMENT: block`
-2. Local optional: `enforcement_mode: block` in `ucgs.config.yaml`
-3. Pre-commit blocks on S4/S5 FAIL
+1. `.github/workflows/ucgs.yml` → `UCGS_ENFORCEMENT: block` ✓
+2. Local optional: `enforcement_mode: block` in `ucgs.config.yaml` (still `warn` — CI-only block)
+3. Pre-commit blocks on S4/S5 FAIL when local `enforcement_mode: block` is set
 
 **Acceptance:**
 
-- [ ] Main branch protected; red CI blocks merge
-- [ ] Documented escape hatch: `UCGS_ENFORCEMENT=warn` on draft PRs only
+- [ ] Main branch protected; red CI blocks merge (repo setting)
+- [x] Documented escape hatch: `UCGS_ENFORCEMENT=warn` on draft PRs only (see `ucgs.yml` comment)
+- [x] Legacy grandfather list: `tests/arch_lint_baseline.json`
 
 ---
 

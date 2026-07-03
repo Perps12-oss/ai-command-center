@@ -63,7 +63,7 @@ class EventCoordinatorMixin:
             view = "home"
 
         def update() -> None:
-            self._navigate(view)
+            self._navigate(view, clear_chat_entity=(view == "chat"))
 
         self._ui_queue.enqueue(update)
 
