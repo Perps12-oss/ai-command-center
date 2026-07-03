@@ -80,7 +80,7 @@ class ApplicationShellMixin:
         commands = [
             ("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace")),
             ("⌂  Home", "Dashboard and quick actions", lambda: self._navigate("home")),
-            ("💬  Chat", "Navigate to Chat", lambda: self._navigate("chat")),
+            ("💬  Chat", "Navigate to Chat", lambda: self._navigate("chat", clear_chat_entity=True)),
             ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
             ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
             ("⚙  System", "System monitor", lambda: self._navigate("system")),
@@ -92,6 +92,11 @@ class ApplicationShellMixin:
             ("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse),
             ("⏱  Command History", "Browse recent commands (Ctrl+H)", self._history_drawer.toggle),
             ("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show),
+            (
+                "🤖  Supervised Agent Demo",
+                "Spawn a permission-gated agent run (visible in System view)",
+                lambda: self._on_command("agent: demo"),
+            ),
         ]
         commands.extend(self._workspace_os_palette_commands())
         self._command_palette.show(commands)
