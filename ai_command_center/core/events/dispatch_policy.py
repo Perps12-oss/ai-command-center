@@ -18,6 +18,18 @@ SYNC_CRITICAL_BUDGET_MS = 5
 SYNC_STANDARD_BUDGET_MS = 10
 ASYNC_ENQUEUE_BUDGET_MS = 1
 
+# Per-topic overrides for handlers that legitimately exceed tier defaults while
+# still running synchronously (AppState reduction, status polling, UI-adjacent work).
+TOPIC_TIME_BUDGET_MS: dict[str, int] = {
+    T.SYSTEM_SNAPSHOT: 150,
+    T.OLLAMA_STATUS: 350,
+    T.OPENAI_STATUS: 350,
+    T.CHAT_HISTORY_LOADED: 50,
+    T.CHAT_CHUNK: 250,
+    T.LLM_CHUNK: 250,
+    T.UI_NAVIGATE: 10,
+}
+
 
 class DispatchTier(str, Enum):
     """How a topic's handlers may be executed under R4 dispatch policy."""
@@ -94,12 +106,24 @@ def get_dispatch_tier(topic: str) -> DispatchTier:
 
 def get_time_budget_ms(topic: str) -> int:
     """Return recommended handler time budget for *topic* (design target only)."""
+    override = TOPIC_TIME_BUDGET_MS.get(topic)
+    if override is not None:
+        return override
     tier = get_dispatch_tier(topic)
     if tier is DispatchTier.SYNC_CRITICAL:
         return SYNC_CRITICAL_BUDGET_MS
     if tier is DispatchTier.ASYNC_ELIGIBLE:
         return ASYNC_ENQUEUE_BUDGET_MS
     return SYNC_STANDARD_BUDGET_MS
+
+
+def budget_exceedance_is_warning(topic: str) -> bool:
+    """Return True when a budget exceedance should log at WARNING level.
+
+    ASYNC_ELIGIBLE topics may still run inline on the sync path until R4b+
+    async dispatch is enabled; those exceedances are DEBUG-only to avoid spam.
+    """
+    return get_dispatch_tier(topic) is not DispatchTier.ASYNC_ELIGIBLE
 
 
 __all__ = [
@@ -109,6 +133,8 @@ __all__ = [
     "SYNC_CRITICAL_BUDGET_MS",
     "SYNC_CRITICAL_TOPICS",
     "SYNC_STANDARD_BUDGET_MS",
+    "TOPIC_TIME_BUDGET_MS",
+    "budget_exceedance_is_warning",
     "get_dispatch_tier",
     "get_time_budget_ms",
 ]
