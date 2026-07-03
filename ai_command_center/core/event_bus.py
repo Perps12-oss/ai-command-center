@@ -22,6 +22,7 @@ from typing import Any
 
 from ai_command_center.core.events.dispatch_policy import (
     DispatchTier,
+    budget_exceedance_is_warning,
     get_dispatch_tier,
     get_time_budget_ms,
 )
@@ -243,6 +244,8 @@ class EventBus:
                 )
 
         for handler in handlers:
+            budget_ms = get_time_budget_ms(topic)
+            start = time.perf_counter()
             try:
                 handler(event)
             except Exception as exc:
@@ -265,6 +268,20 @@ class EventBus:
                         )
                     except Exception:
                         logger.exception("Failed to publish bus.handler_error")
+            finally:
+                elapsed_ms = (time.perf_counter() - start) * 1000.0
+                if elapsed_ms > budget_ms:
+                    log = (
+                        logger.warning
+                        if budget_exceedance_is_warning(topic)
+                        else logger.debug
+                    )
+                    log(
+                        "EventBus handler exceeded budget topic=%s elapsed_ms=%.2f budget_ms=%d",
+                        topic,
+                        elapsed_ms,
+                        budget_ms,
+                    )
 
     def shutdown(self) -> None:
         if not self._async_dispatch or self._dispatch_thread is None:
