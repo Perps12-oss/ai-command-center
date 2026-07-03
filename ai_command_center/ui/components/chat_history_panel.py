@@ -103,6 +103,7 @@ class ChatHistoryPanel(ctk.CTkFrame):
     Public API (called from ChatView)
     ──────────────────────────────────
     add_session(sid, title, ts, active)
+    update_session(sid, title, ts)
     set_active(sid)
     remove_session(sid)
     clear()
@@ -199,6 +200,14 @@ class ChatHistoryPanel(ctk.CTkFrame):
         for existing_sid, existing_row in self._rows.items():
             if existing_sid != sid:
                 existing_row.pack(fill="x", pady=(0, 2))
+
+    def update_session(self, sid: str, title: str, ts: str) -> None:
+        """Refresh title/timestamp for an existing session row."""
+        if sid not in self._rows:
+            self.add_session(sid, title, ts, active=False)
+            return
+        active = self._rows[sid]._active
+        self.add_session(sid, title, ts, active=active)
 
     def set_active(self, sid: str) -> None:
         for row_sid, row in self._rows.items():
