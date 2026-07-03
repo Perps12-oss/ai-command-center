@@ -23,14 +23,11 @@ AI Command Center is a **Workspace OS** — an ambient desktop command surface w
 
 **North star:** [architecture/WORKSPACE_VISION.md](architecture/WORKSPACE_VISION.md)
 
-**Transformation program:**
+**Transformation program (single backlog):**
 
 | Document | Purpose |
 |----------|---------|
-| [development/TRANSFORMATION_AUDIT.md](development/TRANSFORMATION_AUDIT.md) | Evidence-based baseline audit |
-| [development/TRANSFORMATION_ROADMAP.md](development/TRANSFORMATION_ROADMAP.md) | Tracks 0–9 execution plan |
-| [development/ENFORCEMENT_ROADMAP.md](development/ENFORCEMENT_ROADMAP.md) | UCGS warn → CI block stages |
-| [development/STABILIZATION_LOG.md](development/STABILIZATION_LOG.md) | P0/P1 fix record |
+| [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md) | **Only execution backlog** — Programs 1–4, audit, enforcement, gates |
 
 ---
 
@@ -395,25 +392,21 @@ Canonical topic constants live in `ai_command_center/core/events/topics.py`.
 
 ## Roadmap status
 
-Full ownership stack (Tracks 1–3, 4–5, 6.3): **complete**.
+Phase gates (Tracks 1–3, 4–5, 6.1–6.3): **complete**. All open work is in [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md).
 
-| Track | Goal | Status |
-|-------|------|--------|
-| 1 | Foundation — domain models, settings layer, repositories | ✅ |
-| 2 | Runtime engine — EventBus topics, service lifecycle, tool runtime | ✅ |
-| 3 | State & observability — AppState projection, telemetry, snapshots | ✅ |
-| 4 | UI contract compliance — isolation, chat, memory/notes/plugins/Workspace OS | ✅ |
-| 5 | Feature completion — Workspace OS, markdown, memory/notes/plugins/settings polish | ✅ |
-| 6.1–6.3 | Component gallery, design tokens, plugin framework v2 | ✅ |
-| 6.4 | Vector search / memory graph enhancements | ⏳ next |
-| 6.5 | Multi-agent runtime | ⏳ gated — see `docs/ARCHITECTURE_REVIEW_MULTI_AGENT.md` |
+| Program | Focus | Status |
+|---------|-------|--------|
+| 1 — Stabilization | Execution reliability, model router, shell hardening | **Active** — S3/S4/S2 remain |
+| 2 — Enforcement | UCGS block local, arch baseline, contracts | After P1 exit |
+| 3 — Workspace Adoption | Shift gravity chat → workspace | After P1 exit |
+| 4 — Platform Expansion | Vectors, multi-agent, MSI, Linux | Gated on P3 |
 
-**Residual risks:**
-- `core/settings/settings_repository.py` re-export vs `repositories/settings_repository.py` may confuse contributors.
-- `app.py` still subscribes to many EventBus topics directly; replace with AppState subscriptions as projection grows.
-- `tools/tool_executor.py` is a stub — execution happens inside `ToolExecutorService`.
-- UI violations: `hero_panel.py` (AssetService), `layout/compiler.py` (SpatialRepository) — see TRANSFORMATION_AUDIT.md.
-- Transformation tracks 5–9 pending; vision docs define target state.
+| Former track | Now |
+|--------------|-----|
+| 6.4 Vector search | Program 4 — constitutional gate required |
+| 6.5 Multi-agent | Program 4 — Appendix C gate in transition plan |
+
+**Residual risks** (mapped to transition plan): settings re-export confusion (S7); `app.py` bus subscriptions (W4); `tools/tool_executor.py` stub (S7); hero_panel/layout violations **closed** in code.
 
 ---
 

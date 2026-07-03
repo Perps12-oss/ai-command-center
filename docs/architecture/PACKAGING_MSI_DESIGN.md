@@ -240,5 +240,5 @@ Shared abstractions (`runtime_paths`, `HotkeyProvider`) must be extended without
 
 - [PLATFORM_STRATEGY.md](PLATFORM_STRATEGY.md) — platform priority quadrant
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — Platform subsystem row
-- [TRANSFORMATION_ROADMAP.md](../development/TRANSFORMATION_ROADMAP.md) — Track 6 status
+- [ARCHITECTURE_TRANSITION_PLAN.md](ARCHITECTURE_TRANSITION_PLAN.md) — Program 4 packaging (MSI)
 - [packaging/README.md](../../packaging/README.md) — build commands stub
