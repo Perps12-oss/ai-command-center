@@ -38,7 +38,7 @@ class ApplicationShellMixin:
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
 
-        self._sidebar = Sidebar(body, on_navigate=self._navigate)
+        self._sidebar = Sidebar(body, on_navigate=self._on_sidebar_navigate)
         self._sidebar.pack(fill="y", side="left")
 
         right = ctk.CTkFrame(body, fg_color="transparent")
@@ -108,6 +108,14 @@ class ApplicationShellMixin:
                 "entity_type": entity.entity_type,
                 "title": entity.title or entity.entity_id,
             }
+            if meta.get("description"):
+                chat_payload["description"] = str(meta["description"])
+            if meta.get("url"):
+                chat_payload["url"] = str(meta["url"])
+            elif meta.get("path"):
+                chat_payload["path"] = str(meta["path"])
+            elif meta.get("command"):
+                chat_payload["path"] = str(meta["command"])
             chat_label = f"💬  Chat: {entity.title or entity.entity_id}"
             chat_desc = f"Open chat attached to {entity.entity_type}"
             items.append(
@@ -193,6 +201,12 @@ class ApplicationShellMixin:
                     "entity_type": snap.chat_workspace_entity_type,
                     "entity_title": snap.chat_workspace_entity_title,
                 }
+                if snap.chat_workspace_entity_description:
+                    entity["description"] = snap.chat_workspace_entity_description
+                if snap.chat_workspace_entity_url:
+                    entity["url"] = snap.chat_workspace_entity_url
+                if snap.chat_workspace_entity_path:
+                    entity["path"] = snap.chat_workspace_entity_path
             for msg in reversed(chat._history):
                 if msg.get("role") == "user":
                     self._on_command(msg.get("content", ""), workspace_entity=entity)
