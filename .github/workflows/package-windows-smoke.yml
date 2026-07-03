@@ -45,3 +45,36 @@ jobs:
           name: AICommandCenter-windows-unsigned
           path: dist/AICommandCenter/
           retention-days: 7
+
+  msi-smoke:
+    name: WiX MSI build (unsigned, optional)
+    runs-on: windows-latest
+    needs: pyinstaller-smoke
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download PyInstaller artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AICommandCenter-windows-unsigned
+          path: dist/AICommandCenter
+
+      - name: Install WiX Toolset
+        run: choco install wixtoolset --no-progress -y
+
+      - name: Build unsigned MSI
+        shell: pwsh
+        run: .\scripts\build_msi.ps1 -SkipPyInstaller
+
+      - name: Verify MSI exists
+        shell: bash
+        run: test -f dist/AICommandCenter.msi
+
+      - name: Upload unsigned MSI
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AICommandCenter-msi-unsigned
+          path: dist/AICommandCenter.msi
+          retention-days: 7
