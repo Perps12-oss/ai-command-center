@@ -25,6 +25,7 @@ from typing import Any
 
 from ai_command_center.core.events.dispatch_policy import (
     DispatchTier,
+    budget_exceedance_is_warning,
     get_dispatch_tier,
     get_time_budget_ms,
 )
@@ -423,7 +424,12 @@ class EventBus:
             self._handler_duration_total_ms += elapsed_ms
             self._handler_duration_count += 1
             if elapsed_ms > budget_ms:
-                logger.warning(
+                log = (
+                    logger.warning
+                    if budget_exceedance_is_warning(topic)
+                    else logger.debug
+                )
+                log(
                     "EventBus handler exceeded budget topic=%s elapsed_ms=%.2f budget_ms=%d",
                     topic,
                     elapsed_ms,
