@@ -76,7 +76,7 @@ class CommandRouterService(BaseService):
         if clipboard and intent == INTENT_CHAT:
             args = {**args, "clipboard": str(clipboard)}
         workspace_entity_id = str(event.payload.get("workspace_entity_id", "")).strip()
-        if workspace_entity_id and intent == INTENT_CHAT:
+        if workspace_entity_id and intent in {INTENT_CHAT, INTENT_AGENT}:
             args = {
                 **args,
                 "workspace_entity_id": workspace_entity_id,
@@ -87,6 +87,9 @@ class CommandRouterService(BaseService):
                 value = str(event.payload.get(key, "")).strip()
                 if value:
                     args[key] = value
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        if workspace_id and intent == INTENT_AGENT:
+            args = {**args, "workspace_id": workspace_id}
         self._bus.publish(
             COMMAND_ROUTED,
             {
@@ -118,10 +121,18 @@ class CommandRouterService(BaseService):
             return INTENT_MEMORY_REMEMBER, {"body": text[9:].strip()}
         if lower.startswith("memory:"):
             return INTENT_MEMORY_SELECT, {"query": text[7:].strip()}
+        if lower.startswith("agent: spawn "):
+            role = stripped[13:].strip()
+            return INTENT_AGENT, {"task": role or "demo", "spawn_role": role, "spawn_mode": "single"}
+        if lower.startswith("agents:"):
+            body = stripped[7:].strip().lower()
+            if body in {"", "demo", "multi", "multi-demo"}:
+                return INTENT_AGENT, {"task": "multi-demo", "spawn_mode": "multi"}
+            return INTENT_AGENT, {"task": body, "spawn_mode": "multi"}
         if lower.startswith("agent:"):
-            return INTENT_AGENT, {"task": text[6:].strip() or "demo"}
-        if lower in {"agent demo", "supervised agent demo"}:
-            return INTENT_AGENT, {"task": "demo"}
+            return INTENT_AGENT, {"task": text[6:].strip() or "demo", "spawn_mode": "single"}
+        if lower in {"agent demo", "supervised agent demo", "multi-agent demo", "agents demo"}:
+            return INTENT_AGENT, {"task": "demo", "spawn_mode": "single"}
         for verb in _SHELL_VERBS:
             if lower == verb.strip() or lower.startswith(verb):
                 return INTENT_SHELL, {"command": stripped}
