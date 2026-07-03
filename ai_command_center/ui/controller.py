@@ -18,6 +18,7 @@ from ai_command_center.core.events.topics import (
     OVERLAY_ANCHOR,
     OVERLAY_HIDE,
     OVERLAY_SHOW,
+    PERMISSION_CHECK_RESULT,
     PLUGIN_DISABLE_REQUEST,
     PLUGIN_ENABLE_REQUEST,
     SETTINGS_SET_REQUEST,
@@ -170,6 +171,28 @@ class UIController:
         self._bus.publish(
             CHAT_EXPORT_REQUEST,
             {"history": list(history)},
+            source="ui",
+        )
+
+    def publish_permission_result(
+        self,
+        *,
+        check_id: str,
+        granted: bool,
+        permissions: list[str] | tuple[str, ...],
+        actor_type: str = "agent",
+        actor_id: str = "",
+    ) -> None:
+        """Publish user approval/denial for interactive permission checks."""
+        self._bus.publish(
+            PERMISSION_CHECK_RESULT,
+            {
+                "check_id": check_id,
+                "granted": granted,
+                "permissions": list(permissions),
+                "actor_type": actor_type,
+                "actor_id": actor_id,
+            },
             source="ui",
         )
 

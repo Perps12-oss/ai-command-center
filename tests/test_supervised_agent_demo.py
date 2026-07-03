@@ -7,9 +7,11 @@ from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     AGENT_SPAWNED,
     AGENT_SPAWN_REQUEST,
+    AGENT_TASK_COMPLETE,
     AGENT_TERMINATED,
     COMMAND_ROUTED,
     PERMISSION_CHECK_REQUEST,
+    PERMISSION_CHECK_RESULT,
     TOOL_INVOKE,
     UI_COMMAND,
 )
@@ -36,9 +38,29 @@ def _wire_permission(bus: EventBus) -> PermissionService:
     return permission
 
 
+def _auto_approve_interactive(bus: EventBus, *, granted: bool = True) -> None:
+    def on_request(event) -> None:
+        if not event.payload.get("interactive"):
+            return
+        bus.publish(
+            PERMISSION_CHECK_RESULT,
+            {
+                "check_id": event.payload["check_id"],
+                "granted": granted,
+                "permissions": list(event.payload.get("permissions") or []),
+                "actor_type": event.payload.get("actor_type", "agent"),
+                "actor_id": event.payload.get("actor_id"),
+            },
+            source="ui",
+        )
+
+    bus.subscribe(PERMISSION_CHECK_REQUEST, on_request)
+
+
 def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
     bus = EventBus()
     _wire_permission(bus)
+    _auto_approve_interactive(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
@@ -62,6 +84,7 @@ def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
     )
 
     assert permission_checks
+    assert permission_checks[0].get("interactive") is True
     assert {"use_ai", "launch_tool"}.issubset(set(permission_checks[0].get("permissions", [])))
     assert tool_invokes
     assert tool_invokes[0]["tool"] == "shell"
@@ -69,9 +92,75 @@ def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
     assert not terminated[0].get("error")
 
 
+def test_supervised_demo_multi_tool_loop() -> None:
+    bus = EventBus()
+    _wire_permission(bus)
+    _auto_approve_interactive(bus)
+    registry = ToolRegistry()
+    registry.register_tool(
+        ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
+    )
+    ToolRegistryService(bus, registry=registry).start()
+    ToolExecutorService(bus, registry).start()
+    store = AppStateStore(bus)
+    runtime = AgentRuntimeService(bus)
+    runtime.start()
+
+    completes: list[dict] = []
+    bus.subscribe(AGENT_TASK_COMPLETE, lambda e: completes.append(dict(e.payload)))
+
+    bus.publish(
+        AGENT_SPAWN_REQUEST,
+        {
+            "task": "demo: echo one; echo two; echo three",
+            "request_id": "req-multi",
+            "agent_id": "agent-multi",
+        },
+        source="test",
+    )
+
+    assert len(completes) == 3
+    snap = store.snapshot
+    run = next(r for r in snap.agent_runs if r.agent_id == "agent-multi")
+    assert run.steps >= 3
+
+
+def test_interactive_permission_projects_to_app_state() -> None:
+    bus = EventBus()
+    store = AppStateStore(bus)
+
+    bus.publish(
+        PERMISSION_CHECK_REQUEST,
+        {
+            "check_id": "chk-1",
+            "permissions": ["use_ai", "launch_tool"],
+            "actor_type": "agent",
+            "actor_id": "agent-x",
+            "interactive": True,
+            "summary": "Approve agent",
+        },
+        source="agent_runtime",
+    )
+
+    snap = store.snapshot
+    assert snap.pending_permission_check is not None
+    assert snap.pending_permission_check.check_id == "chk-1"
+    assert snap.permission_check_revision == 1
+
+    bus.publish(
+        PERMISSION_CHECK_RESULT,
+        {"check_id": "chk-1", "granted": True},
+        source="ui",
+    )
+    cleared = store.snapshot
+    assert cleared.pending_permission_check is None
+    assert cleared.permission_check_revision == 2
+
+
 def test_supervised_demo_projects_into_app_state() -> None:
     bus = EventBus()
     _wire_permission(bus)
+    _auto_approve_interactive(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
@@ -97,6 +186,7 @@ def test_supervised_demo_projects_into_app_state() -> None:
 def test_agent_command_routes_to_spawn_request() -> None:
     bus = EventBus()
     _wire_permission(bus)
+    _auto_approve_interactive(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
@@ -121,9 +211,8 @@ def test_agent_command_routes_to_spawn_request() -> None:
 
 def test_permission_denied_terminates_agent() -> None:
     bus = EventBus()
-    permission = PermissionService(bus)
-    permission._default_permissions["agent"] = set()
-    permission.wire_bus_handlers()
+    _wire_permission(bus)
+    _auto_approve_interactive(bus, granted=False)
     terminated: list[dict] = []
     bus.subscribe(AGENT_TERMINATED, lambda e: terminated.append(dict(e.payload)))
     AgentRuntimeService(bus).start()

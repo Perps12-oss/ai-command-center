@@ -69,6 +69,12 @@ class PermissionService:
     def _on_permission_check_request(self, event: Any) -> None:
         payload = event.payload
         check_id = str(payload.get("check_id", ""))
+        if not check_id:
+            return
+
+        if bool(payload.get("interactive")):
+            return
+
         actor_type = str(payload.get("actor_type", "agent"))
         actor_id_raw = payload.get("actor_id")
         actor_id: UUID | None = None

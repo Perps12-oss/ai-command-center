@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Callable
 
 import customtkinter as ctk
@@ -13,12 +14,45 @@ BUBBLE_RADIUS = T.BUBBLE_RADIUS
 BUBBLE_WRAP = 520
 BUBBLE_TBX_W = 540
 SIDE_PAD = 16
+_STREAM_DEBOUNCE_MS = 16
+_CURSOR_CHAR = "▌"
+_PLACEHOLDER = "●  ●  ●"
 
 # Fader palette — for non-intrusive action elements
 CLR_META = "#404060"   # timestamps, copy icon at rest
 CLR_REGEN = "#3A3A5A"   # regenerate text at rest
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class StreamTextBuffer:
+    """Pure buffer for incremental stream rendering (testable without CTk)."""
+
+    raw: str = ""
+    rendered_len: int = 0
+    pending: str = field(default="", repr=False)
+
+    def append(self, chunk: str) -> str:
+        """Append chunk; return delta not yet marked rendered."""
+        if not chunk:
+            return ""
+        self.raw += chunk
+        self.pending += chunk
+        return self.pending
+
+    def take_pending(self) -> str:
+        """Return and clear pending delta; advance rendered_len."""
+        delta = self.pending
+        self.pending = ""
+        if delta:
+            self.rendered_len = len(self.raw)
+        return delta
+
+    def reset(self, text: str = "") -> None:
+        self.raw = text
+        self.rendered_len = len(text)
+        self.pending = ""
 
 
 class CopyBtn(ctk.CTkButton):
@@ -67,6 +101,8 @@ class UserBubble(ctk.CTkFrame):
 
 
 class AssistantBubble(ctk.CTkFrame):
+    """Assistant bubble with flicker-free incremental streaming (C4)."""
+
     _BLINK_ON = 550
     _BLINK_OFF = 400
 
@@ -77,12 +113,16 @@ class AssistantBubble(ctk.CTkFrame):
             corner_radius=BUBBLE_RADIUS,
             border_width=0,
         )
-        self._raw = ""
+        self._buffer = StreamTextBuffer()
         self._live = False
         self._cur_vis = True
         self._outer = None          # will be set by ChatView
         self._timestamp = ""          # will be set by ChatView
-        self._blink_job = None        # for after() cancellation
+        self._blink_job = None
+        self._append_job = None
+        self._resize_job = None
+        self._cursor_mark = "stream_cursor"
+        self._showing_placeholder = True
 
         self._textbox = ctk.CTkTextbox(
             self,
@@ -95,7 +135,6 @@ class AssistantBubble(ctk.CTkFrame):
             height=44,
         )
         self._textbox.pack(padx=16, pady=13)
-        # Markdown tags
         self._textbox.tag_config("bold", font=(T.FONT_FAMILY, 14, "bold"))
         self._textbox.tag_config("italic", font=(T.FONT_FAMILY, 14, "italic"))
         self._textbox.tag_config(
@@ -111,55 +150,123 @@ class AssistantBubble(ctk.CTkFrame):
         )
         self._textbox.tag_config("header", font=(T.FONT_FAMILY, 16, "bold"), foreground=T.TEXT_HEADING)
         self._textbox.tag_config("list", foreground=T.TEXT_PRIMARY)
+        self._textbox.tag_config("cursor", foreground=T.ACCENT_DEFAULT)
         self._textbox.configure(state="disabled")
-        self._write("●  ●  ●")
+        self._write_placeholder()
         self._live = True
         self._blink()
 
-    def _write(self, text: str, segments: list[tuple[str, str | None]] | None = None) -> None:
+    def _write_placeholder(self) -> None:
         self._textbox.configure(state="normal")
         self._textbox.delete("1.0", "end")
-        if segments:
-            for seg, tag in segments:
-                self._textbox.insert("end", seg, tag)
-        else:
-            self._textbox.insert("1.0", text)
+        self._textbox.insert("1.0", _PLACEHOLDER)
         self._textbox.configure(state="disabled")
-        self._resize()
+        self._showing_placeholder = True
+        self._buffer.reset("")
+
+    def _clear_placeholder(self) -> None:
+        if not self._showing_placeholder:
+            return
+        self._textbox.configure(state="normal")
+        self._textbox.delete("1.0", "end")
+        self._textbox.configure(state="disabled")
+        self._showing_placeholder = False
+        self._buffer.reset("")
+
+    def _write_segments(self, segments: list[tuple[str, str | None]]) -> None:
+        self._textbox.configure(state="normal")
+        self._textbox.delete("1.0", "end")
+        for seg, tag in segments:
+            if tag:
+                self._textbox.insert("end", seg, tag)
+            else:
+                self._textbox.insert("end", seg)
+        self._textbox.configure(state="disabled")
+        self._schedule_resize()
+
+    def _schedule_resize(self) -> None:
+        if self._resize_job:
+            return
+        self._resize_job = self.after(_STREAM_DEBOUNCE_MS, self._resize)
 
     def _resize(self) -> None:
+        self._resize_job = None
         lines = int(self._textbox.index("end-1c").split(".")[0])
         h = max(40, min(lines * 20 + 20, 500))
         self._textbox.configure(height=h)
 
+    def _remove_cursor(self) -> None:
+        try:
+            end_index = self._textbox.index("end-1c")
+            if end_index == "1.0":
+                return
+            last_char = self._textbox.get("end-2c", "end-1c")
+            if last_char == _CURSOR_CHAR:
+                self._textbox.delete("end-2c", "end-1c")
+        except Exception:
+            pass
+
+    def _insert_cursor(self) -> None:
+        self._textbox.insert("end", _CURSOR_CHAR, "cursor")
+
+    def _append_incremental(self, delta: str) -> None:
+        if not delta:
+            return
+        if self._showing_placeholder:
+            self._clear_placeholder()
+        self._textbox.configure(state="normal")
+        self._remove_cursor()
+        self._textbox.insert("end", delta)
+        if self._live and self._cur_vis:
+            self._insert_cursor()
+        self._textbox.configure(state="disabled")
+        self._schedule_resize()
+
+    def _flush_append(self) -> None:
+        self._append_job = None
+        delta = self._buffer.take_pending()
+        self._append_incremental(delta)
+
     def _blink(self) -> None:
         if not self._live:
             return
-        self._write(self._raw + ("▌" if self._cur_vis else ""))
         self._cur_vis = not self._cur_vis
+        if not self._showing_placeholder:
+            self._textbox.configure(state="normal")
+            self._remove_cursor()
+            if self._cur_vis:
+                self._insert_cursor()
+            self._textbox.configure(state="disabled")
         self._blink_job = self.after(
             self._BLINK_ON if self._cur_vis else self._BLINK_OFF,
-            self._blink
+            self._blink,
         )
 
     def append_raw(self, chunk: str) -> None:
-        self._raw += chunk
-        if self._cur_vis:
-            self._write(self._raw + "▌")
+        self._buffer.append(chunk)
+        if not self._append_job:
+            self._append_job = self.after(_STREAM_DEBOUNCE_MS, self._flush_append)
 
     def finalize(self, full_text: str) -> None:
+        if self._append_job:
+            self.after_cancel(self._append_job)
+            self._append_job = None
+        if self._resize_job:
+            self.after_cancel(self._resize_job)
+            self._resize_job = None
         self._live = False
-        self._raw = full_text
-        self._write("", segments=parse_markdown(full_text))
+        self._buffer.reset(full_text)
+        self._write_segments(parse_markdown(full_text))
 
     def get_raw_text(self) -> str:
         """Expose the raw markdown content without breaking encapsulation."""
-        return self._raw
+        return self._buffer.raw
 
     def destroy(self) -> None:
-        """Cancel any pending blink callback before destroying the widget."""
-        if self._blink_job:
-            self.after_cancel(self._blink_job)
+        """Cancel pending callbacks before destroying the widget."""
+        for job in (self._blink_job, self._append_job, self._resize_job):
+            if job:
+                self.after_cancel(job)
         super().destroy()
 
 
