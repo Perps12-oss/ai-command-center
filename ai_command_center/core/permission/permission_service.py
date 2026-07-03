@@ -6,6 +6,7 @@ Permission checking and management following the frozen Permission contract.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
@@ -17,6 +18,10 @@ from ai_command_center.core.permission.permission import (
 from ai_command_center.core.event_bus import (
     EVENT_PERMISSION_CHECK,
     EVENT_PERMISSION_DENIED,
+)
+from ai_command_center.core.events.topics import (
+    PERMISSION_CHECK_REQUEST,
+    PERMISSION_CHECK_RESULT,
 )
 
 
@@ -32,6 +37,7 @@ class PermissionService:
 
     def __init__(self, event_bus: Any) -> None:
         self._event_bus = event_bus
+        self._bus_unsubscribers: list[Callable[[], None]] = []
         # Default permissions for different actor types
         self._default_permissions: dict[str, set[str]] = {
             "user": {perm.value for perm in Permission},  # Users have all permissions
@@ -40,11 +46,61 @@ class PermissionService:
                 Permission.SEARCH_ENTITY.value,
                 Permission.USE_AI.value,
                 Permission.ANALYZE_ENTITY.value,
-            },  # Agents have limited permissions by default
+                Permission.LAUNCH_TOOL.value,
+            },  # Agents have limited permissions by default (supervised demo uses LAUNCH_TOOL)
             "system": {perm.value for perm in Permission},  # System has all permissions
         }
         # Agent-specific permissions (agent_id -> set of permissions)
         self._agent_permissions: dict[UUID, set[str]] = {}
+
+    def wire_bus_handlers(self) -> None:
+        """Subscribe to permission.check.request and publish permission.check.result."""
+        if self._bus_unsubscribers:
+            return
+        self._bus_unsubscribers.append(
+            self._event_bus.subscribe(PERMISSION_CHECK_REQUEST, self._on_permission_check_request)
+        )
+
+    def unwire_bus_handlers(self) -> None:
+        for unsub in self._bus_unsubscribers:
+            unsub()
+        self._bus_unsubscribers.clear()
+
+    def _on_permission_check_request(self, event: Any) -> None:
+        payload = event.payload
+        check_id = str(payload.get("check_id", ""))
+        actor_type = str(payload.get("actor_type", "agent"))
+        actor_id_raw = payload.get("actor_id")
+        actor_id: UUID | None = None
+        if actor_id_raw:
+            try:
+                actor_id = UUID(str(actor_id_raw))
+            except ValueError:
+                actor_id = None
+
+        requested = payload.get("permissions") or [payload.get("permission", "")]
+        permissions = [str(p) for p in requested if p]
+        context = PermissionContext(
+            entity_id=None,
+            entity_type=str(payload.get("entity_type") or None),
+            action_id=None,
+            actor_type=actor_type,
+            actor_id=actor_id,
+        )
+        granted = bool(permissions) and all(
+            self.check(permission, context) for permission in permissions
+        )
+        self._event_bus.publish(
+            PERMISSION_CHECK_RESULT,
+            {
+                "check_id": check_id,
+                "granted": granted,
+                "permissions": permissions,
+                "actor_type": actor_type,
+                "actor_id": str(actor_id) if actor_id else None,
+            },
+            source="permission_service",
+        )
 
     def check(
         self,
