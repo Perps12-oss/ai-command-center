@@ -210,6 +210,6 @@ flowchart TD
 
 - [ ] Workspace canvas is default home view
 - [ ] All tracks 0–4 complete; 5–9 in flight with clear owners
-- [ ] CI enforcement Stage 3 active
+- [x] CI enforcement Stage 3 active
 - [ ] No P0 audit items open
 - [ ] 29+ pytest tests; daily driver PASS

@@ -4,7 +4,8 @@
 ucgs_version: v5
 profile: ai-command-center
 phase: "transformation"
-enforcement_mode: warn  # warn (Stage 1-2) | block (Stage 3)
+enforcement_mode: warn  # local Phase 1-2 warn; CI Phase 3 block via UCGS_ENFORCEMENT in ucgs.yml
+# Legacy debt grandfather (arch boundary ratchet): tests/arch_lint_baseline.json
 
 rules:
   large_commit:
