@@ -18,6 +18,25 @@ def test_agent_spawn_publishes_lifecycle_and_ui_command() -> None:
     bus = EventBus()
     permission = PermissionService(bus)
     permission.wire_bus_handlers()
+
+    def approve(event) -> None:
+        if event.payload.get("interactive"):
+            from ai_command_center.core.events.topics import PERMISSION_CHECK_RESULT
+
+            bus.publish(
+                PERMISSION_CHECK_RESULT,
+                {
+                    "check_id": event.payload["check_id"],
+                    "granted": True,
+                    "permissions": list(event.payload.get("permissions") or []),
+                    "actor_type": "agent",
+                    "actor_id": event.payload.get("actor_id"),
+                },
+                source="ui",
+            )
+
+    bus.subscribe(PERMISSION_CHECK_REQUEST, approve)
+
     service = AgentRuntimeService(bus)
     spawned: list[dict] = []
     commands: list[dict] = []
