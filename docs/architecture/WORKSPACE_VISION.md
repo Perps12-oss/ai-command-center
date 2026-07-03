@@ -154,4 +154,4 @@ timeline
 | `WORKFLOW_ENGINE.md` | Multi-step automation |
 | `PLATFORM_STRATEGY.md` | OS targets and packaging |
 | `CHAT_MODERNIZATION_SPEC.md` | Chat-as-tool UX |
-| `../development/TRANSFORMATION_ROADMAP.md` | Execution tracks |
+| `ARCHITECTURE_TRANSITION_PLAN.md` | Execution backlog (Programs 1–4) |

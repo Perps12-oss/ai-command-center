@@ -244,5 +244,5 @@ An R4b/R4c implementation PR is **done** when:
 ## Related documents
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — subsystem map, wildcard policy
-- [TRANSFORMATION_ROADMAP.md](../development/TRANSFORMATION_ROADMAP.md) — R4 track status
+- [ARCHITECTURE_TRANSITION_PLAN.md](ARCHITECTURE_TRANSITION_PLAN.md) — R4 async dispatch (Program 1 S1)
 - [PLATFORM_STRATEGY.md](PLATFORM_STRATEGY.md) — packaging (orthogonal)
