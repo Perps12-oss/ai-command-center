@@ -396,7 +396,7 @@ def _is_pending_chat_user_text(text: str) -> bool:
         return False
     lower = stripped.lower()
     if lower.startswith(
-        ("note:", "new note:", "remember:", "memory:", ">", "go ")
+        ("note:", "new note:", "remember:", "memory:", "agent:", ">", "go ")
     ):
         return False
     if lower in (
