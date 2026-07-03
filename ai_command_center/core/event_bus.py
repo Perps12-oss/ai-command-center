@@ -1,4 +1,10 @@
-"""Thread-safe publish/subscribe event bus."""
+"""Thread-safe publish/subscribe event bus.
+
+Handlers run synchronously on the caller thread today. Async dispatch policy,
+topic tiers, and migration phases (R4a/R4b/R4c) are defined in
+``docs/architecture/ASYNC_EVENTBUS_POLICY.md``; classification constants live
+in ``core/events/dispatch_policy.py`` (policy only — no behavior change yet).
+"""
 
 from __future__ import annotations
 

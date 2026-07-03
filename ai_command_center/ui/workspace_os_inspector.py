@@ -180,7 +180,7 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
             if resource_type and value:
                 self._entities_list.insert("end", f"  → {value}\n")
                 self._entities_list.insert("end", "  ")
-                button = ctk.CTkButton(
+                launch_btn = ctk.CTkButton(
                     self._entities_list,
                     text="Launch",
                     width=60,
@@ -190,10 +190,30 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
                         str(eid), rt, val
                     ),
                 )
-                self._entities_list.window_create("end", window=button)
+                self._entities_list.window_create("end", window=launch_btn)
+                self._entities_list.insert("end", "  ")
+                chat_btn = ctk.CTkButton(
+                    self._entities_list,
+                    text="Chat",
+                    width=60,
+                    height=20,
+                    font=T.FONT_SMALL,
+                    command=lambda e=entity: self._open_entity_chat(e),
+                )
+                self._entities_list.window_create("end", window=chat_btn)
                 self._entities_list.insert("end", "\n\n")
             else:
-                self._entities_list.insert("end", "\n")
+                self._entities_list.insert("end", "  ")
+                chat_btn = ctk.CTkButton(
+                    self._entities_list,
+                    text="Chat",
+                    width=60,
+                    height=20,
+                    font=T.FONT_SMALL,
+                    command=lambda e=entity: self._open_entity_chat(e),
+                )
+                self._entities_list.window_create("end", window=chat_btn)
+                self._entities_list.insert("end", "\n\n")
 
         self._entities_list.configure(state="disabled")
 
@@ -248,6 +268,20 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
             if e.entity_type == entity_type:
                 return e
         return None
+
+    def _open_entity_chat(self, entity) -> None:
+        meta = dict(entity.metadata)
+        description = str(meta.get("description", ""))
+        url = str(meta.get("url", ""))
+        path = str(meta.get("path", "") or meta.get("command", ""))
+        self._controller.open_chat(
+            str(entity.entity_id),
+            str(entity.entity_type),
+            str(entity.title or entity.entity_id),
+            description=description,
+            url=url,
+            path=path,
+        )
 
 
 class _CreateResourceDialog(ctk.CTkToplevel):

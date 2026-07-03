@@ -23,6 +23,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_ENABLE_REQUEST,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
+    UI_CHAT_NEW_SESSION,
     UI_COMMAND,
     UI_LAUNCH_RESOURCE,
     UI_NAVIGATE,
@@ -78,6 +79,15 @@ class UIController:
                 payload["workspace_entity_title"] = str(
                     workspace_entity.get("entity_title", "")
                 )
+                description = str(workspace_entity.get("description", "")).strip()
+                url = str(workspace_entity.get("url", "")).strip()
+                path = str(workspace_entity.get("path", "")).strip()
+                if description:
+                    payload["workspace_entity_description"] = description
+                if url:
+                    payload["workspace_entity_url"] = url
+                if path:
+                    payload["workspace_entity_path"] = path
         self._bus.publish(
             UI_COMMAND,
             payload,
@@ -138,16 +148,31 @@ class UIController:
         entity_id: str,
         entity_type: str,
         title: str,
+        *,
+        description: str = "",
+        url: str = "",
+        path: str = "",
     ) -> None:
-        self._bus.publish(
-            UI_OPEN_CHAT,
-            {
-                "entity_id": entity_id,
-                "entity_type": entity_type,
-                "title": title,
-            },
-            source="ui",
-        )
+        payload: dict[str, str] = {
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "title": title,
+        }
+        if description:
+            payload["description"] = description
+        if url:
+            payload["url"] = url
+        if path:
+            payload["path"] = path
+        self._bus.publish(UI_OPEN_CHAT, payload, source="ui")
+
+    def publish_clear_chat_entity(self) -> None:
+        """Detach workspace entity context (generic chat navigation)."""
+        self._bus.publish(UI_OPEN_CHAT, {"entity_id": ""}, source="ui")
+
+    def publish_chat_new_session(self) -> None:
+        """Start a fresh generic chat session and clear entity attach."""
+        self._bus.publish(UI_CHAT_NEW_SESSION, {}, source="ui")
 
     def publish_note_select(self, path: str) -> None:
         self._bus.publish(
