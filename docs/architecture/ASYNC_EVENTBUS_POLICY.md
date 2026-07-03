@@ -1,6 +1,6 @@
 # Async EventBus Policy & Design (R4)
 
-**Status:** Design complete — implementation deferred  
+**Status:** R4b implemented (optional dispatch queue); R4c deferred  
 **Authority:** Subordinate to [PROJECT_CONSTITUTION_V4.md](../../PROJECT_CONSTITUTION_V4.md)  
 **Runtime reference:** `ai_command_center/core/event_bus.py`  
 **Topic registry:** `ai_command_center/core/events/topics.py`  
@@ -153,11 +153,12 @@ Sync services remain sync; the bridge is **opt-in per service**, not a global as
 
 ### R4b — Optional central dispatch queue
 
-- Introduce `DispatchQueue` + `event-dispatch` daemon thread
-- `publish()` enqueues `Event`; default mode remains sync for `SYNC_*` topics
-- Feature flag: `EventBus(async_dispatch=True)` or settings key
-- `EventBus.dispatch(event)` already re-enters publish — reuse for queue consumer
-- Verification: `verify_phase4a` still passes; publish latency p99 < 1 ms for UI intent topics
+- [x] `DispatchQueue` + `event-dispatch` daemon thread
+- [x] `publish()` enqueues `Event` for `ASYNC_ELIGIBLE` topics when flag enabled
+- [x] Feature flag: `EventBus(async_dispatch=True)` or env `EVENTBUS_DISPATCH_QUEUE=1` (default **off**)
+- [x] `EventBus.dispatch(event)` re-enters tier-aware dispatch
+- [x] Tests: `tests/test_eventbus_dispatch_queue.py`
+- [ ] Verification: `verify_phase4a` still passes; publish latency p99 < 1 ms for UI intent topics
 
 ### R4c — Full async adapters
 

@@ -8,14 +8,15 @@ Platform build stubs for Windows P0. Full design: [docs/architecture/PACKAGING_M
 - Python 3.11+ with project dev dependencies
 - `pip install pyinstaller` (not yet in pyproject optional deps — add in P0 build PR)
 
-## P0 — PyInstaller one-folder (stub)
+## P0 — PyInstaller one-folder
 
 ```powershell
-cd $env:USERPROFILE\Documents\GITHUB\ai-command-center
-pip install -e ".[dev]"
-pyinstaller packaging/windows/ai_command_center.spec --noconfirm
+pip install -r requirements.txt -r requirements-test.txt pyinstaller
+python scripts/build_windows.py
 # Output: dist/AICommandCenter/AICommandCenter.exe
 ```
+
+CI: `.github/workflows/package-windows-smoke.yml` (unsigned artifact upload).
 
 ## P0 — MSI via WiX (not implemented)
 

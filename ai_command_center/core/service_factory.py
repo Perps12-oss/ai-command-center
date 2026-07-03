@@ -116,6 +116,7 @@ def build_services(
     agent_runtime = AgentRuntimeService(bus)
     workflow_engine = WorkflowEngineService(bus)
     permission_service = PermissionService(bus)
+    # PermissionService is not a BaseService; factory owns bus handler lifecycle.
     permission_service.wire_bus_handlers()
 
     for svc in (

@@ -86,9 +86,15 @@ class PermissionService:
 
         requested = payload.get("permissions") or [payload.get("permission", "")]
         permissions = [str(p) for p in requested if p]
+        entity_type_raw = payload.get("entity_type")
+        entity_type = (
+            str(entity_type_raw)
+            if entity_type_raw not in (None, "")
+            else None
+        )
         context = PermissionContext(
             entity_id=None,
-            entity_type=str(payload.get("entity_type") or None),
+            entity_type=entity_type,
             action_id=None,
             actor_type=actor_type,
             actor_id=actor_id,
@@ -117,17 +123,18 @@ class PermissionService:
         if not validate_permission(permission):
             raise ValueError(f"Invalid permission: {permission}")
         
-        # Publish check event
+        check_payload: dict[str, Any] = {
+            "permission": permission,
+            "entity_id": str(context.entity_id) if context.entity_id else None,
+            "action_id": str(context.action_id) if context.action_id else None,
+            "actor_type": context.actor_type,
+            "actor_id": str(context.actor_id) if context.actor_id else None,
+        }
+        if context.entity_type:
+            check_payload["entity_type"] = context.entity_type
         self._event_bus.publish(
             EVENT_PERMISSION_CHECK,
-            {
-                "permission": permission,
-                "entity_id": str(context.entity_id) if context.entity_id else None,
-                "entity_type": context.entity_type,
-                "action_id": str(context.action_id) if context.action_id else None,
-                "actor_type": context.actor_type,
-                "actor_id": str(context.actor_id) if context.actor_id else None,
-            },
+            check_payload,
             source="permission_service",
         )
         
