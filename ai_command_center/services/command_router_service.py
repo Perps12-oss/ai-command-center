@@ -128,6 +128,8 @@ class CommandRouterService(BaseService):
             body = stripped[7:].strip().lower()
             if body in {"", "demo", "multi", "multi-demo"}:
                 return INTENT_AGENT, {"task": "multi-demo", "spawn_mode": "multi"}
+            if body in {"pipeline demo", "pipeline", "pipeline-demo"}:
+                return INTENT_AGENT, {"task": "pipeline-demo", "spawn_mode": "pipeline"}
             return INTENT_AGENT, {"task": body, "spawn_mode": "multi"}
         if lower.startswith("agent:"):
             return INTENT_AGENT, {"task": text[6:].strip() or "demo", "spawn_mode": "single"}

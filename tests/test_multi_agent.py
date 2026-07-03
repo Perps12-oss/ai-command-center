@@ -161,6 +161,11 @@ def test_command_router_classifies_spawn_and_multi_intents() -> None:
     assert routed[1]["args"]["spawn_mode"] == "multi"
     assert routed[1]["args"]["task"] == "multi-demo"
 
+    bus.publish(UI_COMMAND, {"text": "agents: pipeline demo"}, source="ui")
+    assert routed[2]["intent"] == INTENT_AGENT
+    assert routed[2]["args"]["spawn_mode"] == "pipeline"
+    assert routed[2]["args"]["task"] == "pipeline-demo"
+
 
 def test_agent_termination_does_not_affect_sibling_active_state() -> None:
     bus = EventBus()
