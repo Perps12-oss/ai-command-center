@@ -26,6 +26,8 @@ from ai_command_center.core.events.topics import (
     AGENT_TERMINATED,
     APP_ERROR,
     APP_PHASE,
+    PERMISSION_CHECK_REQUEST,
+    PERMISSION_CHECK_RESULT,
     CHAT_CANCELLED,
     CHAT_CHUNK,
     CHAT_COMPLETE,
@@ -105,6 +107,8 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKFLOW_STEP_COMPLETED,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
+    PERMISSION_CHECK_REQUEST,
+    PERMISSION_CHECK_RESULT,
 )
 
 
@@ -189,6 +193,18 @@ class AgentRunItem:
 
 
 @dataclass(frozen=True, slots=True)
+class PermissionCheckItem:
+    """Pending interactive permission check surfaced to the UI."""
+
+    check_id: str = ""
+    permissions: tuple[str, ...] = ()
+    actor_type: str = "agent"
+    actor_id: str = ""
+    summary: str = ""
+    interactive: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class WorkflowRunItem:
     """Projection of a workflow run for UI rendering."""
 
@@ -253,6 +269,8 @@ class AppState:
     workflow_runs: tuple[WorkflowRunItem, ...] = ()
     active_agent_run_id: str = ""
     active_workflow_run_id: str = ""
+    pending_permission_check: PermissionCheckItem | None = None
+    permission_check_revision: int = 0
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1088,6 +1106,48 @@ def _reduce_workflow_run(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_permission_check(state: AppState, event: Event) -> AppState:
+    """Project interactive permission checks for UI approval flow."""
+    if event.topic == PERMISSION_CHECK_REQUEST:
+        payload = event.payload
+        if not payload.get("interactive"):
+            return state
+        check_id = str(payload.get("check_id", ""))
+        if not check_id:
+            return state
+        perms = tuple(str(p) for p in (payload.get("permissions") or []) if p)
+        item = PermissionCheckItem(
+            check_id=check_id,
+            permissions=perms,
+            actor_type=str(payload.get("actor_type", "agent")),
+            actor_id=str(payload.get("actor_id") or ""),
+            summary=str(payload.get("summary") or "An agent requested supervised permissions."),
+            interactive=True,
+        )
+        return replace(
+            state,
+            pending_permission_check=item,
+            permission_check_revision=state.permission_check_revision + 1,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    if event.topic == PERMISSION_CHECK_RESULT:
+        result_id = str(event.payload.get("check_id", ""))
+        pending = state.pending_permission_check
+        if pending is None or pending.check_id != result_id:
+            return state
+        return replace(
+            state,
+            pending_permission_check=None,
+            permission_check_revision=state.permission_check_revision + 1,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+
+    return state
+
+
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
     _reduce_settings_changed,
@@ -1117,6 +1177,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_plugin_state_changed,
     _reduce_agent_run,
     _reduce_workflow_run,
+    _reduce_permission_check,
 )
 
 

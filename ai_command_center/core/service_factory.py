@@ -115,6 +115,8 @@ def build_services(
     model_router = ModelRouterService(bus)
     agent_runtime = AgentRuntimeService(bus)
     workflow_engine = WorkflowEngineService(bus)
+    permission_service = PermissionService(bus)
+    permission_service.wire_bus_handlers()
 
     for svc in (
         telemetry,
@@ -150,7 +152,6 @@ def build_services(
         workspace_service = WorkspaceService(entity_service, bus)
         action_registry = ActionRegistry(bus)
         timeline_service = TimelineService(timeline_repo, bus)
-        permission_service = PermissionService(bus)
         observability_service = ObservabilityService(bus)
         snapshot_service = SnapshotService(db, bus)
         feature_registry = FeatureRegistry()

@@ -34,6 +34,7 @@ _logger = logging.getLogger(__name__)
 
 _DEMO_TASKS = frozenset({"demo", "supervised demo", "supervised-agent-demo"})
 _DEMO_TOOL_COMMAND = "echo supervised-agent-demo-ok"
+_MAX_DEMO_TOOLS = 3
 
 
 class AgentRuntimeService(BaseService):
@@ -96,13 +97,17 @@ class AgentRuntimeService(BaseService):
         return normalized.startswith("demo:")
 
     @staticmethod
-    def _demo_tool_command(task: str) -> str:
+    def _demo_tool_commands(task: str) -> list[str]:
         normalized = task.strip()
         if normalized.lower().startswith("demo:"):
-            command = normalized[5:].strip()
-            if command:
-                return command
-        return _DEMO_TOOL_COMMAND
+            body = normalized[5:].strip()
+            if not body:
+                return [_DEMO_TOOL_COMMAND]
+            if ";" in body:
+                parts = [part.strip() for part in body.split(";") if part.strip()]
+                return parts[:_MAX_DEMO_TOOLS]
+            return [body]
+        return [_DEMO_TOOL_COMMAND]
 
     def _on_command_routed(self, event: Event) -> None:
         if event.source != "command_router":
@@ -145,12 +150,14 @@ class AgentRuntimeService(BaseService):
                 "permissions": permissions,
                 "actor_type": "agent",
                 "actor_id": agent_id,
+                "interactive": True,
+                "summary": f"Agent spawn requires: {', '.join(permissions)}",
             },
             source=self.name,
         )
 
     def _on_permission_result(self, event: Event) -> None:
-        if event.source != "permission_service":
+        if event.source not in {"permission_service", "ui"}:
             return
         check_id = str(event.payload.get("check_id", ""))
         pending = self._pending_spawns.pop(check_id, None)
@@ -187,6 +194,8 @@ class AgentRuntimeService(BaseService):
             "steps": 0,
             "state": AgentState.RUNNING.value,
             "demo_mode": demo_mode,
+            "demo_commands": self._demo_tool_commands(task) if demo_mode else [],
+            "demo_index": 0,
         }
         self._bus.publish(
             AGENT_SPAWNED,
@@ -213,19 +222,31 @@ class AgentRuntimeService(BaseService):
             )
 
     def _run_demo_tool(self, agent_id: str, request_id: str, task: str) -> None:
+        entry = self._active.get(agent_id)
+        if entry is None:
+            return
+        commands = list(entry.get("demo_commands") or self._demo_tool_commands(task))
+        if not commands:
+            commands = [_DEMO_TOOL_COMMAND]
+        entry["demo_commands"] = commands
+        entry["demo_index"] = 0
+        self._invoke_demo_tool(agent_id, request_id, commands[0])
+
+    def _invoke_demo_tool(self, agent_id: str, request_id: str, command: str) -> None:
         invoke_id = uuid.uuid4().hex
-        command = self._demo_tool_command(task)
         entry = self._active.get(agent_id)
         if entry is None:
             return
         entry["invoke_id"] = invoke_id
         entry["state"] = AgentState.WAITING.value
+        demo_index = int(entry.get("demo_index", 0))
         self._bus.publish(
             AGENT_TASK_REQUEST,
             {
                 "agent_id": agent_id,
                 "request_id": request_id,
                 "task": f"tool:{command}",
+                "steps": demo_index + 1,
             },
             source=self.name,
         )
@@ -254,16 +275,28 @@ class AgentRuntimeService(BaseService):
                 error = str(event.payload.get("error") or "tool failed")
                 self._terminate(agent_id, error=error)
                 return
+
+            output = str(event.payload.get("output", ""))
             self._bus.publish(
                 AGENT_TASK_COMPLETE,
                 {
                     "agent_id": agent_id,
                     "request_id": request_id,
                     "status": "complete",
-                    "output": str(event.payload.get("output", "")),
+                    "output": output,
                 },
                 source=self.name,
             )
+
+            if entry.get("demo_mode"):
+                commands = list(entry.get("demo_commands") or [])
+                next_index = int(entry.get("demo_index", 0)) + 1
+                if next_index < len(commands) and next_index < _MAX_DEMO_TOOLS:
+                    entry["demo_index"] = next_index
+                    entry["steps"] = int(entry.get("steps", 0)) + 1
+                    self._invoke_demo_tool(agent_id, request_id, commands[next_index])
+                    return
+
             self._terminate(agent_id)
             break
 

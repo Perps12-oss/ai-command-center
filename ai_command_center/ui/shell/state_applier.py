@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai_command_center.platform.secret_store import openai_api_key_configured
+from ai_command_center.ui.components.permission_dialog import PermissionDialog
 from ai_command_center.ui.design_system import theme_manager
 
 
@@ -12,8 +13,40 @@ class StateApplierMixin:
     def _queue_state_refresh(self) -> None:
         self._ui_queue.enqueue(self._apply_state)
 
+    def _maybe_show_permission_dialog(self, snap) -> None:
+        pending = getattr(snap, "pending_permission_check", None)
+        if pending is None:
+            self._shown_permission_check_id = None
+            return
+        if not pending.interactive:
+            return
+        shown_id = getattr(self, "_shown_permission_check_id", None)
+        if shown_id == pending.check_id:
+            return
+        self._shown_permission_check_id = pending.check_id
+
+        def on_result(granted: bool) -> None:
+            self._controller.publish_permission_result(
+                check_id=pending.check_id,
+                granted=granted,
+                permissions=list(pending.permissions),
+                actor_type=pending.actor_type,
+                actor_id=pending.actor_id,
+            )
+
+        PermissionDialog(
+            self,
+            check_id=pending.check_id,
+            permissions=list(pending.permissions),
+            actor_type=pending.actor_type,
+            actor_id=pending.actor_id,
+            summary=pending.summary,
+            on_result=on_result,
+        )
+
     def _apply_state(self) -> None:
         snap = self._controller.snapshot()
+        self._maybe_show_permission_dialog(snap)
         extra = dict(snap.system_snapshot.extra)
         openai_online = bool(extra.get("openai_online", False))
         openai_configured = openai_api_key_configured(snap.settings.openai_api_key)
