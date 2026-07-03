@@ -6,6 +6,7 @@ on:
     paths:
       - "packaging/**"
       - "scripts/build_windows.py"
+      - "scripts/build_msi.ps1"
       - "ai_command_center/platform/runtime_paths.py"
       - "main.py"
       - "requirements.txt"

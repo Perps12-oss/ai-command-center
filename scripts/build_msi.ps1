@@ -41,7 +41,7 @@ $repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $distDir = Join-Path $repo "dist\AICommandCenter"
 $exe = Join-Path $distDir "AICommandCenter.exe"
 $wixOut = Join-Path $repo "build\wix"
-$harvestWxs = Join-Path $repo "packaging\windows\AppHarvest.wxs"
+$harvestWxs = Join-Path $wixOut "AppHarvest.wxs"
 $productWxs = Join-Path $repo "packaging\windows\Product.wxs"
 $msiOut = Join-Path $repo "dist\AICommandCenter.msi"
 
@@ -72,12 +72,13 @@ Write-Host "Harvesting $distDir ..."
 
 Write-Host "Compiling WiX sources ..."
 & $candle `
-    -dSourceDir=$distDir `
-    -out $wixOut\ `
+    "-dSourceDir=$distDir" `
+    -out "$wixOut\" `
     $productWxs $harvestWxs
 
 Write-Host "Linking MSI ..."
 & $light `
+    "-b$distDir" `
     -out $msiOut `
     -ext WixUIExtension `
     (Join-Path $wixOut "Product.wixobj") `
