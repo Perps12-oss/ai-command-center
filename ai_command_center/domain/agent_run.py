@@ -25,3 +25,5 @@ class AgentRunSnapshot:
     error: str = ""
     steps: int = 0
     workspace_id: str = ""
+    workspace_entity_id: str = ""
+    spawn_role: str = ""

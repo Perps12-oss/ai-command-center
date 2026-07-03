@@ -190,6 +190,8 @@ class AgentRunItem:
     error: str = ""
     steps: int = 0
     workspace_id: str = ""
+    workspace_entity_id: str = ""
+    spawn_role: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,6 +270,7 @@ class AppState:
     agent_runs: tuple[AgentRunItem, ...] = ()
     workflow_runs: tuple[WorkflowRunItem, ...] = ()
     active_agent_run_id: str = ""
+    active_agent_run_ids: tuple[str, ...] = ()
     active_workflow_run_id: str = ""
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
@@ -396,7 +399,7 @@ def _is_pending_chat_user_text(text: str) -> bool:
         return False
     lower = stripped.lower()
     if lower.startswith(
-        ("note:", "new note:", "remember:", "memory:", ">", "go ")
+        ("note:", "new note:", "remember:", "memory:", "agent:", ">", "go ")
     ):
         return False
     if lower in (
@@ -939,6 +942,16 @@ def _upsert_workflow_run(
     return updated
 
 
+def _add_active_agent_id(active_ids: tuple[str, ...], agent_id: str) -> tuple[str, ...]:
+    if not agent_id or agent_id in active_ids:
+        return active_ids
+    return (agent_id,) + active_ids
+
+
+def _remove_active_agent_id(active_ids: tuple[str, ...], agent_id: str) -> tuple[str, ...]:
+    return tuple(item for item in active_ids if item != agent_id)
+
+
 def _reduce_agent_run(state: AppState, event: Event) -> AppState:
     """Project agent lifecycle events into agent_runs feed."""
     if event.topic not in {
@@ -961,6 +974,11 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
     workspace_id = str(
         payload.get("workspace_id") or (existing.workspace_id if existing else "")
     )
+    workspace_entity_id = str(
+        payload.get("workspace_entity_id")
+        or (existing.workspace_entity_id if existing else "")
+    )
+    spawn_role = str(payload.get("spawn_role") or (existing.spawn_role if existing else ""))
     if event.topic == AGENT_TERMINATED:
         error = str(payload.get("error", ""))
     else:
@@ -974,11 +992,15 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
             state=run_state,
             task=task,
             workspace_id=workspace_id,
+            workspace_entity_id=workspace_entity_id,
+            spawn_role=spawn_role,
         )
+        active_ids = _add_active_agent_id(state.active_agent_run_ids, agent_id)
         return replace(
             state,
             agent_runs=_upsert_agent_run(state.agent_runs, item),
             active_agent_run_id=agent_id,
+            active_agent_run_ids=active_ids,
             last_event_topic=event.topic,
             last_event_source=event.source,
         )
@@ -1004,15 +1026,21 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
         error=error,
         steps=steps if steps else existing.steps,
         workspace_id=workspace_id or existing.workspace_id,
+        workspace_entity_id=workspace_entity_id or existing.workspace_entity_id,
+        spawn_role=spawn_role or existing.spawn_role,
     )
     active_id = state.active_agent_run_id
-    if event.topic == AGENT_TERMINATED and active_id == agent_id:
-        active_id = ""
+    active_ids = state.active_agent_run_ids
+    if event.topic == AGENT_TERMINATED:
+        active_ids = _remove_active_agent_id(active_ids, agent_id)
+        if active_id == agent_id:
+            active_id = active_ids[0] if active_ids else ""
 
     return replace(
         state,
         agent_runs=_upsert_agent_run(state.agent_runs, item),
         active_agent_run_id=active_id,
+        active_agent_run_ids=active_ids,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
