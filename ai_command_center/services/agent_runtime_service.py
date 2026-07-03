@@ -10,6 +10,10 @@ from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     AGENT_CANCEL_REQUEST,
+    AGENT_PIPELINE_COMPLETE,
+    AGENT_PIPELINE_PLANNED,
+    AGENT_PIPELINE_STAGE,
+    AGENT_PIPELINE_STARTED,
     AGENT_SPAWNED,
     AGENT_SPAWN_REQUEST,
     AGENT_TASK_COMPLETE,
@@ -39,6 +43,7 @@ _MULTI_DEMO_ROLES: tuple[tuple[str, str], ...] = (
     ("research", "demo: echo research-agent-ok"),
     ("review", "demo: echo review-agent-ok"),
 )
+_PIPELINE_DEMO_STAGES: tuple[tuple[str, str], ...] = _MULTI_DEMO_ROLES
 _SPAWN_ROLE_TASKS: dict[str, str] = {
     "research": "demo: echo research-agent-ok",
     "review": "demo: echo review-agent-ok",
@@ -56,6 +61,7 @@ class AgentRuntimeService(BaseService):
         self._unsubscribers: list[Callable[[], None]] = []
         self._active: dict[str, dict[str, object]] = {}
         self._pending_spawns: dict[str, dict[str, object]] = {}
+        self._pipelines: dict[str, dict[str, object]] = {}
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
@@ -89,6 +95,7 @@ class AgentRuntimeService(BaseService):
         self._unsubscribers.clear()
         self._active.clear()
         self._pending_spawns.clear()
+        self._pipelines.clear()
 
     def _telemetry(self, name: str, payload: dict[str, object]) -> None:
         self._bus.publish(
@@ -132,6 +139,13 @@ class AgentRuntimeService(BaseService):
             return normalized in {"", "multi-demo", "multi", "demo"}
         return normalized in {"multi-demo", "multi agent demo", "multi-agent demo"}
 
+    @staticmethod
+    def _is_pipeline_demo_task(task: str, spawn_mode: str = "") -> bool:
+        normalized = task.strip().lower()
+        if spawn_mode == "pipeline":
+            return normalized in {"", "pipeline-demo", "pipeline demo", "demo", "pipeline"}
+        return normalized in {"pipeline-demo", "pipeline demo", "agents pipeline demo"}
+
     def _on_command_routed(self, event: Event) -> None:
         if event.source != "command_router":
             return
@@ -143,6 +157,9 @@ class AgentRuntimeService(BaseService):
         request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
         workspace_id = args.get("workspace_id")
         workspace_entity_id = args.get("workspace_entity_id")
+        if self._is_pipeline_demo_task(task, spawn_mode):
+            self._start_pipeline_demo(request_id, workspace_id, workspace_entity_id)
+            return
         if self._is_multi_demo_task(task, spawn_mode):
             self._publish_multi_spawn(request_id, workspace_id, workspace_entity_id)
             return
@@ -161,8 +178,115 @@ class AgentRuntimeService(BaseService):
                 "spawn_role": spawn_role,
                 **({"agent_id": agent_id} if agent_id else {}),
             },
+                source=self.name,
+            )
+
+    def _start_pipeline_demo(
+        self,
+        request_id: str,
+        workspace_id: object,
+        workspace_entity_id: object,
+    ) -> None:
+        pipeline_id = f"pipeline-{uuid.uuid4().hex[:10]}"
+        stages = list(_PIPELINE_DEMO_STAGES)
+        planned_tools = [f"shell: {task.split(':', 1)[-1].strip()}" for _, task in stages]
+        self._pipelines[pipeline_id] = {
+            "request_id": request_id,
+            "workspace_id": workspace_id,
+            "workspace_entity_id": workspace_entity_id,
+            "stage_index": 0,
+            "stages": stages,
+            "current_agent_id": "",
+        }
+        self._bus.publish(
+            AGENT_PIPELINE_STARTED,
+            {
+                "pipeline_id": pipeline_id,
+                "request_id": request_id,
+                "stage": stages[0][0],
+                "total_stages": len(stages),
+                "workspace_id": workspace_id,
+            },
             source=self.name,
         )
+        self._publish_pipeline_plan(pipeline_id, stages[0][0], [planned_tools[0]])
+        self._publish_pipeline_stage(pipeline_id, stages[0][0], index=0)
+        self._spawn_pipeline_stage(pipeline_id, index=0)
+
+    def _publish_pipeline_plan(
+        self, pipeline_id: str, stage: str, planned_tools: list[str]
+    ) -> None:
+        self._bus.publish(
+            AGENT_PIPELINE_PLANNED,
+            {
+                "pipeline_id": pipeline_id,
+                "stage": stage,
+                "planned_tools": planned_tools,
+                "planner": "stub",
+            },
+            source=self.name,
+        )
+
+    def _publish_pipeline_stage(
+        self, pipeline_id: str, stage: str, *, index: int
+    ) -> None:
+        self._bus.publish(
+            AGENT_PIPELINE_STAGE,
+            {"pipeline_id": pipeline_id, "stage": stage, "index": index},
+            source=self.name,
+        )
+
+    def _spawn_pipeline_stage(self, pipeline_id: str, *, index: int) -> None:
+        pipeline = self._pipelines.get(pipeline_id)
+        if pipeline is None:
+            return
+        stages = list(pipeline.get("stages") or [])
+        if index >= len(stages):
+            return
+        role, role_task = stages[index]
+        agent_id = f"{role}-{uuid.uuid4().hex[:8]}"
+        pipeline["current_agent_id"] = agent_id
+        pipeline["stage_index"] = index
+        self._bus.publish(
+            AGENT_SPAWN_REQUEST,
+            {
+                "agent_id": agent_id,
+                "task": role_task,
+                "request_id": f"{pipeline.get('request_id', pipeline_id)}-{role}",
+                "workspace_id": pipeline.get("workspace_id"),
+                "workspace_entity_id": pipeline.get("workspace_entity_id"),
+                "spawn_role": role,
+                "pipeline_id": pipeline_id,
+                "pipeline_stage_index": index,
+            },
+            source=self.name,
+        )
+
+    def _advance_pipeline(self, pipeline_id: str, completed_agent_id: str) -> None:
+        pipeline = self._pipelines.get(pipeline_id)
+        if pipeline is None:
+            return
+        if str(pipeline.get("current_agent_id", "")) != completed_agent_id:
+            return
+        stages = list(pipeline.get("stages") or [])
+        next_index = int(pipeline.get("stage_index", 0)) + 1
+        if next_index >= len(stages):
+            self._bus.publish(
+                AGENT_PIPELINE_COMPLETE,
+                {
+                    "pipeline_id": pipeline_id,
+                    "request_id": pipeline.get("request_id", ""),
+                    "status": "complete",
+                },
+                source=self.name,
+            )
+            self._pipelines.pop(pipeline_id, None)
+            return
+        role, role_task = stages[next_index]
+        planned = [f"shell: {role_task.split(':', 1)[-1].strip()}"]
+        self._publish_pipeline_plan(pipeline_id, role, planned)
+        self._publish_pipeline_stage(pipeline_id, role, index=next_index)
+        self._spawn_pipeline_stage(pipeline_id, index=next_index)
 
     def _publish_multi_spawn(
         self,
@@ -191,6 +315,7 @@ class AgentRuntimeService(BaseService):
         workspace_id = event.payload.get("workspace_id")
         workspace_entity_id = event.payload.get("workspace_entity_id")
         spawn_role = str(event.payload.get("spawn_role", "")).strip()
+        pipeline_id = str(event.payload.get("pipeline_id", "")).strip()
         task = str(event.payload.get("task", "")).strip()
         task = self._resolve_spawn_task(task, spawn_role=spawn_role)
         check_id = uuid.uuid4().hex
@@ -204,6 +329,7 @@ class AgentRuntimeService(BaseService):
             "workspace_entity_id": workspace_entity_id,
             "spawn_role": spawn_role,
             "task": task,
+            "pipeline_id": pipeline_id,
         }
         self._bus.publish(
             PERMISSION_CHECK_REQUEST,
@@ -263,6 +389,7 @@ class AgentRuntimeService(BaseService):
             "workspace_id": workspace_id,
             "workspace_entity_id": workspace_entity_id,
             "spawn_role": spawn_role,
+            "pipeline_id": str(pending.get("pipeline_id", "")).strip(),
         }
         spawned_payload: dict[str, object] = {
             "agent_id": agent_id,
@@ -369,6 +496,10 @@ class AgentRuntimeService(BaseService):
                     entry["steps"] = int(entry.get("steps", 0)) + 1
                     self._invoke_demo_tool(agent_id, request_id, commands[next_index])
                     return
+
+            pipeline_id = str(entry.get("pipeline_id", "")).strip()
+            if pipeline_id:
+                self._advance_pipeline(pipeline_id, agent_id)
 
             self._terminate(agent_id)
             break
