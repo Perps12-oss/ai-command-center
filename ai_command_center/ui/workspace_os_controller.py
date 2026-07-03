@@ -72,16 +72,28 @@ class WorkspaceOsUIController:
             source="ui",
         )
 
-    def open_chat(self, entity_id: str, entity_type: str, title: str) -> None:
-        self._bus.publish(
-            UI_OPEN_CHAT,
-            {
-                "entity_id": entity_id,
-                "entity_type": entity_type,
-                "title": title,
-            },
-            source="ui",
-        )
+    def open_chat(
+        self,
+        entity_id: str,
+        entity_type: str,
+        title: str,
+        *,
+        description: str = "",
+        url: str = "",
+        path: str = "",
+    ) -> None:
+        payload: dict[str, str] = {
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "title": title,
+        }
+        if description:
+            payload["description"] = description
+        if url:
+            payload["url"] = url
+        if path:
+            payload["path"] = path
+        self._bus.publish(UI_OPEN_CHAT, payload, source="ui")
 
     def search(self, query: str) -> None:
         self._bus.publish(

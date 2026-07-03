@@ -353,6 +353,14 @@ class WorkspaceView(ctk.CTkFrame):
                 "entity_type": entity.entity_type,
                 "title": entity.title or entity.entity_id,
             }
+            if meta.get("description"):
+                chat_payload["description"] = str(meta["description"])
+            if meta.get("url"):
+                chat_payload["url"] = str(meta["url"])
+            elif meta.get("path"):
+                chat_payload["path"] = str(meta["path"])
+            elif meta.get("command"):
+                chat_payload["path"] = str(meta["command"])
 
             def _chat_handler(p: dict = chat_payload) -> None:
                 self._on_open_chat(p)
