@@ -44,6 +44,9 @@ jobs:
       - name: Ruff check
         run: python -m ruff check ai_command_center
 
+      - name: Ruff F821 (undefined names)
+        run: python -m ruff check ai_command_center --select F821
+
       - name: Pytest
         run: python -m pytest tests -q
 

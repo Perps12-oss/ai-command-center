@@ -29,7 +29,12 @@ def main():
     if gate.returncode != 0:
         print("Commit blocked by UCGS architecture rules")
         return 1
-    print("UCGS passed")
+    print("Running architecture boundary lint...")
+    arch = run([PYTHON, "scripts/arch_lint.py", "--baseline", "tests/arch_lint_baseline.json"])
+    if arch.returncode != 0:
+        print("Commit blocked by architecture boundary lint (UI/service imports)")
+        return 1
+    print("UCGS and arch lint passed")
     return 0
 
 if __name__ == "__main__":
