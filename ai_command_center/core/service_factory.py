@@ -102,8 +102,13 @@ def build_services(
     openai = OpenAIHttpService(bus)
 
     # ── core services ─────────────────────────────────────────────────────────
+    permission_service = PermissionService(bus)
+    permission_service.wire_bus_handlers()
+
     tool_registry = ToolRegistryService(bus, registry=shared_tool_registry)
-    tool_executor = ToolExecutorService(bus, shared_tool_registry)
+    tool_executor = ToolExecutorService(
+        bus, shared_tool_registry, permission_service=permission_service
+    )
     obsidian = ObsidianService(bus, note_repo)
     memory_graph = MemoryGraphService(bus, memory_repo)
     session = SessionService(bus, conv_repo)
@@ -112,12 +117,10 @@ def build_services(
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
 
-    model_router = ModelRouterService(bus)
+    model_router = ModelRouterService(bus, provider_registry)
     agent_runtime = AgentRuntimeService(bus)
     workflow_engine = WorkflowEngineService(bus)
-    permission_service = PermissionService(bus)
-    # PermissionService is not a BaseService; factory owns bus handler lifecycle.
-    permission_service.wire_bus_handlers()
+    # PermissionService wired above with tool_executor.
 
     for svc in (
         telemetry,

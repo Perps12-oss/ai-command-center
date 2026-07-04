@@ -13,6 +13,7 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SNAPSHOT,
 )
 from ai_command_center.platform.model_registry import classify_model
+from ai_command_center.providers.provider_registry import ProviderRegistry
 from ai_command_center.services.base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -21,8 +22,11 @@ logger = logging.getLogger(__name__)
 class ModelRouterService(BaseService):
     name = "model_router"
 
-    def __init__(self, bus) -> None:
+    def __init__(self, bus, provider_registry: ProviderRegistry | None = None) -> None:
         super().__init__(bus)
+        from ai_command_center.providers.provider_registry import build_default_registry
+
+        self._registry = provider_registry or build_default_registry()
         self._default_model = "llama3.2:3b"
         self._summarize_model = "llama3.2:3b"
         self._provider = "ollama"
@@ -55,15 +59,19 @@ class ModelRouterService(BaseService):
     def _on_resolve_request(self, event: Event) -> None:
         intent = str(event.payload.get("intent", "chat"))
         query = str(event.payload.get("query", ""))
-        model = self.resolve(intent=intent, query=query)
+        model, provider = self.resolve(intent=intent, query=query)
         self._bus.publish(
             MODEL_RESOLVE_RESULT,
-            {"request_id": event.payload.get("request_id", ""), "model": model},
+            {
+                "request_id": event.payload.get("request_id", ""),
+                "model": model,
+                "provider": provider,
+            },
             source=self.name,
         )
 
-    def resolve(self, *, intent: str, query: str) -> str:
-        """Pick model for a chat request; settings default_model always wins as base."""
+    def resolve(self, *, intent: str, query: str) -> tuple[str, str]:
+        """Pick (model, provider) for a chat request via ProviderRegistry."""
         lower = query.lower()
         if intent == "chat" and any(
             token in lower for token in ("summarize", "summary", "tl;dr", "tldr")
@@ -73,16 +81,26 @@ class ModelRouterService(BaseService):
         else:
             model = self._default_model
             reason = "default"
-        logger.info("model.resolve intent=%s model=%s reason=%s", intent, model, reason)
+        provider = (
+            self._registry.resolve_for_model(model, provider=self._provider)
+            or self._provider
+        )
+        logger.info(
+            "model.resolve intent=%s model=%s provider=%s reason=%s",
+            intent,
+            model,
+            provider,
+            reason,
+        )
         self._bus.publish(
             MODEL_SELECTED,
             {
                 "model": model,
                 "intent": intent,
                 "reason": reason,
-                "provider": self._provider,
+                "provider": provider,
                 "tier": classify_model(model).value,
             },
             source=self.name,
         )
-        return model
+        return model, provider

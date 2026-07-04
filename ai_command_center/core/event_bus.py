@@ -42,10 +42,6 @@ logger = logging.getLogger(__name__)
 WILDCARD_TOPIC = "*"
 DISPATCH_QUEUE_ENV = "EVENTBUS_DISPATCH_QUEUE"
 
-EVENT_ENTITY_CREATED = "entity.created"
-EVENT_ENTITY_UPDATED = "entity.updated"
-EVENT_ENTITY_DELETED = "entity.deleted"
-EVENT_ENTITY_RELATIONSHIPS_CHANGED = "entity.relationships.changed"
 EVENT_RELATIONSHIP_CREATED = "relationship.created"
 EVENT_RELATIONSHIP_DELETED = "relationship.deleted"
 EVENT_RELATIONSHIP_QUERY_REQUEST = "relationship.query.request"
@@ -148,6 +144,8 @@ class EventBus:
         self._dropped_events = 0
         self._handler_duration_total_ms = 0.0
         self._handler_duration_count = 0
+        self._topic_publish_counts: dict[str, int] = defaultdict(int)
+        self._topic_counts_lock = threading.Lock()
         if self._async_dispatch or self._async_adapters:
             self._start_dispatch_thread()
 
@@ -175,6 +173,11 @@ class EventBus:
     @property
     def dropped_events(self) -> int:
         return self._dropped_events
+
+    def get_topic_counts(self) -> dict[str, int]:
+        """Return publish counts per topic (measure phase for S6)."""
+        with self._topic_counts_lock:
+            return dict(self._topic_publish_counts)
 
     def get_handler_metrics(self) -> dict[str, float | int]:
         count = self._handler_duration_count
@@ -346,6 +349,8 @@ class EventBus:
         source: str = "system",
     ) -> Event:
         event = Event(topic=topic, payload=dict(payload or {}), source=source)
+        with self._topic_counts_lock:
+            self._topic_publish_counts[topic] += 1
         if self._should_enqueue_topic(topic):
             if self._debug_mode:
                 logger.debug(

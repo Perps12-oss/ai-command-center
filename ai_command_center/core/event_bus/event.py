@@ -15,6 +15,13 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from ai_command_center.core.events.topics import (
+    ENTITY_CREATED,
+    ENTITY_DELETED,
+    ENTITY_RELATIONSHIPS_CHANGED,
+    ENTITY_UPDATED,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class Event:
@@ -42,11 +49,11 @@ class Event:
     source: str
 
 
-# Entity events
-EVENT_ENTITY_CREATED = "entity.created"
-EVENT_ENTITY_UPDATED = "entity.updated"
-EVENT_ENTITY_DELETED = "entity.deleted"
-EVENT_ENTITY_RELATIONSHIPS_CHANGED = "entity.relationships.changed"
+# Entity events (canonical values in core.events.topics)
+EVENT_ENTITY_CREATED = ENTITY_CREATED
+EVENT_ENTITY_UPDATED = ENTITY_UPDATED
+EVENT_ENTITY_DELETED = ENTITY_DELETED
+EVENT_ENTITY_RELATIONSHIPS_CHANGED = ENTITY_RELATIONSHIPS_CHANGED
 
 # Relationship events
 EVENT_RELATIONSHIP_CREATED = "relationship.created"

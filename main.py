@@ -62,7 +62,9 @@ def main() -> int:
             inspector = None
             return
         if core.workspace_os is not None and core.workspace_os.enabled:
-            inspector = WorkspaceOsInspector(app, core.bus, core.state_store)
+            inspector = WorkspaceOsInspector(
+                app, core.bus, core.state_store, ui_queue=app._ui_queue
+            )
 
     tray = TrayController(
         on_open=show_palette,

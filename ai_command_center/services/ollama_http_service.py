@@ -28,7 +28,7 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SNAPSHOT,
     UI_CHAT_CANCEL,
 )
-from ai_command_center.services.ollama_service import OllamaServiceBase
+from ai_command_center.services.ollama_base import OllamaServiceBase
 
 _DEFAULT_URL = "http://localhost:11434"
 _DEFAULT_KEEP_ALIVE = "10m"
@@ -43,7 +43,11 @@ _LOCAL_ASSISTANT_SYSTEM = (
 
 
 class OllamaHttpService(OllamaServiceBase):
-    """Real Ollama integration — non-blocking stream_chat, asyncio cancellation."""
+    """Real Ollama integration — non-blocking stream_chat, asyncio cancellation.
+
+    Status and active-request fields are guarded by the asyncio loop thread and
+    cancel(); only one LLM stream is active per service instance (single-flight).
+    """
 
     def __init__(self, bus) -> None:
         super().__init__(bus)

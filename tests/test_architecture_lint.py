@@ -2,8 +2,7 @@
 
 The first group validates the linter logic against synthetic sources (always
 deterministic, platform independent). The final test scans the *real* package
-against a committed baseline so any *new* boundary violation fails CI while the
-two known ``hero_panel.py`` violations remain tracked.
+against a committed baseline so any *new* boundary violation fails CI.
 """
 
 from __future__ import annotations
@@ -87,6 +86,22 @@ def test_r3_allows_assignment_inside_appstate_module() -> None:
 def test_r3_ignores_non_appstate_objects() -> None:
     src = "def f(widget):\n    widget.title = 'hello'\n"
     assert "R3" not in _rules("ai_command_center/ui/views/chat.py", src)
+
+
+# ── R4: service importing peer service ────────────────────────────────────────
+def test_r4_flags_service_importing_peer_service() -> None:
+    src = "from ai_command_center.services.chat_handler_service import ChatHandlerService\n"
+    assert "R4" in _rules("ai_command_center/services/tool_executor_service.py", src)
+
+
+def test_r4_allows_service_importing_base() -> None:
+    src = "from ai_command_center.services.base import BaseService\n"
+    assert "R4" not in _rules("ai_command_center/services/chat_service.py", src)
+
+
+def test_r4_allows_service_importing_intents_module() -> None:
+    src = "from ai_command_center.core.events.intents import INTENT_CHAT\n"
+    assert "R4" not in _rules("ai_command_center/services/chat_handler_service.py", src)
 
 
 # ── repo ratchet ──────────────────────────────────────────────────────────────

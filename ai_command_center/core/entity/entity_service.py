@@ -16,11 +16,11 @@ from ai_command_center.core.entity.entity import (
     validate_entity_type,
 )
 from ai_command_center.core.entity.entity_repository import EntityRepository
-from ai_command_center.core.event_bus import (
-    EVENT_ENTITY_CREATED,
-    EVENT_ENTITY_UPDATED,
-    EVENT_ENTITY_DELETED,
-    EVENT_ENTITY_RELATIONSHIPS_CHANGED,
+from ai_command_center.core.events.topics import (
+    ENTITY_CREATED,
+    ENTITY_DELETED,
+    ENTITY_RELATIONSHIPS_CHANGED,
+    ENTITY_UPDATED,
 )
 
 
@@ -68,7 +68,7 @@ class EntityService:
         
         # Publish event
         self._event_bus.publish(
-            EVENT_ENTITY_CREATED,
+            ENTITY_CREATED,
             {
                 "entity_id": str(created.id),
                 "entity_type": created.entity_type,
@@ -110,7 +110,7 @@ class EntityService:
         
         # Publish event
         self._event_bus.publish(
-            EVENT_ENTITY_UPDATED,
+            ENTITY_UPDATED,
             {
                 "entity_id": str(saved.id),
                 "entity_type": saved.entity_type,
@@ -129,7 +129,7 @@ class EntityService:
         if deleted:
             # Publish event
             self._event_bus.publish(
-                EVENT_ENTITY_DELETED,
+                ENTITY_DELETED,
                 {"entity_id": str(entity_id)},
                 source="entity_service",
             )
@@ -181,7 +181,7 @@ class EntityService:
         
         # Publish event
         self._event_bus.publish(
-            EVENT_ENTITY_RELATIONSHIPS_CHANGED,
+            ENTITY_RELATIONSHIPS_CHANGED,
             {
                 "entity_id": str(saved.id),
                 "relationship_id": str(relationship_id),
@@ -221,7 +221,7 @@ class EntityService:
         
         # Publish event
         self._event_bus.publish(
-            EVENT_ENTITY_RELATIONSHIPS_CHANGED,
+            ENTITY_RELATIONSHIPS_CHANGED,
             {
                 "entity_id": str(saved.id),
                 "relationship_id": str(relationship_id),

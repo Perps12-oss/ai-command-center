@@ -7,10 +7,7 @@ Adversarial LLM output must never reach a shell unchecked. These tests:
   spawned (``SecurityError`` and zero ``subprocess`` calls);
 * confirm benign, allow-listed commands pass and would run with ``shell=False``;
 * drive the *real* tool-execution pipeline with a dangerous command and assert
-  it should refuse to spawn it. That last test is marked ``xfail`` because the
-  production pipeline currently shells out with ``shell=True`` and no
-  validation - the gap risk area #3 is meant to surface. Promote
-  ``CommandSandbox`` into ``ToolExecutorService`` to flip it to xpass.
+  it refuses to spawn it (``CommandSandbox`` enforced in ``ToolExecutorService``).
 """
 
 from __future__ import annotations
@@ -81,11 +78,6 @@ def test_sandbox_blocks_non_allowlisted_even_if_clean() -> None:
         sandbox.validate_command("netcat 10.0.0.1 4444")
 
 
-@pytest.mark.xfail(
-    reason="risk #3: production tool pipeline shells out with shell=True and no "
-    "sandbox; promote CommandSandbox into ToolExecutorService to fix",
-    strict=False,
-)
 def test_production_pipeline_should_refuse_dangerous_command(event_bus, monkeypatch) -> None:
     """The real ToolExecutorService should not spawn an injected command."""
     from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
