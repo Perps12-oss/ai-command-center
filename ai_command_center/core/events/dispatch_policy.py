@@ -64,6 +64,7 @@ SYNC_CRITICAL_TOPICS: frozenset[str] = frozenset(
 # Topics that MAY move to async central dispatch (R4b+).
 ASYNC_ELIGIBLE_TOPICS: frozenset[str] = frozenset(
     {
+        T.TOOL_INVOKE,
         T.NOTE_INDEX_PROGRESS,
         T.NOTE_INDEX_COMPLETE,
         T.NOTES_INDEXED,

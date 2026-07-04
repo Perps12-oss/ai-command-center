@@ -1,4 +1,12 @@
-﻿"""Routes chat intents through ContextManager before Ollama (Phase 3A skeleton)."""
+﻿"""Routes chat intents through ContextManager before LLM dispatch (Phase 3A).
+
+Sync bus cascade contract: ``_on_command_routed`` publishes
+``MEMORY_LOOKUP_REQUEST``, ``SESSION_HISTORY_REQUEST``, and ``MODEL_RESOLVE_REQUEST``
+synchronously on the same thread. Handlers for those topics must populate
+``_pending[request_id]`` before ``publish`` returns so the handler can read
+notes, history, model, and provider inline. Do not defer those lookups without
+changing this contract.
+"""
 
 from __future__ import annotations
 
@@ -106,7 +114,11 @@ class ChatHandlerService(BaseService):
     def _on_model_resolve_result(self, event: Event) -> None:
         request_id = str(event.payload.get("request_id", ""))
         if request_id:
-            self._request_result(request_id)["model"] = str(event.payload.get("model", self._default_model))
+            entry = self._request_result(request_id)
+            entry["model"] = str(event.payload.get("model", self._default_model))
+            provider = str(event.payload.get("provider", "")).strip()
+            if provider:
+                entry["provider"] = provider
 
     def _on_command_routed(self, event: Event) -> None:
         if event.payload.get("intent") != INTENT_CHAT:
@@ -151,6 +163,7 @@ class ChatHandlerService(BaseService):
         graph_snippets = [str(n) for n in pending.get("graph_snippets", []) if str(n).strip()]
         history = pending.get("history")
         model = str(pending.get("model", self._default_model))
+        provider = str(pending.get("provider", self._provider))
 
         workspace_entity_id = str(args.get("workspace_entity_id", "")).strip()
         if workspace_entity_id:
@@ -248,7 +261,7 @@ class ChatHandlerService(BaseService):
             {
                 "request_id": request_id,
                 "model": model,
-                "provider": self._provider,
+                "provider": provider,
                 "bundle": bundle,
             },
             source=self.name,

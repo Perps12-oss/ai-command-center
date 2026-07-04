@@ -81,5 +81,20 @@ class CommandPaletteApp(
         )
         self._visible = False
 
+    def destroy(self) -> None:
+        """Unsubscribe bus handlers and tear down views before Tk destroy."""
+        if self._current_view and self._current_view in self._views:
+            prev = self._views[self._current_view]
+            if hasattr(prev, "on_hide"):
+                prev.on_hide()
+        for unsub in self._bus_unsubs:
+            try:
+                unsub()
+            except Exception:
+                pass
+        self._bus_unsubs.clear()
+        self._controller.close()
+        super().destroy()
+
 
 __all__ = ["CommandPaletteApp", "VIEW_IDS"]
