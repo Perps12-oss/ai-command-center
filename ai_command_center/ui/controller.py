@@ -59,6 +59,25 @@ class UIController:
     def snapshot(self):
         return self._state_store.snapshot
 
+    def active_chat_workspace_entity(self) -> dict[str, str] | None:
+        """Active workspace entity from AppState (chat attach), if any."""
+        snap = self._state_store.snapshot
+        entity_id = str(snap.chat_workspace_entity_id).strip()
+        if not entity_id:
+            return None
+        entity: dict[str, str] = {
+            "entity_id": entity_id,
+            "entity_type": snap.chat_workspace_entity_type,
+            "entity_title": snap.chat_workspace_entity_title,
+        }
+        if snap.chat_workspace_entity_description:
+            entity["description"] = snap.chat_workspace_entity_description
+        if snap.chat_workspace_entity_url:
+            entity["url"] = snap.chat_workspace_entity_url
+        if snap.chat_workspace_entity_path:
+            entity["path"] = snap.chat_workspace_entity_path
+        return entity
+
     def publish_command(
         self,
         text: str,
