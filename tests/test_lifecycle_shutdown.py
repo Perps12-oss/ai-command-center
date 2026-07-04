@@ -1,7 +1,8 @@
-"""Program 1 S5 — state store and UI lifecycle teardown tests."""
+﻿"""Program 1 S5 — state store and UI lifecycle teardown tests."""
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -12,6 +13,8 @@ from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT
 from ai_command_center.db.connection import connect, init_database
+
+_WIN_TK = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only Tkinter UI")
 
 
 def test_application_shutdown_closes_state_store() -> None:
@@ -41,6 +44,7 @@ def test_app_state_close_clears_bus_subscriptions() -> None:
     assert revisions == [1]
 
 
+@_WIN_TK
 def test_command_palette_destroy_unsubscribes_bus() -> None:
     pytest.importorskip("customtkinter")
     from ai_command_center.ui.app import CommandPaletteApp
@@ -69,6 +73,8 @@ def test_eventbus_topic_counts_in_system_snapshot() -> None:
     service = SystemMonitorService(bus)
     service.start()
     try:
+        # Payload counts are sampled before the current publish increments.
+        service._publish_snapshot()
         service._publish_snapshot()
         assert snapshots, "expected a system.snapshot publish"
         counts = snapshots[-1].get("eventbus_topic_counts")
@@ -79,6 +85,7 @@ def test_eventbus_topic_counts_in_system_snapshot() -> None:
         service.stop()
 
 
+@_WIN_TK
 def test_system_view_on_hide_stops_psutil_activity(monkeypatch) -> None:
     """S4 — after on_hide(), psutil collection must not continue."""
     pytest.importorskip("customtkinter")
@@ -147,6 +154,7 @@ def test_system_view_on_hide_stops_psutil_activity(monkeypatch) -> None:
         root.destroy()
 
 
+@_WIN_TK
 def test_system_view_on_hide_stops_poll_generation() -> None:
     pytest.importorskip("customtkinter")
     import customtkinter as ctk
