@@ -23,6 +23,7 @@ Topic categories:
 - **UI** (`ui.*`, `overlay.*`, `app.*`): user intent and overlay control.
 - **Workspace OS** (`ui.workspace_os.*`, `ui.inspector.*`): entity creation,
   resource launch, and inspector control.
+- **Entity** (`entity.*`): entity lifecycle and relationship changes.
 """
 
 from __future__ import annotations
@@ -179,6 +180,12 @@ WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
 WORKFLOW_COMPLETED = "workflow.completed"
 WORKFLOW_FAILED = "workflow.failed"
 
+# Entity lifecycle (Workspace OS / entity service)
+ENTITY_CREATED = "entity.created"
+ENTITY_UPDATED = "entity.updated"
+ENTITY_DELETED = "entity.deleted"
+ENTITY_RELATIONSHIPS_CHANGED = "entity.relationships.changed"
+
 
 __all__ = [
     "TOPIC_VERSION",
@@ -304,4 +311,8 @@ __all__ = [
     "WORKFLOW_STEP_COMPLETED",
     "WORKFLOW_COMPLETED",
     "WORKFLOW_FAILED",
+    "ENTITY_CREATED",
+    "ENTITY_UPDATED",
+    "ENTITY_DELETED",
+    "ENTITY_RELATIONSHIPS_CHANGED",
 ]

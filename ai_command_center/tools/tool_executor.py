@@ -14,7 +14,11 @@ from ai_command_center.tools.tool_registry import ToolRegistry
 
 
 class ToolExecutor:
-    """Executes registered tools and tracks execution state."""
+    """Executes registered tools and tracks execution state.
+
+    Shell subprocess cancellation is coordinated with ``ToolExecutorService``
+    via ``cancel_active_shell()``; at most one shell command runs at a time.
+    """
 
     def __init__(self, registry: ToolRegistry) -> None:
         self._registry = registry
@@ -76,7 +80,11 @@ class ToolExecutor:
         return execution
 
     def cancel(self, tool_name: str) -> None:
-        """Mark a running execution as cancelled."""
+        """Mark a running execution as cancelled and interrupt shell subprocesses."""
+        if tool_name == "shell":
+            from ai_command_center.services.tool_executor_service import cancel_active_shell
+
+            cancel_active_shell()
         execution = self._status.get(tool_name)
         if execution is not None and execution.status == "running":
             self._status[tool_name] = ToolExecution(

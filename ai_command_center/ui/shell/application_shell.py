@@ -322,6 +322,10 @@ class ApplicationShellMixin:
         return self._visible
 
     def destroy(self) -> None:
+        if self._current_view and self._current_view in self._views:
+            prev = self._views[self._current_view]
+            if hasattr(prev, "on_hide"):
+                prev.on_hide()
         for unsub in self._bus_unsubs:
             try:
                 unsub()

@@ -32,7 +32,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.core.permission.permission import Permission
 from ai_command_center.domain.agent_session import AgentState
 from ai_command_center.services.base import BaseService
-from ai_command_center.services.command_router_service import INTENT_AGENT
+from ai_command_center.core.events.intents import INTENT_AGENT
 
 _logger = logging.getLogger(__name__)
 

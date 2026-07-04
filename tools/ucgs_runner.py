@@ -107,7 +107,11 @@ def _build_report(
     changed_files: list[str],
 ) -> dict[str, Any]:
     verdict, risk_level = _compute_verdict(result)
-    contract_drift = bool(result.metadata.get("contract_drift", False))
+    cd_meta = result.metadata.get("contract_drift", False)
+    if isinstance(cd_meta, dict):
+        contract_drift = bool(cd_meta.get("contract_drift", False))
+    else:
+        contract_drift = bool(cd_meta)
     pipeline_bypass = any(
         v.rule_id in {"ui_no_services", "eventbus_bypass", "layer_import"}
         or v.classification == "CRITICAL"

@@ -10,10 +10,6 @@ from typing import Any
 
 from ai_command_center.core.event_bus import (
     EVENT_ACTION_REGISTERED,
-    EVENT_ENTITY_CREATED,
-    EVENT_ENTITY_DELETED,
-    EVENT_ENTITY_RELATIONSHIPS_CHANGED,
-    EVENT_ENTITY_UPDATED,
     EVENT_RELATIONSHIP_CREATED,
     EVENT_TIMELINE_EVENT,
     Event,
@@ -40,6 +36,10 @@ from ai_command_center.core.events.topics import (
     CHAT_STARTED,
     COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    ENTITY_CREATED,
+    ENTITY_DELETED,
+    ENTITY_RELATIONSHIPS_CHANGED,
+    ENTITY_UPDATED,
     MEMORY_CLEARED,
     MEMORY_SELECTED,
     MEMORY_STORED,
@@ -92,13 +92,13 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     # Workspace OS (Track B - Phase 2 + 3.2)
-    EVENT_ENTITY_CREATED,
+    ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
     EVENT_ACTION_REGISTERED,
     EVENT_TIMELINE_EVENT,
-    EVENT_ENTITY_UPDATED,
-    EVENT_ENTITY_DELETED,
-    EVENT_ENTITY_RELATIONSHIPS_CHANGED,
+    ENTITY_UPDATED,
+    ENTITY_DELETED,
+    ENTITY_RELATIONSHIPS_CHANGED,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
     # Agent / workflow runs (Track R7)
@@ -692,7 +692,7 @@ def _reduce_ui_chat_new_session(state: AppState, event: Event) -> AppState:
 def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
     """Update Workspace OS counters, recent events, and entity list."""
     current = state.workspace_os
-    if event.topic == EVENT_ENTITY_CREATED:
+    if event.topic == ENTITY_CREATED:
         raw_meta = event.payload.get("metadata", {})
         meta = _freeze_metadata(raw_meta)
         entity = WorkspaceOsEntity(
@@ -706,7 +706,7 @@ def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
             entity_count=current.entity_count + 1,
             entities=current.entities + (entity,),
         )
-    elif event.topic == EVENT_ENTITY_UPDATED:
+    elif event.topic == ENTITY_UPDATED:
         updated_id = str(event.payload.get("entity_id", ""))
         meta = _freeze_metadata(event.payload.get("metadata", {}))
         updated = tuple(
@@ -721,7 +721,7 @@ def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
             for e in current.entities
         )
         snapshot = replace(current, entities=updated)
-    elif event.topic == EVENT_ENTITY_DELETED:
+    elif event.topic == ENTITY_DELETED:
         deleted_id = str(event.payload.get("entity_id", ""))
         remaining = tuple(e for e in current.entities if e.entity_id != deleted_id)
         snapshot = replace(

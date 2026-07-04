@@ -142,6 +142,7 @@ class SystemMonitorService(BaseService):
                 "cpu_delta": round(cpu - self._prev_cpu, 1),
                 "ram_delta": round(ram - self._prev_ram, 1),
                 "extra": {"openai_online": self._openai_online},
+                "eventbus_topic_counts": self._bus.get_topic_counts(),
             },
             source=self.name,
         )

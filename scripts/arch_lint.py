@@ -3,13 +3,17 @@
 
 Risk area #2 - Concurrency & state violations.
 
-Enforces three rules from ``AGENTS.md`` / ``PROJECT_CONSTITUTION_V4.md``:
+Enforces four rules from ``AGENTS.md`` / ``PROJECT_CONSTITUTION_V4.md``:
 
 R1  No file under ``ui/`` may import from ``services/`` or ``backend/``.
 R2  Service classes (``*Service``) may only be *instantiated* inside the
     ``services/`` package or an allow-listed composition root.
 R3  No attribute of an ``AppState`` instance may be assigned outside the
     ``app_state`` module (AppState is an immutable snapshot).
+R4  No file under ``services/`` may import a peer service module except
+    infra modules (``base``, ``states``) or entries in
+    ``_SERVICE_PEER_IMPORT_ALLOWLIST`` (Workspace OS wiring uses composition
+    roots ``service_factory.py`` / ``workspace_os_service.py`` instead).
 
 The linter is importable (``analyze_source`` / ``scan_tree``) so it can be unit
 tested against synthetic fixtures, and runnable as a CLI / pre-commit hook.
@@ -39,6 +43,19 @@ _COMPOSITION_ROOTS = {
     "core/service_factory.py",
     "core/workspace_os_service.py",  # registers/owns workspace sub-services
 }
+
+# Service infra modules — importing these from another service is allowed.
+_SERVICE_INFRA_SUFFIXES = frozenset(
+    {
+        "base",
+        "states",
+        "base_service",
+        "ollama_base",
+    }
+)
+
+# Grandfathered service→service imports (pre-bus refactor). New edges must use EventBus.
+_SERVICE_PEER_IMPORT_ALLOWLIST: frozenset[tuple[str, str]] = frozenset()
 
 # Instance names treated as AppState snapshots for the R3 mutation check.
 _APPSTATE_INSTANCE_NAMES = {"app_state", "appstate"}
@@ -106,6 +123,8 @@ class _Analyzer(ast.NodeVisitor):
                     ),
                 )
             )
+        if self._in_services:
+            self._check_service_peer_import(node.module, node.lineno)
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
@@ -177,6 +196,27 @@ class _Analyzer(ast.NodeVisitor):
                     ),
                 )
             )
+
+    def _check_service_peer_import(self, module: str | None, lineno: int) -> None:
+        if not module or not module.startswith(f"{PACKAGE}.services."):
+            return
+        suffix = module.removeprefix(f"{PACKAGE}.services.")
+        if suffix in _SERVICE_INFRA_SUFFIXES or suffix.startswith("__"):
+            return
+        pkg_rel = self.rel_path.split(f"{PACKAGE}/", 1)[-1]
+        if (pkg_rel, suffix) in _SERVICE_PEER_IMPORT_ALLOWLIST:
+            return
+        self.violations.append(
+            Violation(
+                rule="R4",
+                file=self.rel_path,
+                line=lineno,
+                message=(
+                    f"service module imports peer service {module!r}; "
+                    "route through EventBus or composition root"
+                ),
+            )
+        )
 
 
 def _callee_name(func: ast.expr) -> str | None:
