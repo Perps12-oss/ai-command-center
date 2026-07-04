@@ -99,8 +99,8 @@ def test_r4_allows_service_importing_base() -> None:
     assert "R4" not in _rules("ai_command_center/services/chat_service.py", src)
 
 
-def test_r4_allows_grandfathered_peer_import() -> None:
-    src = "from ai_command_center.services.command_router_service import INTENT_CHAT\n"
+def test_r4_allows_service_importing_intents_module() -> None:
+    src = "from ai_command_center.core.events.intents import INTENT_CHAT\n"
     assert "R4" not in _rules("ai_command_center/services/chat_handler_service.py", src)
 
 

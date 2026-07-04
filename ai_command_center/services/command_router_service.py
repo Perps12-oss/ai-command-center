@@ -4,21 +4,20 @@ from __future__ import annotations
 
 from typing import Callable
 
-from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.topics import COMMAND_ROUTED, UI_COMMAND
 from ai_command_center.core.contracts import COMMAND_ROUTED_VERSION
+from ai_command_center.core.event_bus import Event
+from ai_command_center.core.events.intents import (
+    INTENT_AGENT,
+    INTENT_CHAT,
+    INTENT_MEMORY_REMEMBER,
+    INTENT_MEMORY_SELECT,
+    INTENT_NAVIGATE,
+    INTENT_NOTE_NEW,
+    INTENT_NOTE_SEARCH,
+    INTENT_SHELL,
+)
+from ai_command_center.core.events.topics import COMMAND_ROUTED, UI_COMMAND
 from ai_command_center.services.base import BaseService
-
-# Intents consumed by Phase 3+ services
-INTENT_CHAT = "chat"
-INTENT_SHELL = "shell"
-INTENT_NOTE_SEARCH = "note_search"
-INTENT_NOTE_NEW = "note_new"
-INTENT_NAVIGATE = "navigate"
-INTENT_MEMORY_REMEMBER = "memory_remember"
-INTENT_MEMORY_SELECT = "memory_select"
-INTENT_AGENT = "agent"
-INTENT_UNKNOWN = "unknown"
 
 _VIEW_ALIASES: dict[str, str] = {
     "settings": "settings",

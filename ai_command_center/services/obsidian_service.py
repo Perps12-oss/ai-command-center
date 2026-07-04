@@ -25,10 +25,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.services.base import BaseService
-from ai_command_center.services.command_router_service import (
-    INTENT_NOTE_NEW,
-    INTENT_NOTE_SEARCH,
-)
+from ai_command_center.core.events.intents import INTENT_NOTE_NEW, INTENT_NOTE_SEARCH
 
 _SKIP_DIRS = {".obsidian", ".trash", ".git"}
 _MAX_NOTE_BYTES = 512_000

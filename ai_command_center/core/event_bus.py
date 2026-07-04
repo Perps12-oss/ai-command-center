@@ -42,10 +42,6 @@ logger = logging.getLogger(__name__)
 WILDCARD_TOPIC = "*"
 DISPATCH_QUEUE_ENV = "EVENTBUS_DISPATCH_QUEUE"
 
-EVENT_ENTITY_CREATED = "entity.created"
-EVENT_ENTITY_UPDATED = "entity.updated"
-EVENT_ENTITY_DELETED = "entity.deleted"
-EVENT_ENTITY_RELATIONSHIPS_CHANGED = "entity.relationships.changed"
 EVENT_RELATIONSHIP_CREATED = "relationship.created"
 EVENT_RELATIONSHIP_DELETED = "relationship.deleted"
 EVENT_RELATIONSHIP_QUERY_REQUEST = "relationship.query.request"

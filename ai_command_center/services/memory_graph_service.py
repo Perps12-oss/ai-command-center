@@ -20,10 +20,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.services.base import BaseService
-from ai_command_center.services.command_router_service import (
-    INTENT_MEMORY_REMEMBER,
-    INTENT_MEMORY_SELECT,
-)
+from ai_command_center.core.events.intents import INTENT_MEMORY_REMEMBER, INTENT_MEMORY_SELECT
 
 
 class MemoryGraphService(BaseService):

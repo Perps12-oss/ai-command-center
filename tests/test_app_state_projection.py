@@ -5,8 +5,9 @@ from __future__ import annotations
 import unittest
 
 from ai_command_center.core.app_state import AppStateStore
-from ai_command_center.core.event_bus import EVENT_ENTITY_CREATED, EventBus
+from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
+    ENTITY_CREATED,
     MEMORY_STORED,
     NOTE_CREATED,
     NOTE_INDEX_COMPLETE,
@@ -100,11 +101,11 @@ class AppStateProjectionTest(unittest.TestCase):
 
     def test_workspace_os_entities_projected(self):
         self._publish(
-            EVENT_ENTITY_CREATED,
+            ENTITY_CREATED,
             {"entity_id": "e1", "entity_type": "workspace", "title": "Proj"},
         )
         self._publish(
-            EVENT_ENTITY_CREATED,
+            ENTITY_CREATED,
             {"entity_id": "e2", "entity_type": "card", "title": "Card"},
         )
         snap = self.store.snapshot
