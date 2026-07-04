@@ -77,28 +77,31 @@ class ApplicationShellMixin:
         self.bind("?", self._maybe_show_shortcuts)
 
     def _show_command_palette(self) -> None:
-        commands = [
-            ("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace")),
-            ("⌂  Home", "Dashboard and quick actions", lambda: self._navigate("home")),
-            ("💬  Chat", "Navigate to Chat", lambda: self._navigate("chat", clear_chat_entity=True)),
-            ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
-            ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
-            ("⚙  System", "System monitor", lambda: self._navigate("system")),
-            ("🧩  Plugins", "Manage plugins", lambda: self._navigate("plugins")),
-            ("🎨  Component Gallery", "Design-system tokens and components", lambda: self._navigate("gallery")),
-            ("◈  Settings", "Open settings & themes", lambda: self._navigate("settings")),
-            ("⬇  Export Chat", "Save conversation to markdown", self._on_chat_export_request),
-            ("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate),
-            ("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse),
-            ("⏱  Command History", "Browse recent commands (Ctrl+H)", self._history_drawer.toggle),
-            ("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show),
-            (
-                "🤖  Supervised Agent Demo",
-                "Spawn a permission-gated agent run (visible in System view)",
-                lambda: self._on_command("agent: demo"),
-            ),
-        ]
+        commands: list[tuple[str, str, Callable[[], None]]] = []
         commands.extend(self._workspace_os_palette_commands())
+        commands.extend(
+            [
+                ("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace")),
+                ("⌂  Home", "Dashboard and quick actions", lambda: self._navigate("home")),
+                ("💬  Chat", "Generic chat (no entity attach)", lambda: self._navigate("chat", clear_chat_entity=True)),
+                ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
+                ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
+                ("⚙  System", "System monitor", lambda: self._navigate("system")),
+                ("🧩  Plugins", "Manage plugins", lambda: self._navigate("plugins")),
+                ("🎨  Component Gallery", "Design-system tokens and components", lambda: self._navigate("gallery")),
+                ("◈  Settings", "Open settings & themes", lambda: self._navigate("settings")),
+                ("⬇  Export Chat", "Save conversation to markdown", self._on_chat_export_request),
+                ("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate),
+                ("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse),
+                ("⏱  Command History", "Browse recent commands (Ctrl+H)", self._history_drawer.toggle),
+                ("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show),
+                (
+                    "🤖  Supervised Agent Demo",
+                    "Spawn a permission-gated agent run (visible in System view)",
+                    lambda: self._on_command("agent: demo"),
+                ),
+            ]
+        )
         self._command_palette.show(commands)
 
     def _workspace_os_palette_commands(self) -> list[tuple[str, str, Callable[[], None]]]:
@@ -198,20 +201,7 @@ class ApplicationShellMixin:
     def _on_chat_regenerate(self) -> None:
         chat = self._chat_view()
         if chat and chat._history:
-            snap = self._controller.snapshot()
-            entity: dict[str, str] | None = None
-            if snap.chat_workspace_entity_id:
-                entity = {
-                    "entity_id": snap.chat_workspace_entity_id,
-                    "entity_type": snap.chat_workspace_entity_type,
-                    "entity_title": snap.chat_workspace_entity_title,
-                }
-                if snap.chat_workspace_entity_description:
-                    entity["description"] = snap.chat_workspace_entity_description
-                if snap.chat_workspace_entity_url:
-                    entity["url"] = snap.chat_workspace_entity_url
-                if snap.chat_workspace_entity_path:
-                    entity["path"] = snap.chat_workspace_entity_path
+            entity = self._controller.active_chat_workspace_entity()
             for msg in reversed(chat._history):
                 if msg.get("role") == "user":
                     self._on_command(msg.get("content", ""), workspace_entity=entity)
@@ -248,6 +238,8 @@ class ApplicationShellMixin:
                 self._ui_queue.enqueue(update)
                 return
 
+        if workspace_entity is None:
+            workspace_entity = self._controller.active_chat_workspace_entity()
         self._controller.publish_command(text, clipboard=clipboard, workspace_entity=workspace_entity)
 
     def _show_capability_help(self) -> None:

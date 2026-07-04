@@ -173,18 +173,4 @@ class ViewManagerMixin:
             chat.reset_local_session()
 
     def _on_chat_send(self, text: str) -> None:
-        snap = self._controller.snapshot()
-        entity: dict[str, str] | None = None
-        if snap.chat_workspace_entity_id:
-            entity = {
-                "entity_id": snap.chat_workspace_entity_id,
-                "entity_type": snap.chat_workspace_entity_type,
-                "entity_title": snap.chat_workspace_entity_title,
-            }
-            if snap.chat_workspace_entity_description:
-                entity["description"] = snap.chat_workspace_entity_description
-            if snap.chat_workspace_entity_url:
-                entity["url"] = snap.chat_workspace_entity_url
-            if snap.chat_workspace_entity_path:
-                entity["path"] = snap.chat_workspace_entity_path
-        self._on_command(text, workspace_entity=entity)
+        self._on_command(text, workspace_entity=self._controller.active_chat_workspace_entity())
