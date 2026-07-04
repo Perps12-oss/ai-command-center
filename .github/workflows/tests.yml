@@ -35,6 +35,9 @@ jobs:
       - name: Architecture boundary lint (risk #2)
         run: python scripts/arch_lint.py --baseline tests/arch_lint_baseline.json
 
+      - name: Ruff F821 (undefined names)
+        run: python -m ruff check ai_command_center --select F821
+
       - name: Bandit security scan (risk #3, fail on NEW high severity)
         # The baseline is recorded with Windows path separators (this is a
         # Windows-only app), so run the gate on Windows runners.

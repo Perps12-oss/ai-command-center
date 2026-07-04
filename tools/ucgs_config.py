@@ -36,6 +36,8 @@ def deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     merged = dict(base)
     for key, value in overlay.items():
         if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            if not value:
+                continue
             merged[key] = deep_merge(merged[key], value)
         elif (
             key in merged
