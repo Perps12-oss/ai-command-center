@@ -47,6 +47,7 @@ class ShellToolService(BaseService):
                 "invoke_id": uuid.uuid4().hex,
                 "tool": "shell",
                 "args": {"command": command},
+                "actor_type": "user",
             },
             source=self.name,
         )

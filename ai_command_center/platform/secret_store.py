@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 _SERVICE_NAME = "ai-command-center"
 _OPENAI_KEY_NAME = "openai_api_key"
@@ -21,7 +24,7 @@ def resolve_openai_api_key(stored: str = "") -> str:
         if value:
             return value.strip()
     except Exception:
-        pass
+        logger.warning("keyring read failed for OpenAI API key", exc_info=True)
     cleaned = str(stored or "").strip()
     if cleaned in {"", "********"}:
         return ""
@@ -37,7 +40,7 @@ def store_openai_api_key(value: str) -> str:
 
             keyring.delete_password(_SERVICE_NAME, _OPENAI_KEY_NAME)
         except Exception:
-            pass
+            logger.warning("keyring delete failed for OpenAI API key", exc_info=True)
         return ""
     try:
         import keyring
@@ -45,6 +48,10 @@ def store_openai_api_key(value: str) -> str:
         keyring.set_password(_SERVICE_NAME, _OPENAI_KEY_NAME, cleaned)
         return ""
     except Exception:
+        logger.warning(
+            "keyring store failed; persisting OpenAI API key in settings (plaintext fallback)",
+            exc_info=True,
+        )
         return cleaned
 
 
@@ -62,7 +69,7 @@ def openai_api_key_source(stored: str = "") -> str:
         if keyring.get_password(_SERVICE_NAME, _OPENAI_KEY_NAME):
             return "keyring"
     except Exception:
-        pass
+        logger.warning("keyring probe failed for OpenAI API key source", exc_info=True)
     if str(stored or "").strip():
         return "settings"
     return "none"

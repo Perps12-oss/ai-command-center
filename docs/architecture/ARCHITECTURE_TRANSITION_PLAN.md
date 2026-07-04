@@ -590,11 +590,19 @@ python -m pytest tests -q
 python tools/ucgs_runner.py
 ```
 
-**Program 1 recommended order:** S3 → S4 → S2 → S1 → S6 → S7
+**Program 1 recommended order:** S3 → S4 → **S5** → S2 → S1 → S6 → S7
 
----
+| Step | Item | Why this position |
+|------|------|-------------------|
+| 1 | **S3** Model routing | Unblocks correct Chat → Router → Provider path |
+| 2 | **S4** UI runtime safety | SystemView leak, Inspector UIQueue |
+| 3 | **S5** State & lifecycle | AppState/UI teardown — pairs with S4; verify before S1 shutdown work |
+| 4 | **S2** Shell hardening | Security before widening async execution |
+| 5 | **S1** Execution reliability | `tool.invoke` off UI thread; heaviest change |
+| 6 | **S6** Observability | Topic counters (feeds Program 3 W4 measure phase) |
+| 7 | **S7** Dependency cleanup | Stubs, AssetService, SQLite migration docs |
 
-**Program 1 recommended order:** S3 → S4 → S2 → S1 → S6 → S7
+**S8** (F821 / ruff CI gate) runs continuously — not a sequential step; keep clean after each item.
 
 ---
 

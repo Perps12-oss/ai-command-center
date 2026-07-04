@@ -1,14 +1,5 @@
-"""Canonical plugin manifest contract."""
+"""Canonical plugin manifest — re-export from core contract."""
 
-from __future__ import annotations
+from ai_command_center.core.plugin_manifest import PluginManifest
 
-from dataclasses import dataclass, field
-
-
-@dataclass(frozen=True, slots=True)
-class PluginManifest:
-    plugin_id: str
-    name: str
-    version: str = "1.0"
-    enabled: bool = False
-    capabilities: tuple[str, ...] = field(default_factory=tuple)
+__all__ = ["PluginManifest"]

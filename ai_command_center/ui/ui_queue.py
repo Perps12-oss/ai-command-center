@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import queue
 from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 _VIRTUAL_EVENT = "<<UIQueueItem>>"
 _FALLBACK_INTERVAL_MS = 200
@@ -43,7 +46,7 @@ class UIQueue:
             try:
                 fn()
             except Exception:
-                continue
+                logger.exception("UIQueue callback failed")
 
     def _on_virtual_event(self, _event=None) -> None:
         self._drain()

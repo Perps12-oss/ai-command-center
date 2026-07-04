@@ -11,6 +11,7 @@ from ai_command_center.core.event_bus import (
     EventBus,
 )
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 
 
@@ -31,10 +32,13 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         master: ctk.CTk,
         bus: EventBus,
         state_store: AppStateStore,
+        *,
+        ui_queue: UIQueue | None = None,
     ) -> None:
         super().__init__(master)
         self._bus = bus
         self._state_store = state_store
+        self._ui_queue = ui_queue
         self._controller = WorkspaceOsUIController(bus)
         self._unsubs: list = []
 
@@ -138,8 +142,10 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         )
 
     def _schedule_refresh(self) -> None:
-        """Marshal UI refresh onto the Tk main thread."""
-        if self.winfo_exists():
+        """Marshal UI refresh onto the Tk main thread via UIQueue when available."""
+        if self._ui_queue is not None:
+            self._ui_queue.enqueue(self._refresh)
+        elif self.winfo_exists():
             self.after(0, self._refresh)
 
     def _on_close(self) -> None:

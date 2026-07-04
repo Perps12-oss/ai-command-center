@@ -412,6 +412,7 @@ class SystemView(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent", **kwargs)
         self._active        = False
         self._poll_in_flight = False
+        self._poll_generation = 0
         self._prev_disk     = None
         self._prev_net      = None
         self._prev_ts       = None
@@ -502,19 +503,24 @@ class SystemView(ctk.CTkFrame):
     def _start_polling(self) -> None:
         if not self._active:
             self._active = True
-            self.after(100, self._poll)
+        generation = self._poll_generation
+        self.after(100, lambda: self._poll(generation))
 
-    def _poll(self) -> None:
-        if not _PSUTIL or not self._active:
+    def _poll(self, generation: int) -> None:
+        if not _PSUTIL or not self._active or generation != self._poll_generation:
             return
         if getattr(self, "_poll_in_flight", False):
-            self.after(self._POLL_MS, self._poll)
+            self.after(self._POLL_MS, lambda: self._poll(generation))
             return
         self._poll_in_flight = True
-        threading.Thread(target=self._collect, daemon=True).start()
+        threading.Thread(
+            target=self._collect, args=(generation,), daemon=True
+        ).start()
 
-    def _collect(self) -> None:
+    def _collect(self, generation: int) -> None:
         try:
+            if not self._active or generation != self._poll_generation:
+                return
             now  = time.monotonic()
             cpu  = _psutil.cpu_percent(interval=0.5)
             vm   = _psutil.virtual_memory()
@@ -562,15 +568,33 @@ class SystemView(ctk.CTkFrame):
 
             self._prev_ts = now
 
-            self.after(0, lambda: self._update_ui(
-                cpu, vm, proc_cpu, proc_mem, procs, disk_delta, net_delta
-            ))
+            self.after(
+                0,
+                lambda: self._update_ui_if_active(
+                    generation, cpu, vm, proc_cpu, proc_mem, procs, disk_delta, net_delta
+                ),
+            )
         except Exception:
             pass
         finally:
             self._poll_in_flight = False
-        if self._active:
-            self.after(self._POLL_MS, self._poll)
+        if self._active and generation == self._poll_generation:
+            self.after(self._POLL_MS, lambda: self._poll(generation))
+
+    def _update_ui_if_active(
+        self,
+        generation: int,
+        cpu: float,
+        vm,
+        proc_cpu: float,
+        proc_mem: float,
+        procs: list[tuple[int, float, float, str]],
+        disk_delta: tuple,
+        net_delta: tuple,
+    ) -> None:
+        if not self._active or generation != self._poll_generation:
+            return
+        self._update_ui(cpu, vm, proc_cpu, proc_mem, procs, disk_delta, net_delta)
 
     def _update_ui(
         self,
@@ -685,6 +709,8 @@ class SystemView(ctk.CTkFrame):
 
     def on_hide(self) -> None:
         self._active = False
+        self._poll_generation += 1
 
     def on_show(self) -> None:
+        self._poll_generation += 1
         self._start_polling()

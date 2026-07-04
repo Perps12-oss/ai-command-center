@@ -1,4 +1,9 @@
-"""Canonical persistence layer — import repositories from this package only."""
+"""Canonical persistence layer — import repositories from this package only.
+
+Repositories own storage, indexing, and retrieval. The ``ai_command_center.db``
+package is an implementation detail (connection helpers, schema bootstrap); services
+and UI must not import it directly.
+"""
 
 from ai_command_center.repositories.conversation_repository import (
     CONTEXT_HISTORY_LIMIT,

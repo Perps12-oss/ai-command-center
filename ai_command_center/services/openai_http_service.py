@@ -42,7 +42,11 @@ _LOCAL_ASSISTANT_SYSTEM = (
 
 
 class OpenAIHttpService(BaseService):
-    """OpenAI-compatible API integration — non-blocking stream on asyncio loop."""
+    """OpenAI-compatible API integration — non-blocking stream on asyncio loop.
+
+    Active request state is single-flight per service instance; cancel() targets
+    the current asyncio future only.
+    """
 
     name = "openai"
 
