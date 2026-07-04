@@ -50,20 +50,12 @@ _SERVICE_INFRA_SUFFIXES = frozenset(
         "base",
         "states",
         "base_service",
+        "ollama_base",
     }
 )
 
 # Grandfathered service→service imports (pre-bus refactor). New edges must use EventBus.
-_SERVICE_PEER_IMPORT_ALLOWLIST = frozenset(
-    {
-        ("services/chat_handler_service.py", "command_router_service"),
-        ("services/obsidian_service.py", "command_router_service"),
-        ("services/ollama_http_service.py", "ollama_service"),
-        ("services/agent_runtime_service.py", "command_router_service"),
-        ("services/shell_tool_service.py", "command_router_service"),
-        ("services/memory_graph_service.py", "command_router_service"),
-    }
-)
+_SERVICE_PEER_IMPORT_ALLOWLIST: frozenset[tuple[str, str]] = frozenset()
 
 # Instance names treated as AppState snapshots for the R3 mutation check.
 _APPSTATE_INSTANCE_NAMES = {"app_state", "appstate"}

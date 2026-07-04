@@ -6,10 +6,10 @@ import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import (
-    EVENT_ENTITY_CREATED,
     EVENT_TIMELINE_EVENT,
     EventBus,
 )
+from ai_command_center.core.events.topics import ENTITY_CREATED
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
@@ -135,7 +135,7 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
     def _wire_events(self) -> None:
         """Subscribe to EventBus events that affect the inspector."""
         self._unsubs.append(
-            self._bus.subscribe(EVENT_ENTITY_CREATED, lambda _event: self._schedule_refresh())
+            self._bus.subscribe(ENTITY_CREATED, lambda _event: self._schedule_refresh())
         )
         self._unsubs.append(
             self._bus.subscribe(EVENT_TIMELINE_EVENT, lambda _event: self._schedule_refresh())

@@ -9,7 +9,7 @@ from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import COMMAND_ROUTED, TOOL_INVOKE
 from ai_command_center.services.base import BaseService
-from ai_command_center.services.command_router_service import INTENT_SHELL
+from ai_command_center.core.events.intents import INTENT_SHELL
 
 
 class ShellToolService(BaseService):

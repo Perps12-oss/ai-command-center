@@ -28,7 +28,7 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SNAPSHOT,
     UI_CHAT_CANCEL,
 )
-from ai_command_center.services.ollama_service import OllamaServiceBase
+from ai_command_center.services.ollama_base import OllamaServiceBase
 
 _DEFAULT_URL = "http://localhost:11434"
 _DEFAULT_KEEP_ALIVE = "10m"
