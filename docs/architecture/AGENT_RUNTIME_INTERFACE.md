@@ -199,9 +199,9 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 |-------|-------------|------------|
 | **1** | ARI doc, `CapabilityKind`, `CapabilityRouterService`, `NativeProvider`, `QwenPawSidecarProvider` stub | Classification events on chat route; tests pass |
 | **2** | QwenPaw sidecar spawn + SSE → `capability.stream` | `/plan` query uses sidecar when configured |
-| **3** (current) | ContextManager bundle before external invoke | Grounded planning with ACC memory/history/entity context |
-| **4** (next) | Settings: per-capability provider map + settings UI | User selects provider in settings |
-| **5** | Program 5 runtime plugin manifest | Third-party providers as plugins |
+| **3** | ContextManager bundle before external invoke | Grounded planning with ACC memory/history/entity context |
+| **4** (current) | Settings: per-capability provider map + settings UI | User selects provider in settings |
+| **5** (next) | Program 5 runtime plugin manifest | Third-party providers as plugins |
 
 ---
 
@@ -211,7 +211,7 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 - `pytest tests/test_capability_router.py` — classification + dispatch
 - `pytest tests/test_capability_context.py` — context bundle before external invoke
 - `pytest tests/test_qwenpaw_sse.py tests/test_qwenpaw_sidecar.py` — SSE parser + bridge deferral
-- UCGS layer import check — providers under `runtime/` must not import UI or repositories
+- `pytest tests/test_capability_provider_settings.py` — per-capability provider map + settings round-trip
 
 ---
 

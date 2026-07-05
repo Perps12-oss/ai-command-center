@@ -7,6 +7,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from ai_command_center.domain.capability_provider_settings import (
+    CAPABILITY_PROVIDER_CHOICES,
+    DEFAULT_CAPABILITY_PROVIDER_MAP,
+    settings_key_for_kind,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class SettingsField:
@@ -51,6 +57,13 @@ class SettingsSchema:
             "qwenpaw_python": SettingsField("qwenpaw_python", str, ""),
             "qwenpaw_auth_token": SettingsField("qwenpaw_auth_token", str, ""),
         }
+        for kind, default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
+            self.fields[settings_key_for_kind(kind)] = SettingsField(
+                settings_key_for_kind(kind),
+                str,
+                default,
+                CAPABILITY_PROVIDER_CHOICES,
+            )
 
     def _coerce(self, field: SettingsField, value: Any) -> Any:
         """Coerce and validate a value against the field type."""

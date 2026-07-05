@@ -11,6 +11,10 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SNAPSHOT,
 )
 from ai_command_center.core.settings.settings_service import SettingsService as CoreSettingsService
+from ai_command_center.domain.capability_provider_settings import (
+    DEFAULT_CAPABILITY_PROVIDER_MAP,
+    settings_key_for_kind,
+)
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.platform.secret_store import store_openai_api_key
 from ai_command_center.providers.defaults import default_model_for_provider
@@ -41,6 +45,8 @@ _DEFAULTS: dict[str, str] = {
     "qwenpaw_python": "",
     "qwenpaw_auth_token": "",
 }
+for _kind, _default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
+    _DEFAULTS[settings_key_for_kind(_kind)] = _default
 
 
 class SettingsService(BaseService):

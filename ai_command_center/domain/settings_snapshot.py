@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from ai_command_center.domain.capability_provider_settings import (
+    DEFAULT_CAPABILITY_PROVIDER_MAP,
+    capability_provider_map_from_payload,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +37,10 @@ class SettingsSnapshot:
     vault_path: str | Path = ""
     overlay_hotkey: str = "alt+space"
     telemetry_enabled: bool = True
-    schema_version: int = 1
+    schema_version: int = 4
+    capability_provider_map: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_CAPABILITY_PROVIDER_MAP)
+    )
     qwenpaw_enabled: bool = False
     qwenpaw_url: str = "http://127.0.0.1:8088"
     qwenpaw_agent_id: str = "default"
@@ -62,6 +70,10 @@ class SettingsSnapshot:
             "overlay_hotkey": self.overlay_hotkey,
             "telemetry_enabled": self.telemetry_enabled,
             "schema_version": self.schema_version,
+            **{
+                f"capability_provider_{kind}": provider
+                for kind, provider in self.capability_provider_map.items()
+            },
             "qwenpaw_enabled": self.qwenpaw_enabled,
             "qwenpaw_url": self.qwenpaw_url,
             "qwenpaw_agent_id": self.qwenpaw_agent_id,
