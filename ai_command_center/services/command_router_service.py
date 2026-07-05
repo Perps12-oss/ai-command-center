@@ -66,6 +66,32 @@ class CommandRouterService(BaseService):
             unsub()
         self._unsubscribers.clear()
 
+    @staticmethod
+    def _workspace_scope(event: Event) -> dict[str, str]:
+        """Intent-agnostic workspace scope from ui.command payload."""
+        scope: dict[str, str] = {}
+        workspace_entity_id = str(event.payload.get("workspace_entity_id", "")).strip()
+        if workspace_entity_id:
+            scope["workspace_entity_id"] = workspace_entity_id
+            scope["workspace_entity_type"] = str(
+                event.payload.get("workspace_entity_type", "")
+            )
+            scope["workspace_entity_title"] = str(
+                event.payload.get("workspace_entity_title", "")
+            )
+            for key in (
+                "workspace_entity_description",
+                "workspace_entity_url",
+                "workspace_entity_path",
+            ):
+                value = str(event.payload.get(key, "")).strip()
+                if value:
+                    scope[key] = value
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        if workspace_id:
+            scope["workspace_id"] = workspace_id
+        return scope
+
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
@@ -74,33 +100,24 @@ class CommandRouterService(BaseService):
         clipboard = event.payload.get("clipboard")
         if clipboard and intent == INTENT_CHAT:
             args = {**args, "clipboard": str(clipboard)}
-        workspace_entity_id = str(event.payload.get("workspace_entity_id", "")).strip()
-        if workspace_entity_id and intent in {INTENT_CHAT, INTENT_AGENT}:
-            args = {
-                **args,
-                "workspace_entity_id": workspace_entity_id,
-                "workspace_entity_type": str(event.payload.get("workspace_entity_type", "")),
-                "workspace_entity_title": str(event.payload.get("workspace_entity_title", "")),
-            }
-            for key in ("workspace_entity_description", "workspace_entity_url", "workspace_entity_path"):
-                value = str(event.payload.get(key, "")).strip()
-                if value:
-                    args[key] = value
-        workspace_id = str(event.payload.get("workspace_id", "")).strip()
-        if workspace_id and intent == INTENT_AGENT:
-            args = {**args, "workspace_id": workspace_id}
-        self._bus.publish(
-            COMMAND_ROUTED,
-            {
-                "contract_version": COMMAND_ROUTED_VERSION,
-                "text": text,
-                "intent": intent,
-                "args": args,
-                "status": "pending",
-                "metadata": {"executing": False, "source_router": self.name},
-            },
-            source=self.name,
-        )
+        scope = self._workspace_scope(event)
+        if scope:
+            entity_keys = {k: v for k, v in scope.items() if k.startswith("workspace_entity")}
+            if entity_keys:
+                args = {**args, **entity_keys}
+            if scope.get("workspace_id") and intent == INTENT_AGENT:
+                args = {**args, "workspace_id": scope["workspace_id"]}
+        payload: dict[str, object] = {
+            "contract_version": COMMAND_ROUTED_VERSION,
+            "text": text,
+            "intent": intent,
+            "args": args,
+            "status": "pending",
+            "metadata": {"executing": False, "source_router": self.name},
+        }
+        if scope:
+            payload.update(scope)
+        self._bus.publish(COMMAND_ROUTED, payload, source=self.name)
 
     @staticmethod
     def _classify(text: str) -> tuple[str, dict[str, str]]:
