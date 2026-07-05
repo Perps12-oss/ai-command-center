@@ -16,6 +16,7 @@ from ai_command_center.core.ai.capability_registry_service import (
 )
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.entity.entity_repository import EntityRepository
+from ai_command_center.core.entity.entity_bus_handlers import register_entity_bus_handlers
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.feature.feature_registry import FeatureRegistry
@@ -162,6 +163,15 @@ def build_services(
         ai_capability_registry_service = AICapabilityRegistryService(permission_service)
         command_palette_service = CommandPaletteService(bus)
         search_provider = FTSSearchProvider(entity_service)
+
+        register_entity_bus_handlers(
+            bus,
+            entity_service=entity_service,
+            relationship_service=relationship_service,
+            workspace_service=workspace_service,
+            timeline_service=timeline_service,
+            action_registry=action_registry,
+        )
 
         workspace_os = WorkspaceOsService(
             bus=bus,
