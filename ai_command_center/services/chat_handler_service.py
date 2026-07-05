@@ -1,8 +1,8 @@
 ﻿"""Routes chat intents through ContextManager before LLM dispatch (Phase 3A).
 
 Sync bus cascade contract: ``_on_command_routed`` publishes
-``MEMORY_LOOKUP_REQUEST``, ``SESSION_HISTORY_REQUEST``, and ``MODEL_RESOLVE_REQUEST``
-synchronously on the same thread. Handlers for those topics must populate
+``MEMORY_LOOKUP_REQUEST``, ``SESSION_HISTORY_REQUEST``, ``MODEL_RESOLVE_REQUEST``,
+and optionally ``ENTITY_CONTEXT_REQUEST`` synchronously on the same thread. Handlers for those topics must populate
 ``_pending[request_id]`` before ``publish`` returns so the handler can read
 notes, history, model, and provider inline. Do not defer those lookups without
 changing this contract.
@@ -19,6 +19,7 @@ from ai_command_center.core.clipboard_intent import (
     wants_clipboard,
 )
 from ai_command_center.core.context_manager import ContextManager
+from ai_command_center.core.entity.entity_context import format_entity_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     APP_WARNING,
@@ -27,6 +28,8 @@ from ai_command_center.core.events.topics import (
     CONTEXT_OVER_BUDGET,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_TRIMMED,
+    ENTITY_CONTEXT_REQUEST,
+    ENTITY_CONTEXT_RESULT,
     LLM_REQUEST,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
@@ -77,6 +80,7 @@ class ChatHandlerService(BaseService):
         self._unsubscribers.append(self._bus.subscribe(MEMORY_LOOKUP_RESULT, self._on_memory_lookup_result))
         self._unsubscribers.append(self._bus.subscribe(SESSION_HISTORY_RESULT, self._on_session_history_result))
         self._unsubscribers.append(self._bus.subscribe(MODEL_RESOLVE_RESULT, self._on_model_resolve_result))
+        self._unsubscribers.append(self._bus.subscribe(ENTITY_CONTEXT_RESULT, self._on_entity_context_result))
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -119,6 +123,13 @@ class ChatHandlerService(BaseService):
             provider = str(event.payload.get("provider", "")).strip()
             if provider:
                 entry["provider"] = provider
+
+    def _on_entity_context_result(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id", ""))
+        if request_id:
+            self._request_result(request_id)["entity_snippets"] = list(
+                event.payload.get("snippets", [])
+            )
 
     @staticmethod
     def _session_scope_from_event(event: Event, args: dict) -> dict[str, str]:
@@ -183,46 +194,54 @@ class ChatHandlerService(BaseService):
         self._publish_request(SESSION_HISTORY_REQUEST, request_id, session_scope)
         self._publish_request(MODEL_RESOLVE_REQUEST, request_id, {"intent": INTENT_CHAT, "query": query})
 
-        pending = self._pending.get(request_id, {})
-        graph_snippets = [str(n) for n in pending.get("graph_snippets", []) if str(n).strip()]
-        history = pending.get("history")
-        model = str(pending.get("model", self._default_model))
-        provider = str(pending.get("provider", self._provider))
-
         workspace_entity_id = str(
             event.payload.get("workspace_entity_id") or args.get("workspace_entity_id", "")
         ).strip()
         if workspace_entity_id:
-            entity_type = str(
-                event.payload.get("workspace_entity_type")
-                or args.get("workspace_entity_type", "entity")
+            self._publish_request(
+                ENTITY_CONTEXT_REQUEST,
+                request_id,
+                {"entity_id": workspace_entity_id},
             )
-            entity_title = str(
-                event.payload.get("workspace_entity_title")
-                or args.get("workspace_entity_title", workspace_entity_id)
+
+        pending = self._pending.get(request_id, {})
+        graph_snippets = [str(n) for n in pending.get("graph_snippets", []) if str(n).strip()]
+        entity_snippets = [
+            str(n) for n in pending.get("entity_snippets", []) if str(n).strip()
+        ]
+        if entity_snippets:
+            graph_snippets = entity_snippets + graph_snippets
+        elif workspace_entity_id:
+            fallback = format_entity_context(
+                {
+                    "entity_id": workspace_entity_id,
+                    "entity_type": str(
+                        event.payload.get("workspace_entity_type")
+                        or args.get("workspace_entity_type", "entity")
+                    ),
+                    "entity_title": str(
+                        event.payload.get("workspace_entity_title")
+                        or args.get("workspace_entity_title", workspace_entity_id)
+                    ),
+                    "entity_description": str(
+                        event.payload.get("workspace_entity_description")
+                        or args.get("workspace_entity_description", "")
+                    ),
+                    "url": str(
+                        event.payload.get("workspace_entity_url")
+                        or args.get("workspace_entity_url", "")
+                    ),
+                    "path": str(
+                        event.payload.get("workspace_entity_path")
+                        or args.get("workspace_entity_path", "")
+                    ),
+                }
             )
-            lines = [
-                f"Workspace {entity_type}: {entity_title} (entity_id={workspace_entity_id})",
-            ]
-            description = str(
-                event.payload.get("workspace_entity_description")
-                or args.get("workspace_entity_description", "")
-            ).strip()
-            url = str(
-                event.payload.get("workspace_entity_url")
-                or args.get("workspace_entity_url", "")
-            ).strip()
-            path = str(
-                event.payload.get("workspace_entity_path")
-                or args.get("workspace_entity_path", "")
-            ).strip()
-            if description:
-                lines.append(f"Description: {description}")
-            if url:
-                lines.append(f"URL: {url}")
-            if path:
-                lines.append(f"Path: {path}")
-            graph_snippets.insert(0, "\n".join(lines))
+            if fallback:
+                graph_snippets.insert(0, fallback)
+        history = pending.get("history")
+        model = str(pending.get("model", self._default_model))
+        provider = str(pending.get("provider", self._provider))
 
         bundle = self._context_manager.build_context(
             query,

@@ -186,6 +186,25 @@ ENTITY_UPDATED = "entity.updated"
 ENTITY_DELETED = "entity.deleted"
 ENTITY_RELATIONSHIPS_CHANGED = "entity.relationships.changed"
 
+# Entity bus request/result (Program 3 W3 — bus-native Workspace OS)
+ENTITY_CREATE_REQUEST = "entity.create.request"
+ENTITY_CREATE_RESULT = "entity.create.result"
+ENTITY_SEARCH_REQUEST = "entity.search.request"
+ENTITY_SEARCH_RESULT = "entity.search.result"
+ENTITY_CONTEXT_REQUEST = "entity.context.request"
+ENTITY_CONTEXT_RESULT = "entity.context.result"
+RELATIONSHIP_CREATE_REQUEST = "relationship.create.request"
+RELATIONSHIP_CREATE_RESULT = "relationship.create.result"
+WORKSPACE_CREATE_REQUEST = "workspace.create.request"
+WORKSPACE_CREATE_RESULT = "workspace.create.result"
+WORKSPACE_ADD_ENTITY_REQUEST = "workspace.add_entity.request"
+WORKSPACE_ADD_ENTITY_RESULT = "workspace.add_entity.result"
+ACTION_INVOKE_REQUEST = "action.invoke.request"
+ACTION_INVOKE_RESULT = "action.invoke.result"
+TIMELINE_RECORD_REQUEST = "timeline.record.request"
+TIMELINE_RECORD_RESULT = "timeline.record.result"
+SEARCH_RESULTS = "search.results"
+
 
 __all__ = [
     "TOPIC_VERSION",
@@ -315,4 +334,21 @@ __all__ = [
     "ENTITY_UPDATED",
     "ENTITY_DELETED",
     "ENTITY_RELATIONSHIPS_CHANGED",
+    "ENTITY_CREATE_REQUEST",
+    "ENTITY_CREATE_RESULT",
+    "ENTITY_SEARCH_REQUEST",
+    "ENTITY_SEARCH_RESULT",
+    "ENTITY_CONTEXT_REQUEST",
+    "ENTITY_CONTEXT_RESULT",
+    "RELATIONSHIP_CREATE_REQUEST",
+    "RELATIONSHIP_CREATE_RESULT",
+    "WORKSPACE_CREATE_REQUEST",
+    "WORKSPACE_CREATE_RESULT",
+    "WORKSPACE_ADD_ENTITY_REQUEST",
+    "WORKSPACE_ADD_ENTITY_RESULT",
+    "ACTION_INVOKE_REQUEST",
+    "ACTION_INVOKE_RESULT",
+    "TIMELINE_RECORD_REQUEST",
+    "TIMELINE_RECORD_RESULT",
+    "SEARCH_RESULTS",
 ]
