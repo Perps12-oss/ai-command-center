@@ -31,6 +31,25 @@ class SecretStoreTests(unittest.TestCase):
         stored = store_openai_api_key("")
         self.assertEqual(stored, "")
 
+    def test_missing_keyring_logs_once(self) -> None:
+        import ai_command_center.platform.secret_store as secret_store
+
+        secret_store._keyring_module = None
+        secret_store._keyring_unavailable = False
+        original_import = __import__
+
+        def selective_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "keyring":
+                raise ImportError("no keyring")
+            return original_import(name, globals, locals, fromlist, level)
+
+        with patch("builtins.__import__", side_effect=selective_import):
+            with self.assertLogs("ai_command_center.platform.secret_store", level="INFO") as logs:
+                self.assertIsNone(secret_store._get_keyring())
+                self.assertIsNone(secret_store._get_keyring())
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn("keyring not installed", logs.output[0])
+
 
 if __name__ == "__main__":
     unittest.main()
