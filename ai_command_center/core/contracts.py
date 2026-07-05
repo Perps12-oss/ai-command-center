@@ -46,3 +46,32 @@ SUPPORTED_VERSIONS: dict[str, tuple[str, ...]] = {
     "ollama_service": (OLLAMA_SERVICE_API_VERSION,),
     "tool": (TOOL_CONTRACT_VERSION,),
 }
+
+
+def build_workspace_context(
+    *,
+    workspace_id: object = None,
+    entity_id: object = None,
+    entity_type: object = None,
+) -> dict[str, str]:
+    """Build a tool.invoke workspace_context dict from scoped ids."""
+    ctx: dict[str, str] = {}
+    ws = str(workspace_id or "").strip()
+    eid = str(entity_id or "").strip()
+    etype = str(entity_type or "").strip()
+    if ws:
+        ctx["workspace_id"] = ws
+    if eid:
+        ctx["entity_id"] = eid
+    if etype:
+        ctx["entity_type"] = etype
+    return ctx
+
+
+def is_valid_workspace_context(value: object) -> bool:
+    """Non-user tool invocations require workspace_id and/or entity_id."""
+    if not isinstance(value, dict):
+        return False
+    ws = str(value.get("workspace_id", "")).strip()
+    eid = str(value.get("entity_id", "")).strip()
+    return bool(ws or eid)

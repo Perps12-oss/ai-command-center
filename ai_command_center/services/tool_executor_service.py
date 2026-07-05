@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Callable
 from uuid import UUID
 
 from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
-from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
+from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, is_valid_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     TOOL_COMPLETED,
@@ -172,6 +172,26 @@ class ToolExecutorService(BaseService):
                 {
                     "contract_version": TOOL_CONTRACT_VERSION,
                     "message": "unsupported tool contract version",
+                },
+                source=self.name,
+            )
+            return
+        actor_type = str(payload.get("actor_type", "user")).strip() or "user"
+        if actor_type != "user" and not is_valid_workspace_context(
+            payload.get("workspace_context")
+        ):
+            invoke_id = str(payload.get("invoke_id", ""))
+            self._bus.publish(
+                TOOL_FAILED,
+                {
+                    "contract_version": TOOL_CONTRACT_VERSION,
+                    "invoke_id": invoke_id,
+                    "tool": str(payload.get("tool", "")),
+                    "message": "non-user tool.invoke requires workspace_context",
+                    "run_id": payload.get("run_id"),
+                    "step_id": payload.get("step_id"),
+                    "success": False,
+                    "error": "missing workspace_context",
                 },
                 source=self.name,
             )

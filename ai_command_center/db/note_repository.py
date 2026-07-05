@@ -126,3 +126,15 @@ class NoteRepository:
     def count_indexed(self) -> int:
         row = self._conn.execute("SELECT COUNT(*) AS n FROM note_index").fetchone()
         return int(row["n"]) if row else 0
+
+    def list_indexed(self, *, limit: int = 200) -> list[tuple[str, str]]:
+        """Return (path, title) pairs for indexed notes."""
+        rows = self._conn.execute(
+            """
+            SELECT path, title FROM note_index
+            ORDER BY title COLLATE NOCASE
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [(str(r["path"]), str(r["title"])) for r in rows]
