@@ -1,4 +1,17 @@
 {
   "version": 1,
-  "hooks": {}
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/ucgs-pre-commit.py",
+        "matcher": "git commit",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/babysit-pr-before-commit.py",
+        "matcher": "git commit|git push|gh pr ",
+        "failClosed": false
+      }
+    ]
+  }
 }

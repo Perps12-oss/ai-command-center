@@ -13,6 +13,21 @@ Implementation may not begin before pre-flight completion.
 
 ---
 
+## Default PR workflow — babysit (local + Cloud)
+
+**Babysit PR is the default end-to-end workflow**, not opt-in. Applies to **local Cursor agents** and **Cursor Cloud agents**.
+
+When work involves a feature branch or pull request:
+
+1. **Before commit** — If the branch has an open PR, triage unresolved review comments and latest CI; fix in-scope issues before committing.
+2. **After push / `gh pr create`** — Immediately babysit until merge-ready per `~/.cursor/skills-cursor/babysit/SKILL.md`: unresolved comments (filter resolved threads), merge conflicts, in-scope CI fixes; re-watch until mergeable and green.
+3. **Cloud agents** — Same default in-session; for long CI watch loops, start a Cloud background babysit subagent without waiting for the user to ask.
+4. **Hooks** — `.cursor/hooks.json` injects this reminder on `git commit`, `git push`, and `gh pr` commands when Cursor Hooks are enabled.
+
+Skip only when the user explicitly opts out or the task is clearly unrelated to any PR.
+
+---
+
 # AI Command Center � Implementation Directives for Coding Agents
 
 ## Objective

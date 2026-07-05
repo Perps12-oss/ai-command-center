@@ -1,0 +1,47 @@
+---
+description: Default babysit-PR workflow for local and Cloud agents before commit/push
+alwaysApply: true
+---
+
+# Default PR workflow — babysit until merge-ready
+
+**Babysit PR is the default, not opt-in.** Applies to **local Cursor agents** and **Cursor Cloud agents** on this repo.
+
+When work targets a feature branch or pull request, follow the **babysit** skill (`~/.cursor/skills-cursor/babysit/SKILL.md`) as standard practice. Do not wait for the user to ask.
+
+## When it applies
+
+- Branch has an open PR, or you will create/update one.
+- User asked to commit, push, open a PR, or finish PR-related work.
+- Hooks inject a babysit reminder on `git commit` / `git push` — treat that as mandatory workflow, not a suggestion.
+
+## Before commit
+
+1. If the branch already has an open PR: check unresolved review comments and latest CI **before** committing.
+2. Fix in-scope issues found in triage; do not commit unrelated changes.
+3. State in your plan that post-push babysit is part of the deliverable.
+
+## After push / PR create
+
+Immediately babysit until merge-ready:
+
+1. **Comments** — unresolved threads only (including Bugbot). Read comment bodies and minimum location/URL; skip resolved threads and full JSON dumps.
+2. **Conflicts** — merge latest base branch; resolve preserving both sides' intent; abort and ask if intents conflict.
+3. **CI** — fix failures clearly in this PR's scope only. Never weaken or bypass CI/workflows. If failures look unrelated, merge base first; report if still blocked.
+
+Push scoped fixes and re-check until mergeable, green, and comments triaged.
+
+## Local vs Cloud
+
+| Runtime | Default babysit behavior |
+|---------|--------------------------|
+| **Local agent** | Continue in-session using `gh` and the babysit skill until merge-ready. |
+| **Cloud agent** | Same in-session babysit by default. For long CI watch loops, use a Cloud background subagent (`Task`, `environment: cloud`) with the babysit skill — do not require the user to request it. |
+
+## Opt-out (rare)
+
+Skip only when the user explicitly says not to babysit, or the task is clearly unrelated to any PR (docs-only local edit with no push, etc.).
+
+## Governance
+
+Babysit fixes must respect UCGS, constitution, and architecture rules. Run UCGS before architecture-sensitive commits; do not bypass hooks or CI gates to “make green.”
