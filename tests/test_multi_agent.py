@@ -57,7 +57,7 @@ def _wire_stack(bus: EventBus) -> AppStateStore:
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry).start()
+    ToolExecutorService(bus, registry, permission_service=permission).start()
     CommandRouterService(bus).start()
     AgentRuntimeService(bus).start()
     return AppStateStore(bus)

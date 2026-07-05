@@ -105,7 +105,7 @@ class CommandRouterService(BaseService):
             entity_keys = {k: v for k, v in scope.items() if k.startswith("workspace_entity")}
             if entity_keys:
                 args = {**args, **entity_keys}
-            if scope.get("workspace_id") and intent == INTENT_AGENT:
+            if scope.get("workspace_id"):
                 args = {**args, "workspace_id": scope["workspace_id"]}
         payload: dict[str, object] = {
             "contract_version": COMMAND_ROUTED_VERSION,

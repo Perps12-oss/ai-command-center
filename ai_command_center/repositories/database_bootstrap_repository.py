@@ -63,9 +63,26 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
 
 # ── registry — append new migrations here only ────────────────────────────────
 
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """Add workspace_id namespace column to memory_nodes (Program 3 W2)."""
+    cols = {
+        str(row[1] if isinstance(row, tuple) else row["name"])
+        for row in conn.execute("PRAGMA table_info(memory_nodes)").fetchall()
+    }
+    if "workspace_id" not in cols:
+        conn.execute(
+            "ALTER TABLE memory_nodes ADD COLUMN workspace_id TEXT NOT NULL DEFAULT ''"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memory_nodes_workspace "
+            "ON memory_nodes(workspace_id)"
+        )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
+    (3, _migrate_v3),
 ]
 
 

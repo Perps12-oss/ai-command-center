@@ -47,6 +47,7 @@ from ai_command_center.core.events.topics import (
     NOTE_INDEX_COMPLETE,
     NOTE_SEARCH_RESULTS,
     NOTE_SELECTED,
+    NOTES_INDEXED,
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     SERVICE_STATE_CHANGED,
@@ -86,6 +87,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     NOTE_SELECTED,
     NOTE_CREATED,
     NOTE_INDEX_COMPLETE,
+    NOTES_INDEXED,
     MEMORY_STORED,
     MEMORY_SELECTED,
     MEMORY_CLEARED,
@@ -811,11 +813,42 @@ def _reduce_note_index_complete(state: AppState, event: Event) -> AppState:
     """Record note indexing status."""
     if event.topic != NOTE_INDEX_COMPLETE:
         return state
-    files = int(event.payload.get("files", 0))
-    ms = int(event.payload.get("ms", 0))
+    files = int(event.payload.get("indexed_files", event.payload.get("files", 0)))
+    ms = int(event.payload.get("index_ms", event.payload.get("ms", 0)))
     return replace(
         state,
         note_index_status=(files, ms),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_notes_indexed(state: AppState, event: Event) -> AppState:
+    """Project indexed vault notes as entity_type=note on workspace canvas (W2)."""
+    if event.topic != NOTES_INDEXED:
+        return state
+    raw = event.payload.get("notes") or []
+    note_entities: list[WorkspaceOsEntity] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        path = str(item.get("path", item.get("entity_id", "")))
+        note_entities.append(
+            WorkspaceOsEntity(
+                entity_id=str(item.get("entity_id", path)),
+                entity_type="note",
+                title=str(item.get("title", path)),
+                metadata=_freeze_metadata({"path": path}),
+            )
+        )
+    current = state.workspace_os
+    non_notes = tuple(e for e in current.entities if e.entity_type != "note")
+    merged = non_notes + tuple(note_entities)
+    old_note_count = sum(1 for e in current.entities if e.entity_type == "note")
+    entity_count = current.entity_count - old_note_count + len(note_entities)
+    return replace(
+        state,
+        workspace_os=replace(current, entities=merged, entity_count=entity_count),
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1265,6 +1298,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_note_selected,
     _reduce_note_created,
     _reduce_note_index_complete,
+    _reduce_notes_indexed,
     _reduce_memory_stored,
     _reduce_memory_selected,
     _reduce_memory_cleared,

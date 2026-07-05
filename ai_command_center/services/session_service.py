@@ -26,7 +26,7 @@ from ai_command_center.services.base import BaseService
 
 
 class SessionService(BaseService):
-    """Persists conversations; supports default and per-entity session keys."""
+    """Persists conversations; active workspace entity drives session scope (W2)."""
 
     name = "session"
 
@@ -35,6 +35,9 @@ class SessionService(BaseService):
         self._repo = repo
         self._default_model = "llama3.2:3b"
         self._active_conversation_id = DEFAULT_CONVERSATION_ID
+        self._scope_entity_id = ""
+        self._scope_entity_type = ""
+        self._scope_entity_title = ""
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -87,6 +90,29 @@ class SessionService(BaseService):
                 conversation_id=self._active_conversation_id,
             )
 
+    def _resolve_conversation_id(self, payload: dict | None = None) -> str:
+        payload = payload or {}
+        entity_id = str(payload.get("workspace_entity_id", "")).strip()
+        entity_type = str(payload.get("workspace_entity_type", "")).strip()
+        if not entity_id:
+            entity_id = self._scope_entity_id
+        if not entity_type:
+            entity_type = self._scope_entity_type or "entity"
+        if entity_id:
+            return entity_conversation_id(entity_type, entity_id)
+        return DEFAULT_CONVERSATION_ID
+
+    def _ensure_active_conversation(self, payload: dict) -> None:
+        target = self._resolve_conversation_id(payload)
+        if target == self._active_conversation_id:
+            return
+        title = (
+            str(payload.get("workspace_entity_title", "")).strip()
+            or self._scope_entity_title
+            or "Session"
+        )
+        self._switch_conversation(target, title=title[:80] or "Session")
+
     def _switch_conversation(self, conversation_id: str, *, title: str = "Session") -> None:
         self._active_conversation_id = conversation_id
         self._repo.ensure_conversation(
@@ -99,19 +125,27 @@ class SessionService(BaseService):
     def _on_open_chat(self, event: Event) -> None:
         entity_id = str(event.payload.get("entity_id", "")).strip()
         if not entity_id:
+            self._scope_entity_id = ""
+            self._scope_entity_type = ""
+            self._scope_entity_title = ""
             self._switch_conversation(DEFAULT_CONVERSATION_ID)
             return
         entity_type = str(event.payload.get("entity_type", "entity"))
         title = str(event.payload.get("title", entity_id))
+        self._scope_entity_id = entity_id
+        self._scope_entity_type = entity_type
+        self._scope_entity_title = title
         cid = entity_conversation_id(entity_type, entity_id)
         self._switch_conversation(cid, title=title[:80] or "Entity chat")
 
     def _on_new_session(self, _event: Event) -> None:
-        self._switch_conversation(DEFAULT_CONVERSATION_ID)
-        self._repo.clear_messages(DEFAULT_CONVERSATION_ID)
+        cid = self._resolve_conversation_id()
+        self._switch_conversation(cid)
+        self._repo.clear_messages(cid)
         self._publish_history()
 
     def _on_history_request(self, event: Event) -> None:
+        self._ensure_active_conversation(event.payload)
         self._bus.publish(
             SESSION_HISTORY_RESULT,
             {
@@ -123,6 +157,7 @@ class SessionService(BaseService):
         )
 
     def _on_update_request(self, event: Event) -> None:
+        self._ensure_active_conversation(event.payload)
         role = str(event.payload.get("role", "user")).strip() or "user"
         content = str(event.payload.get("content", "")).strip()
         if content:
@@ -143,6 +178,7 @@ class SessionService(BaseService):
             )
 
     def _on_chat_complete(self, event: Event) -> None:
+        self._ensure_active_conversation(event.payload)
         text = str(event.payload.get("text", "")).strip()
         if not text:
             return

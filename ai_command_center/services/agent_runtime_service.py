@@ -6,7 +6,7 @@ import logging
 import uuid
 from collections.abc import Callable
 
-from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
+from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     AGENT_CANCEL_REQUEST,
@@ -440,6 +440,10 @@ class AgentRuntimeService(BaseService):
         entry["invoke_id"] = invoke_id
         entry["state"] = AgentState.WAITING.value
         demo_index = int(entry.get("demo_index", 0))
+        workspace_context = build_workspace_context(
+            workspace_id=entry.get("workspace_id"),
+            entity_id=entry.get("workspace_entity_id"),
+        )
         self._bus.publish(
             AGENT_TASK_REQUEST,
             {
@@ -459,6 +463,8 @@ class AgentRuntimeService(BaseService):
                 "args": {"command": command},
                 "agent_id": agent_id,
                 "request_id": request_id,
+                "actor_type": "agent",
+                "workspace_context": workspace_context,
             },
             source=self.name,
         )
