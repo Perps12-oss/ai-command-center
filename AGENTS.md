@@ -325,3 +325,38 @@ is strictly enforced.
 Remove architecture violations and document every contract and topic.
 
 Provide a dependency diagram showing final ownership boundaries in `docs/ARCHITECTURE.md` or the relevant architecture docs.
+
+---
+
+## Cursor Cloud specific instructions
+
+Environment: Linux x86_64, Python 3.12. Dependencies are refreshed automatically by the
+startup update script (`pip install --user` of `requirements.txt` + `requirements-test.txt`).
+The `python3-tk` system package is also required (customtkinter imports `tkinter`) and is
+already present in the VM snapshot — do not add it to the update script.
+
+Non-obvious caveats:
+
+- **The GUI (`main.py`) is Windows-ARM64 only.** `main()` calls `is_arm64()` and returns exit
+  code 1 immediately on this x86_64 host, so the desktop app cannot be launched here. Develop
+  and verify against the headless core (`ai_command_center.application.create_application`) and
+  the `pytest` suite instead.
+- **Headless bootstrap requires `APPDATA`.** `get_runtime_data_dir()` raises `OSError` when
+  `APPDATA` is unset (it locates the SQLite DB dir, normally `%APPDATA%/AICommandCenter`). Run
+  headless code with e.g. `APPDATA=/tmp/aicc_appdata`. No X display is needed — the core (incl.
+  `customtkinter.CTkImage` hero asset) loads without one.
+- **`create_application()` + `core.startup()`** wires 19 services (all report `READY`) and can
+  drive a real chat round-trip via `StubOllamaService` (EventBus → AppState → chat.*) with no
+  network. External services (Ollama on :11434, OpenAI, an Obsidian vault) are all optional and
+  mocked in tests; nothing external needs to run.
+- **Console scripts** (`pytest`, `ruff`, `bandit`, `coverage`) install to `~/.local/bin`, which
+  is not on `PATH`. Invoke them as `python3 -m pytest` / `python3 -m ruff` etc.
+
+Common commands (see `README_TESTING.md` and `.github/workflows/` for the source of truth):
+
+- Tests: `python3 -m pytest` (coverage auto-enabled via `pytest.ini`; ~2 min; 5 Windows/ARM64
+  tests auto-skip). Fast subset: `python3 -m pytest -m "not slow"`.
+- Lint: `python3 -m ruff check ai_command_center` and
+  `python3 scripts/arch_lint.py --baseline tests/arch_lint_baseline.json`.
+- Governance gates: `python3 scripts/verify_constitution.py`, then
+  `python3 tools/ucgs_runner.py > .ucgs_last.yaml` and `python3 tools/ucgs_ci_gate.py .ucgs_last.yaml`.
