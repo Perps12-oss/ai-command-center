@@ -33,6 +33,12 @@ class SettingsSnapshot:
     overlay_hotkey: str = "alt+space"
     telemetry_enabled: bool = True
     schema_version: int = 1
+    qwenpaw_enabled: bool = False
+    qwenpaw_url: str = "http://127.0.0.1:8088"
+    qwenpaw_agent_id: str = "default"
+    qwenpaw_auto_start: bool = False
+    qwenpaw_python: str = ""
+    qwenpaw_auth_token: str = ""
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -56,4 +62,10 @@ class SettingsSnapshot:
             "overlay_hotkey": self.overlay_hotkey,
             "telemetry_enabled": self.telemetry_enabled,
             "schema_version": self.schema_version,
+            "qwenpaw_enabled": self.qwenpaw_enabled,
+            "qwenpaw_url": self.qwenpaw_url,
+            "qwenpaw_agent_id": self.qwenpaw_agent_id,
+            "qwenpaw_auto_start": self.qwenpaw_auto_start,
+            "qwenpaw_python": self.qwenpaw_python,
+            "qwenpaw_auth_token": self.qwenpaw_auth_token,
         }

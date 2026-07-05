@@ -44,6 +44,12 @@ class SettingsSchema:
             "window_alpha": SettingsField("window_alpha", float, 0.95),
             "overlay_mode": SettingsField("overlay_mode", str, "palette"),
             "schema_version": SettingsField("schema_version", int, 1),
+            "qwenpaw_enabled": SettingsField("qwenpaw_enabled", bool, False),
+            "qwenpaw_url": SettingsField("qwenpaw_url", str, "http://127.0.0.1:8088"),
+            "qwenpaw_agent_id": SettingsField("qwenpaw_agent_id", str, "default"),
+            "qwenpaw_auto_start": SettingsField("qwenpaw_auto_start", bool, False),
+            "qwenpaw_python": SettingsField("qwenpaw_python", str, ""),
+            "qwenpaw_auth_token": SettingsField("qwenpaw_auth_token", str, ""),
         }
 
     def _coerce(self, field: SettingsField, value: Any) -> Any:

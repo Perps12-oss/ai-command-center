@@ -14,6 +14,7 @@ import logging
 import uuid
 from collections.abc import Callable
 
+from ai_command_center.core.capability_external_registry import is_externally_handled
 from ai_command_center.core.clipboard_intent import (
     empty_clipboard_message,
     wants_clipboard,
@@ -172,7 +173,14 @@ class ChatHandlerService(BaseService):
             )
             return
 
-        request_id = uuid.uuid4().hex
+        request_id = str(event.payload.get("request_id") or "").strip() or uuid.uuid4().hex
+        if is_externally_handled(request_id):
+            logger.info(
+                "chat.deferred_external request_id=%s provider=non-native",
+                request_id,
+            )
+            return
+
         self._pending[request_id] = {}
         logger.info("chat.request_started request_id=%s query_len=%d", request_id, len(query))
 

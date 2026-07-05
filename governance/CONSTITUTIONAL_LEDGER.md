@@ -6,6 +6,7 @@ Tracks constitutional amendments, architectural exception records (AER), constit
 
 | ID | Date | Articles | Status | Approval |
 |---|---|---|---|---|
+| AMEND-2026-001 | 2026-07-05 | III (Invariant 13), IV (Tier B), V | Ratified | Host platform supremacy; external runtimes as capability providers only; ARI as integration gate; wired CapabilityRouter Phase 1 |
 
 ## Architectural Exception Records
 
