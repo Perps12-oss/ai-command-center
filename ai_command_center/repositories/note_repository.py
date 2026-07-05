@@ -34,6 +34,9 @@ class NoteRepository:
     def count_indexed(self) -> int:
         return self._db_repo.count_indexed()
 
+    def list_indexed(self, *, limit: int = 200) -> list[tuple[str, str]]:
+        return self._db_repo.list_indexed(limit=limit)
+
     def read_note(self, rel_path: str | Path) -> str | None:
         return self._vault_repo.read_note(rel_path)
 

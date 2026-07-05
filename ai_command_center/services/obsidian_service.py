@@ -21,6 +21,7 @@ from ai_command_center.core.events.topics import (
     NOTE_SEARCH_RESULTS,
     NOTE_SELECT,
     NOTE_SELECTED,
+    NOTES_INDEXED,
     SETTINGS_SNAPSHOT,
 )
 from ai_command_center.repositories.note_repository import NoteRepository
@@ -329,6 +330,7 @@ class ObsidianService(BaseService):
                 },
                 source=self.name,
             )
+            self._publish_notes_indexed()
             pending = self._pending_search_query
             if pending:
                 search_start = time.perf_counter()
@@ -339,6 +341,23 @@ class ObsidianService(BaseService):
                     pending, hits, search_ms=search_ms, indexing=False
                 )
                 self._pending_search_query = None
+
+    def _publish_notes_indexed(self) -> None:
+        """Bridge vault index to workspace canvas note entities (W2)."""
+        with self._repo_lock:
+            indexed = self._repo.list_indexed(limit=500)
+        if not indexed:
+            return
+        notes = [
+            {
+                "entity_id": path,
+                "entity_type": "note",
+                "title": title or path,
+                "path": path,
+            }
+            for path, title in indexed
+        ]
+        self._bus.publish(NOTES_INDEXED, {"notes": notes}, source=self.name)
 
     def _index_file(self, vault: Path, path: Path) -> bool:
         try:

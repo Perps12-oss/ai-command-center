@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
+from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     TELEMETRY_EVENT,
@@ -61,7 +61,19 @@ class WorkflowEngineService(BaseService):
             )
             return
         workflow_id = str(event.payload.get("workflow_id") or "")
-        self._runs[run_id] = {"steps": steps, "index": 0, "workflow_id": workflow_id}
+        workspace_context = event.payload.get("workspace_context")
+        if not isinstance(workspace_context, dict):
+            workspace_context = build_workspace_context(
+                workspace_id=event.payload.get("workspace_id"),
+                entity_id=event.payload.get("entity_id"),
+                entity_type=event.payload.get("entity_type"),
+            )
+        self._runs[run_id] = {
+            "steps": steps,
+            "index": 0,
+            "workflow_id": workflow_id,
+            "workspace_context": workspace_context,
+        }
         _logger.info("workflow.start run_id=%s steps=%d", run_id, len(steps))
         self._bus.publish(
             WORKFLOW_STARTED,
@@ -121,6 +133,8 @@ class WorkflowEngineService(BaseService):
                 "step_id": step_id,
                 "tool": tool_name,
                 "args": args,
+                "actor_type": "workflow",
+                "workspace_context": run.get("workspace_context") or {},
             },
             source=self.name,
         )

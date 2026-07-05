@@ -53,7 +53,7 @@ def _wire_stack(bus: EventBus) -> AppStateStore:
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry).start()
+    ToolExecutorService(bus, registry, permission_service=permission).start()
     CommandRouterService(bus).start()
     AgentRuntimeService(bus).start()
     return AppStateStore(bus)
@@ -116,7 +116,7 @@ def test_pipeline_permission_check_per_stage() -> None:
 
     bus.subscribe(PERMISSION_CHECK_REQUEST, lambda e: checks.append(dict(e.payload)))
 
-    bus.publish(UI_COMMAND, {"text": "agents: pipeline demo"}, source="ui")
+    bus.publish(UI_COMMAND, {"text": "agents: pipeline demo", "workspace_id": "ws-pipe"}, source="ui")
 
     assert len(checks) == 2
     actor_ids = {c["actor_id"] for c in checks}

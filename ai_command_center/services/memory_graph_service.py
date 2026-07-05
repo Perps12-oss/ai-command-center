@@ -88,12 +88,15 @@ class MemoryGraphService(BaseService):
             return
         intent = event.payload.get("intent")
         args = event.payload.get("args") or {}
+        workspace_id = str(
+            event.payload.get("workspace_id") or args.get("workspace_id", "")
+        ).strip()
         if intent == INTENT_MEMORY_REMEMBER:
-            self._handle_remember_command(str(args.get("body", "")))
+            self._handle_remember_command(str(args.get("body", "")), workspace_id=workspace_id)
         elif intent == INTENT_MEMORY_SELECT:
-            self._handle_select_command(str(args.get("query", "")))
+            self._handle_select_command(str(args.get("query", "")), workspace_id=workspace_id)
 
-    def _handle_remember_command(self, body: str) -> None:
+    def _handle_remember_command(self, body: str, *, workspace_id: str = "") -> None:
         if not body:
             self._bus.publish(
                 MEMORY_ERROR,
@@ -115,12 +118,12 @@ class MemoryGraphService(BaseService):
         self._on_remember(
             Event(
                 topic=MEMORY_REMEMBER,
-                payload={"label": label, "content": content},
+                payload={"label": label, "content": content, "workspace_id": workspace_id},
                 source=self.name,
             )
         )
 
-    def _handle_select_command(self, query: str) -> None:
+    def _handle_select_command(self, query: str, *, workspace_id: str = "") -> None:
         if not query:
             self._bus.publish(
                 MEMORY_ERROR,
@@ -131,16 +134,17 @@ class MemoryGraphService(BaseService):
         self._on_select(
             Event(
                 topic=MEMORY_SELECT,
-                payload={"query": query},
+                payload={"query": query, "workspace_id": workspace_id},
                 source=self.name,
             )
         )
 
     def _on_lookup_request(self, event: Event) -> None:
         query = str(event.payload.get("query", "")).strip()
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
         snippets: list[str] = []
         if query:
-            nodes = self._repo.search(query)
+            nodes = self._repo.search(query, workspace_id=workspace_id)
             snippets = [f"[memory:{n.label}]\n{n.content}" for n in nodes[:3]]
         self._bus.publish(
             MEMORY_LOOKUP_RESULT,
@@ -169,6 +173,7 @@ class MemoryGraphService(BaseService):
             tier=str(event.payload.get("tier", "mid")),
             related_to=event.payload.get("related_to"),
             relation=str(event.payload.get("relation", "relates_to")),
+            workspace_id=str(event.payload.get("workspace_id", "")).strip(),
         )
         self._bus.publish(
             MEMORY_STORED,
@@ -179,13 +184,14 @@ class MemoryGraphService(BaseService):
     def _on_select(self, event: Event) -> None:
         query = str(event.payload.get("query", "")).strip()
         node_id = str(event.payload.get("id", "")).strip()
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
         nodes = []
         if node_id:
             node = self._repo.get(node_id)
             if node:
                 nodes = [node]
         elif query:
-            nodes = self._repo.search(query)
+            nodes = self._repo.search(query, workspace_id=workspace_id)
         if not nodes:
             self._bus.publish(
                 MEMORY_ERROR,
