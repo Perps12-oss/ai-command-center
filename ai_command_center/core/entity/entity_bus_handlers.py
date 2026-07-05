@@ -104,18 +104,27 @@ def register_entity_bus_handlers(
         query = str(event.payload.get("query", ""))
         entity_type = event.payload.get("entity_type")
         et = str(entity_type) if entity_type else None
-        results = entity_service.search(query, entity_type=et)
-        _publish_result(
-            bus,
-            ENTITY_SEARCH_RESULT,
-            rid,
-            {
-                "query": query,
-                "count": len(results),
-                "entity_ids": [str(e.id) for e in results],
-            },
-            source=source,
-        )
+        try:
+            results = entity_service.search(query, entity_type=et)
+            _publish_result(
+                bus,
+                ENTITY_SEARCH_RESULT,
+                rid,
+                {
+                    "query": query,
+                    "count": len(results),
+                    "entity_ids": [str(e.id) for e in results],
+                },
+                source=source,
+            )
+        except Exception as exc:  # noqa: BLE001
+            _publish_result(
+                bus,
+                ENTITY_SEARCH_RESULT,
+                rid,
+                {"query": query, "count": 0, "entity_ids": [], "error": str(exc)},
+                source=source,
+            )
 
     def on_entity_context_request(event: Event) -> None:
         rid = _request_id(event)
@@ -286,21 +295,30 @@ def register_entity_bus_handlers(
     def on_timeline_record_request(event: Event) -> None:
         rid = _request_id(event)
         payload = event.payload
-        entity_id_raw = payload.get("entity_id")
-        entity_id = UUID(str(entity_id_raw)) if entity_id_raw else None
-        timeline_service.record(
-            event_type=str(payload["event_type"]),
-            entity_id=entity_id,
-            entity_type=str(payload.get("entity_type", "")) or None,
-            payload=dict(payload.get("payload") or {}),
-        )
-        _publish_result(
-            bus,
-            TIMELINE_RECORD_RESULT,
-            rid,
-            {"recorded": True},
-            source=source,
-        )
+        try:
+            entity_id_raw = payload.get("entity_id")
+            entity_id = UUID(str(entity_id_raw)) if entity_id_raw else None
+            timeline_service.record(
+                event_type=str(payload["event_type"]),
+                entity_id=entity_id,
+                entity_type=str(payload.get("entity_type", "")) or None,
+                payload=dict(payload.get("payload") or {}),
+            )
+            _publish_result(
+                bus,
+                TIMELINE_RECORD_RESULT,
+                rid,
+                {"recorded": True},
+                source=source,
+            )
+        except Exception as exc:  # noqa: BLE001
+            _publish_result(
+                bus,
+                TIMELINE_RECORD_RESULT,
+                rid,
+                {"error": str(exc)},
+                source=source,
+            )
 
     def on_action_invoke_request(event: Event) -> None:
         rid = _request_id(event)
