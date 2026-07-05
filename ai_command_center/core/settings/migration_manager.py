@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from ai_command_center.domain.capability_provider_settings import (
+    DEFAULT_CAPABILITY_PROVIDER_MAP,
+    settings_key_for_kind,
+)
+
 
 class MigrationManager:
     """Applies simple schema migrations for settings payloads."""
@@ -26,4 +31,10 @@ class MigrationManager:
             payload.setdefault("qwenpaw_python", "")
             payload.setdefault("qwenpaw_auth_token", "")
             payload["schema_version"] = 3
+            schema_version = 3
+        if schema_version < 4:
+            payload = dict(payload)
+            for kind, default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
+                payload.setdefault(settings_key_for_kind(kind), default)
+            payload["schema_version"] = 4
         return payload

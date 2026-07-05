@@ -24,7 +24,12 @@ from ai_command_center.core.events.topics import (
     CHAT_ERROR,
     COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    SETTINGS_SNAPSHOT,
     TELEMETRY_EVENT,
+)
+from ai_command_center.domain.capability_provider_settings import (
+    capability_provider_map_from_payload,
+    resolve_capability_provider,
 )
 from ai_command_center.domain.runtime_capability import (
     CapabilityKind,
@@ -61,17 +66,6 @@ _CODING_HINTS: tuple[str, ...] = (
     "pull request",
 )
 
-_DEFAULT_PROVIDER_MAP: dict[CapabilityKind, str] = {
-    CapabilityKind.CHAT: "native",
-    CapabilityKind.PLANNING: "qwenpaw",
-    CapabilityKind.CODING: "qwenpaw",
-    CapabilityKind.RESEARCH: "native",
-    CapabilityKind.AUTOMATION: "native",
-    CapabilityKind.AGENTS: "native",
-    CapabilityKind.MEMORY: "native",
-}
-
-
 class CapabilityRouterService(BaseService):
     """Classifies capabilities and dispatches to ARI providers (Invariant 13)."""
 
@@ -89,7 +83,7 @@ class CapabilityRouterService(BaseService):
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
         self._registry = provider_registry or RuntimeProviderRegistry()
-        self._provider_map = dict(_DEFAULT_PROVIDER_MAP)
+        self._user_provider_map: dict[str, str] = {}
         self._context_manager = context_manager or ContextManager()
         self._assembler = context_assembler or CapabilityContextAssembler(
             bus,
@@ -101,6 +95,12 @@ class CapabilityRouterService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
+        )
+
+    def _on_settings_snapshot(self, event: Event) -> None:
+        self._user_provider_map = capability_provider_map_from_payload(event.payload)
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -121,7 +121,7 @@ class CapabilityRouterService(BaseService):
         return CapabilityKind.CHAT
 
     def resolve_provider(self, kind: CapabilityKind) -> str:
-        return self._provider_map.get(kind, "native")
+        return resolve_capability_provider(kind, self._user_provider_map)
 
     def _on_command_routed(self, event: Event) -> None:
         if event.source != "command_router":
