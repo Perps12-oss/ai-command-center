@@ -8,7 +8,6 @@ from typing import Any
 
 from ai_command_center.domain.capability_provider_settings import (
     DEFAULT_CAPABILITY_PROVIDER_MAP,
-    capability_provider_map_from_payload,
 )
 
 
