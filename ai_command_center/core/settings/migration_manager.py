@@ -16,4 +16,14 @@ class MigrationManager:
             payload.setdefault("openai_base_url", "https://api.openai.com/v1")
             payload.setdefault("openai_api_key", "")
             payload["schema_version"] = 2
+            schema_version = 2
+        if schema_version < 3:
+            payload = dict(payload)
+            payload.setdefault("qwenpaw_enabled", False)
+            payload.setdefault("qwenpaw_url", "http://127.0.0.1:8088")
+            payload.setdefault("qwenpaw_agent_id", "default")
+            payload.setdefault("qwenpaw_auto_start", False)
+            payload.setdefault("qwenpaw_python", "")
+            payload.setdefault("qwenpaw_auth_token", "")
+            payload["schema_version"] = 3
         return payload

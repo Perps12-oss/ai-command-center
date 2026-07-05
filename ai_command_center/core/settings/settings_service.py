@@ -52,6 +52,12 @@ class SettingsService:
             overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
             telemetry_enabled=bool(payload.get("telemetry_enabled", True)),
             schema_version=int(payload.get("schema_version", 1)),
+            qwenpaw_enabled=bool(payload.get("qwenpaw_enabled", False)),
+            qwenpaw_url=str(payload.get("qwenpaw_url", "http://127.0.0.1:8088")),
+            qwenpaw_agent_id=str(payload.get("qwenpaw_agent_id", "default")),
+            qwenpaw_auto_start=bool(payload.get("qwenpaw_auto_start", False)),
+            qwenpaw_python=str(payload.get("qwenpaw_python", "")),
+            qwenpaw_auth_token=str(payload.get("qwenpaw_auth_token", "")),
         )
 
     def set(self, key: str, value: Any) -> None:

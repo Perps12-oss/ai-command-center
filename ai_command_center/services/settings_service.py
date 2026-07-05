@@ -34,6 +34,12 @@ _DEFAULTS: dict[str, str] = {
     "provider": "ollama",
     "openai_base_url": "https://api.openai.com/v1",
     "openai_api_key": "",
+    "qwenpaw_enabled": "false",
+    "qwenpaw_url": "http://127.0.0.1:8088",
+    "qwenpaw_agent_id": "default",
+    "qwenpaw_auto_start": "false",
+    "qwenpaw_python": "",
+    "qwenpaw_auth_token": "",
 }
 
 
