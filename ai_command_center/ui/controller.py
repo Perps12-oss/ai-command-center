@@ -78,6 +78,28 @@ class UIController:
             entity["path"] = snap.chat_workspace_entity_path
         return entity
 
+    def current_workspace_scope(self) -> dict[str, str]:
+        """Workspace scope derived from AppState for UI-originated intents."""
+        entity = self.active_chat_workspace_entity()
+        if entity is None:
+            return {}
+        scope: dict[str, str] = {
+            "workspace_entity_id": entity["entity_id"],
+            "workspace_entity_type": entity.get("entity_type", ""),
+            "workspace_entity_title": entity.get("entity_title", ""),
+        }
+        if entity.get("entity_type") == "workspace":
+            scope["workspace_id"] = entity["entity_id"]
+        for src, dst in (
+            ("description", "workspace_entity_description"),
+            ("url", "workspace_entity_url"),
+            ("path", "workspace_entity_path"),
+        ):
+            value = str(entity.get(src, "")).strip()
+            if value:
+                scope[dst] = value
+        return scope
+
     def publish_command(
         self,
         text: str,
@@ -107,6 +129,8 @@ class UIController:
                     payload["workspace_entity_url"] = url
                 if path:
                     payload["workspace_entity_path"] = path
+                if str(workspace_entity.get("entity_type", "")) == "workspace":
+                    payload["workspace_id"] = entity_id
         self._bus.publish(
             UI_COMMAND,
             payload,
@@ -152,10 +176,19 @@ class UIController:
             source="ui",
         )
 
-    def publish_memory_remember(self, label: str, content: str) -> None:
+    def publish_memory_remember(
+        self,
+        label: str,
+        content: str,
+        *,
+        workspace_scope: dict[str, str] | None = None,
+    ) -> None:
+        payload = {"label": label, "content": content}
+        if workspace_scope:
+            payload.update(workspace_scope)
         self._bus.publish(
             MEMORY_REMEMBER,
-            {"label": label, "content": content},
+            payload,
             source="ui",
         )
 

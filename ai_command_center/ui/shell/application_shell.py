@@ -212,7 +212,11 @@ class ApplicationShellMixin:
             self._controller.publish_memory_delete(memory_id)
 
     def _on_memory_add(self, label: str, content: str) -> None:
-        self._controller.publish_memory_remember(label, content)
+        self._controller.publish_memory_remember(
+            label,
+            content,
+            workspace_scope=self._controller.current_workspace_scope(),
+        )
 
     def _on_command(self, text: str, *, workspace_entity: dict[str, str] | None = None) -> None:
         lower = text.strip().lower()

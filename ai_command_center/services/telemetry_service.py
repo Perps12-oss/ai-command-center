@@ -23,15 +23,22 @@ from ai_command_center.core.events.topics import (
     CONTEXT_OVER_BUDGET,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_TRIMMED,
+    ENTITY_CREATED,
+    ENTITY_DELETED,
+    ENTITY_UPDATED,
+    MEMORY_LOOKUP_REQUEST,
+    MEMORY_REMEMBER,
     MEMORY_STORED,
     NOTE_CREATED,
     NOTE_ERROR,
     NOTE_SEARCH_RESULTS,
     TELEMETRY_EVENT,
+    TOOL_INVOKE,
     TOOL_ERROR,
     TOOL_RESULT,
     UI_COMMAND,
     UI_NAVIGATE,
+    UI_OPEN_CHAT,
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
 )
@@ -52,11 +59,18 @@ _BUS_TOPICS = (
     CHAT_COMPLETE,
     CHAT_ERROR,
     CHAT_CANCELLED,
+    UI_OPEN_CHAT,
+    ENTITY_CREATED,
+    ENTITY_UPDATED,
+    ENTITY_DELETED,
+    TOOL_INVOKE,
     TOOL_RESULT,
     TOOL_ERROR,
     NOTE_SEARCH_RESULTS,
     NOTE_CREATED,
     NOTE_ERROR,
+    MEMORY_REMEMBER,
+    MEMORY_LOOKUP_REQUEST,
     MEMORY_STORED,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_OVER_BUDGET,
@@ -89,11 +103,29 @@ class TelemetryService(BaseService):
         self._unsubscribers.clear()
 
     def _record(self, event: str, payload: dict[str, Any], *, timestamp: float | None = None) -> None:
-        body = {"session_id": self._session_id, **payload}
+        body = {"session_id": self._session_id, **payload, **self._extract_scope(payload)}
         ts_iso = datetime.fromtimestamp(
             timestamp or time.time(), tz=timezone.utc
         ).isoformat()
         self._repo.insert(event, body, timestamp=ts_iso)
+
+    @staticmethod
+    def _extract_scope(payload: dict[str, Any]) -> dict[str, str]:
+        """Normalize workspace/entity identifiers from bus payload variants."""
+        workspace_id = str(payload.get("workspace_id", "")).strip()
+        entity_id = str(
+            payload.get("entity_id") or payload.get("workspace_entity_id") or ""
+        ).strip()
+        workspace_context = payload.get("workspace_context")
+        if isinstance(workspace_context, dict):
+            workspace_id = workspace_id or str(workspace_context.get("workspace_id", "")).strip()
+            entity_id = entity_id or str(workspace_context.get("entity_id", "")).strip()
+        scope: dict[str, str] = {}
+        if workspace_id:
+            scope["workspace_id"] = workspace_id
+        if entity_id:
+            scope["entity_id"] = entity_id
+        return scope
 
     def _on_bus_event(self, event: Event) -> None:
         started = time.perf_counter()
@@ -105,7 +137,7 @@ class TelemetryService(BaseService):
         self._record(event.topic, payload, timestamp=event.timestamp)
         normalized = TelemetryEvent(
             event_type=event.topic,
-            payload=tuple(payload.items()),
+            payload=tuple({**payload, **self._extract_scope(payload)}.items()),
             emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
         )
         self._bus.publish(

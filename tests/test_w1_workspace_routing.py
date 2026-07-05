@@ -12,6 +12,7 @@ from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_NAVIGATE
 from ai_command_center.core.events.topics import (
     COMMAND_ROUTED,
     LLM_REQUEST,
+    MEMORY_REMEMBER,
     MODEL_RESOLVE_REQUEST,
     MODEL_RESOLVE_RESULT,
     SESSION_HISTORY_REQUEST,
@@ -198,6 +199,28 @@ class W1UIControllerScopeTests(unittest.TestCase):
         self.assertEqual("card", payload.get("workspace_entity_type"))
         self.assertEqual("Alpha", payload.get("workspace_entity_title"))
         self.assertEqual("First card", payload.get("workspace_entity_description"))
+
+    def test_memory_remember_inherits_active_workspace_scope(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+        captured: list[dict] = []
+        bus.subscribe(MEMORY_REMEMBER, lambda e: captured.append(dict(e.payload)))
+        controller = UIController(bus, store, MagicMock())
+
+        bus.publish(
+            UI_OPEN_CHAT,
+            {"entity_id": "ws-7", "entity_type": "workspace", "title": "Workspace 7"},
+            source="tests",
+        )
+        controller.publish_memory_remember(
+            "decision",
+            "Use workspace scope",
+            workspace_scope=controller.current_workspace_scope(),
+        )
+
+        self.assertEqual(1, len(captured))
+        self.assertEqual("ws-7", captured[0].get("workspace_id"))
+        self.assertEqual("ws-7", captured[0].get("workspace_entity_id"))
 
 
 if __name__ == "__main__":
