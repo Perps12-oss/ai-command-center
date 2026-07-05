@@ -165,16 +165,33 @@ class ChatHandlerService(BaseService):
         model = str(pending.get("model", self._default_model))
         provider = str(pending.get("provider", self._provider))
 
-        workspace_entity_id = str(args.get("workspace_entity_id", "")).strip()
+        workspace_entity_id = str(
+            event.payload.get("workspace_entity_id") or args.get("workspace_entity_id", "")
+        ).strip()
         if workspace_entity_id:
-            entity_type = str(args.get("workspace_entity_type", "entity"))
-            entity_title = str(args.get("workspace_entity_title", workspace_entity_id))
+            entity_type = str(
+                event.payload.get("workspace_entity_type")
+                or args.get("workspace_entity_type", "entity")
+            )
+            entity_title = str(
+                event.payload.get("workspace_entity_title")
+                or args.get("workspace_entity_title", workspace_entity_id)
+            )
             lines = [
                 f"Workspace {entity_type}: {entity_title} (entity_id={workspace_entity_id})",
             ]
-            description = str(args.get("workspace_entity_description", "")).strip()
-            url = str(args.get("workspace_entity_url", "")).strip()
-            path = str(args.get("workspace_entity_path", "")).strip()
+            description = str(
+                event.payload.get("workspace_entity_description")
+                or args.get("workspace_entity_description", "")
+            ).strip()
+            url = str(
+                event.payload.get("workspace_entity_url")
+                or args.get("workspace_entity_url", "")
+            ).strip()
+            path = str(
+                event.payload.get("workspace_entity_path")
+                or args.get("workspace_entity_path", "")
+            ).strip()
             if description:
                 lines.append(f"Description: {description}")
             if url:
