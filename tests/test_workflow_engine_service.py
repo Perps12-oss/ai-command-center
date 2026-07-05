@@ -60,6 +60,7 @@ def test_two_step_tool_workflow_completes() -> None:
         WORKFLOW_START,
         {
             "run_id": "run-1",
+            "workspace_context": {"workspace_id": "ws-test"},
             "steps": [
                 {"id": "a", "type": "tool", "tool": "shell", "args": {"command": "echo 1"}},
                 {"id": "b", "type": "tool", "tool": "shell", "args": {"command": "echo 2"}},
@@ -69,6 +70,8 @@ def test_two_step_tool_workflow_completes() -> None:
     )
 
     assert len(invokes) == 2
+    assert all(inv.get("workspace_context") == {"workspace_id": "ws-test"} for inv in invokes)
+    assert all(inv.get("actor_type") == "workflow" for inv in invokes)
     assert completed
     assert completed[0]["run_id"] == "run-1"
 

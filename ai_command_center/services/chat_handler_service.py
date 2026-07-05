@@ -120,6 +120,22 @@ class ChatHandlerService(BaseService):
             if provider:
                 entry["provider"] = provider
 
+    @staticmethod
+    def _session_scope_from_event(event: Event, args: dict) -> dict[str, str]:
+        scope: dict[str, str] = {}
+        for key in (
+            "workspace_entity_id",
+            "workspace_entity_type",
+            "workspace_entity_title",
+            "workspace_entity_description",
+            "workspace_entity_url",
+            "workspace_entity_path",
+        ):
+            value = str(event.payload.get(key) or args.get(key, "")).strip()
+            if value:
+                scope[key] = value
+        return scope
+
     def _on_command_routed(self, event: Event) -> None:
         if event.payload.get("intent") != INTENT_CHAT:
             return
@@ -155,8 +171,16 @@ class ChatHandlerService(BaseService):
             notes = [str(n) for n in notes_raw if str(n).strip()]
         if self._obsidian is not None:
             notes.extend(str(n) for n in self._obsidian.get_context_notes() if str(n).strip())
-        self._publish_request(MEMORY_LOOKUP_REQUEST, request_id, {"query": query})
-        self._publish_request(SESSION_HISTORY_REQUEST, request_id, {})
+
+        session_scope = self._session_scope_from_event(event, args)
+        memory_scope: dict[str, object] = {"query": query}
+        workspace_id = str(
+            event.payload.get("workspace_id") or args.get("workspace_id", "")
+        ).strip()
+        if workspace_id:
+            memory_scope["workspace_id"] = workspace_id
+        self._publish_request(MEMORY_LOOKUP_REQUEST, request_id, memory_scope)
+        self._publish_request(SESSION_HISTORY_REQUEST, request_id, session_scope)
         self._publish_request(MODEL_RESOLVE_REQUEST, request_id, {"intent": INTENT_CHAT, "query": query})
 
         pending = self._pending.get(request_id, {})
@@ -269,7 +293,12 @@ class ChatHandlerService(BaseService):
 
         self._bus.publish(
             SESSION_UPDATE_REQUEST,
-            {"request_id": request_id, "role": "user", "content": query},
+            {
+                "request_id": request_id,
+                "role": "user",
+                "content": query,
+                **session_scope,
+            },
             source=self.name,
         )
 

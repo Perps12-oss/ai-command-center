@@ -59,14 +59,14 @@ def _auto_approve_interactive(bus: EventBus, *, granted: bool = True) -> None:
 
 def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
     bus = EventBus()
-    _wire_permission(bus)
+    permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry).start()
+    ToolExecutorService(bus, registry, permission_service=permission).start()
     AgentRuntimeService(bus).start()
 
     permission_checks: list[dict] = []
@@ -79,7 +79,7 @@ def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
 
     bus.publish(
         AGENT_SPAWN_REQUEST,
-        {"task": "demo", "request_id": "req-demo-1"},
+        {"task": "demo", "request_id": "req-demo-1", "workspace_id": "ws-demo"},
         source="test",
     )
 
@@ -94,14 +94,14 @@ def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
 
 def test_supervised_demo_multi_tool_loop() -> None:
     bus = EventBus()
-    _wire_permission(bus)
+    permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry).start()
+    ToolExecutorService(bus, registry, permission_service=permission).start()
     store = AppStateStore(bus)
     runtime = AgentRuntimeService(bus)
     runtime.start()
@@ -115,6 +115,7 @@ def test_supervised_demo_multi_tool_loop() -> None:
             "task": "demo: echo one; echo two; echo three",
             "request_id": "req-multi",
             "agent_id": "agent-multi",
+            "workspace_id": "ws-demo",
         },
         source="test",
     )
@@ -159,20 +160,25 @@ def test_interactive_permission_projects_to_app_state() -> None:
 
 def test_supervised_demo_projects_into_app_state() -> None:
     bus = EventBus()
-    _wire_permission(bus)
+    permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry).start()
+    ToolExecutorService(bus, registry, permission_service=permission).start()
     store = AppStateStore(bus)
     AgentRuntimeService(bus).start()
 
     bus.publish(
         AGENT_SPAWN_REQUEST,
-        {"task": "demo", "request_id": "req-demo-2", "agent_id": "agent-demo-2"},
+        {
+            "task": "demo",
+            "request_id": "req-demo-2",
+            "agent_id": "agent-demo-2",
+            "workspace_id": "ws-demo",
+        },
         source="test",
     )
 
@@ -185,14 +191,14 @@ def test_supervised_demo_projects_into_app_state() -> None:
 
 def test_agent_command_routes_to_spawn_request() -> None:
     bus = EventBus()
-    _wire_permission(bus)
+    permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry).start()
+    ToolExecutorService(bus, registry, permission_service=permission).start()
     CommandRouterService(bus).start()
     AgentRuntimeService(bus).start()
 
@@ -201,7 +207,7 @@ def test_agent_command_routes_to_spawn_request() -> None:
 
     bus.publish(
         UI_COMMAND,
-        {"text": "agent: demo"},
+        {"text": "agent: demo", "workspace_id": "ws-demo"},
         source="ui",
     )
 
@@ -211,7 +217,7 @@ def test_agent_command_routes_to_spawn_request() -> None:
 
 def test_permission_denied_terminates_agent() -> None:
     bus = EventBus()
-    _wire_permission(bus)
+    permission = _wire_permission(bus)
     _auto_approve_interactive(bus, granted=False)
     terminated: list[dict] = []
     bus.subscribe(AGENT_TERMINATED, lambda e: terminated.append(dict(e.payload)))

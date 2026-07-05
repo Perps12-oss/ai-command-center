@@ -20,12 +20,14 @@ _TYPE_ICON = {
     "workspace": "◈",
     "card": "▢",
     "resource": "🔗",
+    "note": "📝",
 }
 
 _GROUP_ORDER: tuple[tuple[str, str], ...] = (
     ("workspace", "Workspaces"),
     ("card", "Cards"),
     ("resource", "Resources"),
+    ("note", "Notes"),
 )
 
 

@@ -34,15 +34,16 @@ class MemoryRepository:
         tier: str = "mid",
         related_to: str | None = None,
         relation: str = "relates_to",
+        workspace_id: str = "",
     ) -> str:
         node_id = uuid.uuid4().hex
         now = time.time()
         self._conn.execute(
             """
-            INSERT INTO memory_nodes (id, label, kind, content, tier, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO memory_nodes (id, label, kind, content, tier, created_at, workspace_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (node_id, label, kind, content, tier, now),
+            (node_id, label, kind, content, tier, now, workspace_id.strip()),
         )
         if related_to:
             self._conn.execute(
@@ -55,18 +56,37 @@ class MemoryRepository:
         self._conn.commit()
         return node_id
 
-    def search(self, query: str, *, limit: int = 5) -> list[MemoryNode]:
+    def search(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        workspace_id: str = "",
+    ) -> list[MemoryNode]:
         pattern = f"%{query.strip()}%"
-        rows = self._conn.execute(
-            """
-            SELECT id, label, kind, content, tier
-            FROM memory_nodes
-            WHERE label LIKE ? OR content LIKE ?
-            ORDER BY created_at DESC
-            LIMIT ?
-            """,
-            (pattern, pattern, limit),
-        ).fetchall()
+        ws = workspace_id.strip()
+        if ws:
+            rows = self._conn.execute(
+                """
+                SELECT id, label, kind, content, tier
+                FROM memory_nodes
+                WHERE workspace_id = ? AND (label LIKE ? OR content LIKE ?)
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (ws, pattern, pattern, limit),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                """
+                SELECT id, label, kind, content, tier
+                FROM memory_nodes
+                WHERE label LIKE ? OR content LIKE ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (pattern, pattern, limit),
+            ).fetchall()
         return [
             MemoryNode(
                 id=str(r["id"]),
