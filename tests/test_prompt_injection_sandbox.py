@@ -115,3 +115,22 @@ def test_production_pipeline_should_refuse_dangerous_command(event_bus, monkeypa
         service.stop()
 
     assert calls == [], f"dangerous command reached subprocess: {calls!r}"
+
+
+def test_workspace_os_command_action_refuses_dangerous_command(monkeypatch) -> None:
+    """Workspace OS command actions must share the production sandbox invariant."""
+    from ai_command_center.core import workspace_os_actions as actions
+
+    calls: list[object] = []
+
+    def _spy_run(command, *args, **kwargs):
+        calls.append(command)
+        raise AssertionError("dangerous Workspace OS command reached subprocess")
+
+    monkeypatch.setattr(actions.subprocess, "run", _spy_run)
+
+    result = actions._execute_command({"command": "echo hi && rm -rf /"})
+
+    assert result["success"] is False
+    assert calls == []
+    assert "shell metacharacters" in result["stderr"]
