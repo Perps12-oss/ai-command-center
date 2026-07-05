@@ -56,7 +56,7 @@ def create_application(
     db: sqlite3.Connection | None = None,
 ) -> ApplicationCore:
     db = db or init_database()
-    bus = EventBus(debug_mode=debug_mode)
+    bus = EventBus(debug_mode=debug_mode, async_dispatch=True)
     state_store = AppStateStore(bus)
 
     wired = build_services(db, bus, workspace_os_enabled=workspace_os_enabled)

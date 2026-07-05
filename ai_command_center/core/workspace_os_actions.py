@@ -12,13 +12,14 @@ DO NOT MODIFY without constitutional amendment.
 from __future__ import annotations
 
 import os
-import shlex
 import subprocess
-import sys
 import webbrowser
 from typing import TYPE_CHECKING
 
 from ai_command_center.core.action.action import ACTION_TYPE_LAUNCH
+from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
+
+_COMMAND_SANDBOX = CommandSandbox()
 
 if TYPE_CHECKING:
     from ai_command_center.core.action.action_registry import ActionRegistry
@@ -83,24 +84,23 @@ def _execute_command(parameters: dict) -> dict:
     if not command:
         raise ValueError("No command provided")
     command = str(command).strip()
-    use_shell = any(ch in command for ch in "|&;<>$`")
-    if use_shell:
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-    else:
-        argv = shlex.split(command, posix=(sys.platform != "win32"))
-        result = subprocess.run(
-            argv,
-            shell=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+    try:
+        argv = _COMMAND_SANDBOX.validate_command(command)
+    except SecurityError as exc:
+        return {
+            "command": command,
+            "success": False,
+            "returncode": None,
+            "stdout": "",
+            "stderr": str(exc),
+        }
+    result = subprocess.run(
+        argv,
+        shell=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     return {
         "command": command,
         "success": result.returncode == 0,
