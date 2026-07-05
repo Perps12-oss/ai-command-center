@@ -6,17 +6,24 @@ import logging
 import uuid
 from collections.abc import Callable
 
+from ai_command_center.core.capability_context_assembler import (
+    CapabilityContextAssembler,
+    context_bundle_to_dict,
+)
 from ai_command_center.core.capability_external_registry import (
     clear_external_request,
     mark_external_request,
 )
+from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
     CAPABILITY_CLASSIFIED,
     CAPABILITY_DISPATCH,
     CAPABILITY_FALLBACK,
+    CHAT_ERROR,
     COMMAND_ROUTED,
+    CONTEXT_SNAPSHOT_CREATED,
     TELEMETRY_EVENT,
 )
 from ai_command_center.domain.runtime_capability import (
@@ -70,11 +77,25 @@ class CapabilityRouterService(BaseService):
 
     name = "capability_router"
 
-    def __init__(self, bus, *, provider_registry: RuntimeProviderRegistry | None = None) -> None:
+    def __init__(
+        self,
+        bus,
+        *,
+        provider_registry: RuntimeProviderRegistry | None = None,
+        context_manager: ContextManager | None = None,
+        context_assembler: CapabilityContextAssembler | None = None,
+        obsidian=None,
+    ) -> None:
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
         self._registry = provider_registry or RuntimeProviderRegistry()
         self._provider_map = dict(_DEFAULT_PROVIDER_MAP)
+        self._context_manager = context_manager or ContextManager()
+        self._assembler = context_assembler or CapabilityContextAssembler(
+            bus,
+            self._context_manager,
+            obsidian=obsidian,
+        )
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
@@ -155,10 +176,42 @@ class CapabilityRouterService(BaseService):
             )
             return
 
+        assembled = self._assembler.assemble_for_command(
+            request_id=request_id,
+            query=query,
+            event_payload=dict(event.payload),
+            args=dict(args),
+            source=self.name,
+            include_model_resolve=False,
+        )
+        bundle = assembled.bundle
+        budget = self._context_manager.context_budget_tokens
+        self._bus.publish(
+            CONTEXT_SNAPSHOT_CREATED,
+            {
+                "request_id": request_id,
+                "context_size_tokens": bundle.token_estimate,
+                "sources": list(bundle.sources),
+                "budget_tokens": budget,
+                "provider_id": provider_id,
+            },
+            source=self.name,
+        )
+        if not bundle.prompt:
+            message = "Empty prompt after context assembly"
+            self._bus.publish(
+                CHAT_ERROR,
+                {"message": message, "request_id": request_id},
+                source=self.name,
+            )
+            self._emit_fallback(request_id, kind, provider_id, message)
+            return
+
         workspace_id = str(event.payload.get("workspace_id") or args.get("workspace_id", "")).strip()
         workspace_entity_id = str(
             event.payload.get("workspace_entity_id") or args.get("workspace_entity_id", "")
         ).strip()
+        session_id = str(event.payload.get("session_id") or args.get("session_id", "")).strip()
         invocation = RuntimeInvocationRequest(
             request_id=request_id,
             kind=kind,
@@ -166,6 +219,8 @@ class CapabilityRouterService(BaseService):
             query=query,
             workspace_id=workspace_id,
             workspace_entity_id=workspace_entity_id,
+            session_id=session_id,
+            context_bundle=context_bundle_to_dict(bundle),
         )
         mark_external_request(request_id)
         provider.invoke(invocation)
@@ -196,6 +251,9 @@ class CapabilityRouterService(BaseService):
             source=self.name,
         )
         clear_external_request(request_id)
+        # Pre-invoke fallback: external mark was never set (or cleared above), so
+        # ChatHandler on the same COMMAND_ROUTED turn proceeds with native LLM.
+        # Post-invoke failure: sidecar publishes CHAT_ERROR; native re-run is deferred.
         self._bus.publish(
             TELEMETRY_EVENT,
             {

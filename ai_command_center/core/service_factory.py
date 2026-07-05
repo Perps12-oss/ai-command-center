@@ -14,6 +14,7 @@ from ai_command_center.core.action.action_registry import ActionRegistry
 from ai_command_center.core.ai.capability_registry_service import (
     AICapabilityRegistryService,
 )
+from ai_command_center.core.capability_context_assembler import CapabilityContextAssembler
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_bus_handlers import register_entity_bus_handlers
@@ -115,6 +116,7 @@ def build_services(
         bus, shared_tool_registry, permission_service=permission_service
     )
     obsidian = ObsidianService(bus, note_repo)
+    context_assembler = CapabilityContextAssembler(bus, context_manager, obsidian=obsidian)
     memory_graph = MemoryGraphService(bus, memory_repo)
     session = SessionService(bus, conv_repo)
     plugins = PluginRegistryService(bus, repo=plugin_repo)
@@ -127,7 +129,12 @@ def build_services(
     workflow_engine = WorkflowEngineService(bus)
     qwenpaw_health = QwenPawSidecarHealthState()
     runtime_registry = build_default_runtime_registry(bus, qwenpaw_health=qwenpaw_health)
-    capability_router = CapabilityRouterService(bus, provider_registry=runtime_registry)
+    capability_router = CapabilityRouterService(
+        bus,
+        provider_registry=runtime_registry,
+        context_manager=context_manager,
+        context_assembler=context_assembler,
+    )
     qwenpaw_sidecar = QwenPawSidecarService(bus, health_state=qwenpaw_health)
     # PermissionService wired above with tool_executor.
 
@@ -151,7 +158,7 @@ def build_services(
         memory_graph,
         session,
         agent_runtime,
-        ChatHandlerService(bus, context_manager),
+        ChatHandlerService(bus, context_manager, obsidian, context_assembler=context_assembler),
     ):
         services.register(svc)
 
