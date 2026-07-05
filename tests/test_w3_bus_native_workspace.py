@@ -330,5 +330,77 @@ class W3AppStateEntityTopicTests(unittest.TestCase):
         self.assertGreaterEqual(snapshot.entity_count, 1)
 
 
+class W3HandlerErrorResultTests(unittest.TestCase):
+    """Bus handlers publish error payloads instead of swallowing exceptions."""
+
+    def test_search_failure_publishes_error_result(self) -> None:
+        from unittest.mock import MagicMock
+
+        bus = EventBus()
+        entity_service = MagicMock()
+        entity_service.search.side_effect = RuntimeError("search failed")
+        results: list[dict] = []
+
+        def on_result(event) -> None:
+            results.append(dict(event.payload))
+
+        from ai_command_center.core.events.topics import ENTITY_SEARCH_REQUEST, ENTITY_SEARCH_RESULT
+
+        bus.subscribe(ENTITY_SEARCH_RESULT, on_result)
+        register_entity_bus_handlers(
+            bus,
+            entity_service=entity_service,
+            relationship_service=MagicMock(),
+            workspace_service=MagicMock(),
+            timeline_service=MagicMock(),
+            action_registry=MagicMock(),
+        )
+        rid = uuid.uuid4().hex
+        bus.publish(
+            ENTITY_SEARCH_REQUEST,
+            {"request_id": rid, "query": "x"},
+            source="tests",
+        )
+        self.assertEqual(1, len(results))
+        self.assertIn("error", results[0])
+        self.assertEqual(0, results[0]["count"])
+
+    def test_timeline_failure_publishes_error_result(self) -> None:
+        from unittest.mock import MagicMock
+
+        bus = EventBus()
+        timeline_service = MagicMock()
+        timeline_service.record.side_effect = ValueError("bad entity id")
+        results: list[dict] = []
+
+        def on_result(event) -> None:
+            results.append(dict(event.payload))
+
+        from ai_command_center.core.events.topics import TIMELINE_RECORD_REQUEST, TIMELINE_RECORD_RESULT
+
+        bus.subscribe(TIMELINE_RECORD_RESULT, on_result)
+        register_entity_bus_handlers(
+            bus,
+            entity_service=MagicMock(),
+            relationship_service=MagicMock(),
+            workspace_service=MagicMock(),
+            timeline_service=timeline_service,
+            action_registry=MagicMock(),
+        )
+        rid = uuid.uuid4().hex
+        bus.publish(
+            TIMELINE_RECORD_REQUEST,
+            {
+                "request_id": rid,
+                "event_type": "resource.launched",
+                "entity_id": "not-a-uuid",
+            },
+            source="tests",
+        )
+        self.assertEqual(1, len(results))
+        self.assertIn("error", results[0])
+        self.assertNotIn("recorded", results[0])
+
+
 if __name__ == "__main__":
     unittest.main()
