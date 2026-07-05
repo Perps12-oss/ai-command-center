@@ -141,7 +141,7 @@ class ViewManagerMixin:
                 chat.focus_input()
 
     def _on_sidebar_navigate(self, view_id: str) -> None:
-        self._navigate(view_id, clear_chat_entity=(view_id == "chat"))
+        self._navigate(view_id)
 
     def _navigate(self, view_id: str, *, clear_chat_entity: bool = False) -> None:
         if view_id == "chat" and clear_chat_entity:
