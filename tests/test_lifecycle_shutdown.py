@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+import threading
+import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -11,7 +13,7 @@ import pytest
 from ai_command_center.application import create_application
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT
+from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT, TOOL_INVOKE
 from ai_command_center.db.connection import connect, init_database
 
 _WIN_TK = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only Tkinter UI")
@@ -24,6 +26,30 @@ def test_application_shutdown_closes_state_store() -> None:
     assert core.state_store._unsubscribers, "AppState should subscribe to bus topics"
     core.shutdown()
     assert core.state_store._unsubscribers == []
+
+
+def test_application_tool_invoke_dispatch_does_not_block_publisher() -> None:
+    db = init_database(connect(Path(":memory:")))
+    core = create_application(db=db, workspace_os_enabled=False)
+    release = threading.Event()
+    handled = threading.Event()
+
+    def slow_handler(_event) -> None:
+        release.wait(timeout=2.0)
+        handled.set()
+
+    core.bus.subscribe(TOOL_INVOKE, slow_handler)
+    started = time.perf_counter()
+    try:
+        core.bus.publish(TOOL_INVOKE, {"tool": "shell"}, source="test")
+        elapsed = time.perf_counter() - started
+        assert elapsed < 0.25
+        assert not handled.is_set()
+        release.set()
+        assert handled.wait(timeout=2.0)
+    finally:
+        release.set()
+        core.shutdown()
 
 
 def test_app_state_close_clears_bus_subscriptions() -> None:
