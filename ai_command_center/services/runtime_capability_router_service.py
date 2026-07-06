@@ -42,6 +42,35 @@ from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
 
+_ROUTING_SCOPE_KEYS: tuple[str, ...] = (
+    "workspace_id",
+    "selected_entity_id",
+    "selected_entity_type",
+    "selected_entity_title",
+    "workspace_entity_id",
+    "workspace_entity_type",
+    "workspace_entity_title",
+)
+
+
+def _capability_routing_scope(
+    payload: dict[str, object],
+    args: dict[str, object],
+) -> dict[str, str]:
+    scope: dict[str, str] = {}
+    for key in _ROUTING_SCOPE_KEYS:
+        value = str(payload.get(key) or args.get(key, "")).strip()
+        if value:
+            scope[key] = value
+    if "workspace_entity_id" not in scope and scope.get("selected_entity_id"):
+        scope["workspace_entity_id"] = scope["selected_entity_id"]
+        if scope.get("selected_entity_type"):
+            scope["workspace_entity_type"] = scope["selected_entity_type"]
+        if scope.get("selected_entity_title"):
+            scope["workspace_entity_title"] = scope["selected_entity_title"]
+    return scope
+
+
 _PREFIX_KIND: dict[str, CapabilityKind] = {
     "/plan": CapabilityKind.PLANNING,
     "/code": CapabilityKind.CODING,
@@ -136,17 +165,20 @@ class RuntimeCapabilityRouterService(BaseService):
         if is_orchestration_handled(request_id):
             return
 
+        scope = _capability_routing_scope(dict(event.payload), dict(args))
         kind = self.classify(query)
         provider_id = self.resolve_provider(kind)
 
+        classified_payload: dict[str, object] = {
+            "request_id": request_id,
+            "kind": kind.value,
+            "provider_id": provider_id,
+            "query": query,
+        }
+        classified_payload.update(scope)
         self._bus.publish(
             CAPABILITY_CLASSIFIED,
-            {
-                "request_id": request_id,
-                "kind": kind.value,
-                "provider_id": provider_id,
-                "query": query,
-            },
+            classified_payload,
             source=self.name,
         )
 
@@ -157,6 +189,7 @@ class RuntimeCapabilityRouterService(BaseService):
             "fallback_provider_id": "native",
             "query": query,
             "command_routed": dict(event.payload),
+            **scope,
         }
         self._bus.publish(CAPABILITY_DISPATCH, dispatch_payload, source=self.name)
 
@@ -196,6 +229,7 @@ class RuntimeCapabilityRouterService(BaseService):
                 "sources": list(bundle.sources),
                 "budget_tokens": budget,
                 "provider_id": provider_id,
+                "workspace_id": scope.get("workspace_id", ""),
             },
             source=self.name,
         )
@@ -209,10 +243,8 @@ class RuntimeCapabilityRouterService(BaseService):
             self._emit_fallback(request_id, kind, provider_id, message)
             return
 
-        workspace_id = str(event.payload.get("workspace_id") or args.get("workspace_id", "")).strip()
-        workspace_entity_id = str(
-            event.payload.get("workspace_entity_id") or args.get("workspace_entity_id", "")
-        ).strip()
+        workspace_id = scope.get("workspace_id", "")
+        workspace_entity_id = scope.get("workspace_entity_id", "")
         session_id = str(event.payload.get("session_id") or args.get("session_id", "")).strip()
         invocation = RuntimeInvocationRequest(
             request_id=request_id,

@@ -7,7 +7,8 @@ from collections import deque
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
-from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.event_bus import Event, EventBus
+from ai_command_center.core.events.topics import UI_WORKSPACE_REQUIRED
 from ai_command_center.ui.controller import UIController
 from ai_command_center.ui.design_system import theme_manager
 from ai_command_center.ui.design_system import theme_v2 as T
@@ -69,6 +70,7 @@ class CommandPaletteApp(
         self._register_views()
         self._build_layout()
         self._wire_all_events()
+        self._wire_workspace_policy_events()
         self._setup_keybindings()
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
@@ -80,6 +82,25 @@ class CommandPaletteApp(
             alpha=snap.settings.window_alpha,
         )
         self._visible = False
+
+    def _wire_workspace_policy_events(self) -> None:
+        """Route deferred commands back to workspace (Phase 6c consumer policy)."""
+        self._bus_unsubs.append(
+            self._bus.subscribe(UI_WORKSPACE_REQUIRED, self._on_workspace_required)
+        )
+
+    def _on_workspace_required(self, event: Event) -> None:
+        _ = str(event.payload.get("reason", "no_active_workspace"))
+
+        def update() -> None:
+            if self._default_view == "workspace":
+                self._navigate("workspace")
+            self._toast.show(
+                "Activate a workspace before running commands",
+                kind="info",
+            )
+
+        self._ui_queue.enqueue(update)
 
     def destroy(self) -> None:
         """Unsubscribe bus handlers and tear down views before Tk destroy."""
