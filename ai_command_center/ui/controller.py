@@ -30,6 +30,7 @@ from ai_command_center.core.events.topics import (
     UI_OPEN_CHAT,
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
+    UI_SELECT_WORKSPACE,
 )
 
 
@@ -80,14 +81,31 @@ class UIController:
 
     def current_workspace_scope(self) -> dict[str, str]:
         """Workspace scope derived from AppState for UI-originated intents."""
+        snap = self._state_store.snapshot
+        scope: dict[str, str] = {}
+        active_ws = str(snap.active_workspace_id).strip()
+        if active_ws:
+            scope["workspace_id"] = active_ws
+            if snap.active_workspace_title:
+                scope["active_workspace_title"] = snap.active_workspace_title
         entity = self.active_chat_workspace_entity()
         if entity is None:
-            return {}
-        scope: dict[str, str] = {
-            "workspace_entity_id": entity["entity_id"],
-            "workspace_entity_type": entity.get("entity_type", ""),
-            "workspace_entity_title": entity.get("entity_title", ""),
-        }
+            selected_id = str(snap.selected_entity_id).strip()
+            if selected_id:
+                scope["workspace_entity_id"] = selected_id
+                if snap.selected_entity_type:
+                    scope["workspace_entity_type"] = snap.selected_entity_type
+                if snap.selected_entity_title:
+                    scope["workspace_entity_title"] = snap.selected_entity_title
+                scope["selected_entity_id"] = selected_id
+                if snap.selected_entity_type:
+                    scope["selected_entity_type"] = snap.selected_entity_type
+                if snap.selected_entity_title:
+                    scope["selected_entity_title"] = snap.selected_entity_title
+            return scope
+        scope["workspace_entity_id"] = entity["entity_id"]
+        scope["workspace_entity_type"] = entity.get("entity_type", "")
+        scope["workspace_entity_title"] = entity.get("entity_title", "")
         if entity.get("entity_type") == "workspace":
             scope["workspace_id"] = entity["entity_id"]
         for src, dst in (
@@ -131,6 +149,10 @@ class UIController:
                     payload["workspace_entity_path"] = path
                 if str(workspace_entity.get("entity_type", "")) == "workspace":
                     payload["workspace_id"] = entity_id
+        scope = self.current_workspace_scope()
+        for key, value in scope.items():
+            if key not in payload and value:
+                payload[key] = value
         self._bus.publish(
             UI_COMMAND,
             payload,
@@ -195,6 +217,14 @@ class UIController:
     def publish_launch_resource(self, payload: dict[str, object]) -> None:
         self._bus.publish(UI_LAUNCH_RESOURCE, payload, source="ui")
 
+    def publish_select_workspace(self, workspace_id: str) -> None:
+        """Activate a workspace as the runtime scope anchor."""
+        self._bus.publish(
+            UI_SELECT_WORKSPACE,
+            {"workspace_id": workspace_id},
+            source="ui",
+        )
+
     def publish_open_chat(
         self,
         entity_id: str,
@@ -204,6 +234,7 @@ class UIController:
         description: str = "",
         url: str = "",
         path: str = "",
+        workspace_id: str = "",
     ) -> None:
         payload: dict[str, str] = {
             "entity_id": entity_id,
@@ -216,6 +247,11 @@ class UIController:
             payload["url"] = url
         if path:
             payload["path"] = path
+        ws_id = str(workspace_id).strip()
+        if not ws_id and entity_type not in ("", "workspace"):
+            ws_id = str(self._state_store.snapshot.active_workspace_id).strip()
+        if ws_id:
+            payload["workspace_id"] = ws_id
         self._bus.publish(UI_OPEN_CHAT, payload, source="ui")
 
     def publish_clear_chat_entity(self) -> None:

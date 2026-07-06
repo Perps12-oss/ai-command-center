@@ -11,6 +11,8 @@ from ai_command_center.core.events.topics import (
     UI_INSPECTOR_OPEN,
     UI_LAUNCH_RESOURCE,
     UI_OPEN_CHAT,
+    UI_SELECT_ENTITY,
+    UI_SELECT_WORKSPACE,
     UI_SEARCH_WORKSPACE_OS,
 )
 
@@ -81,6 +83,7 @@ class WorkspaceOsUIController:
         description: str = "",
         url: str = "",
         path: str = "",
+        workspace_id: str = "",
     ) -> None:
         payload: dict[str, str] = {
             "entity_id": entity_id,
@@ -93,7 +96,35 @@ class WorkspaceOsUIController:
             payload["url"] = url
         if path:
             payload["path"] = path
+        if workspace_id:
+            payload["workspace_id"] = workspace_id
         self._bus.publish(UI_OPEN_CHAT, payload, source="ui")
+
+    def select_entity(
+        self,
+        entity_id: str,
+        entity_type: str,
+        title: str,
+        *,
+        workspace_id: str = "",
+    ) -> None:
+        """Select a canvas entity; activates parent workspace when applicable."""
+        payload: dict[str, str] = {
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "title": title,
+        }
+        if workspace_id:
+            payload["workspace_id"] = workspace_id
+        self._bus.publish(UI_SELECT_ENTITY, payload, source="ui")
+
+    def select_workspace(self, workspace_id: str) -> None:
+        """Activate a workspace as the runtime scope anchor (Program 3 Phase 1)."""
+        self._bus.publish(
+            UI_SELECT_WORKSPACE,
+            {"workspace_id": workspace_id},
+            source="ui",
+        )
 
     def search(self, query: str) -> None:
         self._bus.publish(

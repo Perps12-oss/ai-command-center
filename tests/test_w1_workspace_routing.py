@@ -19,6 +19,7 @@ from ai_command_center.core.events.topics import (
     SESSION_HISTORY_RESULT,
     UI_COMMAND,
     UI_OPEN_CHAT,
+    WORKSPACE_ACTIVE,
 )
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -221,6 +222,23 @@ class W1UIControllerScopeTests(unittest.TestCase):
         self.assertEqual(1, len(captured))
         self.assertEqual("ws-7", captured[0].get("workspace_id"))
         self.assertEqual("ws-7", captured[0].get("workspace_entity_id"))
+
+    def test_active_workspace_scope_without_open_chat_entity(self) -> None:
+        bus = EventBus()
+        store = AppStateStore(bus)
+        captured: list[dict] = []
+        bus.subscribe(UI_COMMAND, lambda e: captured.append(dict(e.payload)))
+        controller = UIController(bus, store, MagicMock())
+
+        bus.publish(
+            WORKSPACE_ACTIVE,
+            {"workspace_id": "ws-active", "title": "Active WS"},
+            source="tests",
+        )
+        controller.publish_command("hello")
+
+        self.assertEqual(1, len(captured))
+        self.assertEqual("ws-active", captured[0].get("workspace_id"))
 
 
 if __name__ == "__main__":

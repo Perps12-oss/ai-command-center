@@ -156,13 +156,20 @@ class ViewManagerMixin:
         self._on_command(f"new note: {title} | {content}")
 
     def _on_open_chat_from_workspace(self, payload: dict) -> None:
+        workspace_id = str(payload.get("workspace_id", "")).strip()
+        entity_type = str(payload.get("entity_type", "")).strip()
+        if workspace_id and entity_type in ("card", "resource", "note"):
+            snap = self._controller.snapshot()
+            if str(snap.active_workspace_id).strip() != workspace_id:
+                self._controller.publish_select_workspace(workspace_id)
         self._controller.publish_open_chat(
             str(payload.get("entity_id", "")),
-            str(payload.get("entity_type", "")),
+            entity_type,
             str(payload.get("title", "")),
             description=str(payload.get("description", "")),
             url=str(payload.get("url", "")),
             path=str(payload.get("path", "")),
+            workspace_id=workspace_id,
         )
         self._navigate("chat")
 

@@ -1,8 +1,8 @@
 """Shared sync-bus context assembly for chat and external capability invoke.
 
 Sync cascade contract: ``assemble_for_command`` publishes ``MEMORY_LOOKUP_REQUEST``,
-``SESSION_HISTORY_REQUEST``, optional ``MODEL_RESOLVE_REQUEST``, and
-``ENTITY_CONTEXT_REQUEST`` synchronously. Handlers for those topics must populate
+``SESSION_HISTORY_REQUEST``, optional ``MODEL_RESOLVE_REQUEST``,
+``WORKSPACE_CONTEXT_REQUEST``, and ``ENTITY_CONTEXT_REQUEST`` synchronously. Handlers for those topics must populate
 results before ``publish`` returns so assembly can read notes, history, model,
 and entity scope inline. Do not defer those lookups without changing this contract.
 """
@@ -26,6 +26,8 @@ from ai_command_center.core.events.topics import (
     MODEL_RESOLVE_RESULT,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
+    WORKSPACE_CONTEXT_REQUEST,
+    WORKSPACE_CONTEXT_RESULT,
 )
 
 
@@ -37,6 +39,7 @@ class AssembledContext:
     session_scope: dict[str, str]
     model: str
     provider: str
+    workspace_context_snippets: tuple[str, ...] = ()
 
 
 def context_bundle_to_dict(bundle: ContextBundle) -> dict[str, object]:
@@ -77,11 +80,53 @@ class CapabilityContextAssembler:
             "workspace_entity_description",
             "workspace_entity_url",
             "workspace_entity_path",
+            "workspace_id",
         ):
             value = str(event_payload.get(key) or args.get(key, "")).strip()
             if value:
                 scope[key] = value
         return scope
+
+    @staticmethod
+    def resolve_workspace_entity_id(
+        event_payload: dict[str, object],
+        args: dict[str, object],
+    ) -> str:
+        """Default entity context from open-chat entity or canvas selection."""
+        for key in ("workspace_entity_id",):
+            value = str(event_payload.get(key) or args.get(key, "")).strip()
+            if value:
+                return value
+        for key in ("selected_entity_id",):
+            value = str(event_payload.get(key) or args.get(key, "")).strip()
+            if value:
+                return value
+        return ""
+
+    @staticmethod
+    def merge_selected_entity_scope(
+        event_payload: dict[str, object],
+        args: dict[str, object],
+        session_scope: dict[str, str],
+    ) -> dict[str, str]:
+        """Promote selected canvas entity into workspace_entity_* when chat entity absent."""
+        if session_scope.get("workspace_entity_id"):
+            return session_scope
+        selected_id = str(
+            event_payload.get("selected_entity_id") or args.get("selected_entity_id", "")
+        ).strip()
+        if not selected_id:
+            return session_scope
+        merged = dict(session_scope)
+        merged["workspace_entity_id"] = selected_id
+        for src, dst in (
+            ("selected_entity_type", "workspace_entity_type"),
+            ("selected_entity_title", "workspace_entity_title"),
+        ):
+            value = str(event_payload.get(src) or args.get(src, "")).strip()
+            if value:
+                merged[dst] = value
+        return merged
 
     def assemble_for_command(
         self,
@@ -119,11 +164,17 @@ class CapabilityContextAssembler:
             if rid == request_id:
                 pending["entity_snippets"] = list(event.payload.get("snippets", []))
 
+        def _on_workspace_result(event) -> None:
+            rid = str(event.payload.get("request_id", ""))
+            if rid == request_id:
+                pending["workspace_snippets"] = list(event.payload.get("snippets", []))
+
         unsubs = [
             self._bus.subscribe(MEMORY_LOOKUP_RESULT, _on_memory_result),
             self._bus.subscribe(SESSION_HISTORY_RESULT, _on_session_result),
             self._bus.subscribe(MODEL_RESOLVE_RESULT, _on_model_result),
             self._bus.subscribe(ENTITY_CONTEXT_RESULT, _on_entity_result),
+            self._bus.subscribe(WORKSPACE_CONTEXT_RESULT, _on_workspace_result),
         ]
         try:
             clip_intent = wants_clipboard(query)
@@ -137,12 +188,19 @@ class CapabilityContextAssembler:
                 )
 
             session_scope = self.session_scope_from_payload(event_payload, args)
+            session_scope = self.merge_selected_entity_scope(
+                event_payload, args, session_scope
+            )
             memory_scope: dict[str, object] = {"query": query}
             workspace_id = str(
                 event_payload.get("workspace_id") or args.get("workspace_id", "")
             ).strip()
+            if not workspace_id:
+                workspace_id = str(session_scope.get("workspace_id", "")).strip()
             if workspace_id:
                 memory_scope["workspace_id"] = workspace_id
+                if "workspace_id" not in session_scope:
+                    session_scope = {**session_scope, "workspace_id": workspace_id}
 
             self._bus.publish(
                 MEMORY_LOOKUP_REQUEST,
@@ -165,10 +223,24 @@ class CapabilityContextAssembler:
                     source=source,
                 )
 
-            workspace_entity_id = str(
-                event_payload.get("workspace_entity_id")
-                or args.get("workspace_entity_id", "")
-            ).strip()
+            if workspace_id:
+                focus_entity = self.resolve_workspace_entity_id(event_payload, args)
+                workspace_request: dict[str, object] = {
+                    "request_id": request_id,
+                    "workspace_id": workspace_id,
+                    "max_depth": 2,
+                }
+                if focus_entity:
+                    workspace_request["entity_id"] = focus_entity
+                self._bus.publish(
+                    WORKSPACE_CONTEXT_REQUEST,
+                    workspace_request,
+                    source=source,
+                )
+
+            workspace_entity_id = self.resolve_workspace_entity_id(event_payload, args)
+            if not workspace_entity_id:
+                workspace_entity_id = str(session_scope.get("workspace_entity_id", "")).strip()
             if workspace_entity_id:
                 self._bus.publish(
                     ENTITY_CONTEXT_REQUEST,
@@ -179,6 +251,11 @@ class CapabilityContextAssembler:
             graph_snippets = [
                 str(n) for n in pending.get("graph_snippets", []) if str(n).strip()
             ]
+            workspace_snippets = [
+                str(n) for n in pending.get("workspace_snippets", []) if str(n).strip()
+            ]
+            if workspace_snippets:
+                graph_snippets = workspace_snippets + graph_snippets
             entity_snippets = [
                 str(n) for n in pending.get("entity_snippets", []) if str(n).strip()
             ]
@@ -230,6 +307,7 @@ class CapabilityContextAssembler:
                 session_scope=session_scope,
                 model=model,
                 provider=provider,
+                workspace_context_snippets=tuple(workspace_snippets),
             )
         finally:
             for unsub in unsubs:
