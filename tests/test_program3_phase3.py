@@ -32,6 +32,7 @@ from ai_command_center.core.events.topics import (
     SESSION_HISTORY_RESULT,
     UI_COMMAND,
     UI_SELECT_ENTITY,
+    WORKSPACE_ACTIVE,
     WORKSPACE_CONTEXT_REQUEST,
     WORKSPACE_CONTEXT_RESULT,
 )
@@ -265,6 +266,12 @@ class Phase3ChatIntegrationTests(unittest.TestCase):
                 routed.append(dict(event.payload))
 
         bus.subscribe(COMMAND_ROUTED, capture_routed)
+        ws_id = "ws-phase3"
+        bus.publish(
+            WORKSPACE_ACTIVE,
+            {"workspace_id": ws_id, "title": "Phase3"},
+            source="tests",
+        )
         bus.publish(
             UI_SELECT_ENTITY,
             {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.context_manager import ContextManager
@@ -69,6 +70,12 @@ class W1CommandRouterScopeTests(unittest.TestCase):
                 routed.append(dict(event.payload))
 
         bus.subscribe(COMMAND_ROUTED, capture)
+        ws_id = uuid4().hex
+        bus.publish(
+            WORKSPACE_ACTIVE,
+            {"workspace_id": ws_id, "title": "W1"},
+            source="tests",
+        )
         bus.publish(
             UI_COMMAND,
             {

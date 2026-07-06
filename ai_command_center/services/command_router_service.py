@@ -18,8 +18,10 @@ from ai_command_center.core.events.intents import (
     INTENT_SHELL,
 )
 from ai_command_center.core.events.topics import (
+    COMMAND_DEFERRED,
     COMMAND_ROUTED,
     UI_COMMAND,
+    UI_WORKSPACE_REQUIRED,
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
 )
@@ -35,6 +37,9 @@ _VIEW_ALIASES: dict[str, str] = {
     "system": "system",
     "memory": "memory",
 }
+
+# Navigation and inspector flows may proceed without an active workspace (soft gate).
+_WORKSPACE_OPTIONAL_INTENTS: frozenset[str] = frozenset({INTENT_NAVIGATE})
 
 # Obvious shell verbs when user omits the ">" prefix.
 _SHELL_VERBS: tuple[str, ...] = (
@@ -82,6 +87,14 @@ class CommandRouterService(BaseService):
         if not cleared or cleared == self._active_workspace_id:
             self._active_workspace_id = ""
 
+    def _resolve_active_workspace_id(self, event: Event) -> str:
+        payload_ws = str(event.payload.get("workspace_id", "")).strip()
+        return payload_ws or self._active_workspace_id
+
+    @staticmethod
+    def _requires_workspace(intent: str) -> bool:
+        return intent not in _WORKSPACE_OPTIONAL_INTENTS
+
     def _workspace_scope(self, event: Event) -> dict[str, str]:
         """Intent-agnostic workspace scope from ui.command payload."""
         scope: dict[str, str] = {}
@@ -102,11 +115,9 @@ class CommandRouterService(BaseService):
                 value = str(event.payload.get(key, "")).strip()
                 if value:
                     scope[key] = value
-        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        workspace_id = self._resolve_active_workspace_id(event)
         if workspace_id:
             scope["workspace_id"] = workspace_id
-        elif self._active_workspace_id:
-            scope["workspace_id"] = self._active_workspace_id
         for key in (
             "selected_entity_id",
             "selected_entity_type",
@@ -127,6 +138,30 @@ class CommandRouterService(BaseService):
         if not text:
             return
         intent, args = self._classify(text)
+        active_workspace_id = self._resolve_active_workspace_id(event)
+        if self._requires_workspace(intent) and not active_workspace_id:
+            request_id = uuid.uuid4().hex
+            deferred_payload = {
+                "contract_version": COMMAND_ROUTED_VERSION,
+                "request_id": request_id,
+                "text": text,
+                "intent": intent,
+                "args": args,
+                "reason": "no_active_workspace",
+                "status": "deferred",
+            }
+            self._bus.publish(COMMAND_DEFERRED, deferred_payload, source=self.name)
+            self._bus.publish(
+                UI_WORKSPACE_REQUIRED,
+                {
+                    "reason": "no_active_workspace",
+                    "intent": intent,
+                    "text": text,
+                    "request_id": request_id,
+                },
+                source=self.name,
+            )
+            return
         clipboard = event.payload.get("clipboard")
         if clipboard and intent == INTENT_CHAT:
             args = {**args, "clipboard": str(clipboard)}
