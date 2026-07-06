@@ -31,6 +31,7 @@ from ai_command_center.core.events.topics import (
     RELATIONSHIP_CREATE_RESULT,
     TIMELINE_RECORD_REQUEST,
     TIMELINE_RECORD_RESULT,
+    UI_SELECT_WORKSPACE,
     WORKSPACE_ADD_ENTITY_REQUEST,
     WORKSPACE_ADD_ENTITY_RESULT,
     WORKSPACE_CREATE_REQUEST,
@@ -246,6 +247,7 @@ def register_entity_bus_handlers(
                 title=str(payload["title"]),
                 description=str(payload.get("description", "")),
             )
+            workspace_service.activate(workspace.id)
             _publish_result(
                 bus,
                 WORKSPACE_CREATE_RESULT,
@@ -291,6 +293,16 @@ def register_entity_bus_handlers(
                 {"error": str(exc)},
                 source=source,
             )
+
+    def on_ui_select_workspace(event: Event) -> None:
+        workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
+        if not workspace_id_raw:
+            workspace_service.deactivate()
+            return
+        try:
+            workspace_service.activate(UUID(workspace_id_raw))
+        except ValueError:
+            pass
 
     def on_timeline_record_request(event: Event) -> None:
         rid = _request_id(event)
@@ -363,6 +375,7 @@ def register_entity_bus_handlers(
         bus.subscribe(RELATIONSHIP_CREATE_REQUEST, on_relationship_create_request),
         bus.subscribe(WORKSPACE_CREATE_REQUEST, on_workspace_create_request),
         bus.subscribe(WORKSPACE_ADD_ENTITY_REQUEST, on_workspace_add_entity_request),
+        bus.subscribe(UI_SELECT_WORKSPACE, on_ui_select_workspace),
         bus.subscribe(TIMELINE_RECORD_REQUEST, on_timeline_record_request),
         bus.subscribe(ACTION_INVOKE_REQUEST, on_action_invoke_request),
     ]

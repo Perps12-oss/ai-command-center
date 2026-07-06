@@ -365,6 +365,8 @@ class WorkspaceView(ctk.CTkFrame):
                 chat_payload["path"] = str(meta["command"])
 
             def _chat_handler(p: dict = chat_payload) -> None:
+                if entity.entity_type == "workspace":
+                    self._ws.select_workspace(entity.entity_id)
                 self._on_open_chat(p)
 
             chat = _chat_handler

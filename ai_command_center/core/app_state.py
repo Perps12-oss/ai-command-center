@@ -58,6 +58,8 @@ from ai_command_center.core.events.topics import (
     SYSTEM_SNAPSHOT,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
     WORKFLOW_STARTED,
@@ -108,6 +110,8 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ENTITY_UPDATED,
     ENTITY_DELETED,
     ENTITY_RELATIONSHIPS_CHANGED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
     # Agent / workflow runs (Track R7)
@@ -273,6 +277,8 @@ class AppState:
     chat_workspace_entity_description: str = ""
     chat_workspace_entity_url: str = ""
     chat_workspace_entity_path: str = ""
+    active_workspace_id: str = ""
+    active_workspace_title: str = ""
     chat_active_session_key: str = "default"
     errors: tuple[str, ...] = ()
 
@@ -981,6 +987,7 @@ from ai_command_center.core.state.chat_state import (  # noqa: E402
 )
 from ai_command_center.core.state.workspace_state import (  # noqa: E402
     _reduce_notes_indexed,
+    _reduce_workspace_active,
     _reduce_workspace_os_event,
 )
 
@@ -1034,6 +1041,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_chat_workspace_entity,
     _reduce_ui_chat_new_session,
     _reduce_workspace_os_event,
+    _reduce_workspace_active,
     _reduce_note_results,
     _reduce_note_selected,
     _reduce_note_created,

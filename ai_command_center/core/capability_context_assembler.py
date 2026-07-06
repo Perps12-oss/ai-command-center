@@ -77,6 +77,7 @@ class CapabilityContextAssembler:
             "workspace_entity_description",
             "workspace_entity_url",
             "workspace_entity_path",
+            "workspace_id",
         ):
             value = str(event_payload.get(key) or args.get(key, "")).strip()
             if value:
@@ -141,8 +142,12 @@ class CapabilityContextAssembler:
             workspace_id = str(
                 event_payload.get("workspace_id") or args.get("workspace_id", "")
             ).strip()
+            if not workspace_id:
+                workspace_id = str(session_scope.get("workspace_id", "")).strip()
             if workspace_id:
                 memory_scope["workspace_id"] = workspace_id
+                if "workspace_id" not in session_scope:
+                    session_scope = {**session_scope, "workspace_id": workspace_id}
 
             self._bus.publish(
                 MEMORY_LOOKUP_REQUEST,
