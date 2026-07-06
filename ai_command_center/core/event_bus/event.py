@@ -20,6 +20,10 @@ from ai_command_center.core.events.topics import (
     ENTITY_DELETED,
     ENTITY_RELATIONSHIPS_CHANGED,
     ENTITY_UPDATED,
+    WORKSPACE_ACTIVATED,
+    WORKSPACE_CREATED,
+    WORKSPACE_DEACTIVATED,
+    WORKSPACE_LAYOUT_CHANGED,
 )
 
 
@@ -66,11 +70,11 @@ EVENT_ACTION_INVOKED = "action.invoked"
 EVENT_ACTION_COMPLETED = "action.completed"
 EVENT_ACTION_FAILED = "action.failed"
 
-# Workspace events
-EVENT_WORKSPACE_CREATED = "workspace.created"
-EVENT_WORKSPACE_ACTIVATED = "workspace.activated"
-EVENT_WORKSPACE_DEACTIVATED = "workspace.deactivated"
-EVENT_WORKSPACE_LAYOUT_CHANGED = "workspace.layout.changed"
+# Workspace events (canonical values in core.events.topics)
+EVENT_WORKSPACE_CREATED = WORKSPACE_CREATED
+EVENT_WORKSPACE_ACTIVATED = WORKSPACE_ACTIVATED
+EVENT_WORKSPACE_DEACTIVATED = WORKSPACE_DEACTIVATED
+EVENT_WORKSPACE_LAYOUT_CHANGED = WORKSPACE_LAYOUT_CHANGED
 
 # Timeline events (all major actions)
 EVENT_TIMELINE_EVENT = "timeline.event"

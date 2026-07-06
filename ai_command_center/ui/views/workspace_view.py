@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Callable
 
 import customtkinter as ctk
@@ -39,10 +40,13 @@ class _EntityTile(GlassCard):
         title: str,
         entity_type: str,
         subtitle: str,
+        on_select: Callable[[], None] | None = None,
         on_launch: Callable[[], None] | None = None,
         on_chat: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(master)
+        if on_select is not None:
+            self.bind("<Button-1>", lambda _event: on_select())
         icon = _TYPE_ICON.get(entity_type, "•")
         ctk.CTkLabel(
             self,
@@ -201,6 +205,45 @@ class WorkspaceView(ctk.CTkFrame):
             if e.entity_type == entity_type
         ]
 
+    def _resolve_parent_workspace_id(self, entity) -> str:
+        """Resolve parent workspace for card/resource/note tiles."""
+        if entity.entity_type == "workspace":
+            return str(entity.entity_id)
+        meta = dict(entity.metadata)
+        ws = str(meta.get("workspace_id", "")).strip()
+        if ws:
+            return ws
+        card_id = str(meta.get("card_id", "")).strip()
+        if card_id:
+            for candidate in self._entities:
+                if candidate.entity_id == card_id:
+                    return self._resolve_parent_workspace_id(candidate)
+        for workspace in self._entities:
+            if workspace.entity_type != "workspace":
+                continue
+            ws_meta = dict(workspace.metadata)
+            raw = str(ws_meta.get("entities", "")).strip()
+            if not raw:
+                continue
+            try:
+                child_ids = ast.literal_eval(raw)
+            except (SyntaxError, ValueError):
+                continue
+            if isinstance(child_ids, list) and str(entity.entity_id) in {
+                str(child) for child in child_ids
+            }:
+                return str(workspace.entity_id)
+        return ""
+
+    def _on_tile_select(self, entity) -> None:
+        workspace_id = self._resolve_parent_workspace_id(entity)
+        self._ws.select_entity(
+            str(entity.entity_id),
+            str(entity.entity_type),
+            str(entity.title or entity.entity_id),
+            workspace_id=workspace_id,
+        )
+
     def _show_create_workspace(self) -> None:
         dialog = CreateWorkspaceDialog(self.winfo_toplevel())
         self.wait_window(dialog)
@@ -355,6 +398,9 @@ class WorkspaceView(ctk.CTkFrame):
                 "entity_type": entity.entity_type,
                 "title": entity.title or entity.entity_id,
             }
+            parent_ws = self._resolve_parent_workspace_id(entity)
+            if parent_ws and entity.entity_type != "workspace":
+                chat_payload["workspace_id"] = parent_ws
             if meta.get("description"):
                 chat_payload["description"] = str(meta["description"])
             if meta.get("url"):
@@ -365,9 +411,10 @@ class WorkspaceView(ctk.CTkFrame):
                 chat_payload["path"] = str(meta["command"])
 
             def _chat_handler(p: dict = chat_payload) -> None:
-                if entity.entity_type == "workspace":
-                    self._ws.select_workspace(entity.entity_id)
                 self._on_open_chat(p)
+
+            def _select_handler(ent=entity) -> None:
+                self._on_tile_select(ent)
 
             chat = _chat_handler
             row, col = divmod(index, columns)
@@ -376,6 +423,7 @@ class WorkspaceView(ctk.CTkFrame):
                 title=entity.title or entity.entity_id,
                 entity_type=entity.entity_type,
                 subtitle=str(subtitle)[:120],
+                on_select=_select_handler,
                 on_launch=launch,
                 on_chat=chat,
             )

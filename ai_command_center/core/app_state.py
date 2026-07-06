@@ -58,6 +58,7 @@ from ai_command_center.core.events.topics import (
     SYSTEM_SNAPSHOT,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
+    UI_SELECT_ENTITY,
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
     WORKFLOW_COMPLETED,
@@ -114,6 +115,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKSPACE_DEACTIVATED,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
+    UI_SELECT_ENTITY,
     # Agent / workflow runs (Track R7)
     AGENT_SPAWNED,
     AGENT_TASK_REQUEST,
@@ -279,6 +281,9 @@ class AppState:
     chat_workspace_entity_path: str = ""
     active_workspace_id: str = ""
     active_workspace_title: str = ""
+    selected_entity_id: str = ""
+    selected_entity_type: str = ""
+    selected_entity_title: str = ""
     chat_active_session_key: str = "default"
     errors: tuple[str, ...] = ()
 
@@ -369,6 +374,8 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         vault_path=str(payload.get("vault_path", "")),
         overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
         telemetry_enabled=_coerce_bool(payload.get("telemetry_enabled", True)),
+        otel_enabled=_coerce_bool(payload.get("otel_enabled", False)),
+        otel_endpoint=str(payload.get("otel_endpoint", "http://127.0.0.1:4318")),
         schema_version=_coerce_int(payload.get("schema_version", 1), 1),
         capability_provider_map=capability_provider_map_from_payload(payload),
         qwenpaw_enabled=_coerce_bool(payload.get("qwenpaw_enabled", False)),
@@ -989,6 +996,7 @@ from ai_command_center.core.state.workspace_state import (  # noqa: E402
     _reduce_notes_indexed,
     _reduce_workspace_active,
     _reduce_workspace_os_event,
+    _reduce_workspace_selection,
 )
 
 
@@ -1042,6 +1050,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_ui_chat_new_session,
     _reduce_workspace_os_event,
     _reduce_workspace_active,
+    _reduce_workspace_selection,
     _reduce_note_results,
     _reduce_note_selected,
     _reduce_note_created,

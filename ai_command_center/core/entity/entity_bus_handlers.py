@@ -12,7 +12,9 @@ from uuid import UUID
 
 from ai_command_center.core.entity.entity_context import format_entity_context
 from ai_command_center.core.entity.entity import (
+    ENTITY_TYPE_CARD,
     ENTITY_TYPE_RESOURCE,
+    ENTITY_TYPE_WORKSPACE,
     RESOURCE_TYPE_COMMAND,
     RESOURCE_TYPE_FOLDER,
     RESOURCE_TYPE_URL,
@@ -31,6 +33,7 @@ from ai_command_center.core.events.topics import (
     RELATIONSHIP_CREATE_RESULT,
     TIMELINE_RECORD_REQUEST,
     TIMELINE_RECORD_RESULT,
+    UI_SELECT_ENTITY,
     UI_SELECT_WORKSPACE,
     WORKSPACE_ADD_ENTITY_REQUEST,
     WORKSPACE_ADD_ENTITY_RESULT,
@@ -55,6 +58,61 @@ def _publish_result(
     if not request_id:
         return
     bus.publish(topic, {"request_id": request_id, **payload}, source=source)
+
+
+def _resolve_parent_workspace_id(
+    entity_service: Any,
+    relationship_service: Any,
+    entity_id: UUID,
+    entity_type: str,
+) -> UUID | None:
+    """Resolve the parent workspace for a canvas entity (card, resource, note)."""
+    if entity_type == ENTITY_TYPE_WORKSPACE:
+        return entity_id
+    entity = entity_service.get(entity_id)
+    if entity is not None:
+        meta = dict(entity.metadata)
+        ws_raw = str(meta.get("workspace_id", "")).strip()
+        if ws_raw:
+            try:
+                return UUID(ws_raw)
+            except ValueError:
+                pass
+        card_raw = str(meta.get("card_id", "")).strip()
+        if card_raw:
+            try:
+                card_id = UUID(card_raw)
+            except ValueError:
+                card_id = None
+            if card_id is not None:
+                parent = _resolve_parent_workspace_id(
+                    entity_service,
+                    relationship_service,
+                    card_id,
+                    ENTITY_TYPE_CARD,
+                )
+                if parent is not None:
+                    return parent
+    if entity_type == ENTITY_TYPE_CARD:
+        for workspace in entity_service.get_by_type(ENTITY_TYPE_WORKSPACE):
+            child_ids = [
+                UUID(str(child))
+                for child in workspace.metadata.get("entities", [])
+            ]
+            if entity_id in child_ids:
+                return workspace.id
+    if entity_type == ENTITY_TYPE_RESOURCE:
+        for rel in relationship_service.get_by_target(entity_id):
+            if rel.relationship_type == RelationshipType.CONTAINS:
+                parent = _resolve_parent_workspace_id(
+                    entity_service,
+                    relationship_service,
+                    rel.source_id,
+                    ENTITY_TYPE_CARD,
+                )
+                if parent is not None:
+                    return parent
+    return None
 
 
 def register_entity_bus_handlers(
@@ -294,6 +352,37 @@ def register_entity_bus_handlers(
                 source=source,
             )
 
+    def on_ui_select_entity(event: Event) -> None:
+        entity_id_raw = str(event.payload.get("entity_id", "")).strip()
+        entity_type = str(event.payload.get("entity_type", "")).strip()
+        workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
+        target_ws: UUID | None = None
+        if workspace_id_raw:
+            try:
+                target_ws = UUID(workspace_id_raw)
+            except ValueError:
+                target_ws = None
+        elif entity_type == ENTITY_TYPE_WORKSPACE and entity_id_raw:
+            try:
+                target_ws = UUID(entity_id_raw)
+            except ValueError:
+                target_ws = None
+        elif entity_id_raw:
+            try:
+                target_ws = _resolve_parent_workspace_id(
+                    entity_service,
+                    relationship_service,
+                    UUID(entity_id_raw),
+                    entity_type,
+                )
+            except ValueError:
+                target_ws = None
+        if target_ws is not None:
+            try:
+                workspace_service.activate(target_ws)
+            except ValueError:
+                pass
+
     def on_ui_select_workspace(event: Event) -> None:
         workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
         if not workspace_id_raw:
@@ -375,6 +464,7 @@ def register_entity_bus_handlers(
         bus.subscribe(RELATIONSHIP_CREATE_REQUEST, on_relationship_create_request),
         bus.subscribe(WORKSPACE_CREATE_REQUEST, on_workspace_create_request),
         bus.subscribe(WORKSPACE_ADD_ENTITY_REQUEST, on_workspace_add_entity_request),
+        bus.subscribe(UI_SELECT_ENTITY, on_ui_select_entity),
         bus.subscribe(UI_SELECT_WORKSPACE, on_ui_select_workspace),
         bus.subscribe(TIMELINE_RECORD_REQUEST, on_timeline_record_request),
         bus.subscribe(ACTION_INVOKE_REQUEST, on_action_invoke_request),

@@ -14,14 +14,12 @@ from ai_command_center.core.entity.entity import (
     ENTITY_TYPE_WORKSPACE,
 )
 from ai_command_center.core.entity.entity_service import EntityService
-from ai_command_center.core.event_bus import (
-    EVENT_WORKSPACE_CREATED,
-    EVENT_WORKSPACE_LAYOUT_CHANGED,
-)
 from ai_command_center.core.events.topics import (
     WORKSPACE_ACTIVATED,
     WORKSPACE_ACTIVE,
+    WORKSPACE_CREATED,
     WORKSPACE_DEACTIVATED,
+    WORKSPACE_LAYOUT_CHANGED,
 )
 
 
@@ -69,7 +67,7 @@ class WorkspaceService:
         
         # Publish event
         self._event_bus.publish(
-            EVENT_WORKSPACE_CREATED,
+            WORKSPACE_CREATED,
             {
                 "workspace_id": str(workspace.id),
                 "title": workspace.title,
@@ -134,7 +132,7 @@ class WorkspaceService:
         
         # Publish event
         self._event_bus.publish(
-            EVENT_WORKSPACE_LAYOUT_CHANGED,
+            WORKSPACE_LAYOUT_CHANGED,
             {
                 "workspace_id": str(workspace_id),
             },
