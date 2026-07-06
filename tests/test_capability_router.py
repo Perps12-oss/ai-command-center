@@ -1,4 +1,4 @@
-"""Tests for CapabilityRouterService (Agent Runtime Interface Phase 1)."""
+"""Tests for RuntimeCapabilityRouterService (Agent Runtime Interface Phase 1)."""
 
 from __future__ import annotations
 
@@ -12,20 +12,20 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.runtime_capability import CapabilityKind
 from ai_command_center.runtime.provider_registry import build_default_runtime_registry
-from ai_command_center.services.capability_router_service import CapabilityRouterService
+from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 
 
-def _start_router(bus: EventBus) -> CapabilityRouterService:
-    router = CapabilityRouterService(bus, provider_registry=build_default_runtime_registry(bus))
+def _start_router(bus: EventBus) -> RuntimeCapabilityRouterService:
+    router = RuntimeCapabilityRouterService(bus, provider_registry=build_default_runtime_registry(bus))
     router.start()
     return router
 
 
 def test_classify_prefix_and_hints() -> None:
-    assert CapabilityRouterService.classify("/plan my week") == CapabilityKind.PLANNING
-    assert CapabilityRouterService.classify("/code fix auth") == CapabilityKind.CODING
-    assert CapabilityRouterService.classify("what's on my calendar today") == CapabilityKind.PLANNING
-    assert CapabilityRouterService.classify("hello there") == CapabilityKind.CHAT
+    assert RuntimeCapabilityRouterService.classify("/plan my week") == CapabilityKind.PLANNING
+    assert RuntimeCapabilityRouterService.classify("/code fix auth") == CapabilityKind.CODING
+    assert RuntimeCapabilityRouterService.classify("what's on my calendar today") == CapabilityKind.CHAT
+    assert RuntimeCapabilityRouterService.classify("hello there") == CapabilityKind.CHAT
 
 
 def test_chat_routed_emits_capability_events() -> None:
@@ -66,7 +66,7 @@ def test_planning_routes_to_qwenpaw_and_falls_back_when_unavailable() -> None:
             COMMAND_ROUTED,
             {
                 "intent": INTENT_CHAT,
-                "args": {"prompt": "what's on my calendar today"},
+                "args": {"prompt": "plan my week"},
                 "request_id": "req-plan-1",
             },
             source="command_router",
