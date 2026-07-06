@@ -27,6 +27,21 @@ class FeatureRegistry:
     - Feature state management
     """
 
+    _instance: FeatureRegistry | None = None
+
+    @classmethod
+    def instance(cls) -> FeatureRegistry:
+        """Process-wide registry; enables chat docking UI by default."""
+        if cls._instance is None:
+            registry = cls()
+            registry.enable(Feature.FEATURE_DOCKING)
+            cls._instance = registry
+        return cls._instance
+
+    @classmethod
+    def set_instance(cls, registry: FeatureRegistry) -> None:
+        cls._instance = registry
+
     def __init__(self) -> None:
         self._features: dict[str, FeatureState] = {}
         # Initialize all features as disabled by default

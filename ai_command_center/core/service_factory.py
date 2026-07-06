@@ -20,6 +20,7 @@ from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_bus_handlers import register_entity_bus_handlers
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.feature.feature import Feature
 from ai_command_center.core.feature.feature_registry import FeatureRegistry
 from ai_command_center.core.observability.observability_service import (
     ObservabilityService,
@@ -77,6 +78,7 @@ from ai_command_center.services.shell_tool_service import ShellToolService
 from ai_command_center.services.system_monitor_service import SystemMonitorService
 from ai_command_center.services.telemetry_service import TelemetryService
 from ai_command_center.services.execution_run_service import ExecutionRunService
+from ai_command_center.services.execution_query_service import ExecutionQueryService
 from ai_command_center.telemetry.tracing_service import TracingService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
@@ -145,6 +147,7 @@ def build_services(
     )
     capability_lifecycle = CapabilityLifecycleManager(bus)
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
+    execution_query = ExecutionQueryService(bus, repo=ExecutionRunRepository(db))
     workflow_persistence = WorkflowPersistenceService(bus, repo=WorkflowRunRepository(db))
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
@@ -175,6 +178,7 @@ def build_services(
         tracing,
         capability_lifecycle,
         execution_run,
+        execution_query,
         workflow_persistence,
         chat_export,
         system_monitor,
@@ -215,6 +219,8 @@ def build_services(
         observability_service = ObservabilityService(bus)
         snapshot_service = SnapshotService(db, bus)
         feature_registry = FeatureRegistry()
+        FeatureRegistry.set_instance(feature_registry)
+        feature_registry.enable(Feature.FEATURE_DOCKING)
         ai_capability_registry_service = AICapabilityRegistryService(permission_service)
         command_palette_service = CommandPaletteService(bus)
         search_provider = FTSSearchProvider(entity_service)

@@ -55,6 +55,7 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_LIFECYCLE_SNAPSHOT,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
+    EXECUTION_QUERY_RESULT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -83,6 +84,11 @@ from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnap
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.core.state.model_state import ModelSelectionSnapshot
 from ai_command_center.core.state.tool_state import ToolRunItem
+from ai_command_center.core.state.execution_state import (
+    ExecutionContext,
+    SpanItem,
+    reduce_execution_query_result,
+)
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -148,6 +154,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PERMISSION_CHECK_RESULT,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
+    EXECUTION_QUERY_RESULT,
     MODEL_SELECTED,
     TOOL_COMPLETED,
     TOOL_FAILED,
@@ -373,6 +380,7 @@ class AppState:
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
+    execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
@@ -1241,24 +1249,57 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
         return state
     payload = event.payload
     facts = payload.get("execution_facts") or {}
+    run = OrchestrationRunSnapshot(
+        request_id=str(payload.get("request_id", "")),
+        query=str(payload.get("query", "")),
+        intent=str(payload.get("intent", "")),
+        provider_id=str(payload.get("provider_id", "")),
+        execution_success=bool(payload.get("execution_success")),
+        execution_facts=dict(facts) if isinstance(facts, dict) else {},
+        execution_error=str(payload.get("execution_error") or "") or None,
+        truth_valid=bool(payload.get("truth_valid")),
+        truth_detail=str(payload.get("truth_detail", "")),
+        response_source=str(payload.get("response_source", "")),
+        response_text=str(payload.get("response_text", "")),
+        receipt_id=str(payload.get("receipt_id", "")),
+        trace_id=str(payload.get("trace_id", "")),
+        span_id=str(payload.get("span_id", "")),
+    )
+    exec_ctx = ExecutionContext(
+        request_id=run.request_id,
+        provider_id=run.provider_id,
+        status="ready" if run.execution_success else "error",
+        intent=run.intent,
+        query=run.query,
+        response_source=run.response_source,
+        truth_valid=run.truth_valid,
+        truth_detail=run.truth_detail,
+        trace_spans=(
+            SpanItem(
+                span_id=run.span_id or run.request_id,
+                name=run.intent or "orchestration",
+                kind="orchestration",
+                status="ok" if run.execution_success else "error",
+            ),
+        ),
+        metrics={"receipt_id": run.receipt_id, "trace_id": run.trace_id},
+    )
     return replace(
         state,
-        orchestration_run=OrchestrationRunSnapshot(
-            request_id=str(payload.get("request_id", "")),
-            query=str(payload.get("query", "")),
-            intent=str(payload.get("intent", "")),
-            provider_id=str(payload.get("provider_id", "")),
-            execution_success=bool(payload.get("execution_success")),
-            execution_facts=dict(facts) if isinstance(facts, dict) else {},
-            execution_error=str(payload.get("execution_error") or "") or None,
-            truth_valid=bool(payload.get("truth_valid")),
-            truth_detail=str(payload.get("truth_detail", "")),
-            response_source=str(payload.get("response_source", "")),
-            response_text=str(payload.get("response_text", "")),
-            receipt_id=str(payload.get("receipt_id", "")),
-            trace_id=str(payload.get("trace_id", "")),
-            span_id=str(payload.get("span_id", "")),
-        ),
+        orchestration_run=run,
+        execution_context=exec_ctx,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_execution_context(state: AppState, event: Event) -> AppState:
+    new_ctx = reduce_execution_query_result(state.execution_context, event)
+    if new_ctx == state.execution_context:
+        return state
+    return replace(
+        state,
+        execution_context=new_ctx,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1306,6 +1347,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_workflow_runs_loaded,
     _reduce_permission_check,
     _reduce_orchestration_run,
+    _reduce_execution_context,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
 )
