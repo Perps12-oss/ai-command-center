@@ -9,6 +9,9 @@ from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT, SETTINGS_UPD
 from ai_command_center.core.settings.migration_manager import MigrationManager
 from ai_command_center.core.settings.settings_repository import SettingsRepository
 from ai_command_center.core.settings.settings_schema import SettingsSchema
+from ai_command_center.domain.capability_provider_settings import (
+    capability_provider_map_from_payload,
+)
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 
 
@@ -52,6 +55,13 @@ class SettingsService:
             overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
             telemetry_enabled=bool(payload.get("telemetry_enabled", True)),
             schema_version=int(payload.get("schema_version", 1)),
+            capability_provider_map=capability_provider_map_from_payload(payload),
+            qwenpaw_enabled=bool(payload.get("qwenpaw_enabled", False)),
+            qwenpaw_url=str(payload.get("qwenpaw_url", "http://127.0.0.1:8088")),
+            qwenpaw_agent_id=str(payload.get("qwenpaw_agent_id", "default")),
+            qwenpaw_auto_start=bool(payload.get("qwenpaw_auto_start", False)),
+            qwenpaw_python=str(payload.get("qwenpaw_python", "")),
+            qwenpaw_auth_token=str(payload.get("qwenpaw_auth_token", "")),
         )
 
     def set(self, key: str, value: Any) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Callable
 
 from ai_command_center.core.contracts import COMMAND_ROUTED_VERSION
@@ -109,6 +110,7 @@ class CommandRouterService(BaseService):
                 args = {**args, "workspace_id": scope["workspace_id"]}
         payload: dict[str, object] = {
             "contract_version": COMMAND_ROUTED_VERSION,
+            "request_id": uuid.uuid4().hex,
             "text": text,
             "intent": intent,
             "args": args,

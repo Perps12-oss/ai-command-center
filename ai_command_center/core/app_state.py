@@ -62,6 +62,9 @@ from ai_command_center.core.events.topics import (
     WORKFLOW_STEP_COMPLETED,
     WORKFLOW_STEP_STARTED,
 )
+from ai_command_center.domain.capability_provider_settings import (
+    capability_provider_map_from_payload,
+)
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -363,6 +366,13 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
         telemetry_enabled=_coerce_bool(payload.get("telemetry_enabled", True)),
         schema_version=_coerce_int(payload.get("schema_version", 1), 1),
+        capability_provider_map=capability_provider_map_from_payload(payload),
+        qwenpaw_enabled=_coerce_bool(payload.get("qwenpaw_enabled", False)),
+        qwenpaw_url=str(payload.get("qwenpaw_url", "http://127.0.0.1:8088")),
+        qwenpaw_agent_id=str(payload.get("qwenpaw_agent_id", "default")),
+        qwenpaw_auto_start=_coerce_bool(payload.get("qwenpaw_auto_start", False)),
+        qwenpaw_python=str(payload.get("qwenpaw_python", "")),
+        qwenpaw_auth_token=str(payload.get("qwenpaw_auth_token", "")),
     )
 
 
