@@ -30,6 +30,7 @@ from ai_command_center.core.events.topics import (
     UI_OPEN_CHAT,
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
+    UI_SELECT_WORKSPACE,
 )
 
 
@@ -204,6 +205,14 @@ class UIController:
     def publish_launch_resource(self, payload: dict[str, object]) -> None:
         self._bus.publish(UI_LAUNCH_RESOURCE, payload, source="ui")
 
+    def publish_select_workspace(self, workspace_id: str) -> None:
+        """Activate a workspace as the runtime scope anchor."""
+        self._bus.publish(
+            UI_SELECT_WORKSPACE,
+            {"workspace_id": workspace_id},
+            source="ui",
+        )
+
     def publish_open_chat(
         self,
         entity_id: str,
@@ -213,6 +222,7 @@ class UIController:
         description: str = "",
         url: str = "",
         path: str = "",
+        workspace_id: str = "",
     ) -> None:
         payload: dict[str, str] = {
             "entity_id": entity_id,
@@ -225,6 +235,11 @@ class UIController:
             payload["url"] = url
         if path:
             payload["path"] = path
+        ws_id = str(workspace_id).strip()
+        if not ws_id and entity_type not in ("", "workspace"):
+            ws_id = str(self._state_store.snapshot.active_workspace_id).strip()
+        if ws_id:
+            payload["workspace_id"] = ws_id
         self._bus.publish(UI_OPEN_CHAT, payload, source="ui")
 
     def publish_clear_chat_entity(self) -> None:
