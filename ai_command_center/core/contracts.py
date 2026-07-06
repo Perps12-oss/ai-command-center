@@ -40,6 +40,12 @@ OLLAMA_SERVICE_API_VERSION = "1.0"
 # tool.invoke / tool.result envelope (Phase 4B)
 TOOL_CONTRACT_VERSION = "1.0"
 
+# TOOL_INVOKE without workspace_context — documented opt-out paths (Program 3 exit):
+#   1. actor_type "user" with empty workspace_context (no active workspace at invoke time)
+#   2. Non-production tests and verification scripts
+#   3. Workflow runs without workspace binding (run["workspace_context"] defaults to {})
+# Non-user actors (agent, workflow) require workspace_context per ToolExecutorService.
+
 SUPPORTED_VERSIONS: dict[str, tuple[str, ...]] = {
     "context_bundle": (CONTEXT_BUNDLE_VERSION_LEGACY, CONTEXT_BUNDLE_VERSION),
     "command_routed": (COMMAND_ROUTED_VERSION,),

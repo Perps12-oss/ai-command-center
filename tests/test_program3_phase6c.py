@@ -132,7 +132,7 @@ class Phase6cWiiApproachTests(unittest.TestCase):
                 ]
             )
             ratio = summary["workspace_scope"]["ratio_pct"]
-            self.assertGreaterEqual(ratio, 40.0)
+            self.assertGreaterEqual(ratio, 60.0)
             scoped = summary["workspace_scope"]["scoped"]
             self.assertGreaterEqual(scoped, 1)
         finally:
