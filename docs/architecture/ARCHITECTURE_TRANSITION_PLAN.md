@@ -78,7 +78,7 @@ The following documents were **merged into this file and removed** on 2026-07-03
 | TD-05 | Inspector Tk marshal | **PARTIAL** | **S4** | `after(0)` added; migrate to `UIQueue` |
 | TD-06 | EventBus swallows errors | **FIXED** | S6 | `bus.handler_error` exists |
 | TD-07 | AppState listener errors | **FIXED** | S5 | `app.error` exists; verify `close()` everywhere |
-| TD-08 | `shell=True` | **HARDENED** | **S2** | Production sandbox + permission still open |
+| TD-08 | `shell=True` | **HARDENED** | **S2** | Production sandbox + permission gate — **done** |
 | TD-09 | Ruff F401 | **FIXED** | S8 | Maintain in CI |
 | TD-10 | `motion_widgets.py` | KEEP | — | No action |
 | TD-11 | Requirements drift | **VERIFIED** | S7 | `requirements.txt` matches runtime imports (2026-07-06 audit) |
@@ -104,7 +104,7 @@ The following documents were **merged into this file and removed** on 2026-07-03
 
 | Track | Goal | Program | Item |
 |-------|------|---------|------|
-| 1 Stabilization | P0/P1 fixes | **1** | S1–S8 (largely done; S3/S4/S2 remain) |
+| 1 Stabilization | P0/P1 fixes | **1** | S1–S8 (**complete**; S7 doc-only) |
 | 2 Enforcement | warn → block | **2** | E1–E4 |
 | 4 R4 Async EventBus | Non-blocking dispatch | **1** | S1 (`tool.invoke` worker; R4b queue exists) |
 | 5 Structural refactor | God classes, UI violations | **1** + **3** | S7; W4 (`app.py` bus → AppState listeners) |
@@ -249,11 +249,11 @@ Architecture **executes reliably**: no UI freeze on shell, model path goes throu
 
 ### Exit criteria (Program 1)
 
-- [ ] `test_prompt_injection_sandbox` passes (xfail removed)
-- [ ] `test_eventbus_concurrency` + shutdown test green
-- [ ] Chat integration test proves `ModelRouterService` + single provider dispatch
-- [ ] SystemView navigation test: no psutil activity after `on_hide`
-- [ ] Topic counter visible in telemetry or system snapshot
+- [x] `test_prompt_injection_sandbox` passes (xfail removed)
+- [x] `test_eventbus_concurrency` + shutdown test green
+- [x] Chat integration test proves `ModelRouterService` + single provider dispatch
+- [x] SystemView navigation test: no psutil activity after `on_hide`
+- [x] Topic counter visible in telemetry or system snapshot
 
 ### Time
 
