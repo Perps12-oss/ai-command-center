@@ -36,6 +36,8 @@ class SettingsSnapshot:
     vault_path: str | Path = ""
     overlay_hotkey: str = "alt+space"
     telemetry_enabled: bool = True
+    otel_enabled: bool = False
+    otel_endpoint: str = "http://127.0.0.1:4318"
     schema_version: int = 5
     capability_provider_map: dict[str, str] = field(
         default_factory=lambda: dict(DEFAULT_CAPABILITY_PROVIDER_MAP)
@@ -69,6 +71,8 @@ class SettingsSnapshot:
             "vault_path": str(self.vault_path),
             "overlay_hotkey": self.overlay_hotkey,
             "telemetry_enabled": self.telemetry_enabled,
+            "otel_enabled": self.otel_enabled,
+            "otel_endpoint": self.otel_endpoint,
             "schema_version": self.schema_version,
             **{
                 f"capability_provider_{kind}": provider
