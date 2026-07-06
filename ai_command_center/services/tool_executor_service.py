@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import threading
+import uuid
 from typing import TYPE_CHECKING, Callable
 from uuid import UUID
 
@@ -12,6 +13,7 @@ from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, is_valid_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
+    TIMELINE_RECORD_REQUEST,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_INVOKE,
@@ -164,6 +166,63 @@ class ToolExecutorService(BaseService):
         )
         return self._permission.check(Permission.LAUNCH_TOOL.value, context)
 
+    @staticmethod
+    def _workspace_context(payload: dict) -> dict[str, str]:
+        raw = payload.get("workspace_context")
+        if isinstance(raw, dict):
+            return {str(k): str(v) for k, v in raw.items() if v is not None and str(v).strip()}
+        return {}
+
+    @staticmethod
+    def _timeline_entity_id(workspace_context: dict[str, str]) -> str | None:
+        for key in ("entity_id", "workspace_id"):
+            raw = str(workspace_context.get(key, "")).strip()
+            if not raw:
+                continue
+            try:
+                UUID(raw)
+            except ValueError:
+                continue
+            return raw
+        return None
+
+    def _record_tool_timeline(
+        self,
+        workspace_context: dict[str, str],
+        *,
+        tool_name: str,
+        invoke_id: str,
+        success: bool,
+        output: str = "",
+        error: str | None = None,
+    ) -> None:
+        workspace_id = str(workspace_context.get("workspace_id", "")).strip()
+        if not workspace_id:
+            return
+        entity_id = self._timeline_entity_id(workspace_context)
+        entity_type = str(workspace_context.get("entity_type", "")).strip() or None
+        timeline_payload: dict[str, object] = {
+            "request_id": uuid.uuid4().hex,
+            "event_type": "tool.completed" if success else "tool.failed",
+            "payload": {
+                "tool": tool_name,
+                "invoke_id": invoke_id,
+                "workspace_id": workspace_id,
+                "success": success,
+                "output": output[:500] if output else "",
+                "error": error or "",
+            },
+        }
+        if entity_id:
+            timeline_payload["entity_id"] = entity_id
+            if entity_type:
+                timeline_payload["entity_type"] = entity_type
+        self._bus.publish(
+            TIMELINE_RECORD_REQUEST,
+            timeline_payload,
+            source=self.name,
+        )
+
     def _on_tool_invoke(self, event: Event) -> None:
         payload = event.payload
         if payload.get("contract_version") != TOOL_CONTRACT_VERSION:
@@ -203,6 +262,7 @@ class ToolExecutorService(BaseService):
         invoke_id = str(payload.get("invoke_id", ""))
         run_id = payload.get("run_id")
         step_id = payload.get("step_id")
+        workspace_context = self._workspace_context(payload)
 
         if tool_name == "shell" and not self._shell_allowed(payload):
             self._bus.publish(
@@ -241,8 +301,16 @@ class ToolExecutorService(BaseService):
                     "step_id": step_id,
                     "success": False,
                     "error": error,
+                    "workspace_context": workspace_context,
                 },
                 source=self.name,
+            )
+            self._record_tool_timeline(
+                workspace_context,
+                tool_name=tool_name,
+                invoke_id=invoke_id,
+                success=False,
+                error=error,
             )
             return
 
@@ -258,8 +326,17 @@ class ToolExecutorService(BaseService):
                 "error": execution.error,
                 "run_id": run_id,
                 "step_id": step_id,
+                "workspace_context": workspace_context,
             },
             source=self.name,
+        )
+        self._record_tool_timeline(
+            workspace_context,
+            tool_name=tool_name,
+            invoke_id=invoke_id,
+            success=True,
+            output=str(output),
+            error=execution.error,
         )
         self._bus.publish(
             TOOL_COMPLETED,
