@@ -9,6 +9,11 @@ import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.events.topics import (
+    CAPABILITY_PROVIDERS_READY,
+    ORCHESTRATION_PROVIDER_HEALTH,
+    ORCHESTRATION_RUN_SNAPSHOT,
+)
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.ui.design_system import theme_v2 as T
@@ -18,7 +23,12 @@ _MCP_INSPECTOR_URL = "https://modelcontextprotocol.io/docs/tools/inspector"
 
 
 class RuntimeInspector(ctk.CTkToplevel):
-    """Read-only developer inspector with orchestration and capability views."""
+    """
+    Read-only developer inspector with orchestration and capability views.
+
+    Reads all diagnostics from AppStateStore; subscribes to EventBus for refresh
+    signals only (no direct service or repository access).
+    """
 
     WIDTH = 760
     HEIGHT = 620
@@ -36,6 +46,7 @@ class RuntimeInspector(ctk.CTkToplevel):
         self._state_store = state_store
         self._ui_queue = ui_queue
         self._filter_request_id = ""
+        self._unsubs: list = []
 
         self.title("Runtime Inspector (dev)")
         self.geometry(f"{self.WIDTH}x{self.HEIGHT}")
@@ -90,10 +101,22 @@ class RuntimeInspector(ctk.CTkToplevel):
         ).pack(side="left", padx=4)
 
         self._unsub_state = self._state_store.subscribe(self._on_state)
+        self._wire_events()
         self._refresh()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.transient(master)
         self.focus_set()
+
+    def _wire_events(self) -> None:
+        """Subscribe to EventBus topics that affect inspector diagnostics."""
+        for topic in (
+            ORCHESTRATION_RUN_SNAPSHOT,
+            ORCHESTRATION_PROVIDER_HEALTH,
+            CAPABILITY_PROVIDERS_READY,
+        ):
+            self._unsubs.append(
+                self._bus.subscribe(topic, lambda _event: self._schedule_refresh())
+            )
 
     def _apply_filter(self) -> None:
         self._filter_request_id = self._filter_entry.get().strip()
@@ -228,5 +251,7 @@ class RuntimeInspector(ctk.CTkToplevel):
         webbrowser.open(_MCP_INSPECTOR_URL)
 
     def _on_close(self) -> None:
+        for unsub in self._unsubs:
+            unsub()
         self._unsub_state()
         self.destroy()
