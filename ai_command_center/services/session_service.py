@@ -147,7 +147,16 @@ class SessionService(BaseService):
             self._scope_entity_id = ""
             self._scope_entity_type = ""
             self._scope_entity_title = ""
-            self._switch_conversation(DEFAULT_CONVERSATION_ID)
+            workspace_id = (
+                self._active_workspace_id
+                or str(event.payload.get("workspace_id", "")).strip()
+            )
+            if workspace_id:
+                title = str(event.payload.get("title", "")).strip() or "Workspace"
+                cid = entity_conversation_id("workspace", workspace_id)
+                self._switch_conversation(cid, title=title[:80] or "Workspace")
+            else:
+                self._switch_conversation(DEFAULT_CONVERSATION_ID)
             return
         entity_type = str(event.payload.get("entity_type", "entity"))
         title = str(event.payload.get("title", entity_id))
