@@ -9,6 +9,7 @@ from ai_command_center.platform.detector import is_arm64
 from ai_command_center.core.events.topics import UI_ORCHESTRATION_INSPECTOR_OPEN
 from ai_command_center.ui.app import CommandPaletteApp
 from ai_command_center.ui.orchestration_inspector import OrchestrationInspector
+from ai_command_center.ui.runtime_inspector import RuntimeInspector
 from ai_command_center.ui.tray import TrayController
 from ai_command_center.ui.workspace_os_inspector import WorkspaceOsInspector
 from ai_command_center.utils.hotkey import register_hotkey, validate_hotkey
@@ -34,6 +35,7 @@ def main() -> int:
     shutting_down = False
     inspector: WorkspaceOsInspector | None = None
     orch_inspector: OrchestrationInspector | None = None
+    runtime_inspector: RuntimeInspector | None = None
 
     def shutdown() -> None:
         nonlocal shutting_down
@@ -44,6 +46,11 @@ def main() -> int:
         try:
             if inspector is not None:
                 inspector.destroy()
+        except Exception:
+            pass
+        try:
+            if runtime_inspector is not None:
+                runtime_inspector.destroy()
         except Exception:
             pass
         try:
@@ -73,6 +80,16 @@ def main() -> int:
             inspector = WorkspaceOsInspector(
                 app, core.bus, core.state_store, ui_queue=app._ui_queue
             )
+
+    def toggle_runtime_inspector() -> None:
+        nonlocal runtime_inspector
+        if runtime_inspector is not None and runtime_inspector.winfo_exists():
+            runtime_inspector.after(0, runtime_inspector.destroy)
+            runtime_inspector = None
+            return
+        runtime_inspector = RuntimeInspector(
+            app, core.bus, core.state_store, ui_queue=app._ui_queue
+        )
 
     def toggle_orchestration_inspector() -> None:
         nonlocal orch_inspector
@@ -116,6 +133,9 @@ def main() -> int:
     orch_inspector_ok, orch_inspector_msg = register_hotkey(
         "ctrl+shift+o", toggle_orchestration_inspector
     )
+    runtime_inspector_ok, runtime_inspector_msg = register_hotkey(
+        "ctrl+shift+r", toggle_runtime_inspector
+    )
     if orch_inspector_ok:
         print(f"Orchestration Inspector hotkey: {orch_inspector_msg}")
     else:
@@ -123,11 +143,19 @@ def main() -> int:
             f"Orchestration Inspector hotkey unavailable: {orch_inspector_msg}",
             file=sys.stderr,
         )
+    if runtime_inspector_ok:
+        print(f"Runtime Inspector hotkey: {runtime_inspector_msg}")
+    else:
+        print(
+            f"Runtime Inspector hotkey unavailable: {runtime_inspector_msg}",
+            file=sys.stderr,
+        )
 
     print(
         "AI Command Center running. Alt+Space to toggle palette. "
         "Ctrl+Shift+W for Workspace OS Inspector. "
-        "Ctrl+Shift+O for Orchestration Inspector. Tray icon active."
+        "Ctrl+Shift+O for Orchestration Inspector. "
+        "Ctrl+Shift+R for Runtime Inspector. Tray icon active."
     )
     app.protocol("WM_DELETE_WINDOW", app.hide)
     app.show()

@@ -95,11 +95,29 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """Add execution_runs table for Provider Platform time-travel diagnostics."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS execution_runs (
+            run_id TEXT PRIMARY KEY,
+            request_id TEXT NOT NULL,
+            source TEXT NOT NULL,
+            snapshot TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_execution_runs_request ON execution_runs(request_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_runs_created ON execution_runs(created_at);
+        """
+    )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
     (3, _migrate_v3),
     (4, _migrate_v4),
+    (5, _migrate_v5),
 ]
 
 
