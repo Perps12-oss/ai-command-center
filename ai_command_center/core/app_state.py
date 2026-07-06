@@ -183,6 +183,22 @@ class MemoryItem:
 
     node_id: str = ""
     label: str = ""
+    workspace_id: str = ""
+    entity_id: str = ""
+
+
+def _memory_catalog_for_workspace(
+    catalog: tuple[MemoryItem, ...],
+    workspace_id: str,
+) -> tuple[MemoryItem, ...]:
+    """Keep catalog entries visible for the active workspace scope."""
+    if not workspace_id:
+        return catalog
+    return tuple(
+        item
+        for item in catalog
+        if not item.workspace_id or item.workspace_id == workspace_id
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -583,16 +599,50 @@ def _reduce_memory_stored(state: AppState, event: Event) -> AppState:
     """Append newly stored memory to the catalog."""
     if event.topic != MEMORY_STORED:
         return state
+    workspace_id = str(event.payload.get("workspace_id", ""))
+    entity_id = str(event.payload.get("entity_id", ""))
+    active = state.active_workspace_id
+    if active and workspace_id and workspace_id != active:
+        return replace(
+            state,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
     item = MemoryItem(
         node_id=str(event.payload.get("id", "")),
         label=str(event.payload.get("label", "")),
+        workspace_id=workspace_id,
+        entity_id=entity_id,
     )
+    catalog = _memory_catalog_for_workspace((item,) + state.memory_catalog, active)
     return replace(
         state,
-        memory_catalog=(item,) + state.memory_catalog,
+        memory_catalog=catalog,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
+
+
+def _reduce_workspace_memory_catalog(state: AppState, event: Event) -> AppState:
+    """Filter memory catalog when active workspace scope changes."""
+    if event.topic == WORKSPACE_ACTIVE:
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        return replace(
+            state,
+            memory_catalog=_memory_catalog_for_workspace(state.memory_catalog, workspace_id),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic == WORKSPACE_DEACTIVATED:
+        cleared_id = str(event.payload.get("workspace_id", "")).strip()
+        if cleared_id and cleared_id != state.active_workspace_id:
+            return state
+        return replace(
+            state,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    return state
 
 
 def _reduce_memory_selected(state: AppState, event: Event) -> AppState:
@@ -1164,6 +1214,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_stored,
     _reduce_memory_selected,
     _reduce_memory_cleared,
+    _reduce_workspace_memory_catalog,
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
     _reduce_orchestration_provider_health,

@@ -72,6 +72,22 @@ class MemoryGraphService(BaseService):
     def _default_workspace_id(self, explicit: str = "") -> str:
         return explicit.strip() or self._active_workspace_id
 
+    def _resolve_entity_id(self, payload: dict) -> str:
+        return str(
+            payload.get("workspace_entity_id") or payload.get("entity_id", "")
+        ).strip()
+
+    def _resolve_memory_scope(
+        self, payload: dict
+    ) -> tuple[str, str, bool]:
+        """Resolve workspace/entity scope; global search requires explicit opt-in."""
+        global_search = bool(payload.get("global_search", False))
+        if global_search:
+            return "", "", True
+        workspace_id = self._default_workspace_id(str(payload.get("workspace_id", "")))
+        entity_id = self._resolve_entity_id(payload)
+        return workspace_id, entity_id, False
+
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
@@ -108,15 +124,31 @@ class MemoryGraphService(BaseService):
             return
         intent = event.payload.get("intent")
         args = event.payload.get("args") or {}
-        workspace_id = self._default_workspace_id(
-            str(event.payload.get("workspace_id") or args.get("workspace_id", ""))
-        )
+        merged = {**args, **event.payload}
+        workspace_id, entity_id, global_search = self._resolve_memory_scope(merged)
         if intent == INTENT_MEMORY_REMEMBER:
-            self._handle_remember_command(str(args.get("body", "")), workspace_id=workspace_id)
+            self._handle_remember_command(
+                str(args.get("body", "")),
+                workspace_id=workspace_id,
+                entity_id=entity_id,
+                global_search=global_search,
+            )
         elif intent == INTENT_MEMORY_SELECT:
-            self._handle_select_command(str(args.get("query", "")), workspace_id=workspace_id)
+            self._handle_select_command(
+                str(args.get("query", "")),
+                workspace_id=workspace_id,
+                entity_id=entity_id,
+                global_search=global_search,
+            )
 
-    def _handle_remember_command(self, body: str, *, workspace_id: str = "") -> None:
+    def _handle_remember_command(
+        self,
+        body: str,
+        *,
+        workspace_id: str = "",
+        entity_id: str = "",
+        global_search: bool = False,
+    ) -> None:
         if not body:
             self._bus.publish(
                 MEMORY_ERROR,
@@ -135,15 +167,30 @@ class MemoryGraphService(BaseService):
                 source=self.name,
             )
             return
+        payload: dict[str, object] = {
+            "label": label,
+            "content": content,
+            "workspace_id": workspace_id,
+            "entity_id": entity_id,
+        }
+        if global_search:
+            payload["global_search"] = True
         self._on_remember(
             Event(
                 topic=MEMORY_REMEMBER,
-                payload={"label": label, "content": content, "workspace_id": workspace_id},
+                payload=payload,
                 source=self.name,
             )
         )
 
-    def _handle_select_command(self, query: str, *, workspace_id: str = "") -> None:
+    def _handle_select_command(
+        self,
+        query: str,
+        *,
+        workspace_id: str = "",
+        entity_id: str = "",
+        global_search: bool = False,
+    ) -> None:
         if not query:
             self._bus.publish(
                 MEMORY_ERROR,
@@ -151,22 +198,49 @@ class MemoryGraphService(BaseService):
                 source=self.name,
             )
             return
+        payload: dict[str, object] = {
+            "query": query,
+            "workspace_id": workspace_id,
+            "entity_id": entity_id,
+        }
+        if global_search:
+            payload["global_search"] = True
         self._on_select(
             Event(
                 topic=MEMORY_SELECT,
-                payload={"query": query, "workspace_id": workspace_id},
+                payload=payload,
                 source=self.name,
             )
         )
 
+    def _search_nodes(
+        self,
+        query: str,
+        *,
+        workspace_id: str,
+        entity_id: str,
+        global_search: bool,
+    ):
+        return self._repo.search(
+            query,
+            workspace_id=workspace_id,
+            entity_id=entity_id,
+            global_search=global_search,
+        )
+
     def _on_lookup_request(self, event: Event) -> None:
         query = str(event.payload.get("query", "")).strip()
-        workspace_id = self._default_workspace_id(
-            str(event.payload.get("workspace_id", ""))
+        workspace_id, entity_id, global_search = self._resolve_memory_scope(
+            dict(event.payload)
         )
         snippets: list[str] = []
         if query:
-            nodes = self._repo.search(query, workspace_id=workspace_id)
+            nodes = self._search_nodes(
+                query,
+                workspace_id=workspace_id,
+                entity_id=entity_id,
+                global_search=global_search,
+            )
             snippets = [f"[memory:{n.label}]\n{n.content}" for n in nodes[:3]]
         self._bus.publish(
             MEMORY_LOOKUP_RESULT,
@@ -188,6 +262,12 @@ class MemoryGraphService(BaseService):
                 source=self.name,
             )
             return
+        workspace_id, entity_id, global_search = self._resolve_memory_scope(
+            dict(event.payload)
+        )
+        if global_search:
+            workspace_id = ""
+            entity_id = ""
         node_id = self._repo.remember(
             label=label,
             content=content,
@@ -195,21 +275,25 @@ class MemoryGraphService(BaseService):
             tier=str(event.payload.get("tier", "mid")),
             related_to=event.payload.get("related_to"),
             relation=str(event.payload.get("relation", "relates_to")),
-            workspace_id=self._default_workspace_id(
-                str(event.payload.get("workspace_id", ""))
-            ),
+            workspace_id=workspace_id,
+            entity_id=entity_id,
         )
         self._bus.publish(
             MEMORY_STORED,
-            {"id": node_id, "label": label},
+            {
+                "id": node_id,
+                "label": label,
+                "workspace_id": workspace_id,
+                "entity_id": entity_id,
+            },
             source=self.name,
         )
 
     def _on_select(self, event: Event) -> None:
         query = str(event.payload.get("query", "")).strip()
         node_id = str(event.payload.get("id", "")).strip()
-        workspace_id = self._default_workspace_id(
-            str(event.payload.get("workspace_id", ""))
+        workspace_id, entity_id, global_search = self._resolve_memory_scope(
+            dict(event.payload)
         )
         nodes = []
         if node_id:
@@ -217,7 +301,12 @@ class MemoryGraphService(BaseService):
             if node:
                 nodes = [node]
         elif query:
-            nodes = self._repo.search(query, workspace_id=workspace_id)
+            nodes = self._search_nodes(
+                query,
+                workspace_id=workspace_id,
+                entity_id=entity_id,
+                global_search=global_search,
+            )
         if not nodes:
             self._bus.publish(
                 MEMORY_ERROR,
