@@ -1,14 +1,14 @@
 # Program 4 Gate Status
 
-**Status:** **CONDITIONAL** — post-Program 3 backlog closed; Program 3 adoption gate still open.
+**Status:** **CONDITIONAL** — Program 3 **COMPLETE** (exit gate closed); remaining gates are Program 1 S1/S2 shell hardening only.
 
-**Last assessed:** 2026-07-06 (`feat/post-program3-backlog`)
+**Last assessed:** 2026-07-06 (main — exit sprint + post-Program 3 backlog merged)
 
 Program 4 may not expand platform capabilities until:
 
 1. Program 1 stabilization gates pass (partial — S1/S2 shell hardening remain).
 2. Program 2 local/CI enforcement remains active (CI block on; local warn).
-3. Program 3 reports workspace-scoped adoption at or above the transition-plan midpoint (≥30%).
+3. ~~Program 3 workspace adoption~~ — **satisfied** (WII ≥60%, adoption score ~7.0; `tests/test_program3_exit_gate.py`).
 
 ---
 
@@ -27,9 +27,9 @@ Program 4 may not expand platform capabilities until:
 
 | Question | Answer |
 |----------|--------|
-| **Program 3 dependency** | **Partial** — W1–W3 work continues on parallel branches (`feat/program3-phase6-workspace-runtime`, etc.); exit gate (>60% workspace influence) not yet verified |
+| **Program 3 dependency** | **Complete** — exit gate closed (WII ≥60%, adoption ~7.0); see `PROGRAM_3_WORKSPACE_ADOPTION.md` |
 | **Backlog completion** | **~95%** — S1/S2 (shell async, sandbox) remain Program 1 scope, not this backlog |
-| **Program 4 ready?** | **CONDITIONAL** — ready for first slice after Program 3 ≥30% adoption milestone |
+| **Program 4 ready?** | **CONDITIONAL** — unblocked on Program 3; first slice allowed pending S1/S2 shell gates |
 
 ### Quality scores (1–10)
 
@@ -42,7 +42,7 @@ Program 4 may not expand platform capabilities until:
 
 ---
 
-## Recommended Program 4 first slice (after P3 midpoint)
+## Recommended Program 4 first slice
 
 1. **Model tiers** — settings-backed tier map through `ModelRouterService` + `model_state.py` reducers.
 2. **Platform paths** — OS-specific runtime directories behind `platform/runtime_paths.py` abstractions (Linux/macOS `APPDATA` equivalents).
