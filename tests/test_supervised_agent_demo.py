@@ -239,7 +239,9 @@ def test_command_router_classifies_agent_intent() -> None:
     bus.subscribe(COMMAND_ROUTED, lambda e: routed.append(dict(e.payload)))
     CommandRouterService(bus).start()
 
-    bus.publish(UI_COMMAND, {"text": "agent: inspect vault"}, source="ui")
+    bus.publish(
+        UI_COMMAND, {"text": "agent: inspect vault", "workspace_id": "ws-router"}, source="ui"
+    )
 
     assert routed
     assert routed[0]["intent"] == INTENT_AGENT
