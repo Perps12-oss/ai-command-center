@@ -33,6 +33,7 @@ from ai_command_center.core.events.topics import (
     RELATIONSHIP_CREATE_RESULT,
     TIMELINE_RECORD_REQUEST,
     TIMELINE_RECORD_RESULT,
+    SERVICE_READY,
     UI_SELECT_ENTITY,
     UI_SELECT_WORKSPACE,
     WORKSPACE_ADD_ENTITY_REQUEST,
@@ -492,6 +493,15 @@ def register_entity_bus_handlers(
         except ValueError:
             pass
 
+    def on_service_ready(event: Event) -> None:
+        if str(event.payload.get("service", "")).strip() != "workspace_os":
+            return
+        if workspace_service.get_active() is not None:
+            return
+        workspaces = workspace_service.get_all()
+        if workspaces:
+            workspace_service.activate(workspaces[0].id)
+
     def on_timeline_record_request(event: Event) -> None:
         rid = _request_id(event)
         payload = event.payload
@@ -566,6 +576,7 @@ def register_entity_bus_handlers(
         bus.subscribe(WORKSPACE_ADD_ENTITY_REQUEST, on_workspace_add_entity_request),
         bus.subscribe(UI_SELECT_ENTITY, on_ui_select_entity),
         bus.subscribe(UI_SELECT_WORKSPACE, on_ui_select_workspace),
+        bus.subscribe(SERVICE_READY, on_service_ready),
         bus.subscribe(TIMELINE_RECORD_REQUEST, on_timeline_record_request),
         bus.subscribe(ACTION_INVOKE_REQUEST, on_action_invoke_request),
     ]

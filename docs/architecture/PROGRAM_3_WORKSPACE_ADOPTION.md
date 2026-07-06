@@ -56,42 +56,42 @@ All checkboxes must pass before Program 3 is **complete**. Each pillar maps to a
 
 ### 1. Commands
 
-- [ ] `WorkspaceService.activate()` wired from workspace selection UI (`ui.workspace_os.*` or navigation)
-- [ ] `workspace.active` (or canonical `WORKSPACE_ACTIVATED`) defined in `core/events/topics.py` and subscribed by AppState
-- [ ] `UIController.publish_command` always merges `current_workspace_scope()` including `workspace_id` when active workspace set
+- [x] `WorkspaceService.activate()` wired from workspace selection UI (`ui.workspace_os.*` or navigation)
+- [x] `workspace.active` (or canonical `WORKSPACE_ACTIVATED`) defined in `core/events/topics.py` and subscribed by AppState
+- [x] `UIController.publish_command` always merges `current_workspace_scope()` including `workspace_id` when active workspace set
 - [ ] `CommandRouterService._workspace_scope` receives `workspace_id` on ≥60% of production `ui.command` flows (telemetry)
-- [ ] **Tests:** `tests/test_w1_workspace_routing.py` extended for active-workspace-default paths
+- [x] **Tests:** `tests/test_w1_workspace_routing.py` extended for active-workspace-default paths
 - [ ] **Grep signal:** zero `ui.command` publish sites bypassing scope helper
 
 ### 2. Memory
 
-- [ ] `MemoryGraphService` defaults `workspace_id` to active workspace when payload omits it
-- [ ] `MEMORY_LOOKUP_REQUEST` from `CapabilityContextAssembler` always includes active `workspace_id`
-- [ ] Unscoped global search requires explicit opt-in (not default)
-- [ ] **Tests:** remember/lookup with active workspace and without explicit payload scope
+- [x] `MemoryGraphService` defaults `workspace_id` to active workspace when payload omits it
+- [x] `MEMORY_LOOKUP_REQUEST` from `CapabilityContextAssembler` always includes active `workspace_id`
+- [x] Unscoped global search requires explicit opt-in (not default)
+- [x] **Tests:** remember/lookup with active workspace and without explicit payload scope
 - [ ] **Schema:** `workspace_id` populated on insert for ≥60% of new memory nodes in scoped sessions
 
 ### 3. Sessions
 
-- [ ] `SessionService._resolve_conversation_id` prefers active workspace entity over `DEFAULT_CONVERSATION_ID`
-- [ ] `UI_OPEN_CHAT` from workspace sets parent `workspace_id` on session scope (card/resource inheritance)
+- [x] `SessionService._resolve_conversation_id` prefers active workspace entity over `DEFAULT_CONVERSATION_ID`
+- [x] `UI_OPEN_CHAT` from workspace sets parent `workspace_id` on session scope (card/resource inheritance)
 - [ ] New chat from command box uses active entity context when workspace has selection
-- [ ] **Tests:** per-entity `entity_conversation_id` is default when `active_workspace_id` set
+- [x] **Tests:** per-entity `entity_conversation_id` is default when `active_workspace_id` set
 - [ ] **Grep signal:** `DEFAULT_CONVERSATION_ID` not used as default when active workspace present
 
 ### 4. Context
 
-- [ ] `CapabilityContextAssembler.assemble_for_command` always publishes scoped `MEMORY_LOOKUP_REQUEST` and `SESSION_HISTORY_REQUEST`
-- [ ] `ENTITY_CONTEXT_REQUEST` fires for active workspace entity or primary selection
-- [ ] Workspace-level context aggregation available (Phase 3) — entity graph + relationships feed `ContextManager.build_context`
-- [ ] **Tests:** `tests/test_capability_context.py` with active workspace fixtures
+- [x] `CapabilityContextAssembler.assemble_for_command` always publishes scoped `MEMORY_LOOKUP_REQUEST` and `SESSION_HISTORY_REQUEST`
+- [x] `ENTITY_CONTEXT_REQUEST` fires for active workspace entity or primary selection
+- [x] Workspace-level context aggregation available (Phase 3) — entity graph + relationships feed `ContextManager.build_context`
+- [x] **Tests:** `tests/test_capability_context.py` with active workspace fixtures
 - [ ] **Arch lint:** no new UI→service bypass of assembler for AI paths
 
 ### 5. Tools
 
-- [ ] `ShellToolService` includes `workspace_context` on every `TOOL_INVOKE` (mirror agent path in `tool_executor_service.py` L180–181)
+- [x] `ShellToolService` includes `workspace_context` on every `TOOL_INVOKE` (mirror agent path in `tool_executor_service.py` L180–181)
 - [ ] Tool results recorded on workspace timeline when `workspace_id` present
-- [ ] **Tests:** `tests/test_program3_telemetry_scope.py` — tool rows include scope
+- [x] **Tests:** `tests/test_program3_telemetry_scope.py` — tool rows include scope
 - [ ] **Grep signal:** `TOOL_INVOKE` without `workspace_context` limited to explicit user opt-out (documented)
 
 ### Cross-cutting exit checks
@@ -100,7 +100,7 @@ All checkboxes must pass before Program 3 is **complete**. Each pillar maps to a
 - [ ] **Workspace Adoption Score ≥ 7.0**
 - [ ] Zero new direct service→service edges (Program 2 E4 allowlist holds)
 - [ ] Legacy `EVENT_WORKSPACE_*` in `event_bus.py` migrated or aliased to `topics.py` constants
-- [ ] `chat_state.py` + `workspace_state.py` reducers own scope fields (W4 partial — measure from S6 if available)
+- [x] `chat_state.py` + `workspace_state.py` reducers own scope fields (W4 partial — Phase 6c projection; full split deferred to S6 measure)
 
 ---
 
@@ -319,6 +319,12 @@ Maps code-verified audit Phases 1–6 to completion pillars. **Do not skip Phase
 **EventBus topics:** Full spine refactor  
 **AppState:** W4 reducer split (`workspace_state.py`, `chat_state.py`, `tool_state.py`)  
 
+**Phase 6a progress (2026-07-06):** Soft gate in `CommandRouterService` — execution intents (`chat`, `shell`, `agent`, memory, notes) publish `command.deferred` + `ui.workspace.required` when no active workspace; `INTENT_NAVIGATE` whitelisted. Auto-activate first workspace on `service.ready` (`workspace_os`). Tests: `tests/test_program3_phase6a.py`.
+
+**Phase 6b progress (2026-07-06):** `OrchestrationService`, `ModelRouterService`, and `RuntimeCapabilityRouterService` propagate `workspace_id` and `selected_entity_*` on classify/resolve/invoke paths. `CapabilityContextAssembler` forwards scope on `MODEL_RESOLVE_REQUEST`. Tests: `tests/test_program3_phase6b.py`.
+
+**Phase 6c progress (2026-07-06):** Workspace-default UI routing (`view_manager.py`, `app.py`) — chat redirects to workspace without active scope; `ui.workspace.required` surfaces workspace picker. W4 partial: `chat_state` projects routed `workspace_id`; `workspace_state` owns active/selection scope. Headless WII approach test in `tests/test_program3_phase6c.py`.
+
 ---
 
 ## Dependencies
@@ -427,4 +433,7 @@ When coding is approved, start **Phase 1 only** (smallest vertical slice with hi
 
 | Date | Change |
 |------|--------|
+| 2026-07-06 | Phase 6c — workspace-centric UI routing policy, W4 reducer scope projection, WII approach test |
+| 2026-07-06 | Phase 6b — orchestration/model/runtime routers workspace-aware scope |
+| 2026-07-06 | Phase 6a — workspace-required command spine (soft gate), auto-activate on boot |
 | 2026-07-06 | Initial Program 3 tracked initiative — code-verified audit; >60% WII exit gate; five-pillar completion definition |

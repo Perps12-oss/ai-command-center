@@ -65,14 +65,18 @@ def _reduce_command_routed(state: Any, event: Event) -> Any:
         return state
     text = str(event.payload.get("text", ""))
     pending = text if _is_pending_chat_user_text(text) else ""
-    return replace(
-        state,
-        last_command=text,
-        last_command_intent=str(event.payload.get("intent", "")),
-        chat_pending_user_text=pending,
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
+    args = event.payload.get("args") or {}
+    workspace_id = str(event.payload.get("workspace_id") or args.get("workspace_id", "")).strip()
+    updates: dict[str, object] = {
+        "last_command": text,
+        "last_command_intent": str(event.payload.get("intent", "")),
+        "chat_pending_user_text": pending,
+        "last_event_topic": event.topic,
+        "last_event_source": event.source,
+    }
+    if workspace_id:
+        updates["last_workspace_context_workspace_id"] = workspace_id
+    return replace(state, **updates)
 
 
 def _reduce_chat_started(state: Any, event: Event) -> Any:

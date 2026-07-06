@@ -62,7 +62,9 @@ APP_ERROR = "app.error"
 APP_WARNING = "app.warning"
 BUS_HANDLER_ERROR = "bus.handler_error"
 COMMAND_ROUTED = "command.routed"
+COMMAND_DEFERRED = "command.deferred"
 UI_COMMAND = "ui.command"
+UI_WORKSPACE_REQUIRED = "ui.workspace.required"
 UI_NAVIGATE = "ui.navigate"
 UI_PALETTE_OPEN = "ui.palette_open"
 UI_PALETTE_CLOSE = "ui.palette_close"
@@ -266,7 +268,9 @@ __all__ = [
     "APP_WARNING",
     "BUS_HANDLER_ERROR",
     "COMMAND_ROUTED",
+    "COMMAND_DEFERRED",
     "UI_COMMAND",
+    "UI_WORKSPACE_REQUIRED",
     "UI_NAVIGATE",
     "UI_PALETTE_OPEN",
     "UI_PALETTE_CLOSE",
