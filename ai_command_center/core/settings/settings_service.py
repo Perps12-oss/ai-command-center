@@ -1,4 +1,11 @@
-﻿"""Settings service placeholder for the architecture enforcement spec."""
+﻿"""Core settings schema and repository facade (not the EventBus service).
+
+Canonical persistence: ``repositories.settings_repository.SettingsRepository``.
+Bus-facing I/O: ``services.settings_service.SettingsService``.
+
+This module owns schema validation, migration, and snapshot projection helpers
+used by the services-layer SettingsService — it is not a duplicate stub.
+"""
 
 from __future__ import annotations
 
