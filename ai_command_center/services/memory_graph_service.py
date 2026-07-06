@@ -17,6 +17,8 @@ from ai_command_center.core.events.topics import (
     MEMORY_SELECT,
     MEMORY_STORED,
     MEMORY_SELECTED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
 )
 from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.services.base import BaseService
@@ -30,6 +32,7 @@ class MemoryGraphService(BaseService):
         super().__init__(bus)
         self._repo = repo
         self._selected_snippets: list[str] = []
+        self._active_workspace_id: str = ""
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -51,6 +54,23 @@ class MemoryGraphService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(MEMORY_DELETE_REQUEST, self._on_delete_request)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_ACTIVE, self._on_workspace_active)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_DEACTIVATED, self._on_workspace_deactivated)
+        )
+
+    def _on_workspace_active(self, event: Event) -> None:
+        self._active_workspace_id = str(event.payload.get("workspace_id", "")).strip()
+
+    def _on_workspace_deactivated(self, event: Event) -> None:
+        cleared = str(event.payload.get("workspace_id", "")).strip()
+        if not cleared or cleared == self._active_workspace_id:
+            self._active_workspace_id = ""
+
+    def _default_workspace_id(self, explicit: str = "") -> str:
+        return explicit.strip() or self._active_workspace_id
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -88,9 +108,9 @@ class MemoryGraphService(BaseService):
             return
         intent = event.payload.get("intent")
         args = event.payload.get("args") or {}
-        workspace_id = str(
-            event.payload.get("workspace_id") or args.get("workspace_id", "")
-        ).strip()
+        workspace_id = self._default_workspace_id(
+            str(event.payload.get("workspace_id") or args.get("workspace_id", ""))
+        )
         if intent == INTENT_MEMORY_REMEMBER:
             self._handle_remember_command(str(args.get("body", "")), workspace_id=workspace_id)
         elif intent == INTENT_MEMORY_SELECT:
@@ -141,7 +161,9 @@ class MemoryGraphService(BaseService):
 
     def _on_lookup_request(self, event: Event) -> None:
         query = str(event.payload.get("query", "")).strip()
-        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        workspace_id = self._default_workspace_id(
+            str(event.payload.get("workspace_id", ""))
+        )
         snippets: list[str] = []
         if query:
             nodes = self._repo.search(query, workspace_id=workspace_id)
@@ -173,7 +195,9 @@ class MemoryGraphService(BaseService):
             tier=str(event.payload.get("tier", "mid")),
             related_to=event.payload.get("related_to"),
             relation=str(event.payload.get("relation", "relates_to")),
-            workspace_id=str(event.payload.get("workspace_id", "")).strip(),
+            workspace_id=self._default_workspace_id(
+                str(event.payload.get("workspace_id", ""))
+            ),
         )
         self._bus.publish(
             MEMORY_STORED,
@@ -184,7 +208,9 @@ class MemoryGraphService(BaseService):
     def _on_select(self, event: Event) -> None:
         query = str(event.payload.get("query", "")).strip()
         node_id = str(event.payload.get("id", "")).strip()
-        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        workspace_id = self._default_workspace_id(
+            str(event.payload.get("workspace_id", ""))
+        )
         nodes = []
         if node_id:
             node = self._repo.get(node_id)

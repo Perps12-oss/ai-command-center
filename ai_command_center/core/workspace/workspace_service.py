@@ -16,9 +16,12 @@ from ai_command_center.core.entity.entity import (
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import (
     EVENT_WORKSPACE_CREATED,
-    EVENT_WORKSPACE_ACTIVATED,
-    EVENT_WORKSPACE_DEACTIVATED,
     EVENT_WORKSPACE_LAYOUT_CHANGED,
+)
+from ai_command_center.core.events.topics import (
+    WORKSPACE_ACTIVATED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
 )
 
 
@@ -84,13 +87,18 @@ class WorkspaceService:
         
         self._active_workspace_id = workspace_id
         
-        # Publish event
+        payload = {
+            "workspace_id": str(workspace.id),
+            "title": workspace.title,
+        }
         self._event_bus.publish(
-            EVENT_WORKSPACE_ACTIVATED,
-            {
-                "workspace_id": str(workspace.id),
-                "title": workspace.title,
-            },
+            WORKSPACE_ACTIVE,
+            payload,
+            source="workspace_service",
+        )
+        self._event_bus.publish(
+            WORKSPACE_ACTIVATED,
+            payload,
             source="workspace_service",
         )
         
@@ -100,7 +108,7 @@ class WorkspaceService:
         """Deactivate the current workspace."""
         if self._active_workspace_id:
             self._event_bus.publish(
-                EVENT_WORKSPACE_DEACTIVATED,
+                WORKSPACE_DEACTIVATED,
                 {"workspace_id": str(self._active_workspace_id)},
                 source="workspace_service",
             )

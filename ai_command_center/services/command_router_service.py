@@ -17,7 +17,12 @@ from ai_command_center.core.events.intents import (
     INTENT_NOTE_SEARCH,
     INTENT_SHELL,
 )
-from ai_command_center.core.events.topics import COMMAND_ROUTED, UI_COMMAND
+from ai_command_center.core.events.topics import (
+    COMMAND_ROUTED,
+    UI_COMMAND,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
+)
 from ai_command_center.services.base import BaseService
 
 _VIEW_ALIASES: dict[str, str] = {
@@ -58,17 +63,26 @@ class CommandRouterService(BaseService):
     def __init__(self, bus) -> None:
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
+        self._active_workspace_id: str = ""
 
     def _on_load(self) -> None:
         self._unsubscribers.append(self._bus.subscribe(UI_COMMAND, self._on_ui_command))
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_ACTIVE, self._on_workspace_active)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_DEACTIVATED, self._on_workspace_deactivated)
+        )
 
-    def _on_unload(self) -> None:
-        for unsub in self._unsubscribers:
-            unsub()
-        self._unsubscribers.clear()
+    def _on_workspace_active(self, event: Event) -> None:
+        self._active_workspace_id = str(event.payload.get("workspace_id", "")).strip()
 
-    @staticmethod
-    def _workspace_scope(event: Event) -> dict[str, str]:
+    def _on_workspace_deactivated(self, event: Event) -> None:
+        cleared = str(event.payload.get("workspace_id", "")).strip()
+        if not cleared or cleared == self._active_workspace_id:
+            self._active_workspace_id = ""
+
+    def _workspace_scope(self, event: Event) -> dict[str, str]:
         """Intent-agnostic workspace scope from ui.command payload."""
         scope: dict[str, str] = {}
         workspace_entity_id = str(event.payload.get("workspace_entity_id", "")).strip()
@@ -91,7 +105,14 @@ class CommandRouterService(BaseService):
         workspace_id = str(event.payload.get("workspace_id", "")).strip()
         if workspace_id:
             scope["workspace_id"] = workspace_id
+        elif self._active_workspace_id:
+            scope["workspace_id"] = self._active_workspace_id
         return scope
+
+    def _on_unload(self) -> None:
+        for unsub in self._unsubscribers:
+            unsub()
+        self._unsubscribers.clear()
 
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()

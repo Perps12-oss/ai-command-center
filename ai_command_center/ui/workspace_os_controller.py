@@ -11,6 +11,7 @@ from ai_command_center.core.events.topics import (
     UI_INSPECTOR_OPEN,
     UI_LAUNCH_RESOURCE,
     UI_OPEN_CHAT,
+    UI_SELECT_WORKSPACE,
     UI_SEARCH_WORKSPACE_OS,
 )
 
@@ -94,6 +95,14 @@ class WorkspaceOsUIController:
         if path:
             payload["path"] = path
         self._bus.publish(UI_OPEN_CHAT, payload, source="ui")
+
+    def select_workspace(self, workspace_id: str) -> None:
+        """Activate a workspace as the runtime scope anchor (Program 3 Phase 1)."""
+        self._bus.publish(
+            UI_SELECT_WORKSPACE,
+            {"workspace_id": workspace_id},
+            source="ui",
+        )
 
     def search(self, query: str) -> None:
         self._bus.publish(
