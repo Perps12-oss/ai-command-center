@@ -139,6 +139,7 @@ Canonical constants in `ai_command_center/core/events/topics.py`.
 | `capability.complete` | Provider → UI path | `request_id`, `text`, `metadata` |
 | `capability.error` | Provider → UI path | `request_id`, `message` |
 | `capability.fallback` | Router → telemetry | External failed; falling back to native |
+| `capability.providers.ready` | Registry → observers | Provider catalog with health snapshots |
 
 Existing topics remain authoritative for UX today:
 
@@ -200,8 +201,9 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 | **1** | ARI doc, `CapabilityKind`, `CapabilityRouterService`, `NativeProvider`, `QwenPawSidecarProvider` stub | Classification events on chat route; tests pass |
 | **2** | QwenPaw sidecar spawn + SSE → `capability.stream` | `/plan` query uses sidecar when configured |
 | **3** | ContextManager bundle before external invoke | Grounded planning with ACC memory/history/entity context |
-| **4** (current) | Settings: per-capability provider map + settings UI | User selects provider in settings |
-| **5** (next) | Program 5 runtime plugin manifest | Third-party providers as plugins |
+| **4** | Settings: per-capability provider map + settings UI | User selects provider in settings |
+| **5** (current) | Runtime plugin manifest + dynamic provider registry | Providers loaded from `plugins/runtime_manifests/` via allowlisted builtins |
+| **6** (next) | Third-party runtime plugin packaging | External providers ship as installable plugins |
 
 ---
 
@@ -212,6 +214,7 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 - `pytest tests/test_capability_context.py` — context bundle before external invoke
 - `pytest tests/test_qwenpaw_sse.py tests/test_qwenpaw_sidecar.py` — SSE parser + bridge deferral
 - `pytest tests/test_capability_provider_settings.py` — per-capability provider map + settings round-trip
+- `pytest tests/test_runtime_plugin_loader.py` — manifest validation + dynamic registry
 
 ---
 

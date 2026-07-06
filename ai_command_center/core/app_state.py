@@ -50,6 +50,7 @@ from ai_command_center.core.events.topics import (
     NOTES_INDEXED,
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
+    CAPABILITY_PROVIDERS_READY,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -64,6 +65,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
+    register_discovered_providers,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -96,6 +98,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     MEMORY_CLEARED,
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
+    CAPABILITY_PROVIDERS_READY,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -946,6 +949,25 @@ def _reduce_plugin_catalog(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_capability_providers_ready(state: AppState, event: Event) -> AppState:
+    """Register discovered runtime provider ids for settings validation."""
+    if event.topic != CAPABILITY_PROVIDERS_READY:
+        return state
+    raw_providers = event.payload.get("providers") or []
+    provider_ids: list[str] = []
+    for provider in raw_providers:
+        if isinstance(provider, dict):
+            provider_id = str(provider.get("id", "")).strip()
+            if provider_id:
+                provider_ids.append(provider_id)
+    register_discovered_providers(provider_ids)
+    return replace(
+        state,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_plugin_state_changed(state: AppState, event: Event) -> AppState:
     """Update enabled flag for a plugin in the catalog."""
     if event.topic != PLUGIN_STATE_CHANGED:
@@ -1313,6 +1335,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_selected,
     _reduce_memory_cleared,
     _reduce_plugin_catalog,
+    _reduce_capability_providers_ready,
     _reduce_plugin_state_changed,
     _reduce_agent_run,
     _reduce_agent_pipeline,

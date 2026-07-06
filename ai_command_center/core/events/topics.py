@@ -175,6 +175,7 @@ CAPABILITY_STREAM = "capability.stream"
 CAPABILITY_COMPLETE = "capability.complete"
 CAPABILITY_ERROR = "capability.error"
 CAPABILITY_FALLBACK = "capability.fallback"
+CAPABILITY_PROVIDERS_READY = "capability.providers.ready"
 
 # Permission gate (Track 7 — supervised agent pre-flight)
 PERMISSION_CHECK_REQUEST = "permission.check.request"
@@ -337,6 +338,7 @@ __all__ = [
     "CAPABILITY_COMPLETE",
     "CAPABILITY_ERROR",
     "CAPABILITY_FALLBACK",
+    "CAPABILITY_PROVIDERS_READY",
     "PERMISSION_CHECK_REQUEST",
     "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",
