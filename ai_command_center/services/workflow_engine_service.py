@@ -81,6 +81,7 @@ class WorkflowEngineService(BaseService):
                 "run_id": run_id,
                 "workflow_id": workflow_id,
                 "total_steps": len(steps),
+                "steps": steps,
             },
             source=self.name,
         )
