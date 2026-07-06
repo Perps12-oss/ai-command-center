@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from ai_command_center.domain.capability_provider_settings import (
-    CAPABILITY_PROVIDER_CHOICES,
     DEFAULT_CAPABILITY_PROVIDER_MAP,
+    get_capability_provider_choices,
     settings_key_for_kind,
 )
 
@@ -62,7 +62,7 @@ class SettingsSchema:
                 settings_key_for_kind(kind),
                 str,
                 default,
-                CAPABILITY_PROVIDER_CHOICES,
+                get_capability_provider_choices(),
             )
 
     def _coerce(self, field: SettingsField, value: Any) -> Any:
@@ -98,6 +98,9 @@ class SettingsSchema:
     def validate(self, key: str, value: Any) -> Any:
         field = self.fields[key]
         validated = self._coerce(field, value)
-        if field.choices and validated not in field.choices:
-            raise ValueError(f"{key} must be one of {field.choices}")
+        choices = field.choices
+        if key.startswith("capability_provider_"):
+            choices = get_capability_provider_choices()
+        if choices and validated not in choices:
+            raise ValueError(f"{key} must be one of {choices}")
         return validated

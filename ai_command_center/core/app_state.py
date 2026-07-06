@@ -1,4 +1,4 @@
-"""Central application state — updated only via event reducers."""
+﻿"""Central application state â€” updated only via event reducers."""
 
 from __future__ import annotations
 
@@ -50,6 +50,8 @@ from ai_command_center.core.events.topics import (
     NOTES_INDEXED,
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
+    CAPABILITY_PROVIDERS_READY,
+    ORCHESTRATION_RUN_SNAPSHOT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -65,6 +67,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
 )
+from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -96,6 +99,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     MEMORY_CLEARED,
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
+    CAPABILITY_PROVIDERS_READY,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -122,6 +126,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKFLOW_FAILED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
+    ORCHESTRATION_RUN_SNAPSHOT,
 )
 
 
@@ -271,7 +276,7 @@ class AppState:
     chat_active_session_key: str = "default"
     errors: tuple[str, ...] = ()
 
-    # Track 3.2 — full projection of feature catalogs
+    # Track 3.2 â€” full projection of feature catalogs
     notes_catalog: tuple[NoteItem, ...] = ()
     note_selected: NoteItem | None = None
     note_index_status: tuple[int, int] = ()  # (files, ms)
@@ -279,7 +284,7 @@ class AppState:
     memory_selected: tuple[str, ...] = ()
     plugin_catalog: tuple[PluginItem, ...] = ()
 
-    # Track R7 — agent / workflow run projections
+    # Track R7 â€” agent / workflow run projections
     agent_runs: tuple[AgentRunItem, ...] = ()
     workflow_runs: tuple[WorkflowRunItem, ...] = ()
     active_agent_run_id: str = ""
@@ -290,6 +295,7 @@ class AppState:
     active_workflow_run_id: str = ""
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
+    orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -604,6 +610,17 @@ def _reduce_plugin_catalog(state: AppState, event: Event) -> AppState:
     return replace(
         state,
         plugin_catalog=tuple(items),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_capability_providers_ready(state: AppState, event: Event) -> AppState:
+    """Record capability.providers.ready for AppState consumers."""
+    if event.topic != CAPABILITY_PROVIDERS_READY:
+        return state
+    return replace(
+        state,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -972,6 +989,32 @@ def _is_pending_chat_user_text(text: str) -> bool:
     """Compatibility wrapper for tests and diagnostics."""
     return _chat_is_pending_user_text(text)
 
+def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
+    if event.topic != ORCHESTRATION_RUN_SNAPSHOT:
+        return state
+    payload = event.payload
+    facts = payload.get("execution_facts") or {}
+    return replace(
+        state,
+        orchestration_run=OrchestrationRunSnapshot(
+            request_id=str(payload.get("request_id", "")),
+            query=str(payload.get("query", "")),
+            intent=str(payload.get("intent", "")),
+            provider_id=str(payload.get("provider_id", "")),
+            execution_success=bool(payload.get("execution_success")),
+            execution_facts=dict(facts) if isinstance(facts, dict) else {},
+            execution_error=str(payload.get("execution_error") or "") or None,
+            truth_valid=bool(payload.get("truth_valid")),
+            truth_detail=str(payload.get("truth_detail", "")),
+            response_source=str(payload.get("response_source", "")),
+            response_text=str(payload.get("response_text", "")),
+            receipt_id=str(payload.get("receipt_id", "")),
+        ),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
@@ -1000,11 +1043,13 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_selected,
     _reduce_memory_cleared,
     _reduce_plugin_catalog,
+    _reduce_capability_providers_ready,
     _reduce_plugin_state_changed,
     _reduce_agent_run,
     _reduce_agent_pipeline,
     _reduce_workflow_run,
     _reduce_permission_check,
+    _reduce_orchestration_run,
 )
 
 
