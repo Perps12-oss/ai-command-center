@@ -162,6 +162,8 @@ WORKSPACE_ACTIVE = "workspace.active"
 WORKSPACE_ACTIVATED = "workspace.activated"
 WORKSPACE_DEACTIVATED = "workspace.deactivated"
 WORKSPACE_LAYOUT_CHANGED = "workspace.layout.changed"
+WORKSPACE_CONTEXT_REQUEST = "workspace.context.request"
+WORKSPACE_CONTEXT_RESULT = "workspace.context.result"
 
 # Agent framework (Track 7 — A0/A1)
 AGENT_SPAWN_REQUEST = "agent.spawn.request"
@@ -189,6 +191,8 @@ CAPABILITY_PROVIDERS_READY = "capability.providers.ready"
 
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
+ORCHESTRATION_ROUTING_COMPLETED = "orchestration.routing.completed"
+ORCHESTRATION_PROVIDER_SELECTED = "orchestration.provider.selected"
 ORCHESTRATION_RECEIPT = "orchestration.receipt"
 ORCHESTRATION_TRUTH_VALIDATED = "orchestration.truth.validated"
 ORCHESTRATION_RUN_SNAPSHOT = "orchestration.run.snapshot"
@@ -346,6 +350,8 @@ __all__ = [
     "WORKSPACE_ACTIVATED",
     "WORKSPACE_DEACTIVATED",
     "WORKSPACE_LAYOUT_CHANGED",
+    "WORKSPACE_CONTEXT_REQUEST",
+    "WORKSPACE_CONTEXT_RESULT",
     "AGENT_SPAWN_REQUEST",
     "AGENT_SPAWNED",
     "AGENT_TASK_REQUEST",
@@ -365,6 +371,8 @@ __all__ = [
     "CAPABILITY_FALLBACK",
     "CAPABILITY_PROVIDERS_READY",
     "ORCHESTRATION_INTENT_CLASSIFIED",
+    "ORCHESTRATION_ROUTING_COMPLETED",
+    "ORCHESTRATION_PROVIDER_SELECTED",
     "ORCHESTRATION_RECEIPT",
     "ORCHESTRATION_TRUTH_VALIDATED",
     "ORCHESTRATION_RUN_SNAPSHOT",

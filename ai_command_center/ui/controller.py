@@ -90,6 +90,18 @@ class UIController:
                 scope["active_workspace_title"] = snap.active_workspace_title
         entity = self.active_chat_workspace_entity()
         if entity is None:
+            selected_id = str(snap.selected_entity_id).strip()
+            if selected_id:
+                scope["workspace_entity_id"] = selected_id
+                if snap.selected_entity_type:
+                    scope["workspace_entity_type"] = snap.selected_entity_type
+                if snap.selected_entity_title:
+                    scope["workspace_entity_title"] = snap.selected_entity_title
+                scope["selected_entity_id"] = selected_id
+                if snap.selected_entity_type:
+                    scope["selected_entity_type"] = snap.selected_entity_type
+                if snap.selected_entity_title:
+                    scope["selected_entity_title"] = snap.selected_entity_title
             return scope
         scope["workspace_entity_id"] = entity["entity_id"]
         scope["workspace_entity_type"] = entity.get("entity_type", "")
