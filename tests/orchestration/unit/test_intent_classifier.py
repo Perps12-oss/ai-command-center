@@ -1,4 +1,4 @@
-"""Tests for rule-based orchestration intent classifier."""
+"""Layer 1 — IntentClassifier unit tests (rule-based, no LLM/providers/UI)."""
 
 from __future__ import annotations
 
@@ -32,7 +32,15 @@ def test_calendar_query_intents() -> None:
     assert intent is OrchestrationIntent.CALENDAR_QUERY
 
 
-def test_unhandled_chat() -> None:
+def test_calendar_event_create_intent() -> None:
+    classifier = RuleBasedIntentClassifier()
+    intent, args = classifier.classify("Create shopping event today at 14:00")
+    assert intent is OrchestrationIntent.CALENDAR_EVENT_CREATE
+    assert args["title"] == "shopping"
+    assert args["time"] == "14:00"
+
+
+def test_unhandled_defers_to_llm_path() -> None:
     classifier = RuleBasedIntentClassifier()
     intent, args = classifier.classify("Explain quantum computing")
     assert intent is OrchestrationIntent.UNHANDLED
