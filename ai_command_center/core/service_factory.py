@@ -54,6 +54,7 @@ from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHea
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
 from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.orchestration_service import OrchestrationService
+from ai_command_center.services.capability_lifecycle_manager import CapabilityLifecycleManager
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -69,6 +70,7 @@ from ai_command_center.services.runtime_provider_registry_service import (
     RuntimeProviderRegistryService,
 )
 from ai_command_center.services.session_service import SessionService
+from ai_command_center.core.settings.settings_service import SettingsService as CoreSettingsService
 from ai_command_center.services.settings_service import SettingsService
 from ai_command_center.services.shell_tool_service import ShellToolService
 from ai_command_center.services.system_monitor_service import SystemMonitorService
@@ -105,6 +107,8 @@ def build_services(
 
     # ── repositories ──────────────────────────────────────────────────────────
     settings_repo = SettingsRepository(db)
+    core_settings = CoreSettingsService(repo=settings_repo)
+    settings_snapshot = core_settings.get_snapshot()
     note_repo = NoteRepository(db)
     memory_repo = MemoryRepository(db)
     conv_repo = ConversationRepository(db)
@@ -132,7 +136,12 @@ def build_services(
     session = SessionService(bus, conv_repo)
     plugins = PluginRegistryService(bus, repo=plugin_repo)
     telemetry = TelemetryService(bus, TelemetryRepository(db))
-    tracing = TracingService(bus)
+    tracing = TracingService(
+        bus,
+        enabled=settings_snapshot.otel_enabled,
+        otel_endpoint=settings_snapshot.otel_endpoint,
+    )
+    capability_lifecycle = CapabilityLifecycleManager(bus)
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
@@ -161,6 +170,7 @@ def build_services(
     for svc in (
         telemetry,
         tracing,
+        capability_lifecycle,
         execution_run,
         chat_export,
         system_monitor,

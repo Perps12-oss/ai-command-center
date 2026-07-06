@@ -50,13 +50,31 @@ def _reset_tracer_provider() -> None:
     _TRACER_PROVIDER_SET_ONCE._done = False
 
 
-def _init_tracer(span_exporter: Any | None = None) -> Any:
+def _init_tracer(
+    span_exporter: Any | None = None,
+    *,
+    otel_endpoint: str = "",
+) -> Any:
     if not _OTEL_AVAILABLE:
         return None
     _reset_tracer_provider()
     provider = TracerProvider(resource=Resource.create({"service.name": "ai-command-center"}))
     if span_exporter is not None:
         provider.add_span_processor(SimpleSpanProcessor(span_exporter))
+    elif otel_endpoint.strip():
+        try:
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter,
+            )
+
+            endpoint = otel_endpoint.rstrip("/")
+            if not endpoint.endswith("/v1/traces"):
+                endpoint = f"{endpoint}/v1/traces"
+            exporter = OTLPSpanExporter(endpoint=endpoint)
+            provider.add_span_processor(BatchSpanProcessor(exporter))
+        except Exception:
+            _logger.warning("tracing: OTLP exporter unavailable; using console exporter")
+            provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
     else:
         provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
     trace.set_tracer_provider(provider)
@@ -86,11 +104,16 @@ class TracingService(BaseService):
         bus,
         *,
         enabled: bool = True,
+        otel_endpoint: str = "",
         span_exporter: SpanExporter | None = None,
     ) -> None:
         super().__init__(bus)
         self._enabled = enabled and _OTEL_AVAILABLE
-        self._tracer = _init_tracer(span_exporter) if self._enabled else None
+        self._tracer = (
+            _init_tracer(span_exporter, otel_endpoint=otel_endpoint)
+            if self._enabled
+            else None
+        )
         self._spans: dict[str, Any] = {}
         self._unsubscribers: list[Callable[[], None]] = []
 
