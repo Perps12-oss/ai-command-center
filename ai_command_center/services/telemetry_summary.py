@@ -37,6 +37,23 @@ _INTENT_OUTCOMES: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "navigate": (frozenset({UI_NAVIGATE}), frozenset()),
 }
 
+_SESSION_EVENT_TOPICS = frozenset(
+    {
+        UI_COMMAND,
+        COMMAND_ROUTED,
+        CHAT_STARTED,
+        CHAT_COMPLETE,
+        CHAT_ERROR,
+        CHAT_CANCELLED,
+        TOOL_RESULT,
+        TOOL_ERROR,
+        NOTE_SEARCH_RESULTS,
+        NOTE_CREATED,
+        NOTE_ERROR,
+        MEMORY_STORED,
+    }
+)
+
 
 def _event_name(row: TelemetryEvent | dict[str, Any]) -> str:
     if isinstance(row, TelemetryEvent):
@@ -204,6 +221,22 @@ def _derive_ollama_latencies(rows: list[TelemetryEvent | dict[str, Any]]) -> lis
     return latencies
 
 
+def _derive_scope_ratio(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str, Any]:
+    scoped = 0
+    total = 0
+    for row in rows:
+        if _event_name(row) not in _SESSION_EVENT_TOPICS:
+            continue
+        total += 1
+        payload = _payload(row)
+        if str(payload.get("workspace_id", "")).strip() or str(
+            payload.get("entity_id", "")
+        ).strip():
+            scoped += 1
+    ratio = round((scoped / total) * 100, 1) if total else 0.0
+    return {"total": total, "scoped": scoped, "ratio_pct": ratio}
+
+
 def compute_session_summary(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str, Any]:
     """Aggregate raw telemetry rows into a daily-driver session summary."""
     commands = _derive_commands(rows)
@@ -220,6 +253,7 @@ def compute_session_summary(rows: list[TelemetryEvent | dict[str, Any]]) -> dict
 
     avg_tokens = round(sum(token_samples) / len(token_samples), 1) if token_samples else 0.0
     ollama_latencies = _derive_ollama_latencies(rows)
+    workspace_scope = _derive_scope_ratio(rows)
     if ollama_latencies and commands["avg_latency_ms"] == 0.0:
         commands = {
             **commands,
@@ -251,6 +285,7 @@ def compute_session_summary(rows: list[TelemetryEvent | dict[str, Any]]) -> dict
             "over_budget": over_budget,
             "avg_tokens": avg_tokens,
         },
+        "workspace_scope": workspace_scope,
         "friction_score": friction_score,
     }
 
@@ -284,6 +319,7 @@ def format_session_summary(summary: dict[str, Any], *, session_id: str = "") -> 
     commands = summary.get("commands", {})
     ux = summary.get("ux", {})
     context = summary.get("context", {})
+    workspace_scope = summary.get("workspace_scope", {})
     header = "SESSION SUMMARY"
     if session_id:
         header += f" ({session_id})"
@@ -306,6 +342,10 @@ def format_session_summary(summary: dict[str, Any], *, session_id: str = "") -> 
         "Context:",
         f"- over budget: {context.get('over_budget', 0)}",
         f"- avg tokens: {context.get('avg_tokens', 0)}",
+        "",
+        "Workspace scope:",
+        f"- scoped session events: {workspace_scope.get('scoped', 0)} / {workspace_scope.get('total', 0)}",
+        f"- scoped ratio: {workspace_scope.get('ratio_pct', 0)}%",
         "",
         "Friction Score:",
         f"- {summary.get('friction_score', 'LOW')}",
