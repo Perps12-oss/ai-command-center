@@ -10,13 +10,14 @@ from ai_command_center.core.settings.migration_manager import MigrationManager
 class SettingsMigrationTests(unittest.TestCase):
     def test_v1_payload_advances_to_latest_schema_version(self) -> None:
         migrated = MigrationManager().migrate({"schema_version": 1, "theme": "dark"})
-        self.assertEqual(migrated["schema_version"], 4)
+        self.assertEqual(migrated["schema_version"], 5)
         self.assertEqual(migrated["provider"], "ollama")
         self.assertEqual(migrated["capability_provider_planning"], "qwenpaw")
+        self.assertEqual(migrated["mcp_servers"], {})
 
-    def test_v3_payload_advances_to_schema_version_4(self) -> None:
+    def test_v3_payload_advances_to_schema_version_5(self) -> None:
         migrated = MigrationManager().migrate({"schema_version": 3, "theme": "dark"})
-        self.assertEqual(migrated["schema_version"], 4)
+        self.assertEqual(migrated["schema_version"], 5)
         self.assertEqual(migrated["capability_provider_planning"], "qwenpaw")
         self.assertEqual(migrated["capability_provider_chat"], "native")
 
@@ -27,7 +28,7 @@ class SettingsMigrationTests(unittest.TestCase):
             "default_model": "gpt-4o",
         }
         migrated = MigrationManager().migrate(dict(original))
-        self.assertEqual(migrated["schema_version"], 4)
+        self.assertEqual(migrated["schema_version"], 5)
         self.assertEqual(migrated["default_model"], "gpt-4o")
         self.assertEqual(migrated["provider"], "openai")
 
