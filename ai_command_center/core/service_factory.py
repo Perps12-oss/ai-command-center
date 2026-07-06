@@ -43,9 +43,12 @@ from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.repositories.plugin_manifest_repository import (
     PluginManifestRepository,
 )
+from ai_command_center.repositories.runtime_provider_manifest_repository import (
+    RuntimeProviderManifestRepository,
+)
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
-from ai_command_center.runtime.provider_registry import build_default_runtime_registry
+from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
 from ai_command_center.services.capability_router_service import CapabilityRouterService
@@ -60,6 +63,9 @@ from ai_command_center.services.ollama_http_service import OllamaHttpService
 from ai_command_center.services.openai_http_service import OpenAIHttpService
 from ai_command_center.services.plugin_registry_service import PluginRegistryService
 from ai_command_center.services.qwenpaw_sidecar_service import QwenPawSidecarService
+from ai_command_center.services.runtime_provider_registry_service import (
+    RuntimeProviderRegistryService,
+)
 from ai_command_center.services.session_service import SessionService
 from ai_command_center.services.settings_service import SettingsService
 from ai_command_center.services.shell_tool_service import ShellToolService
@@ -99,6 +105,7 @@ def build_services(
     memory_repo = MemoryRepository(db)
     conv_repo = ConversationRepository(db)
     plugin_repo = PluginManifestRepository(db)
+    runtime_provider_repo = RuntimeProviderManifestRepository(db)
 
     # ── shared singletons ─────────────────────────────────────────────────────
     context_manager = ContextManager()
@@ -128,7 +135,13 @@ def build_services(
     agent_runtime = AgentRuntimeService(bus)
     workflow_engine = WorkflowEngineService(bus)
     qwenpaw_health = QwenPawSidecarHealthState()
-    runtime_registry = build_default_runtime_registry(bus, qwenpaw_health=qwenpaw_health)
+    runtime_registry = RuntimeProviderRegistry()
+    runtime_provider_registry = RuntimeProviderRegistryService(
+        bus,
+        registry=runtime_registry,
+        repo=runtime_provider_repo,
+        qwenpaw_health=qwenpaw_health,
+    )
     capability_router = CapabilityRouterService(
         bus,
         provider_registry=runtime_registry,
@@ -144,6 +157,7 @@ def build_services(
         system_monitor,
         SettingsService(bus, settings_repo),
         CommandRouterService(bus),
+        runtime_provider_registry,
         capability_router,
         qwenpaw_sidecar,
         model_router,

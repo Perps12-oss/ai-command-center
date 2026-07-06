@@ -1,0 +1,9 @@
+id: stub_echo
+name: Stub Echo Provider
+version: "1.0"
+description: Test-only echo provider for manifest validation and registry tests
+kind: runtime_provider
+entrypoint: builtin:stub_echo
+capabilities:
+  - chat
+enabled: false

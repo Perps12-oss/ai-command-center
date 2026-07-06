@@ -7,8 +7,9 @@ import customtkinter as ctk
 
 from ai_command_center.domain.capability_provider_settings import (
     CAPABILITY_KIND_LABELS,
-    CAPABILITY_PROVIDER_CHOICES,
     DEFAULT_CAPABILITY_PROVIDER_MAP,
+    capability_provider_label,
+    get_capability_provider_choices,
     settings_key_for_kind,
 )
 from ai_command_center.ui.components.glass_card import GlassCard
@@ -313,12 +314,18 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=T.PAD, pady=(0, 8))
 
         self._capability_providers: dict[str, ctk.CTkComboBox] = {}
-        provider_labels = {
-            "native": "Native",
-            "qwenpaw": "QwenPaw",
-            "auto": "Auto",
+        combo_values = [
+            capability_provider_label(provider_id)
+            for provider_id in get_capability_provider_choices()
+        ]
+        self._provider_label_to_value = {
+            capability_provider_label(provider_id): provider_id
+            for provider_id in get_capability_provider_choices()
         }
-        combo_values = [provider_labels[p] for p in CAPABILITY_PROVIDER_CHOICES]
+        self._provider_value_to_label = {
+            provider_id: capability_provider_label(provider_id)
+            for provider_id in get_capability_provider_choices()
+        }
         for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
             label = CAPABILITY_KIND_LABELS.get(kind, kind.title())
             ctk.CTkLabel(providers, text=label, text_color=T.TEXT_MUTED).pack(
@@ -358,13 +365,6 @@ class SettingsView(ctk.CTkFrame):
         entry.pack(anchor="w", padx=16, pady=(4, 4))
         return entry
 
-    _PROVIDER_LABEL_TO_VALUE = {
-        "Native": "native",
-        "QwenPaw": "qwenpaw",
-        "Auto": "auto",
-    }
-    _PROVIDER_VALUE_TO_LABEL = {v: k for k, v in _PROVIDER_LABEL_TO_VALUE.items()}
-
     def _on_capability_provider_change(self, kind: str) -> None:
         if self._building:
             return
@@ -372,15 +372,16 @@ class SettingsView(ctk.CTkFrame):
         if combo is None:
             return
         label = combo.get().strip()
-        value = self._PROVIDER_LABEL_TO_VALUE.get(label, "auto")
+        value = self._provider_label_to_value.get(label, "auto")
         self._on_save(settings_key_for_kind(kind), value)
 
     def _set_capability_provider(self, kind: str, value: str) -> None:
         combo = self._capability_providers.get(kind)
         if combo is None:
             return
-        normalized = value if value in CAPABILITY_PROVIDER_CHOICES else "auto"
-        combo.set(self._PROVIDER_VALUE_TO_LABEL.get(normalized, "Auto"))
+        choices = get_capability_provider_choices()
+        normalized = value if value in choices else "auto"
+        combo.set(self._provider_value_to_label.get(normalized, "Auto"))
 
     def _on_provider_change(self, value: str) -> None:
         self._update_provider_fields(value)
