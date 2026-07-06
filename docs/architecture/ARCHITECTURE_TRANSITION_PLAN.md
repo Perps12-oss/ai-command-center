@@ -73,15 +73,15 @@ The following documents were **merged into this file and removed** on 2026-07-03
 |----|------|--------------|--------------|-------|
 | TD-01 | F821 `T` in Badge | **FIXED** | — | Appendix A FIX-001 |
 | TD-02 | F821 `Any` in WorkspaceOsService | **FIXED** | S8 | Keep F821 in CI |
-| TD-03 | ModelRouter in factory | **FIXED** | **S3** | Registry injection still open |
-| TD-04 | SystemView poll leak | **PARTIAL** | **S4** | `on_show`/`on_hide` wired; `_collect` race may reschedule poll |
+| TD-03 | ModelRouter in factory | **FIXED** | **S3** | Registry injected; single-provider LLM dispatch via payload filter |
+| TD-04 | SystemView poll leak | **FIXED** | **S4** | Generation token + mid-flight `_poll_live` checks stop reschedule after `on_hide` |
 | TD-05 | Inspector Tk marshal | **PARTIAL** | **S4** | `after(0)` added; migrate to `UIQueue` |
 | TD-06 | EventBus swallows errors | **FIXED** | S6 | `bus.handler_error` exists |
 | TD-07 | AppState listener errors | **FIXED** | S5 | `app.error` exists; verify `close()` everywhere |
 | TD-08 | `shell=True` | **HARDENED** | **S2** | Production sandbox + permission still open |
 | TD-09 | Ruff F401 | **FIXED** | S8 | Maintain in CI |
 | TD-10 | `motion_widgets.py` | KEEP | — | No action |
-| TD-11 | Requirements drift | OPEN | S7 | Verify before dep removal |
+| TD-11 | Requirements drift | **VERIFIED** | S7 | `requirements.txt` matches runtime imports (2026-07-06 audit) |
 
 ### Former session TODO → program mapping
 
@@ -748,4 +748,4 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 | 2026-07-03 | Initial master backlog — audit consolidation into four programs |
 | 2026-07-03 | Merged `TODO_NEXT_SESSION.md`; file removed — single orchestration doc |
 | 2026-07-03 | Merged and deleted all `docs/development/*` backlog docs + `ARCHITECTURE_REVIEW_MULTI_AGENT.md` |
-| 2026-07-06 | Linked `PROGRAM_3_WORKSPACE_ADOPTION.md` — >60% influence target, five-pillar exit gate |
+| 2026-07-06 | Post-Program 3 backlog: S3/S4/S7 closed; W4 partial (`chat_state`, `workspace_state`); `PROGRAM4_GATE_STATUS.md` readiness assessment |
