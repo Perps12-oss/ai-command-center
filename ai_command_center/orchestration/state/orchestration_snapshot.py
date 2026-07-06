@@ -20,6 +20,8 @@ class OrchestrationRunSnapshot:
     response_source: str = ""
     response_text: str = ""
     receipt_id: str = ""
+    trace_id: str = ""
+    span_id: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -35,4 +37,6 @@ class OrchestrationRunSnapshot:
             "response_source": self.response_source,
             "response_text": self.response_text,
             "receipt_id": self.receipt_id,
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
         }
