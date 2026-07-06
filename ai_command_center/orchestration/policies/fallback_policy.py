@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
+from ai_command_center.orchestration.policies.response_policy import ResponsePolicyEngine
 
 
 class OrchestrationFallbackPolicy:
@@ -10,4 +11,4 @@ class OrchestrationFallbackPolicy:
 
     @staticmethod
     def should_defer_to_llm(intent: OrchestrationIntent) -> bool:
-        return intent is OrchestrationIntent.UNHANDLED
+        return ResponsePolicyEngine.should_defer_to_llm(intent)

@@ -8,6 +8,8 @@ _INTENT_PROVIDER: dict[OrchestrationIntent, str] = {
     OrchestrationIntent.LAUNCH_APPLICATION: "application",
     OrchestrationIntent.SYSTEM_TIME_QUERY: "system_facts",
     OrchestrationIntent.CALENDAR_QUERY: "calendar",
+    OrchestrationIntent.CALENDAR_EVENT_CREATE: "calendar",
+    OrchestrationIntent.SEND_EMAIL: "email",
 }
 
 
