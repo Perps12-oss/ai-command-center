@@ -49,6 +49,10 @@ jobs:
       - name: Run risk-area test suite (incl. slow soak/chaos)
         run: python -m pytest -p no:cacheprovider
 
+      - name: Provider certification smoke (platform hardening)
+        run: |
+          python scripts/acc_provider_test.py provider test system_facts --certify
+
       - name: ARM64 binary scan (informational on x64 runners)
         # Hosted runners are x64; this is a hard gate only on native ARM64
         # (see arm64-gate.yml). Here it is informational so x64 does not block.
