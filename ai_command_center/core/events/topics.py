@@ -146,12 +146,19 @@ COMMAND_HISTORY = "command.history"
 # Workspace OS UI topics (Track B - Phase 2)
 UI_INSPECTOR_OPEN = "ui.inspector.open"
 UI_INSPECTOR_CLOSE = "ui.inspector.close"
+UI_ORCHESTRATION_INSPECTOR_OPEN = "ui.orchestration_inspector.open"
 UI_CREATE_WORKSPACE = "ui.workspace_os.create_workspace"
 UI_CREATE_CARD = "ui.workspace_os.create_card"
 UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
 UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
 UI_OPEN_CHAT = "ui.workspace_os.open_chat"
+UI_SELECT_WORKSPACE = "ui.workspace_os.select_workspace"
 UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"
+
+# Workspace lifecycle (Program 3 — active workspace scope)
+WORKSPACE_ACTIVE = "workspace.active"
+WORKSPACE_ACTIVATED = "workspace.activated"
+WORKSPACE_DEACTIVATED = "workspace.deactivated"
 
 # Agent framework (Track 7 — A0/A1)
 AGENT_SPAWN_REQUEST = "agent.spawn.request"
@@ -322,12 +329,17 @@ __all__ = [
     "COMMAND_HISTORY",
     "UI_INSPECTOR_OPEN",
     "UI_INSPECTOR_CLOSE",
+    "UI_ORCHESTRATION_INSPECTOR_OPEN",
     "UI_CREATE_WORKSPACE",
     "UI_CREATE_CARD",
     "UI_CREATE_RESOURCE",
     "UI_LAUNCH_RESOURCE",
     "UI_OPEN_CHAT",
+    "UI_SELECT_WORKSPACE",
     "UI_SEARCH_WORKSPACE_OS",
+    "WORKSPACE_ACTIVE",
+    "WORKSPACE_ACTIVATED",
+    "WORKSPACE_DEACTIVATED",
     "AGENT_SPAWN_REQUEST",
     "AGENT_SPAWNED",
     "AGENT_TASK_REQUEST",
