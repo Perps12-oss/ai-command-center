@@ -48,6 +48,7 @@ from ai_command_center.repositories.runtime_provider_manifest_repository import 
 )
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from ai_command_center.repositories.execution_run_repository import ExecutionRunRepository
 from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
@@ -72,6 +73,8 @@ from ai_command_center.services.settings_service import SettingsService
 from ai_command_center.services.shell_tool_service import ShellToolService
 from ai_command_center.services.system_monitor_service import SystemMonitorService
 from ai_command_center.services.telemetry_service import TelemetryService
+from ai_command_center.services.execution_run_service import ExecutionRunService
+from ai_command_center.telemetry.tracing_service import TracingService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
 from ai_command_center.services.workflow_engine_service import WorkflowEngineService
@@ -129,6 +132,8 @@ def build_services(
     session = SessionService(bus, conv_repo)
     plugins = PluginRegistryService(bus, repo=plugin_repo)
     telemetry = TelemetryService(bus, TelemetryRepository(db))
+    tracing = TracingService(bus)
+    execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
 
@@ -155,6 +160,8 @@ def build_services(
 
     for svc in (
         telemetry,
+        tracing,
+        execution_run,
         chat_export,
         system_monitor,
         SettingsService(bus, settings_repo),

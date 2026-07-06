@@ -75,4 +75,10 @@ class RuntimeProviderManifestRepository:
             capabilities=tuple(capabilities),
             enabled=bool(data.get("enabled", True)),
             kind=str(data.get("kind", "runtime_provider")),
+            permissions=tuple(str(p) for p in (data.get("permissions") or [])),
+            events=tuple(str(e) for e in (data.get("events") or [])),
+            health_probe=str(data.get("health_probe", "")),
+            dependencies=tuple(str(d) for d in (data.get("dependencies") or [])),
+            certification_level=str(data.get("certification_level", "")),
+            min_sdk_version=str(data.get("min_sdk_version", "1.0")),
         )

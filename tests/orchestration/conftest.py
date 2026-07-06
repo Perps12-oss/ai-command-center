@@ -52,13 +52,28 @@ def orchestration_stack(bus: EventBus) -> tuple[OrchestrationService, ChatHandle
     orchestration.stop()
 
 
-def publish_chat(bus: EventBus, prompt: str, *, request_id: str = "req-orch") -> None:
+def publish_chat(
+    bus: EventBus,
+    prompt: str,
+    *,
+    request_id: str = "req-orch",
+    workspace_id: str = "",
+    entity_id: str = "",
+    selected_entity_id: str = "",
+) -> None:
+    payload: dict[str, object] = {
+        "intent": INTENT_CHAT,
+        "args": {"prompt": prompt},
+        "request_id": request_id,
+    }
+    if workspace_id:
+        payload["workspace_id"] = workspace_id
+    if entity_id:
+        payload["entity_id"] = entity_id
+    if selected_entity_id:
+        payload["selected_entity_id"] = selected_entity_id
     bus.publish(
         COMMAND_ROUTED,
-        {
-            "intent": INTENT_CHAT,
-            "args": {"prompt": prompt},
-            "request_id": request_id,
-        },
+        payload,
         source="command_router",
     )
