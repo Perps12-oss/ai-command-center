@@ -62,6 +62,7 @@ class SettingsService:
             qwenpaw_auto_start=bool(payload.get("qwenpaw_auto_start", False)),
             qwenpaw_python=str(payload.get("qwenpaw_python", "")),
             qwenpaw_auth_token=str(payload.get("qwenpaw_auth_token", "")),
+            mcp_servers=dict(payload.get("mcp_servers") or {}),
         )
 
     def set(self, key: str, value: Any) -> None:

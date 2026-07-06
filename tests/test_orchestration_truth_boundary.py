@@ -28,6 +28,31 @@ def test_rejects_failed_execution() -> None:
     assert validation.response_source == "orchestration_rejected"
 
 
+def test_accepts_verified_launch() -> None:
+    boundary = TruthBoundary()
+    facts = {"application": "outlook", "launched": True}
+    result = ProviderExecutionResult(
+        success=True,
+        response_text="Opened outlook.",
+        facts=facts,
+    )
+    receipt = ExecutionReceipt(
+        receipt_id="r3",
+        request_id="req3",
+        intent=OrchestrationIntent.LAUNCH_APPLICATION.value,
+        provider_id="application",
+        success=True,
+        facts=tuple(sorted(facts.items())),
+    )
+    validation = boundary.validate(
+        OrchestrationIntent.LAUNCH_APPLICATION,
+        result,
+        receipt,
+    )
+    assert validation.valid is True
+    assert validation.response_source == "orchestration"
+
+
 def test_accepts_time_fact() -> None:
     boundary = TruthBoundary()
     result = ProviderExecutionResult(

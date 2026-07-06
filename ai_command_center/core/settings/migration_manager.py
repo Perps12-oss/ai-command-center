@@ -37,4 +37,9 @@ class MigrationManager:
             for kind, default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
                 payload.setdefault(settings_key_for_kind(kind), default)
             payload["schema_version"] = 4
+            schema_version = 4
+        if schema_version < 5:
+            payload = dict(payload)
+            payload.setdefault("mcp_servers", {})
+            payload["schema_version"] = 5
         return payload

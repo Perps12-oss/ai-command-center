@@ -7,10 +7,11 @@ import customtkinter as ctk
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.ui_queue import UIQueue
 
 
 class OrchestrationInspector(ctk.CTkToplevel):
-    """Ugly developer inspector for truth-bound orchestration runs."""
+    """Read-only developer inspector for truth-bound orchestration runs."""
 
     WIDTH = 640
     HEIGHT = 520
@@ -20,15 +21,19 @@ class OrchestrationInspector(ctk.CTkToplevel):
         master: ctk.CTk,
         bus: EventBus,
         state_store: AppStateStore,
+        *,
+        ui_queue: UIQueue | None = None,
     ) -> None:
         super().__init__(master)
         self._bus = bus
         self._state_store = state_store
+        self._ui_queue = ui_queue
         self._unsubs: list = []
 
         self.title("Orchestration Inspector (dev)")
         self.geometry(f"{self.WIDTH}x{self.HEIGHT}")
         self.configure(fg_color=("#f0f0f0", "#141414"))
+        self.resizable(True, True)
 
         header = ctk.CTkLabel(
             self,
@@ -40,7 +45,7 @@ class OrchestrationInspector(ctk.CTkToplevel):
 
         ctk.CTkLabel(
             self,
-            text="Developer only — last orchestration run",
+            text="Developer only — last orchestration run (read-only)",
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
         ).pack()
@@ -53,17 +58,28 @@ class OrchestrationInspector(ctk.CTkToplevel):
         self._unsub_state = self._state_store.subscribe(self._on_state)
         self._refresh()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.transient(master)
+        self.focus_set()
 
     def _on_state(self, _state) -> None:
-        self._refresh()
+        self._schedule_refresh()
+
+    def _schedule_refresh(self) -> None:
+        if self._ui_queue is not None:
+            self._ui_queue.enqueue(self._refresh)
+        elif self.winfo_exists():
+            self.after(0, self._refresh)
 
     def _refresh(self) -> None:
         run = self._state_store.snapshot.orchestration_run
         lines = [
             f"Intent: {run.intent or '-'}",
-            f"Selected Provider: {run.provider_id or '-'}",
+            f"Provider: {run.provider_id or '-'}",
             f"Request ID: {run.request_id or '-'}",
             f"Query: {run.query or '-'}",
+            "",
+            "Receipt:",
+            f"  id: {run.receipt_id or '-'}",
             "",
             "Execution Result:",
             f"  success: {run.execution_success}",
@@ -79,8 +95,6 @@ class OrchestrationInspector(ctk.CTkToplevel):
             "",
             "Response:",
             run.response_text or "-",
-            "",
-            f"Receipt: {run.receipt_id or '-'}",
         ]
         self._text.configure(state="normal")
         self._text.delete("1.0", "end")
