@@ -188,7 +188,7 @@ def certify_provider(
         return certify_orchestration_manifest(orchestration_manifest, provider, ctx=ctx)
     return CertificationReport(
         provider_id=provider_id,
-        badges=(
+        badges=tuple(
             BadgeResult(b, False, "manifest not found") for b in CERTIFICATION_BADGES
         ),
     )
