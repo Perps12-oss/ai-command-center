@@ -6,7 +6,9 @@ import sys
 
 from ai_command_center.application import create_application
 from ai_command_center.platform.detector import is_arm64
+from ai_command_center.core.events.topics import UI_ORCHESTRATION_INSPECTOR_OPEN
 from ai_command_center.ui.app import CommandPaletteApp
+from ai_command_center.ui.orchestration_inspector import OrchestrationInspector
 from ai_command_center.ui.tray import TrayController
 from ai_command_center.ui.workspace_os_inspector import WorkspaceOsInspector
 from ai_command_center.utils.hotkey import register_hotkey, validate_hotkey
@@ -31,6 +33,7 @@ def main() -> int:
     )
     shutting_down = False
     inspector: WorkspaceOsInspector | None = None
+    orch_inspector: OrchestrationInspector | None = None
 
     def shutdown() -> None:
         nonlocal shutting_down
@@ -41,6 +44,11 @@ def main() -> int:
         try:
             if inspector is not None:
                 inspector.destroy()
+        except Exception:
+            pass
+        try:
+            if orch_inspector is not None:
+                orch_inspector.destroy()
         except Exception:
             pass
         try:
@@ -66,6 +74,24 @@ def main() -> int:
                 app, core.bus, core.state_store, ui_queue=app._ui_queue
             )
 
+    def toggle_orchestration_inspector() -> None:
+        nonlocal orch_inspector
+        if orch_inspector is not None and orch_inspector.winfo_exists():
+            orch_inspector.after(0, orch_inspector.destroy)
+            orch_inspector = None
+            return
+        orch_inspector = OrchestrationInspector(
+            app, core.bus, core.state_store, ui_queue=app._ui_queue
+        )
+
+    def _on_orchestration_inspector_open(_event=None) -> None:
+        app.after(0, toggle_orchestration_inspector)
+
+    core.bus.subscribe(
+        UI_ORCHESTRATION_INSPECTOR_OPEN,
+        lambda _event: _on_orchestration_inspector_open(),
+    )
+
     tray = TrayController(
         on_open=show_palette,
         on_exit=lambda: app.after(0, shutdown),
@@ -87,7 +113,22 @@ def main() -> int:
     else:
         print(f"Workspace OS Inspector hotkey unavailable: {inspector_msg}", file=sys.stderr)
 
-    print("AI Command Center running. Alt+Space to toggle palette. Ctrl+Shift+W for Workspace OS Inspector. Tray icon active.")
+    orch_inspector_ok, orch_inspector_msg = register_hotkey(
+        "ctrl+shift+o", toggle_orchestration_inspector
+    )
+    if orch_inspector_ok:
+        print(f"Orchestration Inspector hotkey: {orch_inspector_msg}")
+    else:
+        print(
+            f"Orchestration Inspector hotkey unavailable: {orch_inspector_msg}",
+            file=sys.stderr,
+        )
+
+    print(
+        "AI Command Center running. Alt+Space to toggle palette. "
+        "Ctrl+Shift+W for Workspace OS Inspector. "
+        "Ctrl+Shift+O for Orchestration Inspector. Tray icon active."
+    )
     app.protocol("WM_DELETE_WINDOW", app.hide)
     app.show()
 

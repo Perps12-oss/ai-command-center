@@ -36,7 +36,7 @@ class SettingsSnapshot:
     vault_path: str | Path = ""
     overlay_hotkey: str = "alt+space"
     telemetry_enabled: bool = True
-    schema_version: int = 4
+    schema_version: int = 5
     capability_provider_map: dict[str, str] = field(
         default_factory=lambda: dict(DEFAULT_CAPABILITY_PROVIDER_MAP)
     )
@@ -46,6 +46,7 @@ class SettingsSnapshot:
     qwenpaw_auto_start: bool = False
     qwenpaw_python: str = ""
     qwenpaw_auth_token: str = ""
+    mcp_servers: dict[str, dict[str, object]] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -79,4 +80,5 @@ class SettingsSnapshot:
             "qwenpaw_auto_start": self.qwenpaw_auto_start,
             "qwenpaw_python": self.qwenpaw_python,
             "qwenpaw_auth_token": self.qwenpaw_auth_token,
+            "mcp_servers": dict(self.mcp_servers),
         }

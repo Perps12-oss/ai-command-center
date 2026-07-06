@@ -56,6 +56,7 @@ class SettingsSchema:
             "qwenpaw_auto_start": SettingsField("qwenpaw_auto_start", bool, False),
             "qwenpaw_python": SettingsField("qwenpaw_python", str, ""),
             "qwenpaw_auth_token": SettingsField("qwenpaw_auth_token", str, ""),
+            "mcp_servers": SettingsField("mcp_servers", dict, {}),
         }
         for kind, default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
             self.fields[settings_key_for_kind(kind)] = SettingsField(
@@ -89,6 +90,10 @@ class SettingsSchema:
             return value
         if field.value_type is Path:
             return Path(value) if not isinstance(value, Path) else value
+        if field.value_type is dict:
+            if isinstance(value, dict):
+                return value
+            return {}
         if issubclass(field.value_type, Enum):
             if isinstance(value, field.value_type):
                 return value
