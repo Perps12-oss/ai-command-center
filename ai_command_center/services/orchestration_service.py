@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Callable
 
 from ai_command_center.core.event_bus import Event
@@ -12,7 +13,10 @@ from ai_command_center.core.events.topics import (
     CHAT_STARTED,
     COMMAND_ROUTED,
     ORCHESTRATION_INTENT_CLASSIFIED,
+    ORCHESTRATION_PROVIDER_HEALTH,
+    ORCHESTRATION_PROVIDER_SELECTED,
     ORCHESTRATION_RECEIPT,
+    ORCHESTRATION_ROUTING_COMPLETED,
     ORCHESTRATION_RUN_SNAPSHOT,
     ORCHESTRATION_TRUTH_VALIDATED,
     SESSION_UPDATE_REQUEST,
@@ -30,6 +34,20 @@ from ai_command_center.orchestration.verification.truth_boundary import TruthBou
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
+
+
+def _observability_scope(payload: dict[str, object]) -> dict[str, str]:
+    """Pass workspace/entity scope through orchestration events for tracing."""
+    scope: dict[str, str] = {}
+    workspace_id = str(payload.get("workspace_id", "")).strip()
+    if workspace_id:
+        scope["workspace_id"] = workspace_id
+    entity_id = str(payload.get("entity_id", "")).strip()
+    if not entity_id:
+        entity_id = str(payload.get("selected_entity_id", "")).strip()
+    if entity_id:
+        scope["entity_id"] = entity_id
+    return scope
 
 
 class OrchestrationService(BaseService):
@@ -62,6 +80,20 @@ class OrchestrationService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
         )
+        self._publish_provider_health()
+
+    def _publish_provider_health(self) -> None:
+        for provider_id, (healthy, detail) in self._registry.health_checks().items():
+            self._bus.publish(
+                ORCHESTRATION_PROVIDER_HEALTH,
+                {
+                    "provider_id": provider_id,
+                    "healthy": healthy,
+                    "detail": detail,
+                    "display_name": provider_id,
+                },
+                source=self.name,
+            )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -80,6 +112,7 @@ class OrchestrationService(BaseService):
             return
 
         request_id = str(event.payload.get("request_id", "")).strip()
+        scope = _observability_scope(event.payload)
         intent, intent_args = self._classifier.classify(query)
         self._bus.publish(
             ORCHESTRATION_INTENT_CLASSIFIED,
@@ -88,6 +121,7 @@ class OrchestrationService(BaseService):
                 "query": query,
                 "intent": intent.value,
                 "args": intent_args,
+                **scope,
             },
             source=self.name,
         )
@@ -96,8 +130,30 @@ class OrchestrationService(BaseService):
             return
 
         provider_id = self._intent_router.resolve_provider(intent)
+        self._bus.publish(
+            ORCHESTRATION_ROUTING_COMPLETED,
+            {
+                "request_id": request_id,
+                "intent": intent.value,
+                "provider_id": provider_id,
+                "routed": bool(provider_id),
+                **scope,
+            },
+            source=self.name,
+        )
         if not provider_id:
             return
+
+        self._bus.publish(
+            ORCHESTRATION_PROVIDER_SELECTED,
+            {
+                "request_id": request_id,
+                "intent": intent.value,
+                "provider_id": provider_id,
+                **scope,
+            },
+            source=self.name,
+        )
 
         mark_orchestration_request(request_id)
         _logger.info(
@@ -151,6 +207,8 @@ class OrchestrationService(BaseService):
             response_source=validation.response_source,
             response_text=composed.text,
             receipt_id=run.receipt.receipt_id,
+            trace_id=uuid.uuid4().hex,
+            span_id=uuid.uuid4().hex[:16],
         )
         self._bus.publish(
             ORCHESTRATION_RUN_SNAPSHOT,

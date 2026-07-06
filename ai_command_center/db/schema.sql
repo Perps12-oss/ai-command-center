@@ -96,3 +96,15 @@ CREATE TABLE IF NOT EXISTS plugin_state (
 );
 
 CREATE INDEX IF NOT EXISTS idx_plugin_state_enabled ON plugin_state(enabled);
+
+-- Provider Platform: append-only execution runs (time-travel diagnostics)
+CREATE TABLE IF NOT EXISTS execution_runs (
+    run_id TEXT PRIMARY KEY,
+    request_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    snapshot TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_execution_runs_request ON execution_runs(request_id);
+CREATE INDEX IF NOT EXISTS idx_execution_runs_created ON execution_runs(created_at);
