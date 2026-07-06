@@ -115,6 +115,18 @@ class ViewManagerMixin:
         v = self._views.get("workspace")
         return v if isinstance(v, WorkspaceView) else None
 
+    def _workspace_os_routing_enabled(self) -> bool:
+        return self._default_view == "workspace"
+
+    def _policy_resolve_view(self, view_id: str) -> str:
+        """Workspace-centric routing: chat consumes active workspace scope."""
+        if not self._workspace_os_routing_enabled() or view_id != "chat":
+            return view_id
+        snap = self._controller.snapshot()
+        if str(snap.active_workspace_id).strip():
+            return "chat"
+        return "workspace"
+
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:
             view_id = "home"
@@ -144,6 +156,7 @@ class ViewManagerMixin:
         self._navigate(view_id)
 
     def _navigate(self, view_id: str, *, clear_chat_entity: bool = False) -> None:
+        view_id = self._policy_resolve_view(view_id)
         if view_id == "chat" and clear_chat_entity:
             self._controller.publish_clear_chat_entity()
         self._show_view(view_id)

@@ -213,13 +213,24 @@ class CapabilityContextAssembler:
                 source=source,
             )
             if include_model_resolve:
+                resolve_request: dict[str, object] = {
+                    "request_id": request_id,
+                    "intent": INTENT_CHAT,
+                    "query": query,
+                }
+                if workspace_id:
+                    resolve_request["workspace_id"] = workspace_id
+                for key in (
+                    "selected_entity_id",
+                    "selected_entity_type",
+                    "selected_entity_title",
+                ):
+                    value = str(event_payload.get(key) or args.get(key, "")).strip()
+                    if value:
+                        resolve_request[key] = value
                 self._bus.publish(
                     MODEL_RESOLVE_REQUEST,
-                    {
-                        "request_id": request_id,
-                        "intent": INTENT_CHAT,
-                        "query": query,
-                    },
+                    resolve_request,
                     source=source,
                 )
 

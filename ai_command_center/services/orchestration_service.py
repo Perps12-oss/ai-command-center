@@ -36,6 +36,26 @@ from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
 
+_SCOPE_KEYS: tuple[str, ...] = (
+    "workspace_id",
+    "selected_entity_id",
+    "selected_entity_type",
+    "selected_entity_title",
+)
+
+
+def _routing_scope(payload: dict[str, object], args: dict[str, object]) -> dict[str, str]:
+    """Workspace scope from command.routed for classify and provider execution."""
+    scope: dict[str, str] = {}
+    workspace_id = str(payload.get("workspace_id") or args.get("workspace_id", "")).strip()
+    if workspace_id:
+        scope["workspace_id"] = workspace_id
+    for key in _SCOPE_KEYS[1:]:
+        value = str(payload.get(key) or args.get(key, "")).strip()
+        if value:
+            scope[key] = value
+    return scope
+
 
 def _observability_scope(payload: dict[str, object]) -> dict[str, str]:
     """Pass workspace/entity scope through orchestration events for tracing."""
@@ -121,17 +141,21 @@ class OrchestrationService(BaseService):
             return
 
         request_id = str(event.payload.get("request_id", "")).strip()
-        scope = _observability_scope(event.payload)
+        scope = _routing_scope(dict(event.payload), dict(args))
+        for key, value in _observability_scope(event.payload).items():
+            scope.setdefault(key, value)
         intent, intent_args = self._classifier.classify(query)
+        merged_args = {**intent_args, **scope}
+        classified_payload: dict[str, object] = {
+            "request_id": request_id,
+            "query": query,
+            "intent": intent.value,
+            "args": merged_args,
+        }
+        classified_payload.update(scope)
         self._bus.publish(
             ORCHESTRATION_INTENT_CLASSIFIED,
-            {
-                "request_id": request_id,
-                "query": query,
-                "intent": intent.value,
-                "args": intent_args,
-                **scope,
-            },
+            classified_payload,
             source=self.name,
         )
 
@@ -177,7 +201,7 @@ class OrchestrationService(BaseService):
             provider_id,
             request_id=request_id,
             query=query,
-            args=intent_args,
+            args=merged_args,
         )
         self._bus.publish(
             ORCHESTRATION_RECEIPT,
