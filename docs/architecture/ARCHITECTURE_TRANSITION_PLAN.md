@@ -494,6 +494,7 @@ Program 4 **does not start** until:
 | Capability | Audit status today | Prerequisite |
 |------------|-------------------|--------------|
 | **Multi-provider models** | Ollama + OpenAI wired; router keyword-only | S3 complete; provider registry dispatch |
+| **Provider platform** | CP1-FoundationBeta (SDK, tracing, inspector); CP2-ControlPlaneReady adds lifecycle manager + settings→tracing — see `docs/architecture/PROVIDER_PLATFORM.md` | Execution Envelope, Unified Receipts, Router v2 |
 | **Model tiers / task routing** | `classify_model()` warnings only | Workspace-scoped task hints |
 | **Agents** | `AgentRuntimeService` demo skeleton | W1 workspace scope; permission hardening |
 | **Workflows** | Linear executor; no repository | W3 bus-native tools; workspace context on steps |

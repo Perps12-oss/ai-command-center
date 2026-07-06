@@ -54,6 +54,8 @@ class SettingsService:
             vault_path=payload.get("vault_path", ""),
             overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
             telemetry_enabled=bool(payload.get("telemetry_enabled", True)),
+            otel_enabled=bool(payload.get("otel_enabled", False)),
+            otel_endpoint=str(payload.get("otel_endpoint", "http://127.0.0.1:4318")),
             schema_version=int(payload.get("schema_version", 1)),
             capability_provider_map=capability_provider_map_from_payload(payload),
             qwenpaw_enabled=bool(payload.get("qwenpaw_enabled", False)),

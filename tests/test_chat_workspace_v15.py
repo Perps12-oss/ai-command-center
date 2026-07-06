@@ -247,6 +247,7 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
             UI_COMMAND,
             {
                 "text": "Summarize this card",
+                "workspace_id": "ws-v15",
                 "workspace_entity_id": "card-9",
                 "workspace_entity_type": "card",
                 "workspace_entity_title": "Sprint",
@@ -275,6 +276,7 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
             UI_COMMAND,
             {
                 "text": "Summarize resource",
+                "workspace_id": "ws-v15",
                 "workspace_entity_id": "res-3",
                 "workspace_entity_type": "resource",
                 "workspace_entity_title": "Handbook",
