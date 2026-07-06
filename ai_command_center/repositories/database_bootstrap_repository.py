@@ -80,6 +80,22 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
 
 
 def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """Add entity_id scope column to memory_nodes (Program 3 Phase 4)."""
+    cols = {
+        str(row[1] if isinstance(row, tuple) else row["name"])
+        for row in conn.execute("PRAGMA table_info(memory_nodes)").fetchall()
+    }
+    if "entity_id" not in cols:
+        conn.execute(
+            "ALTER TABLE memory_nodes ADD COLUMN entity_id TEXT NOT NULL DEFAULT ''"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memory_nodes_entity "
+            "ON memory_nodes(workspace_id, entity_id)"
+        )
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
     """Add execution_runs table for Provider Platform time-travel diagnostics."""
     conn.executescript(
         """
@@ -101,6 +117,7 @@ _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (2, _migrate_v2),
     (3, _migrate_v3),
     (4, _migrate_v4),
+    (5, _migrate_v5),
 ]
 
 

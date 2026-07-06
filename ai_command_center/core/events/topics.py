@@ -162,6 +162,8 @@ WORKSPACE_ACTIVE = "workspace.active"
 WORKSPACE_ACTIVATED = "workspace.activated"
 WORKSPACE_DEACTIVATED = "workspace.deactivated"
 WORKSPACE_LAYOUT_CHANGED = "workspace.layout.changed"
+WORKSPACE_CONTEXT_REQUEST = "workspace.context.request"
+WORKSPACE_CONTEXT_RESULT = "workspace.context.result"
 
 # Agent framework (Track 7 — A0/A1)
 AGENT_SPAWN_REQUEST = "agent.spawn.request"
@@ -348,6 +350,8 @@ __all__ = [
     "WORKSPACE_ACTIVATED",
     "WORKSPACE_DEACTIVATED",
     "WORKSPACE_LAYOUT_CHANGED",
+    "WORKSPACE_CONTEXT_REQUEST",
+    "WORKSPACE_CONTEXT_RESULT",
     "AGENT_SPAWN_REQUEST",
     "AGENT_SPAWNED",
     "AGENT_TASK_REQUEST",

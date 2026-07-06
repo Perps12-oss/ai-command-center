@@ -197,3 +197,26 @@ class RelationshipService:
                     queue.append((rel.target_id, path + [rel.target_id]))
         
         return None
+
+    def traverse_context_snippets(
+        self,
+        entity_id: UUID,
+        entity_service: Any,
+        *,
+        max_depth: int = 2,
+    ) -> list[str]:
+        """Build human-readable relationship traversal lines for context assembly."""
+        lines: list[str] = []
+        traversal = self.traverse(entity_id, max_depth=max_depth)
+        for depth in sorted(traversal):
+            if depth == 0:
+                continue
+            for related_id in sorted(traversal[depth], key=str):
+                entity = entity_service.get(related_id)
+                if entity is None:
+                    continue
+                lines.append(
+                    f"  depth-{depth}: {entity.entity_type} "
+                    f"\"{entity.title}\" ({related_id})"
+                )
+        return lines
