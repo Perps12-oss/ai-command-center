@@ -216,10 +216,19 @@ def _reduce_context_snapshot(state: Any, event: Event) -> Any:
     raw_sources = event.payload.get("sources", [])
     sources = tuple(str(item) for item in raw_sources) if isinstance(raw_sources, (list, tuple)) else ()
     tokens = _coerce_int(event.payload.get("context_size_tokens", 0), 0)
+    raw_workspace_snippets = event.payload.get("workspace_context_snippets", [])
+    snippet_count = (
+        len(raw_workspace_snippets)
+        if isinstance(raw_workspace_snippets, (list, tuple))
+        else 0
+    )
+    workspace_id = str(event.payload.get("workspace_id", "")).strip()
     return replace(
         state,
         chat_context_sources=sources,
         chat_token_estimate=tokens,
+        workspace_context_snippet_count=snippet_count,
+        last_workspace_context_workspace_id=workspace_id,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )

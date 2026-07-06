@@ -16,6 +16,9 @@ from ai_command_center.core.events.topics import (
     ENTITY_DELETED,
     ENTITY_UPDATED,
     NOTES_INDEXED,
+    UI_SELECT_ENTITY,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
 )
 
 
@@ -123,7 +126,52 @@ def _reduce_notes_indexed(state: Any, event: Event) -> Any:
     )
 
 
+def _reduce_workspace_active(state: Any, event: Event) -> Any:
+    """Project active workspace scope from workspace.active / workspace.deactivated."""
+    if event.topic == WORKSPACE_ACTIVE:
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        title = str(event.payload.get("title", "")).strip()
+        return replace(
+            state,
+            active_workspace_id=workspace_id,
+            active_workspace_title=title,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic == WORKSPACE_DEACTIVATED:
+        cleared_id = str(event.payload.get("workspace_id", "")).strip()
+        if cleared_id and cleared_id != state.active_workspace_id:
+            return state
+        return replace(
+            state,
+            active_workspace_id="",
+            active_workspace_title="",
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    return state
+
+
+def _reduce_workspace_selection(state: Any, event: Event) -> Any:
+    """Project canvas hierarchy selection from ui.workspace_os.select_entity."""
+    if event.topic != UI_SELECT_ENTITY:
+        return state
+    entity_id = str(event.payload.get("entity_id", "")).strip()
+    entity_type = str(event.payload.get("entity_type", "")).strip()
+    title = str(event.payload.get("title", "")).strip()
+    return replace(
+        state,
+        selected_entity_id=entity_id,
+        selected_entity_type=entity_type,
+        selected_entity_title=title,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 WORKSPACE_REDUCERS = (
     _reduce_workspace_os_event,
     _reduce_notes_indexed,
+    _reduce_workspace_active,
+    _reduce_workspace_selection,
 )

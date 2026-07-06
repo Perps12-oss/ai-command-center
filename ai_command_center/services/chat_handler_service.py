@@ -24,6 +24,7 @@ from ai_command_center.core.events.topics import (
     APP_WARNING,
     CHAT_ERROR,
     COMMAND_ROUTED,
+    CONTEXT_COMPLETE,
     CONTEXT_OVER_BUDGET,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_TRIMMED,
@@ -146,15 +147,31 @@ class ChatHandlerService(BaseService):
         provider = assembled.provider
 
         budget = self._context_manager.context_budget_tokens
+        workspace_id = str(session_scope.get("workspace_id", "")).strip()
         self._bus.publish(
             CONTEXT_SNAPSHOT_CREATED,
             {
                 "context_size_tokens": bundle.token_estimate,
                 "sources": list(bundle.sources),
                 "budget_tokens": budget,
+                "workspace_id": workspace_id,
+                "workspace_context_snippets": list(assembled.workspace_context_snippets),
             },
             source=self.name,
         )
+        if assembled.workspace_context_snippets:
+            self._bus.publish(
+                CONTEXT_COMPLETE,
+                {
+                    "request_id": request_id,
+                    "workspace_id": workspace_id,
+                    "snippet_count": len(assembled.workspace_context_snippets),
+                    "workspace_context_snippets": list(
+                        assembled.workspace_context_snippets
+                    ),
+                },
+                source=self.name,
+            )
         if bundle.token_estimate >= budget:
             self._bus.publish(
                 CONTEXT_OVER_BUDGET,

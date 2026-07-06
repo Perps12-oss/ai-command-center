@@ -35,7 +35,14 @@ from ai_command_center.core.events.handler_dispatch import (
     async_adapters_enabled_from_env,
     queue_max_depth_from_env,
 )
-from ai_command_center.core.events.topics import BUS_HANDLER_ERROR, TELEMETRY_EVENT
+from ai_command_center.core.events.topics import (
+    BUS_HANDLER_ERROR,
+    TELEMETRY_EVENT,
+    WORKSPACE_ACTIVATED,
+    WORKSPACE_CREATED,
+    WORKSPACE_DEACTIVATED,
+    WORKSPACE_LAYOUT_CHANGED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +56,10 @@ EVENT_ACTION_REGISTERED = "action.registered"
 EVENT_ACTION_INVOKED = "action.invoked"
 EVENT_ACTION_COMPLETED = "action.completed"
 EVENT_ACTION_FAILED = "action.failed"
-EVENT_WORKSPACE_CREATED = "workspace.created"
-EVENT_WORKSPACE_ACTIVATED = "workspace.activated"
-EVENT_WORKSPACE_DEACTIVATED = "workspace.deactivated"
-EVENT_WORKSPACE_LAYOUT_CHANGED = "workspace.layout.changed"
+EVENT_WORKSPACE_CREATED = WORKSPACE_CREATED
+EVENT_WORKSPACE_ACTIVATED = WORKSPACE_ACTIVATED
+EVENT_WORKSPACE_DEACTIVATED = WORKSPACE_DEACTIVATED
+EVENT_WORKSPACE_LAYOUT_CHANGED = WORKSPACE_LAYOUT_CHANGED
 EVENT_TIMELINE_EVENT = "timeline.event"
 EVENT_SEARCH_EXECUTED = "search.executed"
 EVENT_SEARCH_RESULTS = "search.results"

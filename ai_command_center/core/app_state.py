@@ -51,6 +51,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
+    ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
@@ -58,6 +59,9 @@ from ai_command_center.core.events.topics import (
     SYSTEM_SNAPSHOT,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
+    UI_SELECT_ENTITY,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
     WORKFLOW_STARTED,
@@ -67,6 +71,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
 )
+from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -108,8 +113,11 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ENTITY_UPDATED,
     ENTITY_DELETED,
     ENTITY_RELATIONSHIPS_CHANGED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
+    UI_SELECT_ENTITY,
     # Agent / workflow runs (Track R7)
     AGENT_SPAWNED,
     AGENT_TASK_REQUEST,
@@ -126,6 +134,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKFLOW_FAILED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
+    ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
 )
 
@@ -174,6 +183,22 @@ class MemoryItem:
 
     node_id: str = ""
     label: str = ""
+    workspace_id: str = ""
+    entity_id: str = ""
+
+
+def _memory_catalog_for_workspace(
+    catalog: tuple[MemoryItem, ...],
+    workspace_id: str,
+) -> tuple[MemoryItem, ...]:
+    """Keep catalog entries visible for the active workspace scope."""
+    if not workspace_id:
+        return catalog
+    return tuple(
+        item
+        for item in catalog
+        if not item.workspace_id or item.workspace_id == workspace_id
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +220,31 @@ class PluginItem:
     enabled: bool = True
     error: str = ""
     pending_restart: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeProviderItem:
+    """Projection of a discovered runtime provider."""
+
+    provider_id: str = ""
+    name: str = ""
+    version: str = ""
+    capabilities: tuple[str, ...] = ()
+    permissions: tuple[str, ...] = ()
+    health_state: str = ""
+    health_detail: str = ""
+    enabled: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionRunItem:
+    """Lightweight execution run feed entry."""
+
+    run_id: str = ""
+    request_id: str = ""
+    source: str = ""
+    created_at: float = 0.0
+    summary: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,6 +312,8 @@ class AppState:
     chat_started_user_text: str = ""
     chat_context_sources: tuple[str, ...] = ()
     chat_token_estimate: int = 0
+    workspace_context_snippet_count: int = 0
+    last_workspace_context_workspace_id: str = ""
     last_assistant_message: str = ""
     chat_history_count: int = 0
     chat_history_messages: tuple[ChatHistoryMessage, ...] = ()
@@ -273,6 +325,11 @@ class AppState:
     chat_workspace_entity_description: str = ""
     chat_workspace_entity_url: str = ""
     chat_workspace_entity_path: str = ""
+    active_workspace_id: str = ""
+    active_workspace_title: str = ""
+    selected_entity_id: str = ""
+    selected_entity_type: str = ""
+    selected_entity_title: str = ""
     chat_active_session_key: str = "default"
     errors: tuple[str, ...] = ()
 
@@ -296,6 +353,9 @@ class AppState:
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
     orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
+    provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
+    runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
+    execution_runs: tuple[ExecutionRunItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -363,6 +423,8 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         vault_path=str(payload.get("vault_path", "")),
         overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
         telemetry_enabled=_coerce_bool(payload.get("telemetry_enabled", True)),
+        otel_enabled=_coerce_bool(payload.get("otel_enabled", False)),
+        otel_endpoint=str(payload.get("otel_endpoint", "http://127.0.0.1:4318")),
         schema_version=_coerce_int(payload.get("schema_version", 1), 1),
         capability_provider_map=capability_provider_map_from_payload(payload),
         qwenpaw_enabled=_coerce_bool(payload.get("qwenpaw_enabled", False)),
@@ -537,16 +599,50 @@ def _reduce_memory_stored(state: AppState, event: Event) -> AppState:
     """Append newly stored memory to the catalog."""
     if event.topic != MEMORY_STORED:
         return state
+    workspace_id = str(event.payload.get("workspace_id", ""))
+    entity_id = str(event.payload.get("entity_id", ""))
+    active = state.active_workspace_id
+    if active and workspace_id and workspace_id != active:
+        return replace(
+            state,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
     item = MemoryItem(
         node_id=str(event.payload.get("id", "")),
         label=str(event.payload.get("label", "")),
+        workspace_id=workspace_id,
+        entity_id=entity_id,
     )
+    catalog = _memory_catalog_for_workspace((item,) + state.memory_catalog, active)
     return replace(
         state,
-        memory_catalog=(item,) + state.memory_catalog,
+        memory_catalog=catalog,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
+
+
+def _reduce_workspace_memory_catalog(state: AppState, event: Event) -> AppState:
+    """Filter memory catalog when active workspace scope changes."""
+    if event.topic == WORKSPACE_ACTIVE:
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        return replace(
+            state,
+            memory_catalog=_memory_catalog_for_workspace(state.memory_catalog, workspace_id),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic == WORKSPACE_DEACTIVATED:
+        cleared_id = str(event.payload.get("workspace_id", "")).strip()
+        if cleared_id and cleared_id != state.active_workspace_id:
+            return state
+        return replace(
+            state,
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    return state
 
 
 def _reduce_memory_selected(state: AppState, event: Event) -> AppState:
@@ -616,11 +712,81 @@ def _reduce_plugin_catalog(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_capability_providers_ready(state: AppState, event: Event) -> AppState:
-    """Record capability.providers.ready for AppState consumers."""
+    """Record capability.providers.ready and merge runtime provider health."""
     if event.topic != CAPABILITY_PROVIDERS_READY:
         return state
+    providers = event.payload.get("providers") or []
+    runtime_items: list[RuntimeProviderItem] = []
+    health_items: dict[str, ProviderHealthSnapshot] = {
+        h.provider_id: h for h in state.provider_health_map
+    }
+    for item in providers:
+        if not isinstance(item, dict):
+            continue
+        provider_id = str(item.get("id", ""))
+        runtime_items.append(
+            RuntimeProviderItem(
+                provider_id=provider_id,
+                name=str(item.get("name", provider_id)),
+                version=str(item.get("version", "")),
+                capabilities=tuple(str(c) for c in (item.get("capabilities") or [])),
+                permissions=tuple(str(p) for p in (item.get("permissions") or [])),
+                health_state=str(item.get("health_state", "")),
+                health_detail=str(item.get("health_detail", "")),
+                enabled=bool(item.get("enabled", True)),
+            )
+        )
+        snap = ProviderHealthSnapshot.from_runtime_payload(item)
+        health_items[snap.provider_id] = snap
     return replace(
         state,
+        runtime_capability_providers=tuple(runtime_items),
+        provider_health_map=tuple(health_items.values()),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_orchestration_provider_health(state: AppState, event: Event) -> AppState:
+    if event.topic != ORCHESTRATION_PROVIDER_HEALTH:
+        return state
+    snap = ProviderHealthSnapshot.from_orchestration_payload(event.payload)
+    health_items: dict[str, ProviderHealthSnapshot] = {
+        h.provider_id: h for h in state.provider_health_map
+    }
+    health_items[snap.provider_id] = snap
+    return replace(
+        state,
+        provider_health_map=tuple(health_items.values()),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_execution_run_feed(state: AppState, event: Event) -> AppState:
+    if event.topic not in {ORCHESTRATION_RUN_SNAPSHOT, CHAT_COMPLETE}:
+        return state
+    payload = event.payload
+    request_id = str(payload.get("request_id", "")).strip()
+    if not request_id:
+        return state
+    if event.topic == CHAT_COMPLETE and payload.get("orchestration"):
+        return state
+    source = "orchestration" if event.topic == ORCHESTRATION_RUN_SNAPSHOT else "chat"
+    summary = str(payload.get("intent", payload.get("text", "")))[:120]
+    item = ExecutionRunItem(
+        run_id=f"{request_id}:{source}:{len(state.execution_runs)}",
+        request_id=request_id,
+        source=source,
+        created_at=0.0,
+        summary=summary,
+    )
+    runs = state.execution_runs + (item,)
+    if len(runs) > 50:
+        runs = runs[-50:]
+    return replace(
+        state,
+        execution_runs=runs,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -981,7 +1147,9 @@ from ai_command_center.core.state.chat_state import (  # noqa: E402
 )
 from ai_command_center.core.state.workspace_state import (  # noqa: E402
     _reduce_notes_indexed,
+    _reduce_workspace_active,
     _reduce_workspace_os_event,
+    _reduce_workspace_selection,
 )
 
 
@@ -1009,6 +1177,8 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
             response_source=str(payload.get("response_source", "")),
             response_text=str(payload.get("response_text", "")),
             receipt_id=str(payload.get("receipt_id", "")),
+            trace_id=str(payload.get("trace_id", "")),
+            span_id=str(payload.get("span_id", "")),
         ),
         last_event_topic=event.topic,
         last_event_source=event.source,
@@ -1034,6 +1204,8 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_chat_workspace_entity,
     _reduce_ui_chat_new_session,
     _reduce_workspace_os_event,
+    _reduce_workspace_active,
+    _reduce_workspace_selection,
     _reduce_note_results,
     _reduce_note_selected,
     _reduce_note_created,
@@ -1042,8 +1214,11 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_stored,
     _reduce_memory_selected,
     _reduce_memory_cleared,
+    _reduce_workspace_memory_catalog,
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
+    _reduce_orchestration_provider_health,
+    _reduce_execution_run_feed,
     _reduce_plugin_state_changed,
     _reduce_agent_run,
     _reduce_agent_pipeline,
