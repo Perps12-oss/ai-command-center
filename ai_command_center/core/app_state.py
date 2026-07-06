@@ -1,4 +1,4 @@
-"""Central application state — updated only via event reducers."""
+﻿"""Central application state â€” updated only via event reducers."""
 
 from __future__ import annotations
 
@@ -276,7 +276,7 @@ class AppState:
     chat_active_session_key: str = "default"
     errors: tuple[str, ...] = ()
 
-    # Track 3.2 — full projection of feature catalogs
+    # Track 3.2 â€” full projection of feature catalogs
     notes_catalog: tuple[NoteItem, ...] = ()
     note_selected: NoteItem | None = None
     note_index_status: tuple[int, int] = ()  # (files, ms)
@@ -284,7 +284,7 @@ class AppState:
     memory_selected: tuple[str, ...] = ()
     plugin_catalog: tuple[PluginItem, ...] = ()
 
-    # Track R7 — agent / workflow run projections
+    # Track R7 â€” agent / workflow run projections
     agent_runs: tuple[AgentRunItem, ...] = ()
     workflow_runs: tuple[WorkflowRunItem, ...] = ()
     active_agent_run_id: str = ""
@@ -297,14 +297,6 @@ class AppState:
     permission_check_revision: int = 0
     orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
 Reducer = Callable[[AppState, Event], AppState]
-
-
-def _freeze_metadata(raw: Any) -> tuple[tuple[str, str], ...]:
-    if not isinstance(raw, dict):
-        return ()
-    return tuple(
-        (str(k), str(v)) for k, v in raw.items() if v is not None
-    )
 
 
 def _coerce_bool(value: Any, default: bool = False) -> bool:
@@ -421,193 +413,6 @@ def _reduce_settings_snapshot(state: AppState, event: Event) -> AppState:
     )
 
 
-def _is_pending_chat_user_text(text: str) -> bool:
-    """Mirror shell logic: only plain chat prompts become pending user bubbles."""
-    stripped = text.strip()
-    if not stripped:
-        return False
-    lower = stripped.lower()
-    if lower.startswith(
-        ("note:", "new note:", "remember:", "memory:", "agent:", ">", "go ")
-    ):
-        return False
-    if lower in (
-        "settings",
-        "chat",
-        "notes",
-        "plugins",
-        "home",
-        "workspace",
-        "system",
-        "memory",
-    ):
-        return False
-    return True
-
-
-def _reduce_command_routed(state: AppState, event: Event) -> AppState:
-    if event.topic != COMMAND_ROUTED:
-        return state
-    text = str(event.payload.get("text", ""))
-    pending = text if _is_pending_chat_user_text(text) else ""
-    return replace(
-        state,
-        last_command=text,
-        last_command_intent=str(event.payload.get("intent", "")),
-        chat_pending_user_text=pending,
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_chat_started(state: AppState, event: Event) -> AppState:
-    if event.topic != CHAT_STARTED:
-        return state
-    request_id = str(event.payload.get("request_id", ""))
-    if request_id and state.active_chat_request_id == request_id and state.chat_streaming:
-        return state
-    return replace(
-        state,
-        active_chat_request_id=request_id,
-        last_chat_request_id=request_id,
-        chat_status="streaming",
-        chat_streaming=True,
-        chat_stream_buffer="",
-        chat_stream_revision=state.chat_stream_revision + 1,
-        chat_started_user_text=state.chat_pending_user_text,
-        chat_pending_user_text="",
-        last_chat_error="",
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_chat_chunk(state: AppState, event: Event) -> AppState:
-    if event.topic != CHAT_CHUNK:
-        return state
-    request_id = str(event.payload.get("request_id", ""))
-    if request_id and request_id != state.active_chat_request_id:
-        return state
-    text = str(event.payload.get("text", ""))
-    if not text:
-        return state
-    return replace(
-        state,
-        chat_stream_buffer=state.chat_stream_buffer + text,
-        chat_stream_revision=state.chat_stream_revision + 1,
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_chat_complete(state: AppState, event: Event) -> AppState:
-    if event.topic != CHAT_COMPLETE:
-        return state
-    request_id = str(event.payload.get("request_id", ""))
-    if request_id:
-        if not state.active_chat_request_id:
-            return state
-        if request_id != state.active_chat_request_id:
-            return state
-    return replace(
-        state,
-        active_chat_request_id="",
-        chat_status="complete",
-        chat_streaming=False,
-        chat_stream_buffer="",
-        chat_stream_revision=state.chat_stream_revision + 1,
-        chat_started_user_text="",
-        last_assistant_message=str(event.payload.get("text", "")),
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_chat_cancelled(state: AppState, event: Event) -> AppState:
-    if event.topic != CHAT_CANCELLED:
-        return state
-    request_id = str(event.payload.get("request_id", ""))
-    if request_id:
-        if not state.active_chat_request_id:
-            return state
-        if request_id != state.active_chat_request_id:
-            return state
-    return replace(
-        state,
-        active_chat_request_id="",
-        chat_status="cancelled",
-        chat_streaming=False,
-        chat_stream_buffer="",
-        chat_stream_revision=state.chat_stream_revision + 1,
-        chat_started_user_text="",
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_chat_error(state: AppState, event: Event) -> AppState:
-    if event.topic != CHAT_ERROR:
-        return state
-    request_id = str(event.payload.get("request_id", ""))
-    if request_id:
-        if not state.active_chat_request_id:
-            return state
-        if request_id != state.active_chat_request_id:
-            return state
-    return replace(
-        state,
-        active_chat_request_id="",
-        chat_status="error",
-        chat_streaming=False,
-        chat_stream_buffer="",
-        chat_stream_revision=state.chat_stream_revision + 1,
-        chat_started_user_text="",
-        last_chat_error=str(event.payload.get("message", "Unknown error")),
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_chat_history_loaded(state: AppState, event: Event) -> AppState:
-    if event.topic != CHAT_HISTORY_LOADED:
-        return state
-    raw_messages = event.payload.get("messages")
-    items: list[ChatHistoryMessage] = []
-    if isinstance(raw_messages, list):
-        for item in raw_messages:
-            if not isinstance(item, dict):
-                continue
-            items.append(
-                ChatHistoryMessage(
-                    role=str(item.get("role", "")),
-                    content=str(item.get("content", "")),
-                )
-            )
-    return replace(
-        state,
-        chat_history_count=len(items),
-        chat_history_messages=tuple(items),
-        chat_history_revision=state.chat_history_revision + 1,
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_context_snapshot(state: AppState, event: Event) -> AppState:
-    if event.topic != CONTEXT_SNAPSHOT_CREATED:
-        return state
-    raw_sources = event.payload.get("sources", [])
-    sources = tuple(str(item) for item in raw_sources) if isinstance(raw_sources, (list, tuple)) else ()
-    tokens = _coerce_int(event.payload.get("context_size_tokens", 0), 0)
-    return replace(
-        state,
-        chat_context_sources=sources,
-        chat_token_estimate=tokens,
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
 def _reduce_error(state: AppState, event: Event) -> AppState:
     if event.topic != APP_ERROR:
         return state
@@ -654,117 +459,6 @@ def _reduce_system_snapshot(state: AppState, event: Event) -> AppState:
     return replace(
         state,
         system_snapshot=snapshot,
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _entity_session_key(entity_type: str, entity_id: str) -> str:
-    return f"entity:{entity_type}:{entity_id}"
-
-
-def _clear_chat_entity_fields(state: AppState, event: Event) -> AppState:
-    return replace(
-        state,
-        chat_workspace_entity_id="",
-        chat_workspace_entity_type="",
-        chat_workspace_entity_title="",
-        chat_workspace_entity_description="",
-        chat_workspace_entity_url="",
-        chat_workspace_entity_path="",
-        chat_active_session_key="default",
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_chat_workspace_entity(state: AppState, event: Event) -> AppState:
-    """Project workspace-attached chat entity from ui.workspace_os.open_chat."""
-    if event.topic != UI_OPEN_CHAT:
-        return state
-    entity_id = str(event.payload.get("entity_id", "")).strip()
-    if not entity_id:
-        return _clear_chat_entity_fields(state, event)
-    entity_type = str(event.payload.get("entity_type", ""))
-    return replace(
-        state,
-        chat_workspace_entity_id=entity_id,
-        chat_workspace_entity_type=entity_type,
-        chat_workspace_entity_title=str(event.payload.get("title", "")),
-        chat_workspace_entity_description=str(event.payload.get("description", "")),
-        chat_workspace_entity_url=str(event.payload.get("url", "")),
-        chat_workspace_entity_path=str(event.payload.get("path", "")),
-        chat_active_session_key=_entity_session_key(entity_type, entity_id),
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_ui_chat_new_session(state: AppState, event: Event) -> AppState:
-    """Clear sticky workspace entity context when user starts a fresh chat."""
-    if event.topic != UI_CHAT_NEW_SESSION:
-        return state
-    return _clear_chat_entity_fields(state, event)
-
-
-def _reduce_workspace_os_event(state: AppState, event: Event) -> AppState:
-    """Update Workspace OS counters, recent events, and entity list."""
-    current = state.workspace_os
-    if event.topic == ENTITY_CREATED:
-        raw_meta = event.payload.get("metadata", {})
-        meta = _freeze_metadata(raw_meta)
-        entity = WorkspaceOsEntity(
-            entity_id=str(event.payload.get("entity_id", "")),
-            entity_type=str(event.payload.get("entity_type", "")),
-            title=str(event.payload.get("title", "")),
-            metadata=meta,
-        )
-        snapshot = replace(
-            current,
-            entity_count=current.entity_count + 1,
-            entities=current.entities + (entity,),
-        )
-    elif event.topic == ENTITY_UPDATED:
-        updated_id = str(event.payload.get("entity_id", ""))
-        meta = _freeze_metadata(event.payload.get("metadata", {}))
-        updated = tuple(
-            WorkspaceOsEntity(
-                entity_id=updated_id,
-                entity_type=str(event.payload.get("entity_type", e.entity_type)),
-                title=str(event.payload.get("title", e.title)),
-                metadata=meta if meta else e.metadata,
-            )
-            if e.entity_id == updated_id
-            else e
-            for e in current.entities
-        )
-        snapshot = replace(current, entities=updated)
-    elif event.topic == ENTITY_DELETED:
-        deleted_id = str(event.payload.get("entity_id", ""))
-        remaining = tuple(e for e in current.entities if e.entity_id != deleted_id)
-        snapshot = replace(
-            current,
-            entity_count=max(0, current.entity_count - 1),
-            entities=remaining,
-        )
-    elif event.topic == EVENT_RELATIONSHIP_CREATED:
-        snapshot = replace(current, relationship_count=current.relationship_count + 1)
-    elif event.topic == EVENT_ACTION_REGISTERED:
-        snapshot = replace(current, action_count=current.action_count + 1)
-    elif event.topic == EVENT_TIMELINE_EVENT:
-        recent = current.recent_events + (str(event.payload.get("event_type", event.topic)),)
-        if len(recent) > 20:
-            recent = recent[-20:]
-        snapshot = replace(
-            current,
-            event_count=current.event_count + 1,
-            recent_events=recent,
-        )
-    else:
-        return state
-    return replace(
-        state,
-        workspace_os=snapshot,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -834,37 +528,6 @@ def _reduce_note_index_complete(state: AppState, event: Event) -> AppState:
     return replace(
         state,
         note_index_status=(files, ms),
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
-
-
-def _reduce_notes_indexed(state: AppState, event: Event) -> AppState:
-    """Project indexed vault notes as entity_type=note on workspace canvas (W2)."""
-    if event.topic != NOTES_INDEXED:
-        return state
-    raw = event.payload.get("notes") or []
-    note_entities: list[WorkspaceOsEntity] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        path = str(item.get("path", item.get("entity_id", "")))
-        note_entities.append(
-            WorkspaceOsEntity(
-                entity_id=str(item.get("entity_id", path)),
-                entity_type="note",
-                title=str(item.get("title", path)),
-                metadata=_freeze_metadata({"path": path}),
-            )
-        )
-    current = state.workspace_os
-    non_notes = tuple(e for e in current.entities if e.entity_type != "note")
-    merged = non_notes + tuple(note_entities)
-    old_note_count = sum(1 for e in current.entities if e.entity_type == "note")
-    entity_count = current.entity_count - old_note_count + len(note_entities)
-    return replace(
-        state,
-        workspace_os=replace(current, entities=merged, entity_count=entity_count),
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1303,6 +966,7 @@ def _reduce_permission_check(state: AppState, event: Event) -> AppState:
     return state
 
 
+
 def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
     if event.topic != ORCHESTRATION_RUN_SNAPSHOT:
         return state
@@ -1327,6 +991,30 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
+
+
+from ai_command_center.core.state.chat_state import (  # noqa: E402
+    _is_pending_chat_user_text as _chat_is_pending_user_text,
+    _reduce_chat_cancelled,
+    _reduce_chat_chunk,
+    _reduce_chat_complete,
+    _reduce_chat_error,
+    _reduce_chat_history_loaded,
+    _reduce_chat_started,
+    _reduce_chat_workspace_entity,
+    _reduce_command_routed,
+    _reduce_context_snapshot,
+    _reduce_ui_chat_new_session,
+)
+from ai_command_center.core.state.workspace_state import (  # noqa: E402
+    _reduce_notes_indexed,
+    _reduce_workspace_os_event,
+)
+
+
+def _is_pending_chat_user_text(text: str) -> bool:
+    """Compatibility wrapper for tests and diagnostics."""
+    return _chat_is_pending_user_text(text)
 
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
