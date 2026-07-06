@@ -89,6 +89,7 @@ flowchart TB
 | Agents (planned) | topics in `core/event_bus.py` | [AGENT_FRAMEWORK.md](architecture/AGENT_FRAMEWORK.md) |
 | Workflows (planned) | `core/workflow/` | [WORKFLOW_ENGINE.md](architecture/WORKFLOW_ENGINE.md) |
 | Chat | `services/chat_handler_service.py`, `ui/views/chat_view.py` | [CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md) |
+| UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [ACC_UI_REFURBISHMENT.md](architecture/ACC_UI_REFURBISHMENT.md) |
 | Platform | `platform/`, `utils/hotkey.py` | [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md), [PACKAGING_MSI_DESIGN.md](architecture/PACKAGING_MSI_DESIGN.md) |
 | EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — sync today; async dispatch design complete |
 | Tools | `tools/`, `services/tool_executor_service.py` | Phase 4B flow below |
