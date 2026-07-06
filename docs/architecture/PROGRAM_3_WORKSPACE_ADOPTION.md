@@ -100,7 +100,7 @@ All checkboxes must pass before Program 3 is **complete**. Each pillar maps to a
 - [ ] **Workspace Adoption Score ≥ 7.0**
 - [ ] Zero new direct service→service edges (Program 2 E4 allowlist holds)
 - [ ] Legacy `EVENT_WORKSPACE_*` in `event_bus.py` migrated or aliased to `topics.py` constants
-- [ ] `chat_state.py` + `workspace_state.py` reducers own scope fields (W4 partial — measure from S6 if available)
+- [x] `chat_state.py` + `workspace_state.py` reducers own scope fields (W4 partial — Phase 6c projection; full split deferred to S6 measure)
 
 ---
 
@@ -321,6 +321,10 @@ Maps code-verified audit Phases 1–6 to completion pillars. **Do not skip Phase
 
 **Phase 6a progress (2026-07-06):** Soft gate in `CommandRouterService` — execution intents (`chat`, `shell`, `agent`, memory, notes) publish `command.deferred` + `ui.workspace.required` when no active workspace; `INTENT_NAVIGATE` whitelisted. Auto-activate first workspace on `service.ready` (`workspace_os`). Tests: `tests/test_program3_phase6a.py`.
 
+**Phase 6b progress (2026-07-06):** `OrchestrationService`, `ModelRouterService`, and `RuntimeCapabilityRouterService` propagate `workspace_id` and `selected_entity_*` on classify/resolve/invoke paths. `CapabilityContextAssembler` forwards scope on `MODEL_RESOLVE_REQUEST`. Tests: `tests/test_program3_phase6b.py`.
+
+**Phase 6c progress (2026-07-06):** Workspace-default UI routing (`view_manager.py`, `app.py`) — chat redirects to workspace without active scope; `ui.workspace.required` surfaces workspace picker. W4 partial: `chat_state` projects routed `workspace_id`; `workspace_state` owns active/selection scope. Headless WII approach test in `tests/test_program3_phase6c.py`.
+
 ---
 
 ## Dependencies
@@ -429,5 +433,7 @@ When coding is approved, start **Phase 1 only** (smallest vertical slice with hi
 
 | Date | Change |
 |------|--------|
+| 2026-07-06 | Phase 6c — workspace-centric UI routing policy, W4 reducer scope projection, WII approach test |
+| 2026-07-06 | Phase 6b — orchestration/model/runtime routers workspace-aware scope |
 | 2026-07-06 | Phase 6a — workspace-required command spine (soft gate), auto-activate on boot |
 | 2026-07-06 | Initial Program 3 tracked initiative — code-verified audit; >60% WII exit gate; five-pillar completion definition |
