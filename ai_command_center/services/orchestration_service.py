@@ -9,6 +9,7 @@ from collections.abc import Callable
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
+    CAPABILITY_PROVIDERS_READY,
     CHAT_COMPLETE,
     CHAT_STARTED,
     COMMAND_ROUTED,
@@ -100,6 +101,14 @@ class OrchestrationService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
         )
+        # Refresh orchestration provider health when runtime providers reload, so the
+        # Runtime Inspector dashboard doesn't go stale after plugin changes.
+        self._unsubscribers.append(
+            self._bus.subscribe(CAPABILITY_PROVIDERS_READY, self._on_capability_providers_ready)
+        )
+        self._publish_provider_health()
+
+    def _on_capability_providers_ready(self, _event: Event) -> None:
         self._publish_provider_health()
 
     def _publish_provider_health(self) -> None:
