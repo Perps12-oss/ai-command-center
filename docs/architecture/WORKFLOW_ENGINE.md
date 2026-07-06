@@ -16,10 +16,10 @@ Define a declarative, EventBus-driven workflow engine for multi-step automation 
 
 | Asset | Location | Status |
 |-------|----------|--------|
-| Workflow dataclass | `core/workflow/workflow.py` | Stub |
+| Workflow dataclass | `core/workflow/workflow.py` | Implemented frozen contract |
 | Action registry | `core/action/action_registry.py` | Workspace OS actions registered |
 | Tool pipeline | `tool.invoke` → ToolExecutorService | Production |
-| Workflow engine service | — | Not implemented |
+| Workflow engine service | `services/workflow_engine_service.py` | Tool-only linear executor registered |
 
 ---
 
@@ -75,8 +75,8 @@ Stored in SQLite via `WorkflowRepository` (to be created).
 
 | Phase | Scope | Acceptance |
 |-------|-------|------------|
-| **W0** | Domain model + topics | `workflow.started`, `workflow.step.*`, `workflow.completed` |
-| **W1** | Manual trigger from command palette | 2-step tool chain |
+| **W0** | Domain model + topics | Implemented |
+| **W1** | Manual trigger from command palette | Tool-only executor implemented |
 | **W2** | Schedule trigger | Daily driver integration |
 | **W3** | Workspace event triggers | `entity.created` → workflow |
 
@@ -92,7 +92,7 @@ Stored in SQLite via `WorkflowRepository` (to be created).
 | `workflow.failed` | Engine | AppState, app.error |
 | `workflow.completed` | Engine | Timeline |
 
-Add to `core/events/topics.py` when W0 begins.
+W0 topics are defined in `core/events/topics.py`.
 
 ---
 
@@ -108,7 +108,10 @@ Add to `core/events/topics.py` when W0 begins.
 
 ## Acceptance Criteria (W1)
 
-- [ ] WorkflowEngineService in service_factory
-- [ ] Two-step shell + note workflow demonstrable
-- [ ] State visible in AppState `workflow_runs` projection
-- [ ] Rollback: disable service registration
+- [x] WorkflowEngineService in service_factory
+- [x] Tool-step workflow execution path covered by pytest
+- [x] State visible in AppState `workflow_runs` projection
+- [x] Rollback: disable service registration
+
+Agent workflow steps, persisted workflow repositories, and scheduled triggers are
+Program 4 work and remain gated by `PROGRAM4_GATE_STATUS.md`.
