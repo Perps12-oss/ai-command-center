@@ -1,0 +1,14 @@
+"""Canonical orchestration intent types (rule-based, no LLM)."""
+
+from __future__ import annotations
+
+from enum import Enum
+
+
+class OrchestrationIntent(str, Enum):
+    """Truth-bound intents handled without LLM inference."""
+
+    LAUNCH_APPLICATION = "launch_application"
+    SYSTEM_TIME_QUERY = "system_time_query"
+    CALENDAR_QUERY = "calendar_query"
+    UNHANDLED = "unhandled"

@@ -51,6 +51,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
+    ORCHESTRATION_RUN_SNAPSHOT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -66,6 +67,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
 )
+from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -124,6 +126,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKFLOW_FAILED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
+    ORCHESTRATION_RUN_SNAPSHOT,
 )
 
 
@@ -292,6 +295,7 @@ class AppState:
     active_workflow_run_id: str = ""
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
+    orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1299,6 +1303,32 @@ def _reduce_permission_check(state: AppState, event: Event) -> AppState:
     return state
 
 
+def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
+    if event.topic != ORCHESTRATION_RUN_SNAPSHOT:
+        return state
+    payload = event.payload
+    facts = payload.get("execution_facts") or {}
+    return replace(
+        state,
+        orchestration_run=OrchestrationRunSnapshot(
+            request_id=str(payload.get("request_id", "")),
+            query=str(payload.get("query", "")),
+            intent=str(payload.get("intent", "")),
+            provider_id=str(payload.get("provider_id", "")),
+            execution_success=bool(payload.get("execution_success")),
+            execution_facts=dict(facts) if isinstance(facts, dict) else {},
+            execution_error=str(payload.get("execution_error") or "") or None,
+            truth_valid=bool(payload.get("truth_valid")),
+            truth_detail=str(payload.get("truth_detail", "")),
+            response_source=str(payload.get("response_source", "")),
+            response_text=str(payload.get("response_text", "")),
+            receipt_id=str(payload.get("receipt_id", "")),
+        ),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
     _reduce_settings_changed,
@@ -1332,6 +1362,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_agent_pipeline,
     _reduce_workflow_run,
     _reduce_permission_check,
+    _reduce_orchestration_run,
 )
 
 

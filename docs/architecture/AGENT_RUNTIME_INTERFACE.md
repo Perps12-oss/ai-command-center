@@ -22,7 +22,7 @@ AI Command Center (ACC) is the **host platform**. External runtimes (QwenPaw, Op
 |--------|-------|------------------------|
 | UI / UX | ACC | None — no embedded third-party consoles |
 | Workspace entities | ACC (`EntityService`, repositories) | Read bridged context only |
-| Orchestration | ACC (`CapabilityRouterService`, `AgentRuntimeService`, workflows) | Execute capability slices |
+| Orchestration | ACC (`OrchestrationService`, `RuntimeCapabilityRouterService`, workflows) | Execute capability slices |
 | Settings | ACC (`SettingsSnapshot`) | Receive derived config; never write settings files |
 | Conversation history | ACC (`SessionService`, SQLite) | Ephemeral turn context; results merged back via bus |
 | Memory (authoritative) | ACC (`MemoryGraphService`, repositories) | Optional recall bridge; ACC persists |
@@ -155,7 +155,7 @@ External providers map streams to `capability.stream` / `capability.complete`; a
 
 External runtimes receive **derived context**, never raw repository access.
 
-1. `CapabilityRouterService` receives `command.routed`.
+1. `RuntimeCapabilityRouterService` receives `command.routed` (after truth-bound `OrchestrationService`).
 2. For external provider: publish context assembly requests (same pattern as `ChatHandlerService`).
 3. `ContextManager` produces a bounded `ContextBundle` (settings snapshot, memory snippets, entity scope, session tail).
 4. Provider receives serialized bundle in `RuntimeInvocationRequest`.
@@ -198,7 +198,7 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 
 | Phase | Deliverable | Acceptance |
 |-------|-------------|------------|
-| **1** | ARI doc, `CapabilityKind`, `CapabilityRouterService`, `NativeProvider`, `QwenPawSidecarProvider` stub | Classification events on chat route; tests pass |
+| **1** | ARI doc, `CapabilityKind`, `RuntimeCapabilityRouterService`, `NativeProvider`, `QwenPawSidecarProvider` stub | Classification events on chat route; tests pass |
 | **2** | QwenPaw sidecar spawn + SSE → `capability.stream` | `/plan` query uses sidecar when configured |
 | **3** | ContextManager bundle before external invoke | Grounded planning with ACC memory/history/entity context |
 | **4** | Settings: per-capability provider map + settings UI | User selects provider in settings |
@@ -221,4 +221,4 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 ## References
 
 - Constitution: `PROJECT_CONSTITUTION_V4.md` Invariant 13
-- Code: `ai_command_center/domain/runtime_capability.py`, `ai_command_center/runtime/`, `ai_command_center/services/capability_router_service.py`
+- Code: `ai_command_center/domain/runtime_capability.py`, `ai_command_center/runtime/`, `ai_command_center/services/runtime_capability_router_service.py`

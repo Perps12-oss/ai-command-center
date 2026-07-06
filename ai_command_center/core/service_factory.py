@@ -51,7 +51,8 @@ from ai_command_center.repositories.telemetry_repository import TelemetryReposit
 from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
-from ai_command_center.services.capability_router_service import CapabilityRouterService
+from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
+from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -142,12 +143,13 @@ def build_services(
         repo=runtime_provider_repo,
         qwenpaw_health=qwenpaw_health,
     )
-    capability_router = CapabilityRouterService(
+    capability_router = RuntimeCapabilityRouterService(
         bus,
         provider_registry=runtime_registry,
         context_manager=context_manager,
         context_assembler=context_assembler,
     )
+    orchestration = OrchestrationService(bus)
     qwenpaw_sidecar = QwenPawSidecarService(bus, health_state=qwenpaw_health)
     # PermissionService wired above with tool_executor.
 
@@ -157,6 +159,7 @@ def build_services(
         system_monitor,
         SettingsService(bus, settings_repo),
         CommandRouterService(bus),
+        orchestration,
         runtime_provider_registry,
         capability_router,
         qwenpaw_sidecar,

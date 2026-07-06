@@ -20,7 +20,7 @@ from ai_command_center.domain.capability_provider_settings import (
 )
 from ai_command_center.domain.runtime_capability import CapabilityKind
 from ai_command_center.repositories.settings_repository import SettingsRepository
-from ai_command_center.services.capability_router_service import CapabilityRouterService
+from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.settings_service import SettingsService
 
 
@@ -54,7 +54,7 @@ def test_migration_v3_advances_to_v4_with_defaults() -> None:
 
 def test_router_respects_user_provider_map() -> None:
     bus = EventBus()
-    router = CapabilityRouterService(bus)
+    router = RuntimeCapabilityRouterService(bus)
     classified: list[dict] = []
     bus.subscribe(CAPABILITY_CLASSIFIED, lambda e: classified.append(dict(e.payload)))
     router.start()
@@ -71,7 +71,7 @@ def test_router_respects_user_provider_map() -> None:
             COMMAND_ROUTED,
             {
                 "intent": INTENT_CHAT,
-                "args": {"prompt": "what's on my calendar today"},
+                "args": {"prompt": "plan my week"},
                 "request_id": "req-user-map",
             },
             source="command_router",
@@ -85,7 +85,7 @@ def test_router_respects_user_provider_map() -> None:
 
 def test_auto_resolves_kind_specific_default() -> None:
     bus = EventBus()
-    router = CapabilityRouterService(bus)
+    router = RuntimeCapabilityRouterService(bus)
     router.start()
     try:
         bus.publish(
@@ -105,7 +105,7 @@ def test_auto_resolves_kind_specific_default() -> None:
 
 def test_router_without_snapshot_uses_auto_defaults() -> None:
     bus = EventBus()
-    router = CapabilityRouterService(bus)
+    router = RuntimeCapabilityRouterService(bus)
     router.start()
     try:
         assert router.resolve_provider(CapabilityKind.PLANNING) == "qwenpaw"
