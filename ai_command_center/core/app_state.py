@@ -51,6 +51,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
+    ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
@@ -70,6 +71,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
 )
+from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -132,6 +134,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKFLOW_FAILED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
+    ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
 )
 
@@ -204,6 +207,31 @@ class PluginItem:
 
 
 @dataclass(frozen=True, slots=True)
+class RuntimeProviderItem:
+    """Projection of a discovered runtime provider."""
+
+    provider_id: str = ""
+    name: str = ""
+    version: str = ""
+    capabilities: tuple[str, ...] = ()
+    permissions: tuple[str, ...] = ()
+    health_state: str = ""
+    health_detail: str = ""
+    enabled: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionRunItem:
+    """Lightweight execution run feed entry."""
+
+    run_id: str = ""
+    request_id: str = ""
+    source: str = ""
+    created_at: float = 0.0
+    summary: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class AgentRunItem:
     """Projection of an agent run for UI rendering."""
 
@@ -268,6 +296,8 @@ class AppState:
     chat_started_user_text: str = ""
     chat_context_sources: tuple[str, ...] = ()
     chat_token_estimate: int = 0
+    workspace_context_snippet_count: int = 0
+    last_workspace_context_workspace_id: str = ""
     last_assistant_message: str = ""
     chat_history_count: int = 0
     chat_history_messages: tuple[ChatHistoryMessage, ...] = ()
@@ -307,6 +337,9 @@ class AppState:
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
     orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
+    provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
+    runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
+    execution_runs: tuple[ExecutionRunItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -629,11 +662,81 @@ def _reduce_plugin_catalog(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_capability_providers_ready(state: AppState, event: Event) -> AppState:
-    """Record capability.providers.ready for AppState consumers."""
+    """Record capability.providers.ready and merge runtime provider health."""
     if event.topic != CAPABILITY_PROVIDERS_READY:
         return state
+    providers = event.payload.get("providers") or []
+    runtime_items: list[RuntimeProviderItem] = []
+    health_items: dict[str, ProviderHealthSnapshot] = {
+        h.provider_id: h for h in state.provider_health_map
+    }
+    for item in providers:
+        if not isinstance(item, dict):
+            continue
+        provider_id = str(item.get("id", ""))
+        runtime_items.append(
+            RuntimeProviderItem(
+                provider_id=provider_id,
+                name=str(item.get("name", provider_id)),
+                version=str(item.get("version", "")),
+                capabilities=tuple(str(c) for c in (item.get("capabilities") or [])),
+                permissions=tuple(str(p) for p in (item.get("permissions") or [])),
+                health_state=str(item.get("health_state", "")),
+                health_detail=str(item.get("health_detail", "")),
+                enabled=bool(item.get("enabled", True)),
+            )
+        )
+        snap = ProviderHealthSnapshot.from_runtime_payload(item)
+        health_items[snap.provider_id] = snap
     return replace(
         state,
+        runtime_capability_providers=tuple(runtime_items),
+        provider_health_map=tuple(health_items.values()),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_orchestration_provider_health(state: AppState, event: Event) -> AppState:
+    if event.topic != ORCHESTRATION_PROVIDER_HEALTH:
+        return state
+    snap = ProviderHealthSnapshot.from_orchestration_payload(event.payload)
+    health_items: dict[str, ProviderHealthSnapshot] = {
+        h.provider_id: h for h in state.provider_health_map
+    }
+    health_items[snap.provider_id] = snap
+    return replace(
+        state,
+        provider_health_map=tuple(health_items.values()),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_execution_run_feed(state: AppState, event: Event) -> AppState:
+    if event.topic not in {ORCHESTRATION_RUN_SNAPSHOT, CHAT_COMPLETE}:
+        return state
+    payload = event.payload
+    request_id = str(payload.get("request_id", "")).strip()
+    if not request_id:
+        return state
+    if event.topic == CHAT_COMPLETE and payload.get("orchestration"):
+        return state
+    source = "orchestration" if event.topic == ORCHESTRATION_RUN_SNAPSHOT else "chat"
+    summary = str(payload.get("intent", payload.get("text", "")))[:120]
+    item = ExecutionRunItem(
+        run_id=f"{request_id}:{source}:{len(state.execution_runs)}",
+        request_id=request_id,
+        source=source,
+        created_at=0.0,
+        summary=summary,
+    )
+    runs = state.execution_runs + (item,)
+    if len(runs) > 50:
+        runs = runs[-50:]
+    return replace(
+        state,
+        execution_runs=runs,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1024,6 +1127,8 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
             response_source=str(payload.get("response_source", "")),
             response_text=str(payload.get("response_text", "")),
             receipt_id=str(payload.get("receipt_id", "")),
+            trace_id=str(payload.get("trace_id", "")),
+            span_id=str(payload.get("span_id", "")),
         ),
         last_event_topic=event.topic,
         last_event_source=event.source,
@@ -1061,6 +1166,8 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_cleared,
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
+    _reduce_orchestration_provider_health,
+    _reduce_execution_run_feed,
     _reduce_plugin_state_changed,
     _reduce_agent_run,
     _reduce_agent_pipeline,
