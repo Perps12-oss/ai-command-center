@@ -65,7 +65,6 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
-    register_discovered_providers,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -950,17 +949,9 @@ def _reduce_plugin_catalog(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_capability_providers_ready(state: AppState, event: Event) -> AppState:
-    """Register discovered runtime provider ids for settings validation."""
+    """Record capability.providers.ready for AppState consumers."""
     if event.topic != CAPABILITY_PROVIDERS_READY:
         return state
-    raw_providers = event.payload.get("providers") or []
-    provider_ids: list[str] = []
-    for provider in raw_providers:
-        if isinstance(provider, dict):
-            provider_id = str(provider.get("id", "")).strip()
-            if provider_id:
-                provider_ids.append(provider_id)
-    register_discovered_providers(provider_ids)
     return replace(
         state,
         last_event_topic=event.topic,

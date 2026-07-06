@@ -314,18 +314,7 @@ class SettingsView(ctk.CTkFrame):
         ).pack(anchor="w", padx=T.PAD, pady=(0, 8))
 
         self._capability_providers: dict[str, ctk.CTkComboBox] = {}
-        combo_values = [
-            capability_provider_label(provider_id)
-            for provider_id in get_capability_provider_choices()
-        ]
-        self._provider_label_to_value = {
-            capability_provider_label(provider_id): provider_id
-            for provider_id in get_capability_provider_choices()
-        }
-        self._provider_value_to_label = {
-            provider_id: capability_provider_label(provider_id)
-            for provider_id in get_capability_provider_choices()
-        }
+        combo_values = self._provider_combo_values()
         for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
             label = CAPABILITY_KIND_LABELS.get(kind, kind.title())
             ctk.CTkLabel(providers, text=label, text_color=T.TEXT_MUTED).pack(
@@ -365,6 +354,33 @@ class SettingsView(ctk.CTkFrame):
         entry.pack(anchor="w", padx=16, pady=(4, 4))
         return entry
 
+    @staticmethod
+    def _provider_combo_values() -> list[str]:
+        return [
+            capability_provider_label(provider_id)
+            for provider_id in get_capability_provider_choices()
+        ]
+
+    @staticmethod
+    def _provider_label_to_value() -> dict[str, str]:
+        return {
+            capability_provider_label(provider_id): provider_id
+            for provider_id in get_capability_provider_choices()
+        }
+
+    @staticmethod
+    def _provider_value_to_label() -> dict[str, str]:
+        return {
+            provider_id: capability_provider_label(provider_id)
+            for provider_id in get_capability_provider_choices()
+        }
+
+    def _refresh_provider_combos(self) -> None:
+        """Refresh combo options after runtime provider discovery."""
+        values = self._provider_combo_values()
+        for combo in self._capability_providers.values():
+            combo.configure(values=values)
+
     def _on_capability_provider_change(self, kind: str) -> None:
         if self._building:
             return
@@ -372,7 +388,7 @@ class SettingsView(ctk.CTkFrame):
         if combo is None:
             return
         label = combo.get().strip()
-        value = self._provider_label_to_value.get(label, "auto")
+        value = self._provider_label_to_value().get(label, "auto")
         self._on_save(settings_key_for_kind(kind), value)
 
     def _set_capability_provider(self, kind: str, value: str) -> None:
@@ -381,7 +397,7 @@ class SettingsView(ctk.CTkFrame):
             return
         choices = get_capability_provider_choices()
         normalized = value if value in choices else "auto"
-        combo.set(self._provider_value_to_label.get(normalized, "Auto"))
+        combo.set(self._provider_value_to_label().get(normalized, "Auto"))
 
     def _on_provider_change(self, value: str) -> None:
         self._update_provider_fields(value)
@@ -494,6 +510,7 @@ class SettingsView(ctk.CTkFrame):
         else:
             self._qwenpaw_auto_start.deselect()
 
+        self._refresh_provider_combos()
         provider_map = getattr(settings, "capability_provider_map", None) or {}
         for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
             self._set_capability_provider(kind, str(provider_map.get(kind, "auto")))
