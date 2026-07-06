@@ -107,6 +107,14 @@ class CommandRouterService(BaseService):
             scope["workspace_id"] = workspace_id
         elif self._active_workspace_id:
             scope["workspace_id"] = self._active_workspace_id
+        for key in (
+            "selected_entity_id",
+            "selected_entity_type",
+            "selected_entity_title",
+        ):
+            value = str(event.payload.get(key, "")).strip()
+            if value:
+                scope[key] = value
         return scope
 
     def _on_unload(self) -> None:

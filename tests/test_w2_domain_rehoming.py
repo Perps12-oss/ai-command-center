@@ -140,7 +140,7 @@ class W2MemoryNamespaceTests(unittest.TestCase):
             {"label": "scoped", "content": "ws-only secret", "workspace_id": "ws-a"},
             source="tests",
         )
-        global_hits = self.repo.search("secret", workspace_id="")
+        global_hits = self.repo.search("secret", global_search=True)
         ws_hits = self.repo.search("secret", workspace_id="ws-a")
         self.assertEqual(2, len(global_hits))
         self.assertEqual(1, len(ws_hits))

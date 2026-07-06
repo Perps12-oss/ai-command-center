@@ -35,15 +35,25 @@ class MemoryRepository:
         related_to: str | None = None,
         relation: str = "relates_to",
         workspace_id: str = "",
+        entity_id: str = "",
     ) -> str:
         node_id = uuid.uuid4().hex
         now = time.time()
         self._conn.execute(
             """
-            INSERT INTO memory_nodes (id, label, kind, content, tier, created_at, workspace_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO memory_nodes (id, label, kind, content, tier, created_at, workspace_id, entity_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (node_id, label, kind, content, tier, now, workspace_id.strip()),
+            (
+                node_id,
+                label,
+                kind,
+                content,
+                tier,
+                now,
+                workspace_id.strip(),
+                entity_id.strip(),
+            ),
         )
         if related_to:
             self._conn.execute(
@@ -62,21 +72,11 @@ class MemoryRepository:
         *,
         limit: int = 5,
         workspace_id: str = "",
+        entity_id: str = "",
+        global_search: bool = False,
     ) -> list[MemoryNode]:
         pattern = f"%{query.strip()}%"
-        ws = workspace_id.strip()
-        if ws:
-            rows = self._conn.execute(
-                """
-                SELECT id, label, kind, content, tier
-                FROM memory_nodes
-                WHERE workspace_id = ? AND (label LIKE ? OR content LIKE ?)
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (ws, pattern, pattern, limit),
-            ).fetchall()
-        else:
+        if global_search:
             rows = self._conn.execute(
                 """
                 SELECT id, label, kind, content, tier
@@ -87,6 +87,34 @@ class MemoryRepository:
                 """,
                 (pattern, pattern, limit),
             ).fetchall()
+        else:
+            ws = workspace_id.strip()
+            ent = entity_id.strip()
+            if not ws:
+                return []
+            if ent:
+                rows = self._conn.execute(
+                    """
+                    SELECT id, label, kind, content, tier
+                    FROM memory_nodes
+                    WHERE workspace_id = ? AND entity_id = ?
+                      AND (label LIKE ? OR content LIKE ?)
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (ws, ent, pattern, pattern, limit),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    """
+                    SELECT id, label, kind, content, tier
+                    FROM memory_nodes
+                    WHERE workspace_id = ? AND (label LIKE ? OR content LIKE ?)
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (ws, pattern, pattern, limit),
+                ).fetchall()
         return [
             MemoryNode(
                 id=str(r["id"]),

@@ -37,6 +37,8 @@ from ai_command_center.core.events.topics import (
     UI_SELECT_WORKSPACE,
     WORKSPACE_ADD_ENTITY_REQUEST,
     WORKSPACE_ADD_ENTITY_RESULT,
+    WORKSPACE_CONTEXT_REQUEST,
+    WORKSPACE_CONTEXT_RESULT,
     WORKSPACE_CREATE_REQUEST,
     WORKSPACE_CREATE_RESULT,
 )
@@ -265,6 +267,103 @@ def register_entity_bus_handlers(
             source=source,
         )
 
+    def on_workspace_context_request(event: Event) -> None:
+        rid = _request_id(event)
+        workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
+        focus_entity_raw = str(event.payload.get("entity_id", "")).strip()
+        max_depth = int(event.payload.get("max_depth", 2) or 2)
+        if not workspace_id_raw:
+            _publish_result(
+                bus,
+                WORKSPACE_CONTEXT_RESULT,
+                rid,
+                {"snippets": []},
+                source=source,
+            )
+            return
+        try:
+            workspace_uuid = UUID(workspace_id_raw)
+        except ValueError:
+            _publish_result(
+                bus,
+                WORKSPACE_CONTEXT_RESULT,
+                rid,
+                {"snippets": [], "error": "invalid workspace_id"},
+                source=source,
+            )
+            return
+
+        workspace = entity_service.get(workspace_uuid)
+        if workspace is None or workspace.entity_type != ENTITY_TYPE_WORKSPACE:
+            _publish_result(
+                bus,
+                WORKSPACE_CONTEXT_RESULT,
+                rid,
+                {"snippets": []},
+                source=source,
+            )
+            return
+
+        snippets: list[str] = [
+            f"Active workspace: {workspace.title} (workspace_id={workspace.id})"
+        ]
+        child_ids_raw = workspace.metadata.get("entities", [])
+        child_lines: list[str] = []
+        for child_raw in child_ids_raw:
+            try:
+                child_id = UUID(str(child_raw))
+            except ValueError:
+                continue
+            child = entity_service.get(child_id)
+            if child is None:
+                continue
+            child_lines.append(
+                f"  - {child.entity_type}: \"{child.title}\" ({child.id})"
+            )
+        if child_lines:
+            snippets.append("Workspace entities:\n" + "\n".join(child_lines))
+
+        focus_uuid: UUID | None = None
+        if focus_entity_raw:
+            try:
+                focus_uuid = UUID(focus_entity_raw)
+            except ValueError:
+                focus_uuid = None
+        if focus_uuid is None:
+            focus_uuid = workspace_uuid
+
+        focus_entity = entity_service.get(focus_uuid)
+        if focus_entity is not None and focus_uuid != workspace_uuid:
+            focus_payload: dict[str, object] = {
+                "entity_id": str(focus_entity.id),
+                "entity_type": focus_entity.entity_type,
+                "entity_title": focus_entity.title,
+                "entity_description": focus_entity.description,
+            }
+            focus_snippet = format_entity_context(focus_payload)
+            if focus_snippet:
+                snippets.append(f"Selected entity:\n{focus_snippet}")
+
+        graph_lines = relationship_service.traverse_context_snippets(
+            focus_uuid,
+            entity_service,
+            max_depth=max_depth,
+        )
+        if graph_lines:
+            snippets.append("Relationship graph:\n" + "\n".join(graph_lines))
+
+        _publish_result(
+            bus,
+            WORKSPACE_CONTEXT_RESULT,
+            rid,
+            {
+                "snippets": snippets,
+                "workspace_id": workspace_id_raw,
+                "entity_id": str(focus_uuid),
+            },
+            source=source,
+        )
+
     def on_relationship_create_request(event: Event) -> None:
         rid = _request_id(event)
         payload = event.payload
@@ -461,6 +560,7 @@ def register_entity_bus_handlers(
         bus.subscribe(ENTITY_CREATE_REQUEST, on_entity_create_request),
         bus.subscribe(ENTITY_SEARCH_REQUEST, on_entity_search_request),
         bus.subscribe(ENTITY_CONTEXT_REQUEST, on_entity_context_request),
+        bus.subscribe(WORKSPACE_CONTEXT_REQUEST, on_workspace_context_request),
         bus.subscribe(RELATIONSHIP_CREATE_REQUEST, on_relationship_create_request),
         bus.subscribe(WORKSPACE_CREATE_REQUEST, on_workspace_create_request),
         bus.subscribe(WORKSPACE_ADD_ENTITY_REQUEST, on_workspace_add_entity_request),
