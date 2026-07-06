@@ -10,12 +10,23 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("workspace", "Workspace"),
     ("home", "Home"),
     ("chat", "Chat"),
+    ("executions", "Executions"),
+    ("providers", "Providers"),
+    ("capabilities", "Capabilities"),
+    ("artifacts", "Artifacts"),
     ("notes", "Notes"),
     ("memory", "Memory"),
     ("system", "System"),
     ("plugins", "Plugins"),
     ("settings", "Settings"),
 )
+
+# Feature-flagged nav items — registered dynamically if feature is enabled
+FEATURE_NAV_ITEMS: dict[str, tuple[str, str]] = {
+    "capabilities": ("capabilities", "Capabilities"),
+    "providers":    ("providers",    "Providers"),
+    "artifacts":    ("artifacts",    "Artifacts"),
+}
 
 
 class Sidebar(ctk.CTkFrame):

@@ -239,6 +239,13 @@ TIMELINE_RECORD_REQUEST = "timeline.record.request"
 TIMELINE_RECORD_RESULT = "timeline.record.result"
 SEARCH_RESULTS = "search.results"
 
+# Execution query (TODO 5 — Inspector docked panel)
+EXECUTION_QUERY_REQUEST = "execution.query.request"
+EXECUTION_QUERY_RESULT = "execution.query.result"
+
+# UI artifact actions (TODO 5/6 — artifact viewer bus integration)
+UI_ARTIFACT_ACTION = "ui.artifact.action"
+
 
 __all__ = [
     "TOPIC_VERSION",
@@ -414,4 +421,7 @@ __all__ = [
     "TIMELINE_RECORD_REQUEST",
     "TIMELINE_RECORD_RESULT",
     "SEARCH_RESULTS",
+    "EXECUTION_QUERY_REQUEST",
+    "EXECUTION_QUERY_RESULT",
+    "UI_ARTIFACT_ACTION",
 ]

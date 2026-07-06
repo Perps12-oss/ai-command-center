@@ -509,3 +509,30 @@ class HomeView(ctk.CTkFrame):
 
     def set_extra(self, text: str) -> None:
         self.set_last_command(text)
+
+    # ── Program 4 dashboard summary cards ─────────────────────────────────────
+
+    def update_execution_summary(
+        self,
+        active_count: int = 0,
+        provider_health: str = "",
+        artifact_count: int = 0,
+        pending_approvals: int = 0,
+    ) -> None:
+        """Update the execution/provider/artifact/approval summary badges.
+
+        Called from StateApplierMixin when AppState changes. The badges are
+        rendered as activity feed items or pill sub-labels as appropriate.
+        """
+        if active_count > 0:
+            self.add_activity(
+                f"⚡  {active_count} active execution{'s' if active_count != 1 else ''}",
+                "system",
+            )
+        if provider_health:
+            self._pill_ollama.set_ok(provider_health, "provider health")
+        if pending_approvals > 0:
+            self.add_activity(
+                f"⚠  {pending_approvals} pending approval{'s' if pending_approvals != 1 else ''}",
+                "system",
+            )

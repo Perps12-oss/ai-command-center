@@ -6,11 +6,15 @@ from collections.abc import Callable
 
 from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
+from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
+from ai_command_center.ui.views.providers_view import ProvidersView
+from ai_command_center.ui.views.capabilities_view import CapabilitiesView
+from ai_command_center.ui.views.artifacts_view import ArtifactsView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
@@ -22,6 +26,10 @@ VIEW_IDS: tuple[str, ...] = (
     "workspace",
     "home",
     "chat",
+    "executions",
+    "providers",
+    "capabilities",
+    "artifacts",
     "notes",
     "memory",
     "system",
@@ -76,6 +84,13 @@ class ViewManagerMixin:
             self._content,
             on_toggle=self._controller.publish_plugin_toggle,
         )
+        self._view_registry["executions"] = lambda: ExecutionsView(
+            self._content,
+            on_select=self._on_execution_select,
+        )
+        self._view_registry["providers"] = lambda: ProvidersView(self._content)
+        self._view_registry["capabilities"] = lambda: CapabilitiesView(self._content)
+        self._view_registry["artifacts"] = lambda: ArtifactsView(self._content)
         self._view_registry["gallery"] = lambda: ComponentGalleryView(self._content)
 
     def _ensure_view(self, view_id: str) -> object:
@@ -194,3 +209,23 @@ class ViewManagerMixin:
 
     def _on_chat_send(self, text: str) -> None:
         self._on_command(text, workspace_entity=self._controller.active_chat_workspace_entity())
+
+    def _on_execution_select(self, run_id: str) -> None:
+        """Navigate to execution detail — placeholder until ExecutionDetailView is wired."""
+        pass
+
+    def _executions_view(self) -> "ExecutionsView | None":
+        v = self._views.get("executions")
+        return v if isinstance(v, ExecutionsView) else None
+
+    def _providers_view(self) -> ProvidersView | None:
+        v = self._views.get("providers")
+        return v if isinstance(v, ProvidersView) else None
+
+    def _capabilities_view(self) -> CapabilitiesView | None:
+        v = self._views.get("capabilities")
+        return v if isinstance(v, CapabilitiesView) else None
+
+    def _artifacts_view(self) -> ArtifactsView | None:
+        v = self._views.get("artifacts")
+        return v if isinstance(v, ArtifactsView) else None
