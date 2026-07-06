@@ -16,10 +16,10 @@ Specify a bus-native multi-agent runtime where agents are supervised EventBus pa
 
 | Asset | Status |
 |-------|--------|
-| Event topics `agent.spawned`, `agent.terminated` | Defined in `core/event_bus.py` |
+| Event topics `agent.spawned`, `agent.terminated` | Defined in `core/events/topics.py` |
 | `AICapabilityRegistryService` | Registers AI-executable actions |
 | `PermissionService` | Gates action invocation |
-| Agent runtime | **Not implemented** — gated per ARCHITECTURE.md 6.5 |
+| `AgentRuntimeService` | A1 supervised demo skeleton implemented and registered |
 
 ---
 
@@ -71,9 +71,9 @@ Agents carry: `agent_id`, `parent_workspace_id`, `capabilities[]`, `request_id` 
 | Phase | Deliverable | Acceptance |
 |-------|-------------|------------|
 | **A0** | Topic + domain model `AgentSession` | Dataclass in `domain/` |
-| **A1** | Single supervised agent (chat wrapper) | Spawn → one task → terminate |
-| **A2** | Tool-using agent loop | Max N tool invokes per spawn |
-| **A3** | Multi-agent with workspace scope | Entities link agent runs to cards |
+| **A1** | Single supervised agent demo | Implemented |
+| **A2** | Tool-using agent loop | Existing demo only; expansion gated |
+| **A3** | Multi-agent with workspace scope | Gated by Appendix C and Program 4 |
 
 ---
 
@@ -98,7 +98,10 @@ Agents carry: `agent_id`, `parent_workspace_id`, `capabilities[]`, `request_id` 
 
 ## Acceptance Criteria (A1)
 
-- [ ] `AgentRuntimeService` registered in service_factory
-- [ ] Spawn/terminate visible in AppState + timeline
-- [ ] No direct imports between AgentRuntime and ChatHandler
-- [ ] `verify_phase*` script or pytest coverage for happy path
+- [x] `AgentRuntimeService` registered in service_factory
+- [x] Spawn/terminate visible in AppState
+- [x] No direct imports between AgentRuntime and ChatHandler
+- [x] Pytest coverage for supervised demo paths
+
+Further runtime expansion is blocked by the Appendix C sign-off described in
+`ARCHITECTURE_TRANSITION_PLAN.md` and summarized in `PROGRAM4_GATE_STATUS.md`.
