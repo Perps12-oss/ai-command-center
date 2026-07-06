@@ -1,8 +1,8 @@
-"""Tests for orchestration provider registry and MCP provider."""
+"""Layer 1 — provider registry and MCP adapter unit tests."""
 
 from __future__ import annotations
 
-from ai_command_center.core.permission.permission import Permission, PermissionContext
+from ai_command_center.core.permission.permission import PermissionContext
 from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
 from ai_command_center.orchestration.providers.mcp_adapter import McpAdapterProvider, McpProvider
 from ai_command_center.orchestration.providers.mcp_client import McpServerConfig
