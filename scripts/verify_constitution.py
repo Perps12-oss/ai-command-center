@@ -17,6 +17,7 @@ REQUIRED_FILES = [
     "PROJECT_CONSTITUTION_V4.md",
     "AGENTS.md",
     "docs/ARCHITECTURE.md",
+    "docs/architecture/AGENT_RUNTIME_INTERFACE.md",
     "docs/ARCHITECTURE_ENFORCEMENT.md",
     "governance/constitutional_preflight.md",
     "governance/constitutional_review.md",

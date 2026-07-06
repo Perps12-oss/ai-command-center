@@ -21,9 +21,8 @@ Topic categories:
 - **Context** (`context.*`): context assembly and budget warnings.
 - **Session** (`session.*`): conversation history persistence.
 - **UI** (`ui.*`, `overlay.*`, `app.*`): user intent and overlay control.
-- **Workspace OS** (`ui.workspace_os.*`, `ui.inspector.*`): entity creation,
-  resource launch, and inspector control.
-- **Entity** (`entity.*`): entity lifecycle and relationship changes.
+- **Agent** (`agent.*`): spawn, task, pipeline lifecycle.
+- **Capability runtime** (`capability.*`): ARI classification, dispatch, streaming.
 """
 
 from __future__ import annotations
@@ -167,6 +166,15 @@ AGENT_PIPELINE_STARTED = "agent.pipeline.started"
 AGENT_PIPELINE_STAGE = "agent.pipeline.stage"
 AGENT_PIPELINE_PLANNED = "agent.pipeline.planned"
 AGENT_PIPELINE_COMPLETE = "agent.pipeline.complete"
+
+# Capability runtime (Agent Runtime Interface — Invariant 13)
+CAPABILITY_CLASSIFIED = "capability.classified"
+CAPABILITY_DISPATCH = "capability.dispatch"
+CAPABILITY_RUNTIME_REQUEST = "capability.runtime.request"
+CAPABILITY_STREAM = "capability.stream"
+CAPABILITY_COMPLETE = "capability.complete"
+CAPABILITY_ERROR = "capability.error"
+CAPABILITY_FALLBACK = "capability.fallback"
 
 # Permission gate (Track 7 — supervised agent pre-flight)
 PERMISSION_CHECK_REQUEST = "permission.check.request"
@@ -322,6 +330,13 @@ __all__ = [
     "AGENT_PIPELINE_STAGE",
     "AGENT_PIPELINE_PLANNED",
     "AGENT_PIPELINE_COMPLETE",
+    "CAPABILITY_CLASSIFIED",
+    "CAPABILITY_DISPATCH",
+    "CAPABILITY_RUNTIME_REQUEST",
+    "CAPABILITY_STREAM",
+    "CAPABILITY_COMPLETE",
+    "CAPABILITY_ERROR",
+    "CAPABILITY_FALLBACK",
     "PERMISSION_CHECK_REQUEST",
     "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",
