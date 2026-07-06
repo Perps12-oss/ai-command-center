@@ -9,6 +9,7 @@ from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     CHAT_HISTORY_LOADED,
     UI_OPEN_CHAT,
+    WORKSPACE_ACTIVE,
 )
 from ai_command_center.repositories.conversation_repository import (
     ConversationRepository,
@@ -73,6 +74,17 @@ class SessionServiceEntityTests(unittest.TestCase):
         self.bus.publish(UI_OPEN_CHAT, {"entity_id": ""}, source="tests")
         default_messages = self.history_events[-1]["messages"]
         self.assertEqual([], default_messages)
+
+    def test_open_chat_without_entity_uses_workspace_when_active(self) -> None:
+        ws_id = "ws-c3-active"
+        self.bus.publish(
+            WORKSPACE_ACTIVE,
+            {"workspace_id": ws_id, "title": "Active"},
+            source="tests",
+        )
+        self.bus.publish(UI_OPEN_CHAT, {"entity_id": ""}, source="tests")
+        expected = entity_conversation_id("workspace", ws_id)
+        self.assertEqual(expected, self.history_events[-1]["conversation_id"])
 
 
 if __name__ == "__main__":
