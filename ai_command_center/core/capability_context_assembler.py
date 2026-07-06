@@ -212,28 +212,6 @@ class CapabilityContextAssembler:
                 {"request_id": request_id, **session_scope},
                 source=source,
             )
-            if include_model_resolve:
-                resolve_request: dict[str, object] = {
-                    "request_id": request_id,
-                    "intent": INTENT_CHAT,
-                    "query": query,
-                }
-                if workspace_id:
-                    resolve_request["workspace_id"] = workspace_id
-                for key in (
-                    "selected_entity_id",
-                    "selected_entity_type",
-                    "selected_entity_title",
-                ):
-                    value = str(event_payload.get(key) or args.get(key, "")).strip()
-                    if value:
-                        resolve_request[key] = value
-                self._bus.publish(
-                    MODEL_RESOLVE_REQUEST,
-                    resolve_request,
-                    source=source,
-                )
-
             if workspace_id:
                 focus_entity = self.resolve_workspace_entity_id(event_payload, args)
                 workspace_request: dict[str, object] = {
@@ -302,9 +280,6 @@ class CapabilityContextAssembler:
                     graph_snippets.insert(0, fallback)
 
             history = pending.get("history")
-            model = str(pending.get("model", self._default_model))
-            provider = str(pending.get("provider", self._default_provider))
-
             bundle = self._context_manager.build_context(
                 query,
                 clipboard=clipboard,
@@ -313,6 +288,41 @@ class CapabilityContextAssembler:
                 conversation_history=history if isinstance(history, list) else None,
                 clipboard_intent=clip_intent,
             )
+
+            if include_model_resolve:
+                budget = self._context_manager.context_budget_tokens
+                context_over_budget = (
+                    bundle.token_estimate >= budget and budget > 0
+                )
+                resolve_request: dict[str, object] = {
+                    "request_id": request_id,
+                    "intent": INTENT_CHAT,
+                    "query": query,
+                    "context_size_tokens": bundle.token_estimate,
+                    "budget_tokens": budget,
+                    "context_over_budget": context_over_budget,
+                }
+                if workspace_id:
+                    resolve_request["workspace_id"] = workspace_id
+                for key in (
+                    "selected_entity_id",
+                    "selected_entity_type",
+                    "selected_entity_title",
+                ):
+                    value = str(event_payload.get(key) or args.get(key, "")).strip()
+                    if value:
+                        resolve_request[key] = value
+                self._bus.publish(
+                    MODEL_RESOLVE_REQUEST,
+                    resolve_request,
+                    source=source,
+                )
+                model = str(pending.get("model", self._default_model))
+                provider = str(pending.get("provider", self._default_provider))
+            else:
+                model = str(pending.get("model", self._default_model))
+                provider = str(pending.get("provider", self._default_provider))
+
             return AssembledContext(
                 bundle=bundle,
                 session_scope=session_scope,

@@ -59,6 +59,9 @@ from ai_command_center.core.events.topics import (
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
     SYSTEM_SNAPSHOT,
+    TOOL_COMPLETED,
+    TOOL_FAILED,
+    TOOL_STARTED,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
     UI_SELECT_ENTITY,
@@ -78,6 +81,7 @@ from ai_command_center.platform.model_registry import normalize_tier_map
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.core.state.model_state import ModelSelectionSnapshot
+from ai_command_center.core.state.tool_state import ToolRunItem
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -143,6 +147,9 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     MODEL_SELECTED,
+    TOOL_COMPLETED,
+    TOOL_FAILED,
+    TOOL_STARTED,
 )
 
 
@@ -365,6 +372,7 @@ class AppState:
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
+    recent_tool_runs: tuple[ToolRunItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1184,6 +1192,9 @@ from ai_command_center.core.state.workspace_state import (  # noqa: E402
 from ai_command_center.core.state.model_state import (  # noqa: E402
     MODEL_REDUCERS,
 )
+from ai_command_center.core.state.tool_state import (  # noqa: E402
+    TOOL_REDUCERS,
+)
 
 
 def _is_pending_chat_user_text(text: str) -> bool:
@@ -1260,6 +1271,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_permission_check,
     _reduce_orchestration_run,
     *MODEL_REDUCERS,
+    *TOOL_REDUCERS,
 )
 
 
