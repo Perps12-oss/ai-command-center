@@ -19,6 +19,7 @@ from ai_command_center.domain.capability_provider_settings import (
     settings_key_for_kind,
 )
 from ai_command_center.domain.runtime_capability import CapabilityKind
+from ai_command_center.platform.model_registry import DEFAULT_MODEL_TIER_MAP
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.settings_service import SettingsService
@@ -43,12 +44,13 @@ def test_settings_round_trip_capability_providers() -> None:
             db.close()
 
 
-def test_migration_v3_advances_to_v5_with_defaults() -> None:
+def test_migration_v3_advances_to_v6_with_defaults() -> None:
     from ai_command_center.core.settings.migration_manager import MigrationManager
 
     migrated = MigrationManager().migrate({"schema_version": 3, "theme": "dark"})
-    assert migrated["schema_version"] == 5
+    assert migrated["schema_version"] == 6
     assert migrated["mcp_servers"] == {}
+    assert migrated["model_tier_map"] == dict(DEFAULT_MODEL_TIER_MAP)
     for kind, default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
         assert migrated[settings_key_for_kind(kind)] == default
 
