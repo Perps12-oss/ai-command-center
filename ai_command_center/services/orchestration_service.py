@@ -21,7 +21,6 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.orchestration.execution.executor import OrchestrationExecutor
 from ai_command_center.orchestration.execution.response_composer import ResponseComposer
 from ai_command_center.orchestration.intents.classifier import RuleBasedIntentClassifier
-from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
 from ai_command_center.orchestration.orchestration_registry import mark_orchestration_request
 from ai_command_center.orchestration.policies.fallback_policy import OrchestrationFallbackPolicy
 from ai_command_center.orchestration.providers.provider_registry import OrchestrationProviderRegistry

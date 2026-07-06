@@ -966,6 +966,28 @@ def _reduce_permission_check(state: AppState, event: Event) -> AppState:
     return state
 
 
+from ai_command_center.core.state.chat_state import (  # noqa: E402
+    _is_pending_chat_user_text as _chat_is_pending_user_text,
+    _reduce_chat_cancelled,
+    _reduce_chat_chunk,
+    _reduce_chat_complete,
+    _reduce_chat_error,
+    _reduce_chat_history_loaded,
+    _reduce_chat_started,
+    _reduce_chat_workspace_entity,
+    _reduce_command_routed,
+    _reduce_context_snapshot,
+    _reduce_ui_chat_new_session,
+)
+from ai_command_center.core.state.workspace_state import (  # noqa: E402
+    _reduce_notes_indexed,
+    _reduce_workspace_os_event,
+)
+
+
+def _is_pending_chat_user_text(text: str) -> bool:
+    """Compatibility wrapper for tests and diagnostics."""
+    return _chat_is_pending_user_text(text)
 
 def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
     if event.topic != ORCHESTRATION_RUN_SNAPSHOT:
@@ -992,29 +1014,6 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
         last_event_source=event.source,
     )
 
-
-from ai_command_center.core.state.chat_state import (  # noqa: E402
-    _is_pending_chat_user_text as _chat_is_pending_user_text,
-    _reduce_chat_cancelled,
-    _reduce_chat_chunk,
-    _reduce_chat_complete,
-    _reduce_chat_error,
-    _reduce_chat_history_loaded,
-    _reduce_chat_started,
-    _reduce_chat_workspace_entity,
-    _reduce_command_routed,
-    _reduce_context_snapshot,
-    _reduce_ui_chat_new_session,
-)
-from ai_command_center.core.state.workspace_state import (  # noqa: E402
-    _reduce_notes_indexed,
-    _reduce_workspace_os_event,
-)
-
-
-def _is_pending_chat_user_text(text: str) -> bool:
-    """Compatibility wrapper for tests and diagnostics."""
-    return _chat_is_pending_user_text(text)
 
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (

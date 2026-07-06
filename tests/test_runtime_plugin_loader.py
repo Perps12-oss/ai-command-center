@@ -68,6 +68,25 @@ def test_repository_rejects_manifest_without_capabilities(tmp_path: Path) -> Non
     assert repo.list_manifests(tmp_path) == []
 
 
+def test_repository_skips_malformed_yaml_without_blocking_valid_manifests(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "broken.yaml").write_text("id: [unclosed\n", encoding="utf-8")
+    (tmp_path / "good.yaml").write_text(
+        "\n".join(
+            [
+                "id: stub_echo",
+                "entrypoint: builtin:stub_echo",
+                "capabilities: [chat]",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    repo = RuntimeProviderManifestRepository()
+    manifests = repo.list_manifests(tmp_path)
+    assert [m.id for m in manifests] == ["stub_echo"]
+
+
 def test_load_manifests_applies_enabled_flag(tmp_path: Path) -> None:
     enabled = tmp_path / "enabled.yaml"
     enabled.write_text(
