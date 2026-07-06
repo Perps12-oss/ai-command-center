@@ -25,7 +25,7 @@ class RuntimeProviderManifestRepository:
         for path in sorted(manifests_dir.glob("*.yaml")):
             try:
                 raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            except OSError:
+            except (OSError, yaml.YAMLError):
                 continue
             manifest = self.parse_manifest(raw)
             if manifest is not None:
