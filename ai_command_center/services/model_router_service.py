@@ -59,48 +59,81 @@ class ModelRouterService(BaseService):
     def _on_resolve_request(self, event: Event) -> None:
         intent = str(event.payload.get("intent", "chat"))
         query = str(event.payload.get("query", ""))
-        model, provider = self.resolve(intent=intent, query=query)
-        self._bus.publish(
-            MODEL_RESOLVE_RESULT,
-            {
-                "request_id": event.payload.get("request_id", ""),
-                "model": model,
-                "provider": provider,
-            },
-            source=self.name,
+        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        selected_entity_type = str(event.payload.get("selected_entity_type", "")).strip()
+        selected_entity_id = str(event.payload.get("selected_entity_id", "")).strip()
+        model, provider = self.resolve(
+            intent=intent,
+            query=query,
+            workspace_id=workspace_id,
+            selected_entity_type=selected_entity_type,
+            selected_entity_id=selected_entity_id,
         )
+        result_payload: dict[str, object] = {
+            "request_id": event.payload.get("request_id", ""),
+            "model": model,
+            "provider": provider,
+        }
+        if workspace_id:
+            result_payload["workspace_id"] = workspace_id
+        if selected_entity_type:
+            result_payload["selected_entity_type"] = selected_entity_type
+        if selected_entity_id:
+            result_payload["selected_entity_id"] = selected_entity_id
+        self._bus.publish(MODEL_RESOLVE_RESULT, result_payload, source=self.name)
 
-    def resolve(self, *, intent: str, query: str) -> tuple[str, str]:
+    def resolve(
+        self,
+        *,
+        intent: str,
+        query: str,
+        workspace_id: str = "",
+        selected_entity_type: str = "",
+        selected_entity_id: str = "",
+    ) -> tuple[str, str]:
         """Pick (model, provider) for a chat request via ProviderRegistry."""
         lower = query.lower()
-        if intent == "chat" and any(
-            token in lower for token in ("summarize", "summary", "tl;dr", "tldr")
-        ):
+        summarize_tokens = ("summarize", "summary", "tl;dr", "tldr")
+        if intent == "chat" and any(token in lower for token in summarize_tokens):
             model = self._summarize_model
             reason = "summarize_intent"
+        elif selected_entity_type == "note" and any(token in lower for token in summarize_tokens):
+            model = self._summarize_model
+            reason = "workspace_note_hint"
+        elif selected_entity_type in {"card", "resource"} and any(
+            hint in lower for hint in ("implement", "refactor", "fix bug", "write code")
+        ):
+            model = self._default_model
+            reason = "workspace_task_hint"
         else:
             model = self._default_model
-            reason = "default"
+            reason = "workspace_default" if workspace_id else "default"
         provider = (
             self._registry.resolve_for_model(model, provider=self._provider)
             or self._provider
         )
         logger.info(
-            "model.resolve intent=%s model=%s provider=%s reason=%s",
+            "model.resolve intent=%s model=%s provider=%s reason=%s workspace=%s entity=%s",
             intent,
             model,
             provider,
             reason,
+            workspace_id or "-",
+            selected_entity_type or "-",
         )
-        self._bus.publish(
-            MODEL_SELECTED,
-            {
-                "model": model,
-                "intent": intent,
-                "reason": reason,
-                "provider": provider,
-                "tier": classify_model(model).value,
-            },
-            source=self.name,
-        )
+        selected_payload: dict[str, object] = {
+            "model": model,
+            "intent": intent,
+            "reason": reason,
+            "provider": provider,
+            "tier": classify_model(model).value,
+            "resolved_by": "model_router",
+        }
+        if workspace_id:
+            selected_payload["workspace_id"] = workspace_id
+        if selected_entity_type:
+            selected_payload["selected_entity_type"] = selected_entity_type
+        if selected_entity_id:
+            selected_payload["selected_entity_id"] = selected_entity_id
+        self._bus.publish(MODEL_SELECTED, selected_payload, source=self.name)
         return model, provider
