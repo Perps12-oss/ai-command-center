@@ -588,7 +588,7 @@ class SettingsView(ctk.CTkFrame):
             if combo is None:
                 continue
             label = combo.get().strip()
-            pairs[settings_key_for_kind(kind)] = self._PROVIDER_LABEL_TO_VALUE.get(
+            pairs[settings_key_for_kind(kind)] = self._provider_label_to_value().get(
                 label, "auto"
             )
         for key, value in pairs.items():
