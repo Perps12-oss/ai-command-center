@@ -2,7 +2,7 @@
 
 **Status:** **READY** — Program 3 **COMPLETE**; Program 1 S1–S6 **COMPLETE**; Program 4 slice 2 landed.
 
-**Last assessed:** 2026-07-06 (`feat/program4-slice2-tool-state`)
+**Last assessed:** 2026-07-06 (`feat/program4-slice3-hotkey-workflows-uiqueue`)
 
 Program 4 may not expand platform capabilities until:
 
@@ -32,8 +32,8 @@ Program 4 may not expand platform capabilities until:
 | Question | Answer |
 |----------|--------|
 | **Program 3 dependency** | **Complete** — exit gate closed (WII ≥60%, adoption ~7.0); see `PROGRAM_3_WORKSPACE_ADOPTION.md` |
-| **Backlog completion** | **100%** Program 1; Program 4 slices 1–2 landed |
-| **Program 4 ready?** | **READY** — S1–S6 satisfied; slices 1–2 (tiers, paths, tool state, budget tier) landed |
+| **Backlog completion** | **100%** Program 1; Program 4 slices 1–3 landed |
+| **Program 4 ready?** | **READY** — S1–S6 satisfied; slices 1–3 landed |
 
 ### Quality scores (1–10)
 
@@ -42,7 +42,7 @@ Program 4 may not expand platform capabilities until:
 | S1 Execution reliability | 9 | Async `tool.invoke`; shell cancel on unload |
 | S2 Shell hardening | 9 | Production sandbox + permission gate |
 | S3 Model routing | 9 | Registry wired; dual subscribers remain but provider-gated |
-| S4 UI runtime safety | 9 | Generation + mid-flight checks; Inspector UIQueue migration still open |
+| S4 UI runtime safety | 9 | Generation + mid-flight checks; Inspector UIQueue migration **done** (slice 3) |
 | S5 State & lifecycle | 9 | Shutdown teardown verified |
 | S6 Observability | 8 | Topic counters in system snapshot |
 | S7 Dependency cleanup | 8 | Documented; `PluginManifest` dual-path retained by design |
@@ -71,10 +71,20 @@ Program 4 may not expand platform capabilities until:
 
 ---
 
+## Program 4 slice 3 (2026-07-06)
+
+| Deliverable | Status | Evidence |
+|-------------|--------|----------|
+| `HotkeyProvider` (Win/Linux/macOS/no-op) | **Done** | `platform/hotkey_provider.py`; `main.py` uses `overlay_hotkey`; `tests/test_hotkey_provider.py` |
+| Workflow run persistence + replay | **Done** | `workflow_run_repository.py`, `workflow_persistence_service.py`, migration v6; `tests/test_workflow_persistence.py` |
+| TD-05 Inspector → UIQueue | **Done** | `runtime_inspector.py`, `workspace_os_inspector.py`, `orchestration_inspector.py`; `main.py` marshals toggles via UIQueue; `tests/test_ui_queue.py` |
+
+---
+
 ## Recommended Program 4 next slice
 
-1. **Inspector UIQueue migration** — SystemView poll race follow-up (S4 residual).
-2. **Further W4 splits** — telemetry or orchestration projections if needed.
+1. **Further W4 splits** — telemetry or orchestration projections if needed.
+2. **macOS HotkeyProvider** — CGEvent tap behind `HotkeyProvider` (packaging track).
 
 Do **not** start: semantic/vector memory, multi-agent expansion, or distributed execution until explicit gates in this doc and Appendix C pass.
 
@@ -106,6 +116,8 @@ Do **not** start: semantic/vector memory, multi-agent expansion, or distributed 
 |--------|---------|
 | `ai_command_center.core.state.model_state` | `model.selected` AppState projection (**active** — slice 1) |
 | `ai_command_center.core.state.tool_state` | `recent_tool_runs` AppState projection (**active** — slice 2) |
+| `ai_command_center.repositories.workflow_run_repository` | Workflow run metadata persistence (**active** — slice 3) |
+| `ai_command_center.platform.hotkey_provider` | Cross-platform overlay hotkey registration (**active** — slice 3) |
 | `ai_command_center.core.state.chat_state` | Chat reducers (W4 — **active**) |
 | `ai_command_center.core.state.workspace_state` | Workspace reducers (W4 — **active**) |
 

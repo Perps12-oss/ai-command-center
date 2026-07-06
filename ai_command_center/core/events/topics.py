@@ -212,6 +212,7 @@ WORKFLOW_STEP_STARTED = "workflow.step.started"
 WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
 WORKFLOW_COMPLETED = "workflow.completed"
 WORKFLOW_FAILED = "workflow.failed"
+WORKFLOW_RUNS_LOADED = "workflow.runs.loaded"
 
 # Entity lifecycle (Workspace OS / entity service)
 ENTITY_CREATED = "entity.created"
@@ -391,6 +392,7 @@ __all__ = [
     "WORKFLOW_STEP_COMPLETED",
     "WORKFLOW_COMPLETED",
     "WORKFLOW_FAILED",
+    "WORKFLOW_RUNS_LOADED",
     "ENTITY_CREATED",
     "ENTITY_UPDATED",
     "ENTITY_DELETED",

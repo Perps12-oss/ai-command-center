@@ -112,12 +112,33 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    """Add workflow_runs table for Program 4 workflow persistence."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS workflow_runs (
+            run_id TEXT PRIMARY KEY,
+            workflow_id TEXT NOT NULL,
+            state TEXT NOT NULL,
+            total_steps INTEGER NOT NULL DEFAULT 0,
+            current_step_index INTEGER NOT NULL DEFAULT 0,
+            error TEXT NOT NULL DEFAULT '',
+            steps_json TEXT NOT NULL DEFAULT '[]',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_workflow_runs_updated ON workflow_runs(updated_at);
+        """
+    )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
     (3, _migrate_v3),
     (4, _migrate_v4),
     (5, _migrate_v5),
+    (6, _migrate_v6),
 ]
 
 

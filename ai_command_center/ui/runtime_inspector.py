@@ -39,7 +39,7 @@ class RuntimeInspector(ctk.CTkToplevel):
         bus: EventBus,
         state_store: AppStateStore,
         *,
-        ui_queue: UIQueue | None = None,
+        ui_queue: UIQueue,
     ) -> None:
         super().__init__(master)
         self._bus = bus
@@ -131,10 +131,7 @@ class RuntimeInspector(ctk.CTkToplevel):
         self._schedule_refresh()
 
     def _schedule_refresh(self) -> None:
-        if self._ui_queue is not None:
-            self._ui_queue.enqueue(self._refresh)
-        elif self.winfo_exists():
-            self.after(0, self._refresh)
+        self._ui_queue.enqueue(self._refresh)
 
     def _run(self, snap: OrchestrationRunSnapshot) -> OrchestrationRunSnapshot:
         if not self._filter_request_id:

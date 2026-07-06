@@ -69,6 +69,7 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_DEACTIVATED,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
+    WORKFLOW_RUNS_LOADED,
     WORKFLOW_STARTED,
     WORKFLOW_STEP_COMPLETED,
     WORKFLOW_STEP_STARTED,
@@ -142,6 +143,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKFLOW_STEP_COMPLETED,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
+    WORKFLOW_RUNS_LOADED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
     ORCHESTRATION_PROVIDER_HEALTH,
@@ -1128,6 +1130,39 @@ def _reduce_workflow_run(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_workflow_runs_loaded(state: AppState, event: Event) -> AppState:
+    """Hydrate workflow_runs feed from persisted metadata on startup."""
+    if event.topic != WORKFLOW_RUNS_LOADED:
+        return state
+    raw_runs = event.payload.get("runs")
+    if not isinstance(raw_runs, list) or not raw_runs:
+        return state
+
+    runs = state.workflow_runs
+    for raw in raw_runs:
+        if not isinstance(raw, dict):
+            continue
+        run_id = str(raw.get("run_id", ""))
+        if not run_id or _find_workflow_run(runs, run_id) is not None:
+            continue
+        item = WorkflowRunItem(
+            run_id=run_id,
+            workflow_id=str(raw.get("workflow_id", "")),
+            state=str(raw.get("state", "completed")),
+            current_step_index=_coerce_int(raw.get("current_step_index"), 0),
+            total_steps=_coerce_int(raw.get("total_steps"), 0),
+            error=str(raw.get("error", "")),
+        )
+        runs = _upsert_workflow_run(runs, item)
+
+    return replace(
+        state,
+        workflow_runs=runs,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_permission_check(state: AppState, event: Event) -> AppState:
     """Project interactive permission checks for UI approval flow."""
     if event.topic == PERMISSION_CHECK_REQUEST:
@@ -1268,6 +1303,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_agent_run,
     _reduce_agent_pipeline,
     _reduce_workflow_run,
+    _reduce_workflow_runs_loaded,
     _reduce_permission_check,
     _reduce_orchestration_run,
     *MODEL_REDUCERS,
