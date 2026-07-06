@@ -1,8 +1,8 @@
 # Program 4 Gate Status
 
-**Status:** **READY** — Program 3 **COMPLETE**; Program 1 S1–S6 **COMPLETE**; Program 4 slice 1 started.
+**Status:** **READY** — Program 3 **COMPLETE**; Program 1 S1–S6 **COMPLETE**; Program 4 slice 2 landed.
 
-**Last assessed:** 2026-07-06 (`feat/program1-exit-program4-start`)
+**Last assessed:** 2026-07-06 (`feat/program4-slice2-tool-state`)
 
 Program 4 may not expand platform capabilities until:
 
@@ -23,7 +23,7 @@ Program 4 may not expand platform capabilities until:
 | **S5** | State & lifecycle | **Done** | `application.shutdown()` → `state_store.close()`; palette destroy unsubscribes |
 | **S6** | Observability | **Done** | `eventbus_topic_counts` in `system.snapshot`; `test_eventbus_topic_counts_in_system_snapshot` |
 | **S7** | Settings / telemetry / tool_executor clarity | **Done** | Module docstrings; `ARCHITECTURE.md` settings chain; `requirements.txt` verified |
-| **W4** | AppState domain split | **Partial** | `chat_state.py` + `workspace_state.py` + `model_state.py` (slice 1); `tool_state.py` deferred |
+| **W4** | AppState domain split | **Partial** | `chat_state.py` + `workspace_state.py` + `model_state.py` + `tool_state.py` (slice 2); further splits deferred |
 
 ---
 
@@ -32,8 +32,8 @@ Program 4 may not expand platform capabilities until:
 | Question | Answer |
 |----------|--------|
 | **Program 3 dependency** | **Complete** — exit gate closed (WII ≥60%, adoption ~7.0); see `PROGRAM_3_WORKSPACE_ADOPTION.md` |
-| **Backlog completion** | **100%** Program 1; slice 1 of Program 4 started |
-| **Program 4 ready?** | **READY** — S1–S6 satisfied; slice 1 (tiers + paths) landed |
+| **Backlog completion** | **100%** Program 1; Program 4 slices 1–2 landed |
+| **Program 4 ready?** | **READY** — S1–S6 satisfied; slices 1–2 (tiers, paths, tool state, budget tier) landed |
 
 ### Quality scores (1–10)
 
@@ -46,7 +46,7 @@ Program 4 may not expand platform capabilities until:
 | S5 State & lifecycle | 9 | Shutdown teardown verified |
 | S6 Observability | 8 | Topic counters in system snapshot |
 | S7 Dependency cleanup | 8 | Documented; `PluginManifest` dual-path retained by design |
-| W4 AppState split | 8 | Chat + workspace + model reducers; `tool_state` deferred |
+| W4 AppState split | 9 | Chat + workspace + model + tool reducers |
 
 ---
 
@@ -61,10 +61,20 @@ Program 4 may not expand platform capabilities until:
 
 ---
 
+## Program 4 slice 2 (2026-07-06)
+
+| Deliverable | Status | Evidence |
+|-------------|--------|----------|
+| `tool_state.py` AppState projection | **Done** | `TOOL_STARTED` / `TOOL_COMPLETED` / `TOOL_FAILED` reducers; `recent_tool_runs` |
+| Context budget tier downgrade (M2) | **Done** | `ModelRouterService` subscribes `context.over_budget`; assembler passes token budget |
+| Tests | **Done** | `tests/test_context_budget_tier.py` |
+
+---
+
 ## Recommended Program 4 next slice
 
-1. **Tool state** — `tool_state.py` reducers + `recent_tool_runs` projection.
-2. **Context budget tier** — subscribe `context.over_budget` for tier downgrade (M2).
+1. **Inspector UIQueue migration** — SystemView poll race follow-up (S4 residual).
+2. **Further W4 splits** — telemetry or orchestration projections if needed.
 
 Do **not** start: semantic/vector memory, multi-agent expansion, or distributed execution until explicit gates in this doc and Appendix C pass.
 
@@ -95,8 +105,8 @@ Do **not** start: semantic/vector memory, multi-agent expansion, or distributed 
 | Module | Purpose |
 |--------|---------|
 | `ai_command_center.core.state.model_state` | `model.selected` AppState projection (**active** — slice 1) |
-| `ai_command_center.core.state.tool_state` | Future `recent_tool_runs` AppState projection |
+| `ai_command_center.core.state.tool_state` | `recent_tool_runs` AppState projection (**active** — slice 2) |
 | `ai_command_center.core.state.chat_state` | Chat reducers (W4 — **active**) |
 | `ai_command_center.core.state.workspace_state` | Workspace reducers (W4 — **active**) |
 
-`tool_state` remains a placeholder until the next Program 4 slice.
+`tool_state` is active for `recent_tool_runs` projection (Program 4 slice 2).
