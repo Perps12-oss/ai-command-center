@@ -12,7 +12,10 @@ from ai_command_center.core.events.topics import (
     MODEL_SELECTED,
     SETTINGS_SNAPSHOT,
 )
-from ai_command_center.platform.model_registry import classify_model
+from ai_command_center.platform.model_registry import (
+    classify_model,
+    normalize_tier_map,
+)
 from ai_command_center.providers.provider_registry import ProviderRegistry
 from ai_command_center.services.base import BaseService
 
@@ -30,6 +33,7 @@ class ModelRouterService(BaseService):
         self._default_model = "llama3.2:3b"
         self._summarize_model = "llama3.2:3b"
         self._provider = "ollama"
+        self._tier_map = normalize_tier_map({}, default_model=self._default_model)
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -55,6 +59,13 @@ class ModelRouterService(BaseService):
         provider = str(event.payload.get("provider", "")).strip()
         if provider:
             self._provider = provider
+        self._tier_map = normalize_tier_map(
+            event.payload.get("model_tier_map"),
+            default_model=self._default_model,
+        )
+
+    def _model_for_tier(self, tier: str) -> str:
+        return self._tier_map.get(tier) or self._default_model
 
     def _on_resolve_request(self, event: Event) -> None:
         intent = str(event.payload.get("intent", "chat"))
@@ -94,20 +105,25 @@ class ModelRouterService(BaseService):
         """Pick (model, provider) for a chat request via ProviderRegistry."""
         lower = query.lower()
         summarize_tokens = ("summarize", "summary", "tl;dr", "tldr")
+        routing_tier = "balanced"
         if intent == "chat" and any(token in lower for token in summarize_tokens):
             model = self._summarize_model
             reason = "summarize_intent"
+            routing_tier = "fast"
         elif selected_entity_type == "note" and any(token in lower for token in summarize_tokens):
             model = self._summarize_model
             reason = "workspace_note_hint"
+            routing_tier = "fast"
         elif selected_entity_type in {"card", "resource"} and any(
             hint in lower for hint in ("implement", "refactor", "fix bug", "write code")
         ):
-            model = self._default_model
+            model = self._model_for_tier("reasoning")
             reason = "workspace_task_hint"
+            routing_tier = "reasoning"
         else:
-            model = self._default_model
+            model = self._model_for_tier("balanced")
             reason = "workspace_default" if workspace_id else "default"
+            routing_tier = "balanced"
         provider = (
             self._registry.resolve_for_model(model, provider=self._provider)
             or self._provider
@@ -126,6 +142,8 @@ class ModelRouterService(BaseService):
             "intent": intent,
             "reason": reason,
             "provider": provider,
+            "routing_tier": routing_tier,
+            "capability_tier": classify_model(model).value,
             "tier": classify_model(model).value,
             "resolved_by": "model_router",
         }

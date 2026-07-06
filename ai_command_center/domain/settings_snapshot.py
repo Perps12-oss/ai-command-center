@@ -9,6 +9,7 @@ from typing import Any
 from ai_command_center.domain.capability_provider_settings import (
     DEFAULT_CAPABILITY_PROVIDER_MAP,
 )
+from ai_command_center.platform.model_registry import DEFAULT_MODEL_TIER_MAP
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +20,9 @@ class SettingsSnapshot:
     accent: str = "#3B82F6"
     default_model: str = "llama3.2:3b"
     summarize_model: str = "llama3.2:3b"
+    model_tier_map: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_MODEL_TIER_MAP)
+    )
     ollama_url: str = "http://localhost:11434"
     hotkey: str = "alt+space"
     low_memory_mode: bool = False
@@ -38,7 +42,7 @@ class SettingsSnapshot:
     telemetry_enabled: bool = True
     otel_enabled: bool = False
     otel_endpoint: str = "http://127.0.0.1:4318"
-    schema_version: int = 5
+    schema_version: int = 6
     capability_provider_map: dict[str, str] = field(
         default_factory=lambda: dict(DEFAULT_CAPABILITY_PROVIDER_MAP)
     )
@@ -56,6 +60,7 @@ class SettingsSnapshot:
             "accent": self.accent,
             "default_model": self.default_model,
             "summarize_model": self.summarize_model,
+            "model_tier_map": dict(self.model_tier_map),
             "ollama_url": self.ollama_url,
             "hotkey": self.hotkey,
             "low_memory_mode": self.low_memory_mode,

@@ -8,6 +8,7 @@ from ai_command_center.domain.capability_provider_settings import (
     DEFAULT_CAPABILITY_PROVIDER_MAP,
     settings_key_for_kind,
 )
+from ai_command_center.platform.model_registry import DEFAULT_MODEL_TIER_MAP
 
 
 class MigrationManager:
@@ -42,4 +43,9 @@ class MigrationManager:
             payload = dict(payload)
             payload.setdefault("mcp_servers", {})
             payload["schema_version"] = 5
+            schema_version = 5
+        if schema_version < 6:
+            payload = dict(payload)
+            payload.setdefault("model_tier_map", dict(DEFAULT_MODEL_TIER_MAP))
+            payload["schema_version"] = 6
         return payload

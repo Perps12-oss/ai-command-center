@@ -12,6 +12,7 @@ from ai_command_center.domain.capability_provider_settings import (
     get_capability_provider_choices,
     settings_key_for_kind,
 )
+from ai_command_center.platform.model_registry import DEFAULT_MODEL_TIER_MAP
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +40,9 @@ class SettingsSchema:
             "accent": SettingsField("accent", str, "#3B82F6"),
             "default_model": SettingsField("default_model", str, "llama3.2:3b"),
             "summarize_model": SettingsField("summarize_model", str, "llama3.2:3b"),
+            "model_tier_map": SettingsField(
+                "model_tier_map", dict, dict(DEFAULT_MODEL_TIER_MAP)
+            ),
             "ollama_url": SettingsField("ollama_url", str, "http://localhost:11434"),
             "ollama_keep_alive": SettingsField("ollama_keep_alive", str, "10m"),
             "hotkey": SettingsField("hotkey", str, "alt+space"),

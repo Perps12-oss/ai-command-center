@@ -43,6 +43,7 @@ from ai_command_center.core.events.topics import (
     MEMORY_CLEARED,
     MEMORY_SELECTED,
     MEMORY_STORED,
+    MODEL_SELECTED,
     NOTE_CREATED,
     NOTE_INDEX_COMPLETE,
     NOTE_SEARCH_RESULTS,
@@ -73,8 +74,10 @@ from ai_command_center.domain.capability_lifecycle import CapabilityRecord
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
 )
+from ai_command_center.platform.model_registry import normalize_tier_map
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
+from ai_command_center.core.state.model_state import ModelSelectionSnapshot
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -139,6 +142,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PERMISSION_CHECK_RESULT,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
+    MODEL_SELECTED,
 )
 
 
@@ -360,6 +364,7 @@ class AppState:
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
+    model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -412,6 +417,10 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         accent=str(payload.get("accent", "#3B82F6")),
         default_model=str(payload.get("default_model", "llama3.2:3b")),
         summarize_model=str(payload.get("summarize_model", "llama3.2:3b")),
+        model_tier_map=normalize_tier_map(
+            payload.get("model_tier_map"),
+            default_model=str(payload.get("default_model", "llama3.2:3b")),
+        ),
         ollama_url=str(payload.get("ollama_url", "http://localhost:11434")),
         hotkey=str(payload.get("hotkey", "alt+space")),
         low_memory_mode=_coerce_bool(payload.get("low_memory_mode", False)),
@@ -1172,6 +1181,9 @@ from ai_command_center.core.state.workspace_state import (  # noqa: E402
     _reduce_workspace_os_event,
     _reduce_workspace_selection,
 )
+from ai_command_center.core.state.model_state import (  # noqa: E402
+    MODEL_REDUCERS,
+)
 
 
 def _is_pending_chat_user_text(text: str) -> bool:
@@ -1247,6 +1259,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_workflow_run,
     _reduce_permission_check,
     _reduce_orchestration_run,
+    *MODEL_REDUCERS,
 )
 
 

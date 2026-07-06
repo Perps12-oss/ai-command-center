@@ -3,6 +3,31 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
+
+DEFAULT_MODEL_TIER_MAP: dict[str, str] = {
+    "fast": "llama3.2:3b",
+    "balanced": "llama3.2:3b",
+    "reasoning": "llama3.2:3b",
+}
+
+
+def normalize_tier_map(
+    raw: Any,
+    *,
+    default_model: str = "llama3.2:3b",
+) -> dict[str, str]:
+    """Merge persisted tier map with defaults; always seed balanced from default_model."""
+    merged = dict(DEFAULT_MODEL_TIER_MAP)
+    if default_model:
+        merged["balanced"] = default_model
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            tier = str(key).strip()
+            model = str(value).strip()
+            if tier and model:
+                merged[tier] = model
+    return merged
 
 
 class ModelCapability(str, Enum):
