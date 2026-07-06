@@ -39,9 +39,21 @@ except ImportError:  # pragma: no cover - optional dependency
     _OTEL_AVAILABLE = False
 
 
+def _reset_tracer_provider() -> None:
+    if not _OTEL_AVAILABLE or trace is None:
+        return
+    provider = trace.get_tracer_provider()
+    if hasattr(provider, "shutdown"):
+        provider.shutdown()
+    from opentelemetry.trace import _TRACER_PROVIDER_SET_ONCE
+
+    _TRACER_PROVIDER_SET_ONCE._done = False
+
+
 def _init_tracer(span_exporter: Any | None = None) -> Any:
     if not _OTEL_AVAILABLE:
         return None
+    _reset_tracer_provider()
     provider = TracerProvider(resource=Resource.create({"service.name": "ai-command-center"}))
     if span_exporter is not None:
         provider.add_span_processor(SimpleSpanProcessor(span_exporter))
@@ -103,6 +115,8 @@ class TracingService(BaseService):
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
+        for span in self._spans.values():
+            span.end()
         self._spans.clear()
 
     def _request_id(self, payload: dict[str, object]) -> str:

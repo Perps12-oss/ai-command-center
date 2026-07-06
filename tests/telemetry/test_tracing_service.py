@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     ORCHESTRATION_INTENT_CLASSIFIED,
@@ -12,16 +10,8 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.telemetry.tracing_service import TracingService
-from tests.orchestration.conftest import build_registry, publish_chat
-
-pytest.importorskip("opentelemetry.sdk.trace.export.in_memory_span_exporter")
-
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-
-
-@pytest.fixture
-def span_exporter() -> InMemorySpanExporter:
-    return InMemorySpanExporter()
+from tests.orchestration.conftest import build_registry, publish_chat
 
 
 def _span_names(exporter: InMemorySpanExporter) -> list[str]:
