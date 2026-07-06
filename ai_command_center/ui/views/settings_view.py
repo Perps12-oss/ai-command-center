@@ -329,6 +329,35 @@ class SettingsView(ctk.CTkFrame):
             combo.pack(anchor="w", padx=16, pady=(4, 4))
             self._capability_providers[kind] = combo
 
+        # Observability section
+        observability = GlassCard(scroll)
+        observability.pack(fill="x", padx=T.PAD, pady=(0, 8))
+
+        ctk.CTkLabel(
+            observability,
+            text="OBSERVABILITY",
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
+
+        ctk.CTkLabel(
+            observability,
+            text="OpenTelemetry tracing (export via OTLP). Enable only when debugging.",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", padx=T.PAD, pady=(0, 8))
+
+        self._otel_enabled = ctk.CTkCheckBox(observability, text="Enable OpenTelemetry tracing")
+        self._otel_enabled.pack(anchor="w", padx=16, pady=(4, 4))
+        self._otel_endpoint = self._field(
+            observability,
+            "OTLP endpoint (HTTP)",
+            "http://127.0.0.1:4318",
+        )
+
         save = ctk.CTkButton(form, text="Save settings", command=self._save)
         save.pack(anchor="w", padx=16, pady=(8, 16))
 
@@ -510,6 +539,16 @@ class SettingsView(ctk.CTkFrame):
         else:
             self._qwenpaw_auto_start.deselect()
 
+        otel_enabled = getattr(settings, "otel_enabled", False)
+        if str(otel_enabled).lower() in ("true", "1", "yes"):
+            self._otel_enabled.select()
+        else:
+            self._otel_enabled.deselect()
+        self._set_entry(
+            self._otel_endpoint,
+            str(getattr(settings, "otel_endpoint", "http://127.0.0.1:4318")),
+        )
+
         self._refresh_provider_combos()
         provider_map = getattr(settings, "capability_provider_map", None) or {}
         for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
@@ -582,6 +621,8 @@ class SettingsView(ctk.CTkFrame):
             "qwenpaw_agent_id": self._qwenpaw_agent_id.get().strip(),
             "qwenpaw_python": self._qwenpaw_python.get().strip(),
             "qwenpaw_auto_start": "true" if self._qwenpaw_auto_start.get() else "false",
+            "otel_enabled": "true" if self._otel_enabled.get() else "false",
+            "otel_endpoint": self._otel_endpoint.get().strip(),
         }
         for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
             combo = self._capability_providers.get(kind)
