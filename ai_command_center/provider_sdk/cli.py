@@ -125,20 +125,22 @@ def cmd_provider_test(args: argparse.Namespace) -> int:
     registry = ProviderManifestRegistry()
     if runtime_manifest is not None:
         result = registry.register_runtime(runtime_manifest)
-        print(f"validate runtime {provider_id}: ok={result.ok}")
-        for w in result.warnings:
-            print(f"  warn: {w}")
-        for e in result.errors:
-            print(f"  error: {e}")
+        if not args.certify:
+            print(f"validate runtime {provider_id}: ok={result.ok}")
+            for w in result.warnings:
+                print(f"  warn: {w}")
+            for e in result.errors:
+                print(f"  error: {e}")
         if not result.ok:
             return 1
     if orch_manifest is not None:
         result = registry.register_orchestration(orch_manifest)
-        print(f"validate orchestration {provider_id}: ok={result.ok}")
-        for w in result.warnings:
-            print(f"  warn: {w}")
-        for e in result.errors:
-            print(f"  error: {e}")
+        if not args.certify:
+            print(f"validate orchestration {provider_id}: ok={result.ok}")
+            for w in result.warnings:
+                print(f"  warn: {w}")
+            for e in result.errors:
+                print(f"  error: {e}")
         if not result.ok:
             return 1
 
