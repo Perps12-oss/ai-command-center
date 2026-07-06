@@ -45,6 +45,10 @@ class SettingsSchema:
             "overlay_hotkey": SettingsField("overlay_hotkey", str, "alt+space"),
             "low_memory_mode": SettingsField("low_memory_mode", bool, False),
             "telemetry_enabled": SettingsField("telemetry_enabled", bool, True),
+            "otel_enabled": SettingsField("otel_enabled", bool, False),
+            "otel_endpoint": SettingsField(
+                "otel_endpoint", str, "http://127.0.0.1:4318"
+            ),
             "window_width": SettingsField("window_width", int, 1100),
             "window_height": SettingsField("window_height", int, 700),
             "window_alpha": SettingsField("window_alpha", float, 0.95),

@@ -51,6 +51,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
+    CAPABILITY_LIFECYCLE_SNAPSHOT,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     SERVICE_STATE_CHANGED,
@@ -68,6 +69,7 @@ from ai_command_center.core.events.topics import (
     WORKFLOW_STEP_COMPLETED,
     WORKFLOW_STEP_STARTED,
 )
+from ai_command_center.domain.capability_lifecycle import CapabilityRecord
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
 )
@@ -105,6 +107,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PLUGIN_CATALOG,
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
+    CAPABILITY_LIFECYCLE_SNAPSHOT,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -355,6 +358,7 @@ class AppState:
     orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
     provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
+    capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
 
@@ -758,6 +762,23 @@ def _reduce_orchestration_provider_health(state: AppState, event: Event) -> AppS
     return replace(
         state,
         provider_health_map=tuple(health_items.values()),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_capability_lifecycle_snapshot(state: AppState, event: Event) -> AppState:
+    if event.topic != CAPABILITY_LIFECYCLE_SNAPSHOT:
+        return state
+    raw_records = event.payload.get("capability_lifecycle") or []
+    records: list[CapabilityRecord] = []
+    for item in raw_records:
+        if not isinstance(item, dict):
+            continue
+        records.append(CapabilityRecord.from_dict(item))
+    return replace(
+        state,
+        capability_lifecycle=tuple(records),
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1217,6 +1238,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_workspace_memory_catalog,
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
+    _reduce_capability_lifecycle_snapshot,
     _reduce_orchestration_provider_health,
     _reduce_execution_run_feed,
     _reduce_plugin_state_changed,
