@@ -20,6 +20,7 @@ from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
+from ai_command_center.platform.model_registry import normalize_tier_map
 
 
 class SettingsService:
@@ -44,6 +45,10 @@ class SettingsService:
             accent=str(payload.get("accent", "#3B82F6")),
             default_model=str(payload.get("default_model", "llama3.2:3b")),
             summarize_model=str(payload.get("summarize_model", "llama3.2:3b")),
+            model_tier_map=normalize_tier_map(
+                payload.get("model_tier_map"),
+                default_model=str(payload.get("default_model", "llama3.2:3b")),
+            ),
             ollama_url=str(payload.get("ollama_url", "http://localhost:11434")),
             hotkey=str(payload.get("hotkey", "alt+space")),
             low_memory_mode=bool(payload.get("low_memory_mode", False)),
