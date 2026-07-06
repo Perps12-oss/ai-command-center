@@ -18,7 +18,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.runtime.provider_registry import build_default_runtime_registry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
-from ai_command_center.services.capability_router_service import CapabilityRouterService
+from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.qwenpaw_sidecar_service import QwenPawSidecarService
 
@@ -27,7 +27,7 @@ def test_qwenpaw_ready_invokes_runtime_request() -> None:
     bus = EventBus()
     health = QwenPawSidecarHealthState()
     health.update(enabled=True, reachable=True, detail="ready")
-    router = CapabilityRouterService(
+    router = RuntimeCapabilityRouterService(
         bus, provider_registry=build_default_runtime_registry(bus, qwenpaw_health=health)
     )
     runtime_requests: list[dict] = []
@@ -55,7 +55,7 @@ def test_chat_handler_defers_when_external_request_active() -> None:
     bus = EventBus()
     health = QwenPawSidecarHealthState()
     health.update(enabled=True, reachable=True, detail="ready")
-    router = CapabilityRouterService(
+    router = RuntimeCapabilityRouterService(
         bus, provider_registry=build_default_runtime_registry(bus, qwenpaw_health=health)
     )
     chat = ChatHandlerService(bus, ContextManager())

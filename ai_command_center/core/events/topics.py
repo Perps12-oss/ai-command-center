@@ -175,6 +175,14 @@ CAPABILITY_STREAM = "capability.stream"
 CAPABILITY_COMPLETE = "capability.complete"
 CAPABILITY_ERROR = "capability.error"
 CAPABILITY_FALLBACK = "capability.fallback"
+CAPABILITY_PROVIDERS_READY = "capability.providers.ready"
+
+# Truth-bound orchestration (deterministic intents, receipts, truth boundary)
+ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
+ORCHESTRATION_RECEIPT = "orchestration.receipt"
+ORCHESTRATION_TRUTH_VALIDATED = "orchestration.truth.validated"
+ORCHESTRATION_RUN_SNAPSHOT = "orchestration.run.snapshot"
+ORCHESTRATION_PROVIDER_HEALTH = "orchestration.provider.health"
 
 # Permission gate (Track 7 — supervised agent pre-flight)
 PERMISSION_CHECK_REQUEST = "permission.check.request"
@@ -337,6 +345,12 @@ __all__ = [
     "CAPABILITY_COMPLETE",
     "CAPABILITY_ERROR",
     "CAPABILITY_FALLBACK",
+    "CAPABILITY_PROVIDERS_READY",
+    "ORCHESTRATION_INTENT_CLASSIFIED",
+    "ORCHESTRATION_RECEIPT",
+    "ORCHESTRATION_TRUTH_VALIDATED",
+    "ORCHESTRATION_RUN_SNAPSHOT",
+    "ORCHESTRATION_PROVIDER_HEALTH",
     "PERMISSION_CHECK_REQUEST",
     "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",

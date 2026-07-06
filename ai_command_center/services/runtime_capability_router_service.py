@@ -1,4 +1,4 @@
-"""Routes command.routed chat intents to capability kinds and runtime providers."""
+"""Routes command.routed chat intents to ARI capability kinds and LLM runtime providers."""
 
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ from ai_command_center.domain.runtime_capability import (
     ProviderHealthState,
     RuntimeInvocationRequest,
 )
+from ai_command_center.orchestration.orchestration_registry import is_orchestration_handled
 from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
 from ai_command_center.services.base import BaseService
 
@@ -52,10 +53,7 @@ _PREFIX_KIND: dict[str, CapabilityKind] = {
 _PLANNING_HINTS: tuple[str, ...] = (
     "plan my",
     "schedule",
-    "calendar",
     "agenda",
-    "what's on my calendar",
-    "whats on my calendar",
 )
 
 _CODING_HINTS: tuple[str, ...] = (
@@ -66,10 +64,11 @@ _CODING_HINTS: tuple[str, ...] = (
     "pull request",
 )
 
-class CapabilityRouterService(BaseService):
-    """Classifies capabilities and dispatches to ARI providers (Invariant 13)."""
 
-    name = "capability_router"
+class RuntimeCapabilityRouterService(BaseService):
+    """Classifies ARI capability kinds and dispatches to runtime providers (Invariant 13)."""
+
+    name = "runtime_capability_router"
 
     def __init__(
         self,
@@ -133,9 +132,12 @@ class CapabilityRouterService(BaseService):
         if not query:
             return
 
+        request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
+        if is_orchestration_handled(request_id):
+            return
+
         kind = self.classify(query)
         provider_id = self.resolve_provider(kind)
-        request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
 
         self._bus.publish(
             CAPABILITY_CLASSIFIED,
@@ -251,9 +253,6 @@ class CapabilityRouterService(BaseService):
             source=self.name,
         )
         clear_external_request(request_id)
-        # Pre-invoke fallback: external mark was never set (or cleared above), so
-        # ChatHandler on the same COMMAND_ROUTED turn proceeds with native LLM.
-        # Post-invoke failure: sidecar publishes CHAT_ERROR; native re-run is deferred.
         self._bus.publish(
             TELEMETRY_EVENT,
             {

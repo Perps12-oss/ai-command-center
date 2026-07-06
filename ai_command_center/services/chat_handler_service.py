@@ -1,7 +1,7 @@
 ﻿"""Routes chat intents through ContextManager before LLM dispatch (Phase 3A).
 
 Context assembly is delegated to ``CapabilityContextAssembler`` (shared with
-``CapabilityRouterService`` for external invoke). See that module for the sync
+``RuntimeCapabilityRouterService`` for external invoke). See that module for the sync
 bus cascade contract.
 """
 
@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 from ai_command_center.core.capability_context_assembler import CapabilityContextAssembler
 from ai_command_center.core.capability_external_registry import is_externally_handled
+from ai_command_center.orchestration.orchestration_registry import is_orchestration_handled
 from ai_command_center.core.clipboard_intent import (
     empty_clipboard_message,
     wants_clipboard,
@@ -111,6 +112,12 @@ class ChatHandlerService(BaseService):
             return
 
         request_id = str(event.payload.get("request_id") or "").strip() or uuid.uuid4().hex
+        if is_orchestration_handled(request_id):
+            logger.info(
+                "chat.deferred_orchestration request_id=%s",
+                request_id,
+            )
+            return
         if is_externally_handled(request_id):
             logger.info(
                 "chat.deferred_external request_id=%s provider=non-native",

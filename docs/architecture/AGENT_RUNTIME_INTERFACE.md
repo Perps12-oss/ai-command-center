@@ -22,7 +22,7 @@ AI Command Center (ACC) is the **host platform**. External runtimes (QwenPaw, Op
 |--------|-------|------------------------|
 | UI / UX | ACC | None — no embedded third-party consoles |
 | Workspace entities | ACC (`EntityService`, repositories) | Read bridged context only |
-| Orchestration | ACC (`CapabilityRouterService`, `AgentRuntimeService`, workflows) | Execute capability slices |
+| Orchestration | ACC (`OrchestrationService`, `RuntimeCapabilityRouterService`, workflows) | Execute capability slices |
 | Settings | ACC (`SettingsSnapshot`) | Receive derived config; never write settings files |
 | Conversation history | ACC (`SessionService`, SQLite) | Ephemeral turn context; results merged back via bus |
 | Memory (authoritative) | ACC (`MemoryGraphService`, repositories) | Optional recall bridge; ACC persists |
@@ -139,6 +139,7 @@ Canonical constants in `ai_command_center/core/events/topics.py`.
 | `capability.complete` | Provider → UI path | `request_id`, `text`, `metadata` |
 | `capability.error` | Provider → UI path | `request_id`, `message` |
 | `capability.fallback` | Router → telemetry | External failed; falling back to native |
+| `capability.providers.ready` | Registry → observers | Provider catalog with health snapshots |
 
 Existing topics remain authoritative for UX today:
 
@@ -154,7 +155,7 @@ External providers map streams to `capability.stream` / `capability.complete`; a
 
 External runtimes receive **derived context**, never raw repository access.
 
-1. `CapabilityRouterService` receives `command.routed`.
+1. `RuntimeCapabilityRouterService` receives `command.routed` (after truth-bound `OrchestrationService`).
 2. For external provider: publish context assembly requests (same pattern as `ChatHandlerService`).
 3. `ContextManager` produces a bounded `ContextBundle` (settings snapshot, memory snippets, entity scope, session tail).
 4. Provider receives serialized bundle in `RuntimeInvocationRequest`.
@@ -197,11 +198,12 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 
 | Phase | Deliverable | Acceptance |
 |-------|-------------|------------|
-| **1** | ARI doc, `CapabilityKind`, `CapabilityRouterService`, `NativeProvider`, `QwenPawSidecarProvider` stub | Classification events on chat route; tests pass |
+| **1** | ARI doc, `CapabilityKind`, `RuntimeCapabilityRouterService`, `NativeProvider`, `QwenPawSidecarProvider` stub | Classification events on chat route; tests pass |
 | **2** | QwenPaw sidecar spawn + SSE → `capability.stream` | `/plan` query uses sidecar when configured |
 | **3** | ContextManager bundle before external invoke | Grounded planning with ACC memory/history/entity context |
-| **4** (current) | Settings: per-capability provider map + settings UI | User selects provider in settings |
-| **5** (next) | Program 5 runtime plugin manifest | Third-party providers as plugins |
+| **4** | Settings: per-capability provider map + settings UI | User selects provider in settings |
+| **5** (current) | Runtime plugin manifest + dynamic provider registry | Providers loaded from `plugins/runtime_manifests/` via allowlisted builtins |
+| **6** (next) | Third-party runtime plugin packaging | External providers ship as installable plugins |
 
 ---
 
@@ -212,10 +214,11 @@ Phase 1 delivers `QwenPawSidecarProvider` stub (health + contract). Phase 2 wire
 - `pytest tests/test_capability_context.py` — context bundle before external invoke
 - `pytest tests/test_qwenpaw_sse.py tests/test_qwenpaw_sidecar.py` — SSE parser + bridge deferral
 - `pytest tests/test_capability_provider_settings.py` — per-capability provider map + settings round-trip
+- `pytest tests/test_runtime_plugin_loader.py` — manifest validation + dynamic registry
 
 ---
 
 ## References
 
 - Constitution: `PROJECT_CONSTITUTION_V4.md` Invariant 13
-- Code: `ai_command_center/domain/runtime_capability.py`, `ai_command_center/runtime/`, `ai_command_center/services/capability_router_service.py`
+- Code: `ai_command_center/domain/runtime_capability.py`, `ai_command_center/runtime/`, `ai_command_center/services/runtime_capability_router_service.py`

@@ -1,0 +1,12 @@
+id: qwenpaw
+name: QwenPaw Sidecar
+version: "1.0"
+description: External planning, coding, and research via QwenPaw sidecar
+kind: runtime_provider
+entrypoint: builtin:qwenpaw
+capabilities:
+  - planning
+  - coding
+  - research
+  - agents
+enabled: true

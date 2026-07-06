@@ -1,0 +1,15 @@
+id: native
+name: Native ACC
+version: "1.0"
+description: Default ACC runtime — chat and agents via existing bus handlers
+kind: core
+entrypoint: builtin:native
+capabilities:
+  - chat
+  - planning
+  - coding
+  - research
+  - automation
+  - agents
+  - memory
+enabled: true

@@ -18,7 +18,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.runtime.provider_registry import build_default_runtime_registry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
-from ai_command_center.services.capability_router_service import CapabilityRouterService
+from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 
 
 def _wire_sync_handlers(bus: EventBus) -> None:
@@ -63,7 +63,7 @@ def test_external_invoke_includes_context_bundle_before_runtime_request() -> Non
     health = QwenPawSidecarHealthState()
     health.update(enabled=True, reachable=True, detail="ready")
     assembler = CapabilityContextAssembler(bus, ContextManager())
-    router = CapabilityRouterService(
+    router = RuntimeCapabilityRouterService(
         bus,
         provider_registry=build_default_runtime_registry(bus, qwenpaw_health=health),
         context_assembler=assembler,
