@@ -7,6 +7,7 @@ import customtkinter as ctk
 
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
+from ai_command_center.ui.components.inspector.execution_inspector import ExecutionInspector
 from ai_command_center.ui.components.inspector.inspector_host import InspectorHost
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.views.chat.chat_header import ChatHeader
@@ -14,7 +15,6 @@ from ai_command_center.ui.views.chat.chat_input import InputPill, TemplatesOverl
 from ai_command_center.ui.views.chat.chat_search import ChatSearchController
 from ai_command_center.ui.views.chat.chat_workspace_layout import make_chat_workspace_layout
 from ai_command_center.ui.views.chat.conversation_list import ConversationList
-from ai_command_center.ui.views.chat.inspector.inspector_panel import InspectorPanel
 from ai_command_center.ui.views.chat.message_block import AssistantMessageBlock, UserMessageBlock
 from ai_command_center.ui.views.chat.session_store import SessionStore, hhmm, session_title
 from ai_command_center.ui.views.chat.stream_renderer import (
@@ -161,7 +161,7 @@ class ChatView(ctk.CTkFrame):
         self._docking = False
         self._chat_header: ChatHeader | None = None
         self._conversation_list: ConversationList | None = None
-        self._inspector_panel: InspectorPanel | None = None
+        self._execution_inspector: ExecutionInspector | None = None
         self._inspector_host: InspectorHost | None = None
         self._use_v2_blocks = False
         self._session_bar: _SessionBar | None = None
@@ -248,9 +248,10 @@ class ChatView(ctk.CTkFrame):
         self._empty = EmptyState(self._scroll)
         self._empty.pack(fill="both", expand=True, pady=30)
 
-        self._inspector_panel = InspectorPanel(self._workspace.right_host())
+        self._execution_inspector = ExecutionInspector(self._workspace.right_host())
         self._inspector_host = InspectorHost(self._workspace.right_host())
-        self._inspector_host.set_default(self._inspector_panel)
+        self._inspector_host.register("execution", self._execution_inspector)
+        self._inspector_host.set_default(self._execution_inspector)
         self._workspace.set_right(self._inspector_host)
 
         self._scroll_btn = ctk.CTkButton(
@@ -396,8 +397,8 @@ class ChatView(ctk.CTkFrame):
             self._conversation_list.update_conversation(meta)
 
     def update_inspector(self, context) -> None:
-        if self._inspector_panel is not None:
-            self._inspector_panel.update(context)
+        if self._execution_inspector is not None:
+            self._execution_inspector.update_context(context)
 
     def show_inspector(self, ref: InspectableRef) -> None:
         if self._inspector_host is not None:
