@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import time
 
+from ai_command_center.db.connection_lock import connection_lock
 from ai_command_center.domain.artifact import Artifact
 
 
@@ -13,34 +14,36 @@ class ArtifactRepository:
 
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
+        self._lock = connection_lock(conn)
 
     def insert(self, artifact: Artifact) -> Artifact:
         now = time.time()
         created = artifact.created_at or now
         updated = artifact.updated_at or now
-        self._conn.execute(
-            """
-            INSERT INTO artifacts (
-                artifact_id, kind, label, content, size_bytes, mime_type,
-                request_id, workspace_id, entity_id, source, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                artifact.artifact_id,
-                artifact.normalized_kind(),
-                artifact.label,
-                artifact.content,
-                artifact.size_bytes,
-                artifact.mime_type,
-                artifact.request_id,
-                artifact.workspace_id,
-                artifact.entity_id,
-                artifact.source,
-                created,
-                updated,
-            ),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO artifacts (
+                    artifact_id, kind, label, content, size_bytes, mime_type,
+                    request_id, workspace_id, entity_id, source, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    artifact.artifact_id,
+                    artifact.normalized_kind(),
+                    artifact.label,
+                    artifact.content,
+                    artifact.size_bytes,
+                    artifact.mime_type,
+                    artifact.request_id,
+                    artifact.workspace_id,
+                    artifact.entity_id,
+                    artifact.source,
+                    created,
+                    updated,
+                ),
+            )
+            self._conn.commit()
         return Artifact(
             artifact_id=artifact.artifact_id,
             kind=artifact.normalized_kind(),
@@ -57,63 +60,67 @@ class ArtifactRepository:
         )
 
     def update(self, artifact: Artifact) -> Artifact | None:
-        row = self._conn.execute(
-            "SELECT artifact_id FROM artifacts WHERE artifact_id = ?",
-            (artifact.artifact_id,),
-        ).fetchone()
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT artifact_id FROM artifacts WHERE artifact_id = ?",
+                (artifact.artifact_id,),
+            ).fetchone()
         if row is None:
             return None
         now = time.time()
         updated = artifact.updated_at or now
-        self._conn.execute(
-            """
-            UPDATE artifacts
-            SET kind = ?, label = ?, content = ?, size_bytes = ?, mime_type = ?,
-                request_id = ?, workspace_id = ?, entity_id = ?, source = ?,
-                updated_at = ?
-            WHERE artifact_id = ?
-            """,
-            (
-                artifact.normalized_kind(),
-                artifact.label,
-                artifact.content,
-                artifact.size_bytes,
-                artifact.mime_type,
-                artifact.request_id,
-                artifact.workspace_id,
-                artifact.entity_id,
-                artifact.source,
-                updated,
-                artifact.artifact_id,
-            ),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """
+                UPDATE artifacts
+                SET kind = ?, label = ?, content = ?, size_bytes = ?, mime_type = ?,
+                    request_id = ?, workspace_id = ?, entity_id = ?, source = ?,
+                    updated_at = ?
+                WHERE artifact_id = ?
+                """,
+                (
+                    artifact.normalized_kind(),
+                    artifact.label,
+                    artifact.content,
+                    artifact.size_bytes,
+                    artifact.mime_type,
+                    artifact.request_id,
+                    artifact.workspace_id,
+                    artifact.entity_id,
+                    artifact.source,
+                    updated,
+                    artifact.artifact_id,
+                ),
+            )
+            self._conn.commit()
         return self.get(artifact.artifact_id)
 
     def get(self, artifact_id: str) -> Artifact | None:
-        row = self._conn.execute(
-            """
-            SELECT artifact_id, kind, label, content, size_bytes, mime_type,
-                   request_id, workspace_id, entity_id, source, created_at, updated_at
-            FROM artifacts WHERE artifact_id = ?
-            """,
-            (artifact_id,),
-        ).fetchone()
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT artifact_id, kind, label, content, size_bytes, mime_type,
+                       request_id, workspace_id, entity_id, source, created_at, updated_at
+                FROM artifacts WHERE artifact_id = ?
+                """,
+                (artifact_id,),
+            ).fetchone()
         if row is None:
             return None
         return self._row_to_artifact(row)
 
     def list_recent(self, *, limit: int = 50) -> list[Artifact]:
-        rows = self._conn.execute(
-            """
-            SELECT artifact_id, kind, label, content, size_bytes, mime_type,
-                   request_id, workspace_id, entity_id, source, created_at, updated_at
-            FROM artifacts
-            ORDER BY updated_at DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT artifact_id, kind, label, content, size_bytes, mime_type,
+                       request_id, workspace_id, entity_id, source, created_at, updated_at
+                FROM artifacts
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
         return [self._row_to_artifact(row) for row in reversed(rows)]
 
     @staticmethod

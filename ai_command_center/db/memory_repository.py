@@ -11,6 +11,8 @@ import time
 import uuid
 from dataclasses import dataclass
 
+from ai_command_center.db.connection_lock import connection_lock
+
 
 @dataclass(frozen=True, slots=True)
 class MemoryNode:
@@ -24,6 +26,7 @@ class MemoryNode:
 class MemoryRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
+        self._lock = connection_lock(conn)
 
     def remember(
         self,
@@ -39,31 +42,32 @@ class MemoryRepository:
     ) -> str:
         node_id = uuid.uuid4().hex
         now = time.time()
-        self._conn.execute(
-            """
-            INSERT INTO memory_nodes (id, label, kind, content, tier, created_at, workspace_id, entity_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                node_id,
-                label,
-                kind,
-                content,
-                tier,
-                now,
-                workspace_id.strip(),
-                entity_id.strip(),
-            ),
-        )
-        if related_to:
+        with self._lock:
             self._conn.execute(
                 """
-                INSERT INTO memory_edges (source_id, target_id, relation, created_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO memory_nodes (id, label, kind, content, tier, created_at, workspace_id, entity_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (node_id, related_to, relation, now),
+                (
+                    node_id,
+                    label,
+                    kind,
+                    content,
+                    tier,
+                    now,
+                    workspace_id.strip(),
+                    entity_id.strip(),
+                ),
             )
-        self._conn.commit()
+            if related_to:
+                self._conn.execute(
+                    """
+                    INSERT INTO memory_edges (source_id, target_id, relation, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (node_id, related_to, relation, now),
+                )
+            self._conn.commit()
         return node_id
 
     def search(
@@ -76,45 +80,46 @@ class MemoryRepository:
         global_search: bool = False,
     ) -> list[MemoryNode]:
         pattern = f"%{query.strip()}%"
-        if global_search:
-            rows = self._conn.execute(
-                """
-                SELECT id, label, kind, content, tier
-                FROM memory_nodes
-                WHERE label LIKE ? OR content LIKE ?
-                ORDER BY created_at DESC
-                LIMIT ?
-                """,
-                (pattern, pattern, limit),
-            ).fetchall()
-        else:
-            ws = workspace_id.strip()
-            ent = entity_id.strip()
-            if not ws:
-                return []
-            if ent:
+        with self._lock:
+            if global_search:
                 rows = self._conn.execute(
                     """
                     SELECT id, label, kind, content, tier
                     FROM memory_nodes
-                    WHERE workspace_id = ? AND entity_id = ?
-                      AND (label LIKE ? OR content LIKE ?)
+                    WHERE label LIKE ? OR content LIKE ?
                     ORDER BY created_at DESC
                     LIMIT ?
                     """,
-                    (ws, ent, pattern, pattern, limit),
+                    (pattern, pattern, limit),
                 ).fetchall()
             else:
-                rows = self._conn.execute(
-                    """
-                    SELECT id, label, kind, content, tier
-                    FROM memory_nodes
-                    WHERE workspace_id = ? AND (label LIKE ? OR content LIKE ?)
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (ws, pattern, pattern, limit),
-                ).fetchall()
+                ws = workspace_id.strip()
+                ent = entity_id.strip()
+                if not ws:
+                    return []
+                if ent:
+                    rows = self._conn.execute(
+                        """
+                        SELECT id, label, kind, content, tier
+                        FROM memory_nodes
+                        WHERE workspace_id = ? AND entity_id = ?
+                          AND (label LIKE ? OR content LIKE ?)
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (ws, ent, pattern, pattern, limit),
+                    ).fetchall()
+                else:
+                    rows = self._conn.execute(
+                        """
+                        SELECT id, label, kind, content, tier
+                        FROM memory_nodes
+                        WHERE workspace_id = ? AND (label LIKE ? OR content LIKE ?)
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (ws, pattern, pattern, limit),
+                    ).fetchall()
         return [
             MemoryNode(
                 id=str(r["id"]),
@@ -127,10 +132,11 @@ class MemoryRepository:
         ]
 
     def get(self, node_id: str) -> MemoryNode | None:
-        row = self._conn.execute(
-            "SELECT id, label, kind, content, tier FROM memory_nodes WHERE id = ?",
-            (node_id,),
-        ).fetchone()
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT id, label, kind, content, tier FROM memory_nodes WHERE id = ?",
+                (node_id,),
+            ).fetchone()
         if row is None:
             return None
         return MemoryNode(
@@ -142,13 +148,14 @@ class MemoryRepository:
         )
 
     def delete(self, node_id: str) -> bool:
-        cursor = self._conn.execute(
-            "DELETE FROM memory_nodes WHERE id = ?",
-            (node_id,),
-        )
-        self._conn.execute(
-            "DELETE FROM memory_edges WHERE source_id = ? OR target_id = ?",
-            (node_id, node_id),
-        )
-        self._conn.commit()
-        return cursor.rowcount > 0
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM memory_nodes WHERE id = ?",
+                (node_id,),
+            )
+            self._conn.execute(
+                "DELETE FROM memory_edges WHERE source_id = ? OR target_id = ?",
+                (node_id, node_id),
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
