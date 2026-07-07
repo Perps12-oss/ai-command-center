@@ -9,6 +9,7 @@ import customtkinter as ctk
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.inspector.artifact_inspector import ArtifactInspector
 from ai_command_center.ui.components.inspector.base_inspector import BaseInspector
+from ai_command_center.ui.components.inspector.decision_inspector import DecisionInspector
 from ai_command_center.ui.components.inspector.provider_inspector import ProviderInspector
 from ai_command_center.ui.components.inspector.message_inspector import MessageInspector
 from ai_command_center.ui.design_system import theme_v2 as T
@@ -69,6 +70,7 @@ class InspectorHost(ctk.CTkFrame):
         self.register("message", MessageInspector(self._body))
         self.register("artifact", ArtifactInspector(self._body))
         self.register("provider", ProviderInspector(self._body))
+        self.register("decision", DecisionInspector(self._body))
 
     def set_default(self, widget: ctk.CTkBaseClass) -> None:
         self._default_widget = widget

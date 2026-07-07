@@ -3,6 +3,7 @@
 from ai_command_center.ui.components.inspector.artifact_inspector import ArtifactInspector
 from ai_command_center.ui.components.inspector.base_inspector import BaseInspector
 from ai_command_center.ui.components.inspector.collapsible_section import CollapsibleSection
+from ai_command_center.ui.components.inspector.decision_inspector import DecisionInspector
 from ai_command_center.ui.components.inspector.execution_inspector import ExecutionInspector
 from ai_command_center.ui.components.inspector.inspect_gestures import bind_inspect_gestures
 from ai_command_center.ui.components.inspector.inspector_host import InspectorHost
@@ -13,6 +14,7 @@ __all__ = [
     "ArtifactInspector",
     "BaseInspector",
     "CollapsibleSection",
+    "DecisionInspector",
     "ExecutionInspector",
     "bind_inspect_gestures",
     "InspectorHost",
