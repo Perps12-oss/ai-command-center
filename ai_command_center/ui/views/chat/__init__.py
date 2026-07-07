@@ -1,4 +1,6 @@
 """Chat view package — split modules for streaming, sessions, input, and search."""
-from ai_command_center.ui.views.chat.chat_view import ChatView
 
-__all__ = ["ChatView"]
+# Avoid eager ChatView import: submodules (e.g. inspector tabs) must load without
+# pulling the full chat shell, which would circularly import ExecutionInspector.
+
+__all__: list[str] = []

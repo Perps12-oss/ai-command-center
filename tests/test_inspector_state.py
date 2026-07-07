@@ -76,7 +76,7 @@ def test_inspector_select_and_clear_projection(event_bus) -> None:
     assert after is not before
 
 
-def test_inspector_navigate_is_ignored(event_bus) -> None:
+def test_inspector_navigate_projects_target_without_changing_selection(event_bus) -> None:
     store = AppStateStore(event_bus)
 
     event_bus.publish(
@@ -87,13 +87,27 @@ def test_inspector_navigate_is_ignored(event_bus) -> None:
     before = store.snapshot.inspector
     event_bus.publish(
         UI_INSPECT_NAVIGATE,
-        {"kind": "message", "ref_id": "msg-1"},
+        {"kind": "artifact", "ref_id": "art-1", "label": "Artifact One"},
         source="tests",
     )
     after = store.snapshot.inspector
 
     assert after.selected == before.selected
     assert after.revision == before.revision
+    assert after.navigate_target is not None
+    assert after.navigate_target.kind == "artifact"
+    assert after.navigate_target.ref_id == "art-1"
+    assert after.navigate_revision == 1
+
+
+def test_resolve_inspect_navigate_view_maps_known_kinds() -> None:
+    from ai_command_center.core.state.inspector_state import resolve_inspect_navigate_view
+
+    assert resolve_inspect_navigate_view("message") == "chat"
+    assert resolve_inspect_navigate_view("artifact") == "artifacts"
+    assert resolve_inspect_navigate_view("provider") == "providers"
+    assert resolve_inspect_navigate_view("execution") == "executions"
+    assert resolve_inspect_navigate_view("unknown") is None
 
 
 def test_empty_payload_noop(event_bus) -> None:
