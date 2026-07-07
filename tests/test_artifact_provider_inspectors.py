@@ -20,6 +20,7 @@ from ai_command_center.ui.components.inspector import (
     InspectorHost,
     ProviderInspector,
 )
+from ai_command_center.ui.views.chat import message_block as chat_message_block
 
 
 def test_artifact_and_provider_inspectors_smoke() -> None:
@@ -86,5 +87,44 @@ def test_artifact_and_provider_inspectors_smoke() -> None:
         host.show(unknown_ref)
         root.update_idletasks()
         assert host._visible_widget is host._placeholder
+    finally:
+        root.destroy()
+
+
+def test_assistant_message_text_widget_is_not_bound(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tk.Tk()
+    root.withdraw()
+    captured: list[tuple[object, ...]] = []
+
+    def record_bind(widgets, *, get_ref, on_select, on_navigate):
+        captured.append(tuple(widgets))
+
+    monkeypatch.setattr(chat_message_block, "bind_inspect_gestures", record_bind)
+
+    try:
+        ref = InspectableRef.from_payload(
+            {
+                "kind": "message",
+                "ref_id": "msg-1",
+                "label": "Assistant",
+                "payload": {"role": "assistant", "content": "hello"},
+            }
+        )
+        block = chat_message_block.AssistantMessageBlock(
+            root,
+            inspect_ref=ref,
+            on_inspect_select=lambda _ref: None,
+            on_inspect_navigate=lambda _ref: None,
+        )
+        block.pack(fill="both", expand=True)
+        root.update_idletasks()
+
+        assert captured
+        widgets = captured[-1]
+        assert block._textbox not in widgets
+        assert block._bubble in widgets
+        assert block in widgets
     finally:
         root.destroy()
