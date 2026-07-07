@@ -22,6 +22,7 @@ from typing import Any, Callable
 import customtkinter as ctk
 
 from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.ui.components.inspector.inspect_gestures import bind_inspect_gestures
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.markdown_view import parse_markdown
 
@@ -132,28 +133,15 @@ class UserMessageBlock(ctk.CTkFrame):
             text_color=T.TEXT_MUTED,
         ).pack(side="right", padx=(0, 4))
         _CopyBtn(mrow, lambda: self._text).pack(side="right")
-        self._bind_inspect_handlers(self, bubble, txt_lbl, mrow)
+        bind_inspect_gestures(
+            (self, bubble, txt_lbl, mrow),
+            get_ref=lambda: self._inspect_ref,
+            on_select=self._on_inspect_select,
+            on_navigate=self._on_inspect_navigate,
+        )
 
     def get_text(self) -> str:
         return self._text
-
-    def _bind_inspect_handlers(self, *widgets: Any) -> None:
-        if self._inspect_ref is None:
-            return
-        for widget in widgets:
-            try:
-                widget.bind("<Button-1>", self._handle_inspect_select, add="+")
-                widget.bind("<Double-Button-1>", self._handle_inspect_navigate, add="+")
-            except Exception:
-                pass
-
-    def _handle_inspect_select(self, _event: Any) -> None:
-        if self._inspect_ref is not None and self._on_inspect_select is not None:
-            self._on_inspect_select(self._inspect_ref)
-
-    def _handle_inspect_navigate(self, _event: Any) -> None:
-        if self._inspect_ref is not None and self._on_inspect_navigate is not None:
-            self._on_inspect_navigate(self._inspect_ref)
 
 
 class AssistantMessageBlock(ctk.CTkFrame):
@@ -222,7 +210,12 @@ class AssistantMessageBlock(ctk.CTkFrame):
         self._textbox.configure(state="normal")
         self._textbox.insert("end", _PLACEHOLDER)
         self._textbox.configure(state="disabled")
-        self._bind_inspect_handlers(self, self._bubble, self._textbox)
+        bind_inspect_gestures(
+            (self, self._bubble, self._textbox),
+            get_ref=lambda: self._inspect_ref,
+            on_select=self._on_inspect_select,
+            on_navigate=self._on_inspect_navigate,
+        )
 
     def append_raw(self, text: str) -> None:
         """Append raw streaming text to the textbox."""
@@ -280,24 +273,6 @@ class AssistantMessageBlock(ctk.CTkFrame):
                 "payload": payload,
             }
         )
-
-    def _bind_inspect_handlers(self, *widgets: Any) -> None:
-        if self._inspect_ref is None:
-            return
-        for widget in widgets:
-            try:
-                widget.bind("<Button-1>", self._handle_inspect_select, add="+")
-                widget.bind("<Double-Button-1>", self._handle_inspect_navigate, add="+")
-            except Exception:
-                pass
-
-    def _handle_inspect_select(self, _event: Any) -> None:
-        if self._inspect_ref is not None and self._on_inspect_select is not None:
-            self._on_inspect_select(self._inspect_ref)
-
-    def _handle_inspect_navigate(self, _event: Any) -> None:
-        if self._inspect_ref is not None and self._on_inspect_navigate is not None:
-            self._on_inspect_navigate(self._inspect_ref)
 
     def _resize_textbox(self) -> None:
         """Expand textbox height to fit content (no scrollbar needed)."""
