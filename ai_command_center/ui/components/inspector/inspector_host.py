@@ -13,6 +13,8 @@ from ai_command_center.ui.components.inspector.provider_inspector import Provide
 from ai_command_center.ui.components.inspector.message_inspector import MessageInspector
 from ai_command_center.ui.design_system import theme_v2 as T
 
+_DEFAULT_PLACEHOLDER = "Select an object to inspect."
+
 
 class InspectorHost(ctk.CTkFrame):
     """Registry-driven host for inspectable ACC objects."""
@@ -57,7 +59,7 @@ class InspectorHost(ctk.CTkFrame):
 
         self._placeholder = ctk.CTkLabel(
             self._body,
-            text="Select a message to inspect.",
+            text=_DEFAULT_PLACEHOLDER,
             font=T.FONT_BODY,
             text_color=T.TEXT_MUTED,
             anchor="w",
@@ -123,7 +125,7 @@ class InspectorHost(ctk.CTkFrame):
             self._default_widget.pack(in_=self._body, fill="both", expand=True)
             self._set_visible(self._default_widget)
             return
-        self._show_placeholder("Select a message to inspect.")
+        self._show_placeholder(_DEFAULT_PLACEHOLDER)
 
     def _show_placeholder(self, message: str) -> None:
         self._hide_current()

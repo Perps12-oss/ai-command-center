@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from ai_command_center.domain.inspectable import InspectableRef
+
+logger = logging.getLogger(__name__)
 
 
 def bind_inspect_gestures(
@@ -33,7 +36,11 @@ def bind_inspect_gestures(
             widget.bind("<Button-1>", _handle_select, add="+")
             widget.bind("<Double-Button-1>", _handle_navigate, add="+")
         except Exception:
-            pass
+            logger.warning(
+                "Failed to bind inspect gestures on %r",
+                widget,
+                exc_info=True,
+            )
 
 
 __all__ = ["bind_inspect_gestures"]

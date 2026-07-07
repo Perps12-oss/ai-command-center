@@ -14,6 +14,19 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.domain.inspectable import InspectableRef
 
 
+_INSPECT_NAVIGATE_VIEWS: dict[str, str] = {
+    "message": "chat",
+    "artifact": "artifacts",
+    "provider": "providers",
+    "execution": "executions",
+}
+
+
+def resolve_inspect_navigate_view(kind: str) -> str | None:
+    """Map an inspectable kind to the workspace view for double-click navigate."""
+    return _INSPECT_NAVIGATE_VIEWS.get(str(kind).strip())
+
+
 @dataclass(frozen=True, slots=True)
 class InspectorState:
     """Presentation state for the global inspector."""
@@ -21,6 +34,8 @@ class InspectorState:
     selected: InspectableRef | None = None
     collapsed: bool = False
     revision: int = 0
+    navigate_target: InspectableRef | None = None
+    navigate_revision: int = 0
 
 
 def _parse_inspect_ref(payload: dict[str, Any]) -> InspectableRef | None:
@@ -42,8 +57,19 @@ def reduce_inspector_state(state: InspectorState, event: Event) -> InspectorStat
             return state
         return replace(state, selected=None, revision=state.revision + 1)
     if event.topic == UI_INSPECT_NAVIGATE:
-        return state
+        ref = _parse_inspect_ref(event.payload)
+        if ref is None:
+            return state
+        return replace(
+            state,
+            navigate_target=ref,
+            navigate_revision=state.navigate_revision + 1,
+        )
     return state
 
 
-__all__ = ["InspectorState", "reduce_inspector_state"]
+__all__ = [
+    "InspectorState",
+    "reduce_inspector_state",
+    "resolve_inspect_navigate_view",
+]
