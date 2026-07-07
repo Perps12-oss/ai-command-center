@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
 from ai_command_center.ui.views.executions_view import ExecutionsView
@@ -63,6 +64,8 @@ class ViewManagerMixin:
             on_regenerate=self._on_chat_regenerate,
             on_send=self._on_chat_send,
             on_new_session=self._on_chat_new_session,
+            on_inspect_select=self._on_chat_inspect_select,
+            on_inspect_navigate=self._on_chat_inspect_navigate,
         )
         self._view_registry["notes"] = lambda: NotesView(
             self._content,
@@ -209,6 +212,17 @@ class ViewManagerMixin:
 
     def _on_chat_send(self, text: str) -> None:
         self._on_command(text, workspace_entity=self._controller.active_chat_workspace_entity())
+
+    def _on_chat_inspect_select(self, ref: InspectableRef) -> None:
+        self._controller.publish_inspect_select(
+            ref.kind,
+            ref.ref_id,
+            label=ref.label,
+            payload=dict(ref.payload),
+        )
+
+    def _on_chat_inspect_navigate(self, ref: InspectableRef) -> None:
+        self._controller.publish_inspect_navigate(ref.kind, ref.ref_id)
 
     def _on_execution_select(self, run_id: str) -> None:
         """Navigate to execution detail — placeholder until ExecutionDetailView is wired."""

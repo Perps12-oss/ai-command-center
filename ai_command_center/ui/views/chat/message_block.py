@@ -21,6 +21,7 @@ from typing import Any, Callable
 
 import customtkinter as ctk
 
+from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.markdown_view import parse_markdown
 
@@ -79,10 +80,16 @@ class UserMessageBlock(ctk.CTkFrame):
         text: str,
         *,
         timestamp: str = "",
+        inspect_ref: InspectableRef | None = None,
+        on_inspect_select: Callable[[InspectableRef], None] | None = None,
+        on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._text = text
+        self._inspect_ref = inspect_ref
+        self._on_inspect_select = on_inspect_select
+        self._on_inspect_navigate = on_inspect_navigate
         ts = timestamp or _hhmm()
 
         # Bubble row (right-aligned)
@@ -125,9 +132,28 @@ class UserMessageBlock(ctk.CTkFrame):
             text_color=T.TEXT_MUTED,
         ).pack(side="right", padx=(0, 4))
         _CopyBtn(mrow, lambda: self._text).pack(side="right")
+        self._bind_inspect_handlers(self, bubble, txt_lbl, mrow)
 
     def get_text(self) -> str:
         return self._text
+
+    def _bind_inspect_handlers(self, *widgets: Any) -> None:
+        if self._inspect_ref is None:
+            return
+        for widget in widgets:
+            try:
+                widget.bind("<Button-1>", self._handle_inspect_select, add="+")
+                widget.bind("<Double-Button-1>", self._handle_inspect_navigate, add="+")
+            except Exception:
+                pass
+
+    def _handle_inspect_select(self, _event: Any) -> None:
+        if self._inspect_ref is not None and self._on_inspect_select is not None:
+            self._on_inspect_select(self._inspect_ref)
+
+    def _handle_inspect_navigate(self, _event: Any) -> None:
+        if self._inspect_ref is not None and self._on_inspect_navigate is not None:
+            self._on_inspect_navigate(self._inspect_ref)
 
 
 class AssistantMessageBlock(ctk.CTkFrame):
@@ -146,11 +172,17 @@ class AssistantMessageBlock(ctk.CTkFrame):
         *,
         on_regenerate: Callable[[], None] | None = None,
         on_rate: Callable[[str], None] | None = None,
+        inspect_ref: InspectableRef | None = None,
+        on_inspect_select: Callable[[InspectableRef], None] | None = None,
+        on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_regenerate = on_regenerate
         self._on_rate = on_rate
+        self._inspect_ref = inspect_ref
+        self._on_inspect_select = on_inspect_select
+        self._on_inspect_navigate = on_inspect_navigate
         self._raw_text: str = ""
         self._timestamp: str = _hhmm()
         self._streaming: bool = False
@@ -190,6 +222,7 @@ class AssistantMessageBlock(ctk.CTkFrame):
         self._textbox.configure(state="normal")
         self._textbox.insert("end", _PLACEHOLDER)
         self._textbox.configure(state="disabled")
+        self._bind_inspect_handlers(self, self._bubble, self._textbox)
 
     def append_raw(self, text: str) -> None:
         """Append raw streaming text to the textbox."""
@@ -202,6 +235,7 @@ class AssistantMessageBlock(ctk.CTkFrame):
             self._textbox.delete("1.0", "end")
 
         self._raw_text += text
+        self._refresh_inspect_ref()
         self._textbox.configure(state="normal")
         self._textbox.insert("end", text)
         self._textbox.configure(state="disabled")
@@ -218,6 +252,7 @@ class AssistantMessageBlock(ctk.CTkFrame):
         """Finalize the message with full text and optional metadata."""
         self._streaming = False
         self._raw_text = text
+        self._refresh_inspect_ref()
         self._textbox.configure(state="normal")
         self._textbox.delete("1.0", "end")
         try:
@@ -231,6 +266,38 @@ class AssistantMessageBlock(ctk.CTkFrame):
 
     def get_raw_text(self) -> str:
         return self._raw_text
+
+    def _refresh_inspect_ref(self) -> None:
+        if self._inspect_ref is None:
+            return
+        payload = dict(self._inspect_ref.payload)
+        payload["content"] = self._raw_text
+        self._inspect_ref = InspectableRef.from_payload(
+            {
+                "kind": self._inspect_ref.kind,
+                "ref_id": self._inspect_ref.ref_id,
+                "label": self._inspect_ref.label,
+                "payload": payload,
+            }
+        )
+
+    def _bind_inspect_handlers(self, *widgets: Any) -> None:
+        if self._inspect_ref is None:
+            return
+        for widget in widgets:
+            try:
+                widget.bind("<Button-1>", self._handle_inspect_select, add="+")
+                widget.bind("<Double-Button-1>", self._handle_inspect_navigate, add="+")
+            except Exception:
+                pass
+
+    def _handle_inspect_select(self, _event: Any) -> None:
+        if self._inspect_ref is not None and self._on_inspect_select is not None:
+            self._on_inspect_select(self._inspect_ref)
+
+    def _handle_inspect_navigate(self, _event: Any) -> None:
+        if self._inspect_ref is not None and self._on_inspect_navigate is not None:
+            self._on_inspect_navigate(self._inspect_ref)
 
     def _resize_textbox(self) -> None:
         """Expand textbox height to fit content (no scrollbar needed)."""
