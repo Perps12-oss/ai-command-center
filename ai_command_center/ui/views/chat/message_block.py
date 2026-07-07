@@ -211,7 +211,7 @@ class AssistantMessageBlock(ctk.CTkFrame):
         self._textbox.insert("end", _PLACEHOLDER)
         self._textbox.configure(state="disabled")
         bind_inspect_gestures(
-            (self, self._bubble, self._textbox),
+            (self, self._bubble),
             get_ref=lambda: self._inspect_ref,
             on_select=self._on_inspect_select,
             on_navigate=self._on_inspect_navigate,
