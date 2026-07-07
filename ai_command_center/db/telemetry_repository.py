@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
 from datetime import datetime, timezone
 from typing import Any
 
+from ai_command_center.db.connection_lock import connection_lock
 from ai_command_center.domain.telemetry_event import TelemetryEvent
 
 
@@ -23,7 +23,7 @@ def _utc_iso(ts: float | None = None) -> str:
 class TelemetryRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
-        self._lock = threading.Lock()
+        self._lock = connection_lock(conn)
 
     def insert(self, event: str, payload: dict[str, Any], *, timestamp: str | None = None) -> None:
         row_ts = timestamp or _utc_iso()
