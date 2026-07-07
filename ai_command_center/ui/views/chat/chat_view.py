@@ -1,7 +1,7 @@
 """Chat view — premium minimalist messaging UI, consumer-facing only."""
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 import customtkinter as ctk
 
@@ -165,6 +165,7 @@ class ChatView(ctk.CTkFrame):
         self._inspector_host: InspectorHost | None = None
         self._use_v2_blocks = False
         self._session_bar: _SessionBar | None = None
+        self._execution_context: Any = None
 
         self._build()
 
@@ -397,6 +398,7 @@ class ChatView(ctk.CTkFrame):
             self._conversation_list.update_conversation(meta)
 
     def update_inspector(self, context) -> None:
+        self._execution_context = context
         if self._execution_inspector is not None:
             self._execution_inspector.update_context(context)
 
@@ -632,10 +634,20 @@ class ChatView(ctk.CTkFrame):
 
     def _finalize_meta(self, bubble: AssistantBubble | AssistantMessageBlock) -> None:
         if isinstance(bubble, AssistantMessageBlock):
+            execution_id = self._request_id or ""
+            artifact_count = 0
+            decision_count = 0
+            if self._execution_context is not None:
+                artifact_count = len(
+                    getattr(self._execution_context, "artifacts", ()) or ()
+                )
             bubble.finalize(
                 bubble.get_raw_text(),
                 model=self._model,
                 tokens=int(len(bubble.get_raw_text()) / 4),
+                execution_id=execution_id,
+                artifact_count=artifact_count,
+                decision_count=decision_count,
             )
             return
         outer = getattr(bubble, "_outer", None)

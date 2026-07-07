@@ -19,6 +19,7 @@ _INSPECT_NAVIGATE_VIEWS: dict[str, str] = {
     "artifact": "artifacts",
     "provider": "providers",
     "execution": "executions",
+    "decision": "chat",
 }
 
 
