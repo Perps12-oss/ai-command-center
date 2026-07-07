@@ -222,7 +222,22 @@ class ViewManagerMixin:
         )
 
     def _on_chat_inspect_navigate(self, ref: InspectableRef) -> None:
-        self._controller.publish_inspect_navigate(ref.kind, ref.ref_id)
+        self._controller.publish_inspect_navigate(ref.kind, ref.ref_id, label=ref.label)
+
+    def _focus_inspect_navigate_target(self, ref: InspectableRef) -> None:
+        """Best-effort focus in the destination workspace after inspect navigate."""
+        if ref.kind == "artifact" and ref.ref_id:
+            artifacts = self._artifacts_view()
+            if artifacts is not None:
+                artifacts._viewer.show(
+                    ref.ref_id,
+                    kind="text",
+                    label=ref.label or ref.ref_id,
+                )
+        elif ref.kind == "message":
+            chat = self._chat_view()
+            if chat is not None:
+                chat.focus_input()
 
     def _on_execution_select(self, run_id: str) -> None:
         """Navigate to execution detail — placeholder until ExecutionDetailView is wired."""

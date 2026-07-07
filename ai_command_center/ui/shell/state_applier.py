@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai_command_center.core.state.inspector_state import resolve_inspect_navigate_view
 from ai_command_center.platform.secret_store import openai_api_key_configured
 from ai_command_center.ui.components.permission_dialog import PermissionDialog
 from ai_command_center.ui.design_system import theme_manager
@@ -173,6 +174,17 @@ class StateApplierMixin:
                     self._last_stream_buffer_len = 0
                     self._top.update_status("error", snap.settings.default_model)
                     self._last_terminal_chat_key = terminal_key
+
+        if snap.inspector.navigate_revision != getattr(
+            self, "_last_inspector_navigate_revision", 0
+        ):
+            target = snap.inspector.navigate_target
+            if target is not None:
+                view_id = resolve_inspect_navigate_view(target.kind)
+                if view_id is not None:
+                    self._navigate(view_id)
+                    self._focus_inspect_navigate_target(target)
+            self._last_inspector_navigate_revision = snap.inspector.navigate_revision
 
         try:
             theme_manager.apply(

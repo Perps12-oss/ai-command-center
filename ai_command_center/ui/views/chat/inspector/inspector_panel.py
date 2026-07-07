@@ -1,5 +1,9 @@
 """InspectorPanel — Langflow-inspired docked right-rail execution inspector.
 
+.. deprecated::
+    Superseded by ``InspectorHost`` + ``ExecutionInspector`` (ACC UI Refurbishment
+    PR 2–4). Scheduled for removal when ``InspectorDock`` lands (PR 11).
+
 Tabs (left to right):
   Trace      — execution span tree
   Provider   — provider health cards

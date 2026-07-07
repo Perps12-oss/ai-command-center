@@ -194,10 +194,19 @@ class UIController:
     def publish_inspect_clear(self) -> None:
         self._bus.publish(UI_INSPECT_CLEAR, {}, source="ui")
 
-    def publish_inspect_navigate(self, kind: str, ref_id: str) -> None:
+    def publish_inspect_navigate(
+        self,
+        kind: str,
+        ref_id: str,
+        *,
+        label: str = "",
+    ) -> None:
+        payload: dict[str, object] = {"kind": kind, "ref_id": ref_id}
+        if label:
+            payload["label"] = label
         self._bus.publish(
             UI_INSPECT_NAVIGATE,
-            {"kind": kind, "ref_id": ref_id},
+            payload,
             source="ui",
         )
 

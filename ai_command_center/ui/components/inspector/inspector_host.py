@@ -7,9 +7,13 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.ui.components.inspector.artifact_inspector import ArtifactInspector
 from ai_command_center.ui.components.inspector.base_inspector import BaseInspector
+from ai_command_center.ui.components.inspector.provider_inspector import ProviderInspector
 from ai_command_center.ui.components.inspector.message_inspector import MessageInspector
 from ai_command_center.ui.design_system import theme_v2 as T
+
+_DEFAULT_PLACEHOLDER = "Select an object to inspect."
 
 
 class InspectorHost(ctk.CTkFrame):
@@ -55,7 +59,7 @@ class InspectorHost(ctk.CTkFrame):
 
         self._placeholder = ctk.CTkLabel(
             self._body,
-            text="Select a message to inspect.",
+            text=_DEFAULT_PLACEHOLDER,
             font=T.FONT_BODY,
             text_color=T.TEXT_MUTED,
             anchor="w",
@@ -63,6 +67,8 @@ class InspectorHost(ctk.CTkFrame):
         self._placeholder.pack(fill="both", expand=True, padx=12, pady=12)
 
         self.register("message", MessageInspector(self._body))
+        self.register("artifact", ArtifactInspector(self._body))
+        self.register("provider", ProviderInspector(self._body))
 
     def set_default(self, widget: ctk.CTkBaseClass) -> None:
         self._default_widget = widget
@@ -119,7 +125,7 @@ class InspectorHost(ctk.CTkFrame):
             self._default_widget.pack(in_=self._body, fill="both", expand=True)
             self._set_visible(self._default_widget)
             return
-        self._show_placeholder("Select a message to inspect.")
+        self._show_placeholder(_DEFAULT_PLACEHOLDER)
 
     def _show_placeholder(self, message: str) -> None:
         self._hide_current()
