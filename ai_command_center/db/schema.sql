@@ -108,3 +108,19 @@ CREATE TABLE IF NOT EXISTS execution_runs (
 
 CREATE INDEX IF NOT EXISTS idx_execution_runs_request ON execution_runs(request_id);
 CREATE INDEX IF NOT EXISTS idx_execution_runs_created ON execution_runs(created_at);
+
+-- ACC UI Refurbishment: artifact stream persistence (PR 6)
+CREATE TABLE IF NOT EXISTS artifacts (
+    artifact_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    content_ref TEXT NOT NULL DEFAULT '',
+    execution_id TEXT NOT NULL DEFAULT '',
+    mime_type TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_artifacts_execution ON artifacts(execution_id);
+CREATE INDEX IF NOT EXISTS idx_artifacts_created ON artifacts(created_at);

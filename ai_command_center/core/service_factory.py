@@ -49,6 +49,7 @@ from ai_command_center.repositories.runtime_provider_manifest_repository import 
 )
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from ai_command_center.repositories.artifact_repository import ArtifactRepository
 from ai_command_center.repositories.execution_run_repository import ExecutionRunRepository
 from ai_command_center.repositories.workflow_run_repository import WorkflowRunRepository
 from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
@@ -77,6 +78,7 @@ from ai_command_center.services.settings_service import SettingsService
 from ai_command_center.services.shell_tool_service import ShellToolService
 from ai_command_center.services.system_monitor_service import SystemMonitorService
 from ai_command_center.services.telemetry_service import TelemetryService
+from ai_command_center.services.artifact_service import ArtifactService
 from ai_command_center.services.execution_run_service import ExecutionRunService
 from ai_command_center.services.execution_query_service import ExecutionQueryService
 from ai_command_center.telemetry.tracing_service import TracingService
@@ -148,6 +150,7 @@ def build_services(
     capability_lifecycle = CapabilityLifecycleManager(bus)
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     execution_query = ExecutionQueryService(bus, repo=ExecutionRunRepository(db))
+    artifact = ArtifactService(bus, repo=ArtifactRepository(db))
     workflow_persistence = WorkflowPersistenceService(bus, repo=WorkflowRunRepository(db))
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
@@ -179,6 +182,7 @@ def build_services(
         capability_lifecycle,
         execution_run,
         execution_query,
+        artifact,
         workflow_persistence,
         chat_export,
         system_monitor,

@@ -56,6 +56,8 @@ from ai_command_center.core.events.topics import (
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_QUERY_RESULT,
+    ARTIFACT_CREATED,
+    ARTIFACT_UPDATED,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -95,6 +97,10 @@ from ai_command_center.core.state.execution_state import (
 from ai_command_center.core.state.inspector_state import (
     InspectorState,
     reduce_inspector_state,
+)
+from ai_command_center.core.state.artifact_state import (
+    ARTIFACT_REDUCERS,
+    ArtifactStateItem,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -165,6 +171,8 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_QUERY_RESULT,
+    ARTIFACT_CREATED,
+    ARTIFACT_UPDATED,
     MODEL_SELECTED,
     TOOL_COMPLETED,
     TOOL_FAILED,
@@ -392,6 +400,7 @@ class AppState:
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     inspector: InspectorState = field(default_factory=InspectorState)
+    recent_artifacts: tuple[ArtifactStateItem, ...] = ()
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
@@ -1372,6 +1381,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_orchestration_run,
     _reduce_execution_context,
     _reduce_inspector,
+    *ARTIFACT_REDUCERS,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
 )

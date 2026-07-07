@@ -248,6 +248,12 @@ SEARCH_RESULTS = "search.results"
 EXECUTION_QUERY_REQUEST = "execution.query.request"
 EXECUTION_QUERY_RESULT = "execution.query.result"
 
+# Artifact lifecycle (Design Item #3 — ACC UI Refurbishment PR 6)
+ARTIFACT_CREATE_REQUEST = "artifact.create.request"
+ARTIFACT_UPDATE_REQUEST = "artifact.update.request"
+ARTIFACT_CREATED = "artifact.created"
+ARTIFACT_UPDATED = "artifact.updated"
+
 # UI artifact actions (TODO 5/6 — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
 
@@ -431,5 +437,9 @@ __all__ = [
     "SEARCH_RESULTS",
     "EXECUTION_QUERY_REQUEST",
     "EXECUTION_QUERY_RESULT",
+    "ARTIFACT_CREATE_REQUEST",
+    "ARTIFACT_UPDATE_REQUEST",
+    "ARTIFACT_CREATED",
+    "ARTIFACT_UPDATED",
     "UI_ARTIFACT_ACTION",
 ]

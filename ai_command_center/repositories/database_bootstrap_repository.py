@@ -132,6 +132,27 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v7(conn: sqlite3.Connection) -> None:
+    """Add artifacts table for ACC UI Refurbishment artifact stream (PR 6)."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS artifacts (
+            artifact_id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            size_bytes INTEGER NOT NULL DEFAULT 0,
+            content_ref TEXT NOT NULL DEFAULT '',
+            execution_id TEXT NOT NULL DEFAULT '',
+            mime_type TEXT NOT NULL DEFAULT '',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_artifacts_execution ON artifacts(execution_id);
+        CREATE INDEX IF NOT EXISTS idx_artifacts_created ON artifacts(created_at);
+        """
+    )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
@@ -139,6 +160,7 @@ _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (4, _migrate_v4),
     (5, _migrate_v5),
     (6, _migrate_v6),
+    (7, _migrate_v7),
 ]
 
 
