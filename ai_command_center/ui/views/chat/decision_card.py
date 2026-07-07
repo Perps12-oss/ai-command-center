@@ -13,6 +13,9 @@ from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.domain.decision import Decision
+from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.ui.components.inspector.inspect_gestures import bind_inspect_gestures
 from ai_command_center.ui.design_system import theme_v2 as T
 
 
@@ -34,6 +37,8 @@ class DecisionCard(ctk.CTkFrame):
         *,
         on_approve: Callable[[str], None] | None = None,
         on_reject: Callable[[str], None] | None = None,
+        on_inspect_select: Callable[[InspectableRef], None] | None = None,
+        on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -45,8 +50,11 @@ class DecisionCard(ctk.CTkFrame):
             **kwargs,
         )
         self._decision_id = decision_id
+        self._summary = summary
         self._on_approve = on_approve or (lambda d: None)
         self._on_reject = on_reject or (lambda d: None)
+        self._on_inspect_select = on_inspect_select
+        self._on_inspect_navigate = on_inspect_navigate
         self._resolved = False
 
         # Header
@@ -60,7 +68,7 @@ class DecisionCard(ctk.CTkFrame):
         ).pack(side="left")
 
         # Summary
-        ctk.CTkLabel(
+        summary_lbl = ctk.CTkLabel(
             self,
             text=summary[:200],
             font=T.FONT_BODY,
@@ -68,7 +76,8 @@ class DecisionCard(ctk.CTkFrame):
             wraplength=400,
             justify="left",
             anchor="w",
-        ).pack(fill="x", padx=12, pady=(0, 8))
+        )
+        summary_lbl.pack(fill="x", padx=12, pady=(0, 8))
 
         # Buttons
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
@@ -99,6 +108,22 @@ class DecisionCard(ctk.CTkFrame):
             corner_radius=T.SMALL_RADIUS,
             command=self._reject,
         ).pack(side="left")
+
+        bind_inspect_gestures(
+            (self,),
+            get_ref=self._inspect_ref,
+            on_select=self._on_inspect_select,
+            on_navigate=self._on_inspect_navigate,
+        )
+
+    def _inspect_ref(self) -> InspectableRef:
+        decision = Decision(reason=self._summary)
+        return InspectableRef.from_payload(
+            decision.to_inspect_payload(
+                ref_id=self._decision_id,
+                label=self._summary[:60] or self._decision_id,
+            )
+        )
 
     def _approve(self) -> None:
         if not self._resolved:

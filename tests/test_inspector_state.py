@@ -107,6 +107,7 @@ def test_resolve_inspect_navigate_view_maps_known_kinds() -> None:
     assert resolve_inspect_navigate_view("artifact") == "artifacts"
     assert resolve_inspect_navigate_view("provider") == "providers"
     assert resolve_inspect_navigate_view("execution") == "executions"
+    assert resolve_inspect_navigate_view("decision") == "chat"
     assert resolve_inspect_navigate_view("unknown") is None
 
 
