@@ -25,6 +25,7 @@ from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.inspector.inspect_gestures import bind_inspect_gestures
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.markdown_view import parse_markdown
+from ai_command_center.ui.views.chat.response_action_strip import ResponseActionStrip
 
 _BUBBLE_WRAP = 520
 _BUBBLE_TBX_W = 540
@@ -241,6 +242,10 @@ class AssistantMessageBlock(ctk.CTkFrame):
         model: str = "",
         duration_ms: int = 0,
         tokens: int = 0,
+        execution_id: str = "",
+        execution_index: int = 0,
+        artifact_count: int = 0,
+        decision_count: int = 0,
     ) -> None:
         """Finalize the message with full text and optional metadata."""
         self._streaming = False
@@ -256,6 +261,16 @@ class AssistantMessageBlock(ctk.CTkFrame):
         self._textbox.configure(state="disabled")
         self._resize_textbox()
         self._build_meta_row(model=model, duration_ms=duration_ms, tokens=tokens)
+        if execution_id or execution_index or artifact_count or decision_count:
+            ResponseActionStrip(
+                self,
+                execution_id=execution_id,
+                execution_index=execution_index,
+                artifact_count=artifact_count,
+                decision_count=decision_count,
+                on_inspect_select=self._on_inspect_select,
+                on_inspect_navigate=self._on_inspect_navigate,
+            ).pack(fill="x", padx=14, pady=(0, 6))
 
     def get_raw_text(self) -> str:
         return self._raw_text

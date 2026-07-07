@@ -78,10 +78,10 @@ def test_artifact_and_provider_inspectors_smoke() -> None:
 
         unknown_ref = InspectableRef.from_payload(
             {
-                "kind": "decision",
-                "ref_id": "dec-1",
-                "label": "Decision One",
-                "payload": {"decision_id": "dec-1"},
+                "kind": "workflow",
+                "ref_id": "wf-1",
+                "label": "Workflow One",
+                "payload": {"workflow_id": "wf-1"},
             }
         )
         host.show(unknown_ref)
