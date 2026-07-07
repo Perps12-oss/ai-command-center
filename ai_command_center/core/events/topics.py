@@ -74,6 +74,11 @@ OVERLAY_SHOW = "overlay.show"
 OVERLAY_HIDE = "overlay.hide"
 OVERLAY_ANCHOR = "overlay.anchor"
 
+# Global Inspector System — Design Item #2
+UI_INSPECT_SELECT = "ui.inspect.select"
+UI_INSPECT_CLEAR = "ui.inspect.clear"
+UI_INSPECT_NAVIGATE = "ui.inspect.navigate"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -287,6 +292,9 @@ __all__ = [
     "OVERLAY_SHOW",
     "OVERLAY_HIDE",
     "OVERLAY_ANCHOR",
+    "UI_INSPECT_SELECT",
+    "UI_INSPECT_CLEAR",
+    "UI_INSPECT_NAVIGATE",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",

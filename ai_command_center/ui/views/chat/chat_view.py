@@ -5,14 +5,15 @@ from typing import Callable
 
 import customtkinter as ctk
 
+from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
+from ai_command_center.ui.components.inspector.inspector_host import InspectorHost
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.views.chat.chat_header import ChatHeader
 from ai_command_center.ui.views.chat.chat_input import InputPill, TemplatesOverlay
 from ai_command_center.ui.views.chat.chat_search import ChatSearchController
 from ai_command_center.ui.views.chat.chat_workspace_layout import make_chat_workspace_layout
 from ai_command_center.ui.views.chat.conversation_list import ConversationList
-from ai_command_center.ui.views.chat.conversation_metadata import ConversationMetadata
 from ai_command_center.ui.views.chat.inspector.inspector_panel import InspectorPanel
 from ai_command_center.ui.views.chat.message_block import AssistantMessageBlock, UserMessageBlock
 from ai_command_center.ui.views.chat.session_store import SessionStore, hhmm, session_title
@@ -133,6 +134,8 @@ class ChatView(ctk.CTkFrame):
         on_regenerate: Callable[[], None]            | None = None,
         on_send:       Callable[[str], None]         | None = None,
         on_new_session: Callable[[], None]           | None = None,
+        on_inspect_select: Callable[[InspectableRef], None] | None = None,
+        on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -141,6 +144,8 @@ class ChatView(ctk.CTkFrame):
         self._on_regenerate = on_regenerate
         self._on_send       = on_send
         self._on_new_session = on_new_session
+        self._on_inspect_select = on_inspect_select
+        self._on_inspect_navigate = on_inspect_navigate
 
         self._request_id:       str | None              = None
         self._streaming:        bool                    = False
@@ -157,6 +162,7 @@ class ChatView(ctk.CTkFrame):
         self._chat_header: ChatHeader | None = None
         self._conversation_list: ConversationList | None = None
         self._inspector_panel: InspectorPanel | None = None
+        self._inspector_host: InspectorHost | None = None
         self._use_v2_blocks = False
         self._session_bar: _SessionBar | None = None
 
@@ -243,7 +249,9 @@ class ChatView(ctk.CTkFrame):
         self._empty.pack(fill="both", expand=True, pady=30)
 
         self._inspector_panel = InspectorPanel(self._workspace.right_host())
-        self._workspace.set_right(self._inspector_panel)
+        self._inspector_host = InspectorHost(self._workspace.right_host())
+        self._inspector_host.set_default(self._inspector_panel)
+        self._workspace.set_right(self._inspector_host)
 
         self._scroll_btn = ctk.CTkButton(
             self,
@@ -391,6 +399,14 @@ class ChatView(ctk.CTkFrame):
         if self._inspector_panel is not None:
             self._inspector_panel.update(context)
 
+    def show_inspector(self, ref: InspectableRef) -> None:
+        if self._inspector_host is not None:
+            self._inspector_host.show(ref)
+
+    def clear_inspector(self) -> None:
+        if self._inspector_host is not None:
+            self._inspector_host.clear()
+
     def update_chat_execution_status(
         self, status: str, provider: str, model: str
     ) -> None:
@@ -522,10 +538,43 @@ class ChatView(ctk.CTkFrame):
         if self._empty.winfo_ismapped():
             self._empty.pack_forget()
 
-    def _user_row(self, text: str) -> None:
+    def _make_message_ref(
+        self,
+        role: str,
+        content: str,
+        *,
+        request_id: str = "",
+        message_index: int | None = None,
+    ) -> InspectableRef:
+        preview = content.strip().splitlines()[0][:60] if content.strip() else f"{role.title()} message"
+        payload: dict[str, str] = {
+            "role": role,
+            "content": content,
+        }
+        if request_id:
+            payload["request_id"] = request_id
+        if message_index is not None:
+            payload["index"] = str(message_index)
+        return InspectableRef.from_payload(
+            {
+                "kind": "message",
+                "ref_id": request_id or f"{self._store.session_id}:{role}:{message_index if message_index is not None else len(self._history)}",
+                "label": preview,
+                "payload": payload,
+            }
+        )
+
+    def _user_row(self, text: str, *, message_index: int | None = None) -> None:
         self._hide_empty()
         if self._use_v2_blocks:
-            UserMessageBlock(self._scroll, text).pack(
+            ref = self._make_message_ref("user", text, message_index=message_index)
+            UserMessageBlock(
+                self._scroll,
+                text,
+                inspect_ref=ref,
+                on_inspect_select=self._on_inspect_select,
+                on_inspect_navigate=self._on_inspect_navigate,
+            ).pack(
                 fill="x", padx=SIDE_PAD, pady=(0, 8)
             )
             return
@@ -548,13 +597,22 @@ class ChatView(ctk.CTkFrame):
         ).pack(side="right", padx=(0, 4))
         CopyBtn(mrow, lambda t=text: t).pack(side="right")
 
-    def _assistant_row(self) -> AssistantBubble | AssistantMessageBlock:
+    def _assistant_row(self, *, message_index: int | None = None) -> AssistantBubble | AssistantMessageBlock:
         self._hide_empty()
         if self._use_v2_blocks:
+            ref = self._make_message_ref(
+                "assistant",
+                self._chunk_buffer or "",
+                request_id=self._request_id or "",
+                message_index=message_index,
+            )
             block = AssistantMessageBlock(
                 self._scroll,
                 on_regenerate=self._on_regenerate,
                 on_rate=lambda rating: None,
+                inspect_ref=ref,
+                on_inspect_select=self._on_inspect_select,
+                on_inspect_navigate=self._on_inspect_navigate,
             )
             block.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
             return block
@@ -675,13 +733,13 @@ class ChatView(ctk.CTkFrame):
     def load_history(self, messages: list[dict]) -> None:
         self._clear_ui()
         self._history = list(messages)
-        for item in messages:
+        for index, item in enumerate(messages):
             role    = str(item.get("role", ""))
             content = str(item.get("content", ""))
             if role == "user":
-                self._user_row(content)
+                self._user_row(content, message_index=index)
             elif role == "assistant":
-                b = self._assistant_row()
+                b = self._assistant_row(message_index=index)
                 b.finalize(content)
                 self._finalize_meta(b)
         self._refresh_session_bar()
@@ -689,7 +747,7 @@ class ChatView(ctk.CTkFrame):
 
     def show_user_message(self, text: str) -> None:
         self._store.append_message("user", text)
-        self._user_row(text)
+        self._user_row(text, message_index=len(self._history) - 1)
         self._refresh_session_bar()
         self._scroll_to_bottom()
 
@@ -697,7 +755,7 @@ class ChatView(ctk.CTkFrame):
         self._request_id   = request_id
         self._streaming    = True
         self._chunk_buffer = ""
-        self._streaming_bubble = self._assistant_row()
+        self._streaming_bubble = self._assistant_row(message_index=len(self._history))
         self._pill.set_streaming(True)
         self._scroll_to_bottom()
 

@@ -63,6 +63,9 @@ from ai_command_center.core.events.topics import (
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
+    UI_INSPECT_CLEAR,
+    UI_INSPECT_NAVIGATE,
+    UI_INSPECT_SELECT,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
     UI_SELECT_ENTITY,
@@ -88,6 +91,10 @@ from ai_command_center.core.state.execution_state import (
     ExecutionContext,
     SpanItem,
     reduce_execution_query_result,
+)
+from ai_command_center.core.state.inspector_state import (
+    InspectorState,
+    reduce_inspector_state,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -134,6 +141,9 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     WORKSPACE_DEACTIVATED,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
+    UI_INSPECT_SELECT,
+    UI_INSPECT_CLEAR,
+    UI_INSPECT_NAVIGATE,
     UI_SELECT_ENTITY,
     # Agent / workflow runs (Track R7)
     AGENT_SPAWNED,
@@ -381,6 +391,7 @@ class AppState:
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
+    inspector: InspectorState = field(default_factory=InspectorState)
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
@@ -1305,6 +1316,18 @@ def _reduce_execution_context(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_inspector(state: AppState, event: Event) -> AppState:
+    new_inspector = reduce_inspector_state(state.inspector, event)
+    if new_inspector == state.inspector:
+        return state
+    return replace(
+        state,
+        inspector=new_inspector,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
@@ -1348,6 +1371,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_permission_check,
     _reduce_orchestration_run,
     _reduce_execution_context,
+    _reduce_inspector,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
 )
