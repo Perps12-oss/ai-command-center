@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-import pyperclip
+try:
+    import pyperclip
+except Exception:  # pragma: no cover - optional clipboard dependency
+    pyperclip = None
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
@@ -21,6 +24,9 @@ from ai_command_center.core.events.topics import (
     PERMISSION_CHECK_RESULT,
     PLUGIN_DISABLE_REQUEST,
     PLUGIN_ENABLE_REQUEST,
+    UI_INSPECT_CLEAR,
+    UI_INSPECT_NAVIGATE,
+    UI_INSPECT_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -163,6 +169,35 @@ class UIController:
         self._bus.publish(
             UI_NAVIGATE,
             {"view": view_id},
+            source="ui",
+        )
+
+    def publish_inspect_select(
+        self,
+        kind: str,
+        ref_id: str,
+        *,
+        label: str = "",
+        payload: dict[str, str] | None = None,
+    ) -> None:
+        self._bus.publish(
+            UI_INSPECT_SELECT,
+            {
+                "kind": kind,
+                "ref_id": ref_id,
+                "label": label,
+                "payload": {str(k): str(v) for k, v in (payload or {}).items()},
+            },
+            source="ui",
+        )
+
+    def publish_inspect_clear(self) -> None:
+        self._bus.publish(UI_INSPECT_CLEAR, {}, source="ui")
+
+    def publish_inspect_navigate(self, kind: str, ref_id: str) -> None:
+        self._bus.publish(
+            UI_INSPECT_NAVIGATE,
+            {"kind": kind, "ref_id": ref_id},
             source="ui",
         )
 
@@ -310,6 +345,8 @@ class UIController:
         )
 
     def read_clipboard(self) -> str | None:
+        if pyperclip is None:
+            return None
         try:
             text = pyperclip.paste()
         except Exception:
