@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -101,7 +102,15 @@ class SettingsSchema:
         if field.value_type is dict:
             if isinstance(value, dict):
                 return value
-            return {}
+            if isinstance(value, str):
+                try:
+                    parsed = json.loads(value or "{}")
+                except json.JSONDecodeError as exc:
+                    raise TypeError(f"{field.name} must be a JSON object") from exc
+                if not isinstance(parsed, dict):
+                    raise TypeError(f"{field.name} must be a JSON object")
+                return parsed
+            raise TypeError(f"{field.name} must be a dict")
         if issubclass(field.value_type, Enum):
             if isinstance(value, field.value_type):
                 return value

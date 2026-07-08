@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from enum import Enum
 from typing import Any
 
@@ -21,6 +22,11 @@ def normalize_tier_map(
     merged = dict(DEFAULT_MODEL_TIER_MAP)
     if default_model:
         merged["balanced"] = default_model
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw or "{}")
+        except json.JSONDecodeError:
+            raw = {}
     if isinstance(raw, dict):
         for key, value in raw.items():
             tier = str(key).strip()
