@@ -1,11 +1,8 @@
 ﻿"""Routes chat intents through ContextManager before LLM dispatch (Phase 3A).
 
-Sync bus cascade contract: ``_on_command_routed`` publishes
-``MEMORY_LOOKUP_REQUEST``, ``SESSION_HISTORY_REQUEST``, ``MODEL_RESOLVE_REQUEST``,
-and optionally ``ENTITY_CONTEXT_REQUEST`` synchronously on the same thread. Handlers for those topics must populate
-``_pending[request_id]`` before ``publish`` returns so the handler can read
-notes, history, model, and provider inline. Do not defer those lookups without
-changing this contract.
+Context assembly is delegated to ``CapabilityContextAssembler`` (shared with
+``RuntimeCapabilityRouterService`` for external invoke). See that module for the sync
+bus cascade contract.
 """
 
 from __future__ import annotations
@@ -14,30 +11,24 @@ import logging
 import uuid
 from collections.abc import Callable
 
+from ai_command_center.core.capability_context_assembler import CapabilityContextAssembler
+from ai_command_center.core.capability_external_registry import is_externally_handled
+from ai_command_center.orchestration.orchestration_registry import is_orchestration_handled
 from ai_command_center.core.clipboard_intent import (
     empty_clipboard_message,
     wants_clipboard,
 )
 from ai_command_center.core.context_manager import ContextManager
-from ai_command_center.core.entity.entity_context import format_entity_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     APP_WARNING,
     CHAT_ERROR,
     COMMAND_ROUTED,
+    CONTEXT_COMPLETE,
     CONTEXT_OVER_BUDGET,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_TRIMMED,
-    ENTITY_CONTEXT_REQUEST,
-    ENTITY_CONTEXT_RESULT,
     LLM_REQUEST,
-    MEMORY_LOOKUP_REQUEST,
-    MEMORY_LOOKUP_RESULT,
-    MODEL_RESOLVE_REQUEST,
-    MODEL_RESOLVE_RESULT,
-    NOTE_CONTEXT_RESULT,
-    SESSION_HISTORY_REQUEST,
-    SESSION_HISTORY_RESULT,
     SESSION_UPDATE_REQUEST,
     SETTINGS_SNAPSHOT,
 )
@@ -63,6 +54,8 @@ class ChatHandlerService(BaseService):
         context_manager: ContextManager,
         obsidian=None,
         session=None,
+        *,
+        context_assembler: CapabilityContextAssembler | None = None,
     ) -> None:
         super().__init__(bus)
         self._context_manager = context_manager
@@ -70,17 +63,16 @@ class ChatHandlerService(BaseService):
         self._session = session
         self._default_model = "llama3.2:3b"
         self._provider = "ollama"
+        self._assembler = context_assembler or CapabilityContextAssembler(
+            bus,
+            context_manager,
+            obsidian=obsidian,
+        )
         self._unsubscribers: list[Callable[[], None]] = []
-        self._pending: dict[str, dict[str, object]] = {}
 
     def _on_load(self) -> None:
         self._unsubscribers.append(self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed))
         self._unsubscribers.append(self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot))
-        self._unsubscribers.append(self._bus.subscribe(NOTE_CONTEXT_RESULT, self._on_note_context_result))
-        self._unsubscribers.append(self._bus.subscribe(MEMORY_LOOKUP_RESULT, self._on_memory_lookup_result))
-        self._unsubscribers.append(self._bus.subscribe(SESSION_HISTORY_RESULT, self._on_session_history_result))
-        self._unsubscribers.append(self._bus.subscribe(MODEL_RESOLVE_RESULT, self._on_model_resolve_result))
-        self._unsubscribers.append(self._bus.subscribe(ENTITY_CONTEXT_RESULT, self._on_entity_context_result))
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -92,60 +84,8 @@ class ChatHandlerService(BaseService):
             event.payload.get("default_model", self._default_model)
         )
         self._provider = str(event.payload.get("provider", self._provider)).strip() or "ollama"
-
-    def _request_result(self, request_id: str) -> dict[str, object]:
-        entry = self._pending.setdefault(request_id, {})
-        return entry
-
-    def _publish_request(self, topic: str, request_id: str, payload: dict[str, object]) -> None:
-        self._bus.publish(topic, {"request_id": request_id, **payload}, source=self.name)
-
-    def _on_note_context_result(self, event: Event) -> None:
-        request_id = str(event.payload.get("request_id", ""))
-        if request_id:
-            self._request_result(request_id)["notes"] = list(event.payload.get("notes", []))
-
-    def _on_memory_lookup_result(self, event: Event) -> None:
-        request_id = str(event.payload.get("request_id", ""))
-        if request_id:
-            self._request_result(request_id)["graph_snippets"] = list(event.payload.get("snippets", []))
-
-    def _on_session_history_result(self, event: Event) -> None:
-        request_id = str(event.payload.get("request_id", ""))
-        if request_id:
-            self._request_result(request_id)["history"] = list(event.payload.get("history", []))
-
-    def _on_model_resolve_result(self, event: Event) -> None:
-        request_id = str(event.payload.get("request_id", ""))
-        if request_id:
-            entry = self._request_result(request_id)
-            entry["model"] = str(event.payload.get("model", self._default_model))
-            provider = str(event.payload.get("provider", "")).strip()
-            if provider:
-                entry["provider"] = provider
-
-    def _on_entity_context_result(self, event: Event) -> None:
-        request_id = str(event.payload.get("request_id", ""))
-        if request_id:
-            self._request_result(request_id)["entity_snippets"] = list(
-                event.payload.get("snippets", [])
-            )
-
-    @staticmethod
-    def _session_scope_from_event(event: Event, args: dict) -> dict[str, str]:
-        scope: dict[str, str] = {}
-        for key in (
-            "workspace_entity_id",
-            "workspace_entity_type",
-            "workspace_entity_title",
-            "workspace_entity_description",
-            "workspace_entity_url",
-            "workspace_entity_path",
-        ):
-            value = str(event.payload.get(key) or args.get(key, "")).strip()
-            if value:
-                scope[key] = value
-        return scope
+        self._assembler._default_model = self._default_model
+        self._assembler._default_provider = self._provider
 
     def _on_command_routed(self, event: Event) -> None:
         if event.payload.get("intent") != INTENT_CHAT:
@@ -172,100 +112,66 @@ class ChatHandlerService(BaseService):
             )
             return
 
-        request_id = uuid.uuid4().hex
-        self._pending[request_id] = {}
+        request_id = str(event.payload.get("request_id") or "").strip() or uuid.uuid4().hex
+        if is_orchestration_handled(request_id):
+            logger.info(
+                "chat.deferred_orchestration request_id=%s",
+                request_id,
+            )
+            return
+        if is_externally_handled(request_id):
+            logger.info(
+                "chat.deferred_external request_id=%s provider=non-native",
+                request_id,
+            )
+            # Full auto-fallback after a failed external invoke (post sidecar error)
+            # is deferred: sidecar publishes CHAT_ERROR and clears the external mark,
+            # but this handler does not re-run. Pre-invoke fallback uses CAPABILITY_FALLBACK
+            # without marking external, so native assembly proceeds on the same bus turn.
+            return
+
         logger.info("chat.request_started request_id=%s query_len=%d", request_id, len(query))
 
-        notes_raw = args.get("notes")
-        notes: list[str] = []
-        if isinstance(notes_raw, list):
-            notes = [str(n) for n in notes_raw if str(n).strip()]
-        if self._obsidian is not None:
-            notes.extend(str(n) for n in self._obsidian.get_context_notes() if str(n).strip())
-
-        session_scope = self._session_scope_from_event(event, args)
-        memory_scope: dict[str, object] = {"query": query}
-        workspace_id = str(
-            event.payload.get("workspace_id") or args.get("workspace_id", "")
-        ).strip()
-        if workspace_id:
-            memory_scope["workspace_id"] = workspace_id
-        self._publish_request(MEMORY_LOOKUP_REQUEST, request_id, memory_scope)
-        self._publish_request(SESSION_HISTORY_REQUEST, request_id, session_scope)
-        workspace_entity_id = str(
-            event.payload.get("workspace_entity_id") or args.get("workspace_entity_id", "")
-        ).strip()
-        workspace_entity_type = str(
-            event.payload.get("workspace_entity_type")
-            or args.get("workspace_entity_type", "")
-        ).strip()
-        model_payload: dict[str, object] = {"intent": INTENT_CHAT, "query": query}
-        if workspace_entity_type:
-            model_payload["workspace_entity_type"] = workspace_entity_type
-            model_payload["workspace_task_hint"] = f"entity:{workspace_entity_type}"
-        self._publish_request(MODEL_RESOLVE_REQUEST, request_id, model_payload)
-
-        if workspace_entity_id:
-            self._publish_request(
-                ENTITY_CONTEXT_REQUEST,
-                request_id,
-                {"entity_id": workspace_entity_id},
-            )
-
-        pending = self._pending.get(request_id, {})
-        graph_snippets = [str(n) for n in pending.get("graph_snippets", []) if str(n).strip()]
-        entity_snippets = [
-            str(n) for n in pending.get("entity_snippets", []) if str(n).strip()
-        ]
-        if entity_snippets:
-            graph_snippets = entity_snippets + graph_snippets
-        elif workspace_entity_id:
-            fallback = format_entity_context(
-                {
-                    "entity_id": workspace_entity_id,
-                    "entity_type": workspace_entity_type or "entity",
-                    "entity_title": str(
-                        event.payload.get("workspace_entity_title")
-                        or args.get("workspace_entity_title", workspace_entity_id)
-                    ),
-                    "entity_description": str(
-                        event.payload.get("workspace_entity_description")
-                        or args.get("workspace_entity_description", "")
-                    ),
-                    "url": str(
-                        event.payload.get("workspace_entity_url")
-                        or args.get("workspace_entity_url", "")
-                    ),
-                    "path": str(
-                        event.payload.get("workspace_entity_path")
-                        or args.get("workspace_entity_path", "")
-                    ),
-                }
-            )
-            if fallback:
-                graph_snippets.insert(0, fallback)
-        history = pending.get("history")
-        model = str(pending.get("model", self._default_model))
-        provider = str(pending.get("provider", self._provider))
-
-        bundle = self._context_manager.build_context(
-            query,
+        assembled = self._assembler.assemble_for_command(
+            request_id=request_id,
+            query=query,
+            event_payload=dict(event.payload),
+            args=dict(args),
+            source=self.name,
+            include_model_resolve=True,
             clipboard=clipboard_text,
-            notes=notes or None,
-            graph_snippets=graph_snippets or None,
-            conversation_history=history if isinstance(history, list) else None,
-            clipboard_intent=clip_intent,
         )
+        bundle = assembled.bundle
+        session_scope = assembled.session_scope
+        model = assembled.model
+        provider = assembled.provider
+
         budget = self._context_manager.context_budget_tokens
+        workspace_id = str(session_scope.get("workspace_id", "")).strip()
         self._bus.publish(
             CONTEXT_SNAPSHOT_CREATED,
             {
                 "context_size_tokens": bundle.token_estimate,
                 "sources": list(bundle.sources),
                 "budget_tokens": budget,
+                "workspace_id": workspace_id,
+                "workspace_context_snippets": list(assembled.workspace_context_snippets),
             },
             source=self.name,
         )
+        if assembled.workspace_context_snippets:
+            self._bus.publish(
+                CONTEXT_COMPLETE,
+                {
+                    "request_id": request_id,
+                    "workspace_id": workspace_id,
+                    "snippet_count": len(assembled.workspace_context_snippets),
+                    "workspace_context_snippets": list(
+                        assembled.workspace_context_snippets
+                    ),
+                },
+                source=self.name,
+            )
         if bundle.token_estimate >= budget:
             self._bus.publish(
                 CONTEXT_OVER_BUDGET,
@@ -336,6 +242,3 @@ class ChatHandlerService(BaseService):
             },
             source=self.name,
         )
-        self._pending.pop(request_id, None)
-
-

@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from ai_command_center.domain.capability_provider_settings import (
+    DEFAULT_CAPABILITY_PROVIDER_MAP,
+)
+from ai_command_center.platform.model_registry import DEFAULT_MODEL_TIER_MAP
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +20,9 @@ class SettingsSnapshot:
     accent: str = "#3B82F6"
     default_model: str = "llama3.2:3b"
     summarize_model: str = "llama3.2:3b"
+    model_tier_map: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_MODEL_TIER_MAP)
+    )
     ollama_url: str = "http://localhost:11434"
     hotkey: str = "alt+space"
     low_memory_mode: bool = False
@@ -32,8 +40,19 @@ class SettingsSnapshot:
     vault_path: str | Path = ""
     overlay_hotkey: str = "alt+space"
     telemetry_enabled: bool = True
-    model_tier_map: dict[str, str] | None = None
-    schema_version: int = 1
+    otel_enabled: bool = False
+    otel_endpoint: str = "http://127.0.0.1:4318"
+    schema_version: int = 6
+    capability_provider_map: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_CAPABILITY_PROVIDER_MAP)
+    )
+    qwenpaw_enabled: bool = False
+    qwenpaw_url: str = "http://127.0.0.1:8088"
+    qwenpaw_agent_id: str = "default"
+    qwenpaw_auto_start: bool = False
+    qwenpaw_python: str = ""
+    qwenpaw_auth_token: str = ""
+    mcp_servers: dict[str, dict[str, object]] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -41,6 +60,7 @@ class SettingsSnapshot:
             "accent": self.accent,
             "default_model": self.default_model,
             "summarize_model": self.summarize_model,
+            "model_tier_map": dict(self.model_tier_map),
             "ollama_url": self.ollama_url,
             "hotkey": self.hotkey,
             "low_memory_mode": self.low_memory_mode,
@@ -56,6 +76,18 @@ class SettingsSnapshot:
             "vault_path": str(self.vault_path),
             "overlay_hotkey": self.overlay_hotkey,
             "telemetry_enabled": self.telemetry_enabled,
-            "model_tier_map": dict(self.model_tier_map or {}),
+            "otel_enabled": self.otel_enabled,
+            "otel_endpoint": self.otel_endpoint,
             "schema_version": self.schema_version,
+            **{
+                f"capability_provider_{kind}": provider
+                for kind, provider in self.capability_provider_map.items()
+            },
+            "qwenpaw_enabled": self.qwenpaw_enabled,
+            "qwenpaw_url": self.qwenpaw_url,
+            "qwenpaw_agent_id": self.qwenpaw_agent_id,
+            "qwenpaw_auto_start": self.qwenpaw_auto_start,
+            "qwenpaw_python": self.qwenpaw_python,
+            "qwenpaw_auth_token": self.qwenpaw_auth_token,
+            "mcp_servers": dict(self.mcp_servers),
         }

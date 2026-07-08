@@ -47,7 +47,7 @@ Model                          Entities
 |---------|------|-------------|------|
 | **1 — Stabilization** | Make current architecture trustworthy | Architecture executes reliably | 1–2 weeks |
 | **2 — Enforcement** | Prevent regression | Contributors cannot reintroduce debt | 1 week (immediately after P1) |
-| **3 — Workspace Adoption** | Move runtime from chat system to workspace system | ≥50% interactive flows start from workspace | 4–8 weeks |
+| **3 — Workspace Adoption** | Move runtime from chat system to workspace system | >60% workspace runtime influence; five-pillar exit gate | 4–8 weeks |
 | **4 — Platform Expansion** | Add capability on correct foundation | Multi-provider, agents, workflows, Linux | After P1–P3 |
 
 **Sequencing rule:** Program 2 starts the week Program 1 exits. Program 3 runs in parallel with late P2 only after P1 exit criteria pass. Program 4 does not start until Program 3 hit **Emerging → Core** on the adoption scorecard (see §Program 3).
@@ -73,15 +73,15 @@ The following documents were **merged into this file and removed** on 2026-07-03
 |----|------|--------------|--------------|-------|
 | TD-01 | F821 `T` in Badge | **FIXED** | — | Appendix A FIX-001 |
 | TD-02 | F821 `Any` in WorkspaceOsService | **FIXED** | S8 | Keep F821 in CI |
-| TD-03 | ModelRouter in factory | **FIXED** | **S3** | Registry injection still open |
-| TD-04 | SystemView poll leak | **PARTIAL** | **S4** | `on_show`/`on_hide` wired; `_collect` race may reschedule poll |
+| TD-03 | ModelRouter in factory | **FIXED** | **S3** | Registry injected; single-provider LLM dispatch via payload filter |
+| TD-04 | SystemView poll leak | **FIXED** | **S4** | Generation token + mid-flight `_poll_live` checks stop reschedule after `on_hide` |
 | TD-05 | Inspector Tk marshal | **PARTIAL** | **S4** | `after(0)` added; migrate to `UIQueue` |
 | TD-06 | EventBus swallows errors | **FIXED** | S6 | `bus.handler_error` exists |
 | TD-07 | AppState listener errors | **FIXED** | S5 | `app.error` exists; verify `close()` everywhere |
-| TD-08 | `shell=True` | **HARDENED** | **S2** | Production sandbox + permission still open |
+| TD-08 | `shell=True` | **HARDENED** | **S2** | Production sandbox + permission gate — **done** |
 | TD-09 | Ruff F401 | **FIXED** | S8 | Maintain in CI |
 | TD-10 | `motion_widgets.py` | KEEP | — | No action |
-| TD-11 | Requirements drift | OPEN | S7 | Verify before dep removal |
+| TD-11 | Requirements drift | **VERIFIED** | S7 | `requirements.txt` matches runtime imports (2026-07-06 audit) |
 
 ### Former session TODO → program mapping
 
@@ -104,7 +104,7 @@ The following documents were **merged into this file and removed** on 2026-07-03
 
 | Track | Goal | Program | Item |
 |-------|------|---------|------|
-| 1 Stabilization | P0/P1 fixes | **1** | S1–S8 (largely done; S3/S4/S2 remain) |
+| 1 Stabilization | P0/P1 fixes | **1** | S1–S8 (**complete**; S7 doc-only) |
 | 2 Enforcement | warn → block | **2** | E1–E4 |
 | 4 R4 Async EventBus | Non-blocking dispatch | **1** | S1 (`tool.invoke` worker; R4b queue exists) |
 | 5 Structural refactor | God classes, UI violations | **1** + **3** | S7; W4 (`app.py` bus → AppState listeners) |
@@ -249,11 +249,11 @@ Architecture **executes reliably**: no UI freeze on shell, model path goes throu
 
 ### Exit criteria (Program 1)
 
-- [ ] `test_prompt_injection_sandbox` passes (xfail removed)
-- [ ] `test_eventbus_concurrency` + shutdown test green
-- [ ] Chat integration test proves `ModelRouterService` + single provider dispatch
-- [ ] SystemView navigation test: no psutil activity after `on_hide`
-- [ ] Topic counter visible in telemetry or system snapshot
+- [x] `test_prompt_injection_sandbox` passes (xfail removed)
+- [x] `test_eventbus_concurrency` + shutdown test green
+- [x] Chat integration test proves `ModelRouterService` + single provider dispatch
+- [x] SystemView navigation test: no psutil activity after `on_hide`
+- [x] Topic counter visible in telemetry or system snapshot
 
 ### Time
 
@@ -326,9 +326,11 @@ Without enforcement, Program 1 fixes get re-broken in the next PR.
 
 ## Program 3 — Workspace Adoption (Center of Gravity Shift)
 
+> **Execution spec:** [PROGRAM_3_WORKSPACE_ADOPTION.md](PROGRAM_3_WORKSPACE_ADOPTION.md) — canonical exit gate (>60% workspace influence), five-pillar completion checklist, phased roadmap (Phases 1–6), and WII scorecard. This section retains the W1–W4 backlog summary.
+
 ### Goal
 
-Move runtime activity from the **chat system** to the **workspace system**.
+Move runtime activity from the **chat system** to the **workspace system**. Target **>60% workspace runtime influence** with commands, memory, sessions, context, and tools executing through an **active workspace scope** (see linked doc).
 
 ### Critical clarification
 
@@ -492,6 +494,7 @@ Program 4 **does not start** until:
 | Capability | Audit status today | Prerequisite |
 |------------|-------------------|--------------|
 | **Multi-provider models** | Ollama + OpenAI wired; router keyword-only | S3 complete; provider registry dispatch |
+| **Provider platform** | CP1-FoundationBeta (SDK, tracing, inspector); CP2-ControlPlaneReady adds lifecycle manager + settings→tracing — see `docs/architecture/PROVIDER_PLATFORM.md` | Execution Envelope, Unified Receipts, Router v2 |
 | **Model tiers / task routing** | `classify_model()` warnings only | Workspace-scoped task hints |
 | **Agents** | `AgentRuntimeService` demo skeleton | W1 workspace scope; permission hardening |
 | **Workflows** | Linear executor; no repository | W3 bus-native tools; workspace context on steps |
@@ -731,6 +734,7 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 | `AGENTS.md` | Layer ownership rules |
 | `docs/ARCHITECTURE.md` | Runtime architecture (not backlog) |
 | `docs/architecture/WORKSPACE_VISION.md` | North star vision |
+| `docs/architecture/PROGRAM_3_WORKSPACE_ADOPTION.md` | Program 3 execution spec and exit gate |
 | `docs/architecture/MODEL_ORCHESTRATION.md` | Router sequence spec |
 | `docs/architecture/ASYNC_EVENTBUS_POLICY.md` | Dispatch tiers spec |
 | `scripts/audit_dependency_analysis.py` | Reproducible static analysis |
@@ -744,3 +748,4 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 | 2026-07-03 | Initial master backlog — audit consolidation into four programs |
 | 2026-07-03 | Merged `TODO_NEXT_SESSION.md`; file removed — single orchestration doc |
 | 2026-07-03 | Merged and deleted all `docs/development/*` backlog docs + `ARCHITECTURE_REVIEW_MULTI_AGENT.md` |
+| 2026-07-06 | Post-Program 3 backlog: S3/S4/S7 closed; W4 partial (`chat_state`, `workspace_state`); `PROGRAM4_GATE_STATUS.md` readiness assessment |

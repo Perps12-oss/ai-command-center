@@ -1,0 +1,19 @@
+id: system_facts
+name: System Facts
+version: "1.0"
+description: Truth-bound system time and environment facts
+kind: orchestration_provider
+entrypoint: builtin:system_facts
+intents:
+  - system_time_query
+permissions:
+  - shell.execute
+events:
+  - orchestration.receipt
+  - orchestration.run.snapshot
+  - orchestration.provider.health
+health_probe: provider.health
+dependencies: []
+certification_level: silver
+min_sdk_version: "1.0"
+enabled: true

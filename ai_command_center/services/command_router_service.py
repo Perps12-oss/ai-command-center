@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Callable
 
 from ai_command_center.core.contracts import COMMAND_ROUTED_VERSION
@@ -16,7 +17,14 @@ from ai_command_center.core.events.intents import (
     INTENT_NOTE_SEARCH,
     INTENT_SHELL,
 )
-from ai_command_center.core.events.topics import COMMAND_ROUTED, UI_COMMAND
+from ai_command_center.core.events.topics import (
+    COMMAND_DEFERRED,
+    COMMAND_ROUTED,
+    UI_COMMAND,
+    UI_WORKSPACE_REQUIRED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
+)
 from ai_command_center.services.base import BaseService
 
 _VIEW_ALIASES: dict[str, str] = {
@@ -29,6 +37,9 @@ _VIEW_ALIASES: dict[str, str] = {
     "system": "system",
     "memory": "memory",
 }
+
+# Navigation and inspector flows may proceed without an active workspace (soft gate).
+_WORKSPACE_OPTIONAL_INTENTS: frozenset[str] = frozenset({INTENT_NAVIGATE})
 
 # Obvious shell verbs when user omits the ">" prefix.
 _SHELL_VERBS: tuple[str, ...] = (
@@ -57,17 +68,34 @@ class CommandRouterService(BaseService):
     def __init__(self, bus) -> None:
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
+        self._active_workspace_id: str = ""
 
     def _on_load(self) -> None:
         self._unsubscribers.append(self._bus.subscribe(UI_COMMAND, self._on_ui_command))
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_ACTIVE, self._on_workspace_active)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_DEACTIVATED, self._on_workspace_deactivated)
+        )
 
-    def _on_unload(self) -> None:
-        for unsub in self._unsubscribers:
-            unsub()
-        self._unsubscribers.clear()
+    def _on_workspace_active(self, event: Event) -> None:
+        self._active_workspace_id = str(event.payload.get("workspace_id", "")).strip()
+
+    def _on_workspace_deactivated(self, event: Event) -> None:
+        cleared = str(event.payload.get("workspace_id", "")).strip()
+        if not cleared or cleared == self._active_workspace_id:
+            self._active_workspace_id = ""
+
+    def _resolve_active_workspace_id(self, event: Event) -> str:
+        payload_ws = str(event.payload.get("workspace_id", "")).strip()
+        return payload_ws or self._active_workspace_id
 
     @staticmethod
-    def _workspace_scope(event: Event) -> dict[str, str]:
+    def _requires_workspace(intent: str) -> bool:
+        return intent not in _WORKSPACE_OPTIONAL_INTENTS
+
+    def _workspace_scope(self, event: Event) -> dict[str, str]:
         """Intent-agnostic workspace scope from ui.command payload."""
         scope: dict[str, str] = {}
         workspace_entity_id = str(event.payload.get("workspace_entity_id", "")).strip()
@@ -87,16 +115,53 @@ class CommandRouterService(BaseService):
                 value = str(event.payload.get(key, "")).strip()
                 if value:
                     scope[key] = value
-        workspace_id = str(event.payload.get("workspace_id", "")).strip()
+        workspace_id = self._resolve_active_workspace_id(event)
         if workspace_id:
             scope["workspace_id"] = workspace_id
+        for key in (
+            "selected_entity_id",
+            "selected_entity_type",
+            "selected_entity_title",
+        ):
+            value = str(event.payload.get(key, "")).strip()
+            if value:
+                scope[key] = value
         return scope
+
+    def _on_unload(self) -> None:
+        for unsub in self._unsubscribers:
+            unsub()
+        self._unsubscribers.clear()
 
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
             return
         intent, args = self._classify(text)
+        active_workspace_id = self._resolve_active_workspace_id(event)
+        if self._requires_workspace(intent) and not active_workspace_id:
+            request_id = uuid.uuid4().hex
+            deferred_payload = {
+                "contract_version": COMMAND_ROUTED_VERSION,
+                "request_id": request_id,
+                "text": text,
+                "intent": intent,
+                "args": args,
+                "reason": "no_active_workspace",
+                "status": "deferred",
+            }
+            self._bus.publish(COMMAND_DEFERRED, deferred_payload, source=self.name)
+            self._bus.publish(
+                UI_WORKSPACE_REQUIRED,
+                {
+                    "reason": "no_active_workspace",
+                    "intent": intent,
+                    "text": text,
+                    "request_id": request_id,
+                },
+                source=self.name,
+            )
+            return
         clipboard = event.payload.get("clipboard")
         if clipboard and intent == INTENT_CHAT:
             args = {**args, "clipboard": str(clipboard)}
@@ -109,6 +174,7 @@ class CommandRouterService(BaseService):
                 args = {**args, "workspace_id": scope["workspace_id"]}
         payload: dict[str, object] = {
             "contract_version": COMMAND_ROUTED_VERSION,
+            "request_id": uuid.uuid4().hex,
             "text": text,
             "intent": intent,
             "args": args,

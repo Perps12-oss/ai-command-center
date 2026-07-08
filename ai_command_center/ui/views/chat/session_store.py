@@ -5,6 +5,8 @@ import time
 import uuid
 from typing import Callable
 
+from ai_command_center.ui.views.chat.conversation_metadata import ConversationMetadata
+
 
 def new_sid() -> str:
     return uuid.uuid4().hex[:8]
@@ -33,6 +35,35 @@ class SessionStore:
         self._sessions: dict[str, list[dict]] = {}
         self._session_id: str = new_sid()
         self._history: list[dict] = []
+        self._metadata: dict[str, ConversationMetadata] = {}
+
+    def ensure_metadata(
+        self,
+        sid: str,
+        *,
+        title: str | None = None,
+        provider_badge: str = "",
+    ) -> ConversationMetadata:
+        meta = self._metadata.get(sid)
+        if meta is None:
+            meta = ConversationMetadata(session_id=sid, title=title or "New Chat")
+            self._metadata[sid] = meta
+        if title:
+            meta.title = title
+        if provider_badge:
+            meta.provider_badge = provider_badge
+        meta.last_activity = time.time()
+        meta.message_count = len(self._sessions.get(sid, self._history))
+        return meta
+
+    def get_metadata(self, sid: str) -> ConversationMetadata | None:
+        return self._metadata.get(sid)
+
+    def all_metadata(self) -> list[ConversationMetadata]:
+        return list(self._metadata.values())
+
+    def remove_metadata(self, sid: str) -> None:
+        self._metadata.pop(sid, None)
 
     @property
     def session_id(self) -> str:
@@ -72,6 +103,7 @@ class SessionStore:
         """Remove a session. Returns True if it was the active session."""
         was_active = sid == self._session_id
         self._sessions.pop(sid, None)
+        self.remove_metadata(sid)
         return was_active
 
     def save_current_session(

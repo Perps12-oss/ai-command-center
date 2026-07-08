@@ -4,13 +4,18 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
+from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
+from ai_command_center.ui.views.providers_view import ProvidersView
+from ai_command_center.ui.views.capabilities_view import CapabilitiesView
+from ai_command_center.ui.views.artifacts_view import ArtifactsView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
@@ -22,6 +27,10 @@ VIEW_IDS: tuple[str, ...] = (
     "workspace",
     "home",
     "chat",
+    "executions",
+    "providers",
+    "capabilities",
+    "artifacts",
     "notes",
     "memory",
     "system",
@@ -55,6 +64,8 @@ class ViewManagerMixin:
             on_regenerate=self._on_chat_regenerate,
             on_send=self._on_chat_send,
             on_new_session=self._on_chat_new_session,
+            on_inspect_select=self._on_chat_inspect_select,
+            on_inspect_navigate=self._on_chat_inspect_navigate,
         )
         self._view_registry["notes"] = lambda: NotesView(
             self._content,
@@ -76,6 +87,13 @@ class ViewManagerMixin:
             self._content,
             on_toggle=self._controller.publish_plugin_toggle,
         )
+        self._view_registry["executions"] = lambda: ExecutionsView(
+            self._content,
+            on_select=self._on_execution_select,
+        )
+        self._view_registry["providers"] = lambda: ProvidersView(self._content)
+        self._view_registry["capabilities"] = lambda: CapabilitiesView(self._content)
+        self._view_registry["artifacts"] = lambda: ArtifactsView(self._content)
         self._view_registry["gallery"] = lambda: ComponentGalleryView(self._content)
 
     def _ensure_view(self, view_id: str) -> object:
@@ -115,6 +133,18 @@ class ViewManagerMixin:
         v = self._views.get("workspace")
         return v if isinstance(v, WorkspaceView) else None
 
+    def _workspace_os_routing_enabled(self) -> bool:
+        return self._default_view == "workspace"
+
+    def _policy_resolve_view(self, view_id: str) -> str:
+        """Workspace-centric routing: chat consumes active workspace scope."""
+        if not self._workspace_os_routing_enabled() or view_id != "chat":
+            return view_id
+        snap = self._controller.snapshot()
+        if str(snap.active_workspace_id).strip():
+            return "chat"
+        return "workspace"
+
     def _show_view(self, view_id: str) -> None:
         if view_id not in VIEW_IDS:
             view_id = "home"
@@ -144,6 +174,7 @@ class ViewManagerMixin:
         self._navigate(view_id)
 
     def _navigate(self, view_id: str, *, clear_chat_entity: bool = False) -> None:
+        view_id = self._policy_resolve_view(view_id)
         if view_id == "chat" and clear_chat_entity:
             self._controller.publish_clear_chat_entity()
         self._show_view(view_id)
@@ -156,13 +187,20 @@ class ViewManagerMixin:
         self._on_command(f"new note: {title} | {content}")
 
     def _on_open_chat_from_workspace(self, payload: dict) -> None:
+        workspace_id = str(payload.get("workspace_id", "")).strip()
+        entity_type = str(payload.get("entity_type", "")).strip()
+        if workspace_id and entity_type in ("card", "resource", "note"):
+            snap = self._controller.snapshot()
+            if str(snap.active_workspace_id).strip() != workspace_id:
+                self._controller.publish_select_workspace(workspace_id)
         self._controller.publish_open_chat(
             str(payload.get("entity_id", "")),
-            str(payload.get("entity_type", "")),
+            entity_type,
             str(payload.get("title", "")),
             description=str(payload.get("description", "")),
             url=str(payload.get("url", "")),
             path=str(payload.get("path", "")),
+            workspace_id=workspace_id,
         )
         self._navigate("chat")
 
@@ -174,3 +212,49 @@ class ViewManagerMixin:
 
     def _on_chat_send(self, text: str) -> None:
         self._on_command(text, workspace_entity=self._controller.active_chat_workspace_entity())
+
+    def _on_chat_inspect_select(self, ref: InspectableRef) -> None:
+        self._controller.publish_inspect_select(
+            ref.kind,
+            ref.ref_id,
+            label=ref.label,
+            payload=dict(ref.payload),
+        )
+
+    def _on_chat_inspect_navigate(self, ref: InspectableRef) -> None:
+        self._controller.publish_inspect_navigate(ref.kind, ref.ref_id, label=ref.label)
+
+    def _focus_inspect_navigate_target(self, ref: InspectableRef) -> None:
+        """Best-effort focus in the destination workspace after inspect navigate."""
+        if ref.kind == "artifact" and ref.ref_id:
+            artifacts = self._artifacts_view()
+            if artifacts is not None:
+                artifacts._viewer.show(
+                    ref.ref_id,
+                    kind="text",
+                    label=ref.label or ref.ref_id,
+                )
+        elif ref.kind == "message":
+            chat = self._chat_view()
+            if chat is not None:
+                chat.focus_input()
+
+    def _on_execution_select(self, run_id: str) -> None:
+        """Navigate to execution detail — placeholder until ExecutionDetailView is wired."""
+        pass
+
+    def _executions_view(self) -> "ExecutionsView | None":
+        v = self._views.get("executions")
+        return v if isinstance(v, ExecutionsView) else None
+
+    def _providers_view(self) -> ProvidersView | None:
+        v = self._views.get("providers")
+        return v if isinstance(v, ProvidersView) else None
+
+    def _capabilities_view(self) -> CapabilitiesView | None:
+        v = self._views.get("capabilities")
+        return v if isinstance(v, CapabilitiesView) else None
+
+    def _artifacts_view(self) -> ArtifactsView | None:
+        v = self._views.get("artifacts")
+        return v if isinstance(v, ArtifactsView) else None

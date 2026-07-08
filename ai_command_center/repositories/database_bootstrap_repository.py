@@ -79,10 +79,66 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """Add entity_id scope column to memory_nodes (Program 3 Phase 4)."""
+    cols = {
+        str(row[1] if isinstance(row, tuple) else row["name"])
+        for row in conn.execute("PRAGMA table_info(memory_nodes)").fetchall()
+    }
+    if "entity_id" not in cols:
+        conn.execute(
+            "ALTER TABLE memory_nodes ADD COLUMN entity_id TEXT NOT NULL DEFAULT ''"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_memory_nodes_entity "
+            "ON memory_nodes(workspace_id, entity_id)"
+        )
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """Add execution_runs table for Provider Platform time-travel diagnostics."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS execution_runs (
+            run_id TEXT PRIMARY KEY,
+            request_id TEXT NOT NULL,
+            source TEXT NOT NULL,
+            snapshot TEXT NOT NULL,
+            created_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_execution_runs_request ON execution_runs(request_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_runs_created ON execution_runs(created_at);
+        """
+    )
+
+
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    """Add workflow_runs table for Program 4 workflow persistence."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS workflow_runs (
+            run_id TEXT PRIMARY KEY,
+            workflow_id TEXT NOT NULL,
+            state TEXT NOT NULL,
+            total_steps INTEGER NOT NULL DEFAULT 0,
+            current_step_index INTEGER NOT NULL DEFAULT 0,
+            error TEXT NOT NULL DEFAULT '',
+            steps_json TEXT NOT NULL DEFAULT '[]',
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_workflow_runs_updated ON workflow_runs(updated_at);
+        """
+    )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
     (3, _migrate_v3),
+    (4, _migrate_v4),
+    (5, _migrate_v5),
+    (6, _migrate_v6),
 ]
 
 

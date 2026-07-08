@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai_command_center.core.state.inspector_state import resolve_inspect_navigate_view
 from ai_command_center.platform.secret_store import openai_api_key_configured
 from ai_command_center.ui.components.permission_dialog import PermissionDialog
 from ai_command_center.ui.design_system import theme_manager
@@ -93,6 +94,22 @@ class StateApplierMixin:
                 snap.chat_workspace_entity_title,
             )
             chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
+            if hasattr(chat, "update_inspector"):
+                chat.update_inspector(snap.execution_context)
+            if hasattr(chat, "show_inspector") and hasattr(chat, "clear_inspector"):
+                if snap.inspector.revision != getattr(self, "_last_inspector_revision", 0):
+                    if snap.inspector.selected is not None:
+                        chat.show_inspector(snap.inspector.selected)
+                    else:
+                        chat.clear_inspector()
+                    self._last_inspector_revision = snap.inspector.revision
+            if hasattr(chat, "update_chat_execution_status"):
+                status = "streaming" if snap.chat_streaming else str(snap.chat_status or "idle")
+                chat.update_chat_execution_status(
+                    status,
+                    snap.settings.provider,
+                    snap.settings.default_model,
+                )
 
             if snap.chat_history_revision != self._last_chat_history_revision:
                 messages = [
@@ -158,6 +175,17 @@ class StateApplierMixin:
                     self._top.update_status("error", snap.settings.default_model)
                     self._last_terminal_chat_key = terminal_key
 
+        if snap.inspector.navigate_revision != getattr(
+            self, "_last_inspector_navigate_revision", 0
+        ):
+            target = snap.inspector.navigate_target
+            if target is not None:
+                view_id = resolve_inspect_navigate_view(target.kind)
+                if view_id is not None:
+                    self._navigate(view_id)
+                    self._focus_inspect_navigate_target(target)
+            self._last_inspector_navigate_revision = snap.inspector.navigate_revision
+
         try:
             theme_manager.apply(
                 self,
@@ -195,10 +223,49 @@ class StateApplierMixin:
         if workspace:
             workspace.load_from_appstate(snap)
 
+        executions = self._executions_view()
+        if executions and hasattr(executions, "apply_state"):
+            executions.apply_state(list(snap.execution_runs))
+
+        providers = self._providers_view()
+        if providers and hasattr(providers, "apply_state"):
+            providers.apply_state(snap.provider_health_map, snap.runtime_capability_providers)
+
+        capabilities = self._capabilities_view()
+        if capabilities and hasattr(capabilities, "apply_state"):
+            capabilities.apply_state(snap.capability_lifecycle)
+
+        artifacts = self._artifacts_view()
+        if artifacts and hasattr(artifacts, "apply_state"):
+            artifact_items = [
+                {
+                    "artifact_id": str(getattr(a, "artifact_id", "")),
+                    "kind": str(getattr(a, "kind", "text")),
+                    "label": str(getattr(a, "label", "")),
+                }
+                for a in getattr(snap.execution_context, "artifacts", ())
+            ]
+            artifacts.apply_state(artifact_items)
+
         home = self._home_view()
-        if home and snap.chat_history_count:
-            home.update_stats(
-                messages=snap.chat_history_count,
-                memories=self._memory_count,
-                notes=self._note_count,
+        if home:
+            if snap.chat_history_count:
+                home.update_stats(
+                    messages=snap.chat_history_count,
+                    memories=self._memory_count,
+                    notes=self._note_count,
+                )
+            active_exec = sum(
+                1 for r in snap.execution_runs
+                if str(getattr(r, "source", "")) == "orchestration"
             )
+            provider_health = "healthy" if snap.provider_health_map else ""
+            artifact_count = len(getattr(snap.execution_context, "artifacts", ()))
+            pending = 1 if snap.pending_permission_check else 0
+            if hasattr(home, "update_execution_summary"):
+                home.update_execution_summary(
+                    active_count=active_exec,
+                    provider_health=provider_health,
+                    artifact_count=artifact_count,
+                    pending_approvals=pending,
+                )

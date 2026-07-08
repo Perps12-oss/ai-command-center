@@ -101,10 +101,17 @@ def test_live_environment_is_pure_arm64() -> None:
     Skipped unless we are actually on native ARM64; on x64/emulated hosts this is
     expected to fail (that is the whole point of the gate).
     """
-    from ai_command_center.platform.detector import is_arm64
+    import sys
+
+    from ai_command_center.platform.detector import get_pe_machine_type, is_arm64
 
     if not is_arm64():
         pytest.skip("host is not native ARM64; live-environment gate is N/A here")
+    if get_pe_machine_type(sys.executable) != "ARM64":
+        pytest.skip(
+            "Python interpreter is not native ARM64 PE "
+            "(x64/emulated runtime on ARM64 host); live-environment gate is N/A here"
+        )
 
     report = scanner.scan(scanner.default_scan_roots(), allow=set())
     assert not report["offenders"], (

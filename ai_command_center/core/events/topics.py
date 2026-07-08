@@ -21,9 +21,8 @@ Topic categories:
 - **Context** (`context.*`): context assembly and budget warnings.
 - **Session** (`session.*`): conversation history persistence.
 - **UI** (`ui.*`, `overlay.*`, `app.*`): user intent and overlay control.
-- **Workspace OS** (`ui.workspace_os.*`, `ui.inspector.*`): entity creation,
-  resource launch, and inspector control.
-- **Entity** (`entity.*`): entity lifecycle and relationship changes.
+- **Agent** (`agent.*`): spawn, task, pipeline lifecycle.
+- **Capability runtime** (`capability.*`): ARI classification, dispatch, streaming.
 """
 
 from __future__ import annotations
@@ -63,7 +62,9 @@ APP_ERROR = "app.error"
 APP_WARNING = "app.warning"
 BUS_HANDLER_ERROR = "bus.handler_error"
 COMMAND_ROUTED = "command.routed"
+COMMAND_DEFERRED = "command.deferred"
 UI_COMMAND = "ui.command"
+UI_WORKSPACE_REQUIRED = "ui.workspace.required"
 UI_NAVIGATE = "ui.navigate"
 UI_PALETTE_OPEN = "ui.palette_open"
 UI_PALETTE_CLOSE = "ui.palette_close"
@@ -72,6 +73,11 @@ UI_CHAT_NEW_SESSION = "ui.chat.new_session"
 OVERLAY_SHOW = "overlay.show"
 OVERLAY_HIDE = "overlay.hide"
 OVERLAY_ANCHOR = "overlay.anchor"
+
+# Global Inspector System — Design Item #2
+UI_INSPECT_SELECT = "ui.inspect.select"
+UI_INSPECT_CLEAR = "ui.inspect.clear"
+UI_INSPECT_NAVIGATE = "ui.inspect.navigate"
 
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
@@ -147,12 +153,24 @@ COMMAND_HISTORY = "command.history"
 # Workspace OS UI topics (Track B - Phase 2)
 UI_INSPECTOR_OPEN = "ui.inspector.open"
 UI_INSPECTOR_CLOSE = "ui.inspector.close"
+UI_ORCHESTRATION_INSPECTOR_OPEN = "ui.orchestration_inspector.open"
 UI_CREATE_WORKSPACE = "ui.workspace_os.create_workspace"
 UI_CREATE_CARD = "ui.workspace_os.create_card"
 UI_CREATE_RESOURCE = "ui.workspace_os.create_resource"
 UI_LAUNCH_RESOURCE = "ui.workspace_os.launch_resource"
 UI_OPEN_CHAT = "ui.workspace_os.open_chat"
+UI_SELECT_WORKSPACE = "ui.workspace_os.select_workspace"
+UI_SELECT_ENTITY = "ui.workspace_os.select_entity"
 UI_SEARCH_WORKSPACE_OS = "ui.workspace_os.search"
+
+# Workspace lifecycle (Program 3 — active workspace scope)
+WORKSPACE_CREATED = "workspace.created"
+WORKSPACE_ACTIVE = "workspace.active"
+WORKSPACE_ACTIVATED = "workspace.activated"
+WORKSPACE_DEACTIVATED = "workspace.deactivated"
+WORKSPACE_LAYOUT_CHANGED = "workspace.layout.changed"
+WORKSPACE_CONTEXT_REQUEST = "workspace.context.request"
+WORKSPACE_CONTEXT_RESULT = "workspace.context.result"
 
 # Agent framework (Track 7 — A0/A1)
 AGENT_SPAWN_REQUEST = "agent.spawn.request"
@@ -168,6 +186,26 @@ AGENT_PIPELINE_STAGE = "agent.pipeline.stage"
 AGENT_PIPELINE_PLANNED = "agent.pipeline.planned"
 AGENT_PIPELINE_COMPLETE = "agent.pipeline.complete"
 
+# Capability runtime (Agent Runtime Interface — Invariant 13)
+CAPABILITY_CLASSIFIED = "capability.classified"
+CAPABILITY_DISPATCH = "capability.dispatch"
+CAPABILITY_RUNTIME_REQUEST = "capability.runtime.request"
+CAPABILITY_STREAM = "capability.stream"
+CAPABILITY_COMPLETE = "capability.complete"
+CAPABILITY_ERROR = "capability.error"
+CAPABILITY_FALLBACK = "capability.fallback"
+CAPABILITY_PROVIDERS_READY = "capability.providers.ready"
+CAPABILITY_LIFECYCLE_SNAPSHOT = "capability.lifecycle.snapshot"
+
+# Truth-bound orchestration (deterministic intents, receipts, truth boundary)
+ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
+ORCHESTRATION_ROUTING_COMPLETED = "orchestration.routing.completed"
+ORCHESTRATION_PROVIDER_SELECTED = "orchestration.provider.selected"
+ORCHESTRATION_RECEIPT = "orchestration.receipt"
+ORCHESTRATION_TRUTH_VALIDATED = "orchestration.truth.validated"
+ORCHESTRATION_RUN_SNAPSHOT = "orchestration.run.snapshot"
+ORCHESTRATION_PROVIDER_HEALTH = "orchestration.provider.health"
+
 # Permission gate (Track 7 — supervised agent pre-flight)
 PERMISSION_CHECK_REQUEST = "permission.check.request"
 PERMISSION_CHECK_RESULT = "permission.check.result"
@@ -179,6 +217,7 @@ WORKFLOW_STEP_STARTED = "workflow.step.started"
 WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
 WORKFLOW_COMPLETED = "workflow.completed"
 WORKFLOW_FAILED = "workflow.failed"
+WORKFLOW_RUNS_LOADED = "workflow.runs.loaded"
 
 # Entity lifecycle (Workspace OS / entity service)
 ENTITY_CREATED = "entity.created"
@@ -204,6 +243,13 @@ ACTION_INVOKE_RESULT = "action.invoke.result"
 TIMELINE_RECORD_REQUEST = "timeline.record.request"
 TIMELINE_RECORD_RESULT = "timeline.record.result"
 SEARCH_RESULTS = "search.results"
+
+# Execution query (TODO 5 — Inspector docked panel)
+EXECUTION_QUERY_REQUEST = "execution.query.request"
+EXECUTION_QUERY_RESULT = "execution.query.result"
+
+# UI artifact actions (TODO 5/6 — artifact viewer bus integration)
+UI_ARTIFACT_ACTION = "ui.artifact.action"
 
 
 __all__ = [
@@ -235,7 +281,9 @@ __all__ = [
     "APP_WARNING",
     "BUS_HANDLER_ERROR",
     "COMMAND_ROUTED",
+    "COMMAND_DEFERRED",
     "UI_COMMAND",
+    "UI_WORKSPACE_REQUIRED",
     "UI_NAVIGATE",
     "UI_PALETTE_OPEN",
     "UI_PALETTE_CLOSE",
@@ -244,6 +292,9 @@ __all__ = [
     "OVERLAY_SHOW",
     "OVERLAY_HIDE",
     "OVERLAY_ANCHOR",
+    "UI_INSPECT_SELECT",
+    "UI_INSPECT_CLEAR",
+    "UI_INSPECT_NAVIGATE",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",
@@ -306,12 +357,22 @@ __all__ = [
     "COMMAND_HISTORY",
     "UI_INSPECTOR_OPEN",
     "UI_INSPECTOR_CLOSE",
+    "UI_ORCHESTRATION_INSPECTOR_OPEN",
     "UI_CREATE_WORKSPACE",
     "UI_CREATE_CARD",
     "UI_CREATE_RESOURCE",
     "UI_LAUNCH_RESOURCE",
     "UI_OPEN_CHAT",
+    "UI_SELECT_WORKSPACE",
+    "UI_SELECT_ENTITY",
     "UI_SEARCH_WORKSPACE_OS",
+    "WORKSPACE_CREATED",
+    "WORKSPACE_ACTIVE",
+    "WORKSPACE_ACTIVATED",
+    "WORKSPACE_DEACTIVATED",
+    "WORKSPACE_LAYOUT_CHANGED",
+    "WORKSPACE_CONTEXT_REQUEST",
+    "WORKSPACE_CONTEXT_RESULT",
     "AGENT_SPAWN_REQUEST",
     "AGENT_SPAWNED",
     "AGENT_TASK_REQUEST",
@@ -322,6 +383,22 @@ __all__ = [
     "AGENT_PIPELINE_STAGE",
     "AGENT_PIPELINE_PLANNED",
     "AGENT_PIPELINE_COMPLETE",
+    "CAPABILITY_CLASSIFIED",
+    "CAPABILITY_DISPATCH",
+    "CAPABILITY_RUNTIME_REQUEST",
+    "CAPABILITY_STREAM",
+    "CAPABILITY_COMPLETE",
+    "CAPABILITY_ERROR",
+    "CAPABILITY_FALLBACK",
+    "CAPABILITY_PROVIDERS_READY",
+    "CAPABILITY_LIFECYCLE_SNAPSHOT",
+    "ORCHESTRATION_INTENT_CLASSIFIED",
+    "ORCHESTRATION_ROUTING_COMPLETED",
+    "ORCHESTRATION_PROVIDER_SELECTED",
+    "ORCHESTRATION_RECEIPT",
+    "ORCHESTRATION_TRUTH_VALIDATED",
+    "ORCHESTRATION_RUN_SNAPSHOT",
+    "ORCHESTRATION_PROVIDER_HEALTH",
     "PERMISSION_CHECK_REQUEST",
     "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",
@@ -330,6 +407,7 @@ __all__ = [
     "WORKFLOW_STEP_COMPLETED",
     "WORKFLOW_COMPLETED",
     "WORKFLOW_FAILED",
+    "WORKFLOW_RUNS_LOADED",
     "ENTITY_CREATED",
     "ENTITY_UPDATED",
     "ENTITY_DELETED",
@@ -351,4 +429,7 @@ __all__ = [
     "TIMELINE_RECORD_REQUEST",
     "TIMELINE_RECORD_RESULT",
     "SEARCH_RESULTS",
+    "EXECUTION_QUERY_REQUEST",
+    "EXECUTION_QUERY_RESULT",
+    "UI_ARTIFACT_ACTION",
 ]

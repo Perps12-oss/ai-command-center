@@ -5,6 +5,13 @@ from pathlib import Path
 
 import customtkinter as ctk
 
+from ai_command_center.domain.capability_provider_settings import (
+    CAPABILITY_KIND_LABELS,
+    DEFAULT_CAPABILITY_PROVIDER_MAP,
+    capability_provider_label,
+    get_capability_provider_choices,
+    settings_key_for_kind,
+)
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.platform.secret_store import (
     openai_api_key_configured,
@@ -261,6 +268,96 @@ class SettingsView(ctk.CTkFrame):
         self._low_memory = ctk.CTkCheckBox(form, text="Low memory mode")
         self._low_memory.pack(anchor="w", padx=16, pady=8)
 
+        # QwenPaw sidecar section
+        qwenpaw = GlassCard(scroll)
+        qwenpaw.pack(fill="x", padx=T.PAD, pady=(0, 8))
+
+        ctk.CTkLabel(
+            qwenpaw,
+            text="QWENPAW SIDECAR",
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
+
+        self._qwenpaw_enabled = ctk.CTkCheckBox(qwenpaw, text="Enable QwenPaw sidecar")
+        self._qwenpaw_enabled.pack(anchor="w", padx=16, pady=(8, 4))
+        self._qwenpaw_url = self._field(qwenpaw, "QwenPaw URL", "http://127.0.0.1:8088")
+        self._qwenpaw_agent_id = self._field(qwenpaw, "QwenPaw agent id", "default")
+        self._qwenpaw_python = self._field(
+            qwenpaw,
+            "Python executable (3.13 venv for sidecar)",
+            "",
+        )
+        self._qwenpaw_auto_start = ctk.CTkCheckBox(qwenpaw, text="Auto-start sidecar on launch")
+        self._qwenpaw_auto_start.pack(anchor="w", padx=16, pady=(4, 8))
+
+        # Capability providers section
+        providers = GlassCard(scroll)
+        providers.pack(fill="x", padx=T.PAD, pady=(0, 8))
+
+        ctk.CTkLabel(
+            providers,
+            text="CAPABILITY PROVIDERS",
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
+
+        ctk.CTkLabel(
+            providers,
+            text="Route each capability to Native ACC, QwenPaw, or Auto (default policy).",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", padx=T.PAD, pady=(0, 8))
+
+        self._capability_providers: dict[str, ctk.CTkComboBox] = {}
+        combo_values = self._provider_combo_values()
+        for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
+            label = CAPABILITY_KIND_LABELS.get(kind, kind.title())
+            ctk.CTkLabel(providers, text=label, text_color=T.TEXT_MUTED).pack(
+                anchor="w", padx=16, pady=(8, 0)
+            )
+            combo = ctk.CTkComboBox(
+                providers,
+                values=combo_values,
+                width=280,
+                command=lambda _v, k=kind: self._on_capability_provider_change(k),
+            )
+            combo.pack(anchor="w", padx=16, pady=(4, 4))
+            self._capability_providers[kind] = combo
+
+        # Observability section
+        observability = GlassCard(scroll)
+        observability.pack(fill="x", padx=T.PAD, pady=(0, 8))
+
+        ctk.CTkLabel(
+            observability,
+            text="OBSERVABILITY",
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
+
+        ctk.CTkLabel(
+            observability,
+            text="OpenTelemetry tracing (export via OTLP). Enable only when debugging.",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", padx=T.PAD, pady=(0, 8))
+
+        self._otel_enabled = ctk.CTkCheckBox(observability, text="Enable OpenTelemetry tracing")
+        self._otel_enabled.pack(anchor="w", padx=16, pady=(4, 4))
+        self._otel_endpoint = self._field(
+            observability,
+            "OTLP endpoint (HTTP)",
+            "http://127.0.0.1:4318",
+        )
+
         save = ctk.CTkButton(form, text="Save settings", command=self._save)
         save.pack(anchor="w", padx=16, pady=(8, 16))
 
@@ -285,6 +382,51 @@ class SettingsView(ctk.CTkFrame):
         entry.insert(0, default)
         entry.pack(anchor="w", padx=16, pady=(4, 4))
         return entry
+
+    @staticmethod
+    def _provider_combo_values() -> list[str]:
+        return [
+            capability_provider_label(provider_id)
+            for provider_id in get_capability_provider_choices()
+        ]
+
+    @staticmethod
+    def _provider_label_to_value() -> dict[str, str]:
+        return {
+            capability_provider_label(provider_id): provider_id
+            for provider_id in get_capability_provider_choices()
+        }
+
+    @staticmethod
+    def _provider_value_to_label() -> dict[str, str]:
+        return {
+            provider_id: capability_provider_label(provider_id)
+            for provider_id in get_capability_provider_choices()
+        }
+
+    def _refresh_provider_combos(self) -> None:
+        """Refresh combo options after runtime provider discovery."""
+        values = self._provider_combo_values()
+        for combo in self._capability_providers.values():
+            combo.configure(values=values)
+
+    def _on_capability_provider_change(self, kind: str) -> None:
+        if self._building:
+            return
+        combo = self._capability_providers.get(kind)
+        if combo is None:
+            return
+        label = combo.get().strip()
+        value = self._provider_label_to_value().get(label, "auto")
+        self._on_save(settings_key_for_kind(kind), value)
+
+    def _set_capability_provider(self, kind: str, value: str) -> None:
+        combo = self._capability_providers.get(kind)
+        if combo is None:
+            return
+        choices = get_capability_provider_choices()
+        normalized = value if value in choices else "auto"
+        combo.set(self._provider_value_to_label().get(normalized, "Auto"))
 
     def _on_provider_change(self, value: str) -> None:
         self._update_provider_fields(value)
@@ -384,6 +526,34 @@ class SettingsView(ctk.CTkFrame):
         else:
             self._low_memory.deselect()
 
+        qwenpaw_enabled = getattr(settings, "qwenpaw_enabled", False)
+        if str(qwenpaw_enabled).lower() in ("true", "1", "yes"):
+            self._qwenpaw_enabled.select()
+        else:
+            self._qwenpaw_enabled.deselect()
+        self._set_entry(self._qwenpaw_url, getattr(settings, "qwenpaw_url", "http://127.0.0.1:8088"))
+        self._set_entry(self._qwenpaw_agent_id, getattr(settings, "qwenpaw_agent_id", "default"))
+        self._set_entry(self._qwenpaw_python, getattr(settings, "qwenpaw_python", ""))
+        if str(getattr(settings, "qwenpaw_auto_start", False)).lower() in ("true", "1", "yes"):
+            self._qwenpaw_auto_start.select()
+        else:
+            self._qwenpaw_auto_start.deselect()
+
+        otel_enabled = getattr(settings, "otel_enabled", False)
+        if str(otel_enabled).lower() in ("true", "1", "yes"):
+            self._otel_enabled.select()
+        else:
+            self._otel_enabled.deselect()
+        self._set_entry(
+            self._otel_endpoint,
+            str(getattr(settings, "otel_endpoint", "http://127.0.0.1:4318")),
+        )
+
+        self._refresh_provider_combos()
+        provider_map = getattr(settings, "capability_provider_map", None) or {}
+        for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
+            self._set_capability_provider(kind, str(provider_map.get(kind, "auto")))
+
         theme = getattr(settings, "theme", "dark")
         theme_name = theme if theme in T.THEMES else "VS Dark"
         for n, sw in self._swatches.items():
@@ -446,7 +616,22 @@ class SettingsView(ctk.CTkFrame):
             "obsidian_vault_path": vault,
             "overlay_mode": self._overlay_mode.get().strip(),
             "low_memory_mode": "true" if self._low_memory.get() else "false",
+            "qwenpaw_enabled": "true" if self._qwenpaw_enabled.get() else "false",
+            "qwenpaw_url": self._qwenpaw_url.get().strip(),
+            "qwenpaw_agent_id": self._qwenpaw_agent_id.get().strip(),
+            "qwenpaw_python": self._qwenpaw_python.get().strip(),
+            "qwenpaw_auto_start": "true" if self._qwenpaw_auto_start.get() else "false",
+            "otel_enabled": "true" if self._otel_enabled.get() else "false",
+            "otel_endpoint": self._otel_endpoint.get().strip(),
         }
+        for kind in DEFAULT_CAPABILITY_PROVIDER_MAP:
+            combo = self._capability_providers.get(kind)
+            if combo is None:
+                continue
+            label = combo.get().strip()
+            pairs[settings_key_for_kind(kind)] = self._provider_label_to_value().get(
+                label, "auto"
+            )
         for key, value in pairs.items():
             if key == "obsidian_vault_path" or value:
                 self._on_save(key, value)

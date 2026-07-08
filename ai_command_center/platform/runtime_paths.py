@@ -19,16 +19,9 @@ def get_install_dir() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def get_runtime_data_dir() -> Path:
-    """Application data directory (not in repo), selected by host OS."""
-    path = get_platform_data_root() / "AICommandCenter"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def get_platform_data_root() -> Path:
-    """Return the OS-specific user data root."""
-    if sys.platform.startswith("win"):
+def _runtime_data_base_dir() -> Path:
+    """OS-specific parent directory for application data (not in repo)."""
+    if sys.platform == "win32":
         appdata = os.environ.get("APPDATA")
         if not appdata:
             raise OSError("APPDATA environment variable is not set")
@@ -39,3 +32,10 @@ def get_platform_data_root() -> Path:
     if xdg:
         return Path(xdg)
     return Path.home() / ".local" / "share"
+
+
+def get_runtime_data_dir() -> Path:
+    """Application data directory (not in repo)."""
+    path = _runtime_data_base_dir() / "AICommandCenter"
+    path.mkdir(parents=True, exist_ok=True)
+    return path

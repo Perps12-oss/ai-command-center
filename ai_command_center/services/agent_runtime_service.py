@@ -538,11 +538,18 @@ class AgentRuntimeService(BaseService):
         if not task:
             self._terminate(agent_id)
             return
-        self._bus.publish(
-            UI_COMMAND,
-            {"text": task, "agent_id": agent_id, "request_id": request_id},
-            source=self.name,
-        )
+        command_payload: dict[str, object] = {
+            "text": task,
+            "agent_id": agent_id,
+            "request_id": request_id,
+        }
+        workspace_id = str(entry.get("workspace_id") or "").strip()
+        workspace_entity_id = str(entry.get("workspace_entity_id") or "").strip()
+        if workspace_id:
+            command_payload["workspace_id"] = workspace_id
+        if workspace_entity_id:
+            command_payload["workspace_entity_id"] = workspace_entity_id
+        self._bus.publish(UI_COMMAND, command_payload, source=self.name)
 
     def _on_chat_complete(self, event: Event) -> None:
         request_id = str(event.payload.get("request_id") or "")

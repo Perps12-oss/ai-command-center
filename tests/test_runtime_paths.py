@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 from ai_command_center.platform import runtime_paths
@@ -18,33 +20,35 @@ def test_get_install_dir_dev_points_at_repo_root() -> None:
         assert (runtime_paths.get_install_dir() / "main.py").is_file()
 
 
-def test_get_runtime_data_dir_uses_windows_appdata(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(runtime_paths.sys, "platform", "win32")
-    monkeypatch.setenv("APPDATA", str(tmp_path / "AppData" / "Roaming"))
-
-    path = runtime_paths.get_runtime_data_dir()
-
-    assert path == tmp_path / "AppData" / "Roaming" / "AICommandCenter"
+def test_runtime_data_dir_windows_uses_appdata(tmp_path) -> None:
+    with patch.object(sys, "platform", "win32"):
+        with patch.dict(os.environ, {"APPDATA": str(tmp_path)}, clear=False):
+            path = runtime_paths.get_runtime_data_dir()
+    assert path == tmp_path / "AICommandCenter"
     assert path.is_dir()
 
 
-def test_get_runtime_data_dir_uses_linux_xdg(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(runtime_paths.sys, "platform", "linux")
-    monkeypatch.delenv("APPDATA", raising=False)
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
-
+def test_runtime_data_dir_macos_uses_application_support(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     path = runtime_paths.get_runtime_data_dir()
-
-    assert path == tmp_path / "xdg" / "AICommandCenter"
-    assert path.is_dir()
-
-
-def test_get_runtime_data_dir_uses_macos_application_support(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(runtime_paths.sys, "platform", "darwin")
-    monkeypatch.delenv("APPDATA", raising=False)
-    monkeypatch.setattr(runtime_paths.Path, "home", classmethod(lambda _cls: tmp_path))
-
-    path = runtime_paths.get_runtime_data_dir()
-
     assert path == tmp_path / "Library" / "Application Support" / "AICommandCenter"
+    assert path.is_dir()
+
+
+def test_runtime_data_dir_linux_uses_xdg_data_home(tmp_path) -> None:
+    xdg = tmp_path / "xdg"
+    with patch.object(sys, "platform", "linux"):
+        with patch.dict(os.environ, {"XDG_DATA_HOME": str(xdg)}, clear=False):
+            path = runtime_paths.get_runtime_data_dir()
+    assert path == xdg / "AICommandCenter"
+    assert path.is_dir()
+
+
+def test_runtime_data_dir_linux_default_local_share(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    path = runtime_paths.get_runtime_data_dir()
+    assert path == tmp_path / ".local" / "share" / "AICommandCenter"
     assert path.is_dir()

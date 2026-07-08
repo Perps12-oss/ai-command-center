@@ -232,6 +232,36 @@ Constitutional Non-Circumvention
 
 No mechanism may bypass constitutional requirements through indirection, temporary exceptions, wrappers, aliases, compatibility layers, or migration paths.
 
+### Invariant 13
+
+Host Platform Supremacy
+
+AI Command Center owns:
+
+- User experience
+- Workspace
+- Orchestration
+- Application state
+- Workspace state
+- Platform governance
+
+External agent runtimes (QwenPaw, OpenHands, CrewAI, hosted LLM platforms, and similar) provide **capabilities** only.
+
+No external runtime may become the system of record for:
+
+- Application state
+- Workspace state
+- Platform governance
+- Settings
+- Authoritative memory
+- Authoritative conversation history
+
+External runtime state is ephemeral or bridged. ACC repositories and AppState projections remain authoritative.
+
+Capability providers must integrate through the Agent Runtime Interface (`docs/architecture/AGENT_RUNTIME_INTERFACE.md`). Direct UI coupling, shadow settings stores, or bypass of ContextManager for AI requests is prohibited.
+
+**Integration gate:** Before any external runtime (QwenPaw, OpenHands, CrewAI, hosted platforms) is wired into production paths, `AGENT_RUNTIME_INTERFACE.md` and its domain contracts must be current. A stable ARI turns future providers into adapters; an ad hoc integration creates architectural debt.
+
 ---
 
 # ARTICLE IV
@@ -262,6 +292,7 @@ Modification requires architectural review.
 - Telemetry System
 - Service Lifecycle Framework
 - Capability Registry
+- Agent Runtime Interface
 - Phase Ledger
 
 ---
@@ -277,6 +308,8 @@ No duplicate authority may be introduced.
 No shadow registry may be introduced.
 
 No derived representation may become authoritative.
+
+External capability runtimes are never authoritative owners. They may read bridged context and emit capability results; ACC persists, projects, and governs all durable state.
 
 When ambiguity exists:
 

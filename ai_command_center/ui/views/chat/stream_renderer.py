@@ -25,6 +25,37 @@ CLR_REGEN = "#3A3A5A"   # regenerate text at rest
 _logger = logging.getLogger(__name__)
 
 
+def _configure_markdown_tags(textbox: ctk.CTkTextbox) -> None:
+    """Configure markdown tags on the underlying tk.Text.
+
+    CTkTextbox.tag_config forbids ``font`` (scaling); the inner widget allows it.
+    """
+    tk_text = textbox._textbox
+    tk_text.tag_config("bold", font=(T.FONT_FAMILY, 14, "bold"))
+    tk_text.tag_config("italic", font=(T.FONT_FAMILY, 14, "italic"))
+    tk_text.tag_config(
+        "code",
+        font=(T.FONT_FAMILY, 13),
+        foreground=T.CODE_TEXT,
+        background=T.CODE_BG,
+    )
+    tk_text.tag_config(
+        "code_block",
+        font=(T.FONT_MONO, 12),
+        foreground=T.CODE_TEXT,
+        background=T.CODE_BG,
+        lmargin1=8,
+        lmargin2=8,
+    )
+    tk_text.tag_config(
+        "header",
+        font=(T.FONT_FAMILY, 16, "bold"),
+        foreground=T.TEXT_HEADING,
+    )
+    textbox.tag_config("list", foreground=T.TEXT_PRIMARY)
+    textbox.tag_config("cursor", foreground=T.ACCENT_DEFAULT)
+
+
 @dataclass
 class StreamTextBuffer:
     """Pure buffer for incremental stream rendering (testable without CTk)."""
@@ -63,7 +94,7 @@ class CopyBtn(ctk.CTkButton):
             width=22, height=18,
             font=T.FONT_SMALL,
             fg_color="transparent",
-            hover_color="transparent",
+            hover_color=T.BG_GLASS,
             text_color=CLR_META,
             corner_radius=T.SMALL_RADIUS,
             command=self._copy,
@@ -135,22 +166,7 @@ class AssistantBubble(ctk.CTkFrame):
             height=44,
         )
         self._textbox.pack(padx=16, pady=13)
-        self._textbox.tag_config("bold", font=(T.FONT_FAMILY, 14, "bold"))
-        self._textbox.tag_config("italic", font=(T.FONT_FAMILY, 14, "italic"))
-        self._textbox.tag_config(
-            "code", font=(T.FONT_FAMILY, 13), foreground=T.CODE_TEXT, background=T.CODE_BG
-        )
-        self._textbox.tag_config(
-            "code_block",
-            font=(T.FONT_MONO, 12),
-            foreground=T.CODE_TEXT,
-            background=T.CODE_BG,
-            lmargin1=8,
-            lmargin2=8,
-        )
-        self._textbox.tag_config("header", font=(T.FONT_FAMILY, 16, "bold"), foreground=T.TEXT_HEADING)
-        self._textbox.tag_config("list", foreground=T.TEXT_PRIMARY)
-        self._textbox.tag_config("cursor", foreground=T.ACCENT_DEFAULT)
+        _configure_markdown_tags(self._textbox)
         self._textbox.configure(state="disabled")
         self._write_placeholder()
         self._live = True
