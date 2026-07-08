@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from collections.abc import Callable
@@ -333,6 +334,23 @@ def _coerce_float(value: Any, default: float) -> float:
         return default
 
 
+def _coerce_model_tier_map(value: Any) -> dict[str, str]:
+    if isinstance(value, dict):
+        return {str(k): str(v) for k, v in value.items() if str(k).strip() and str(v).strip()}
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value or "{}")
+        except json.JSONDecodeError:
+            return {}
+        if isinstance(parsed, dict):
+            return {
+                str(k): str(v)
+                for k, v in parsed.items()
+                if str(k).strip() and str(v).strip()
+            }
+    return {}
+
+
 def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
     return SettingsSnapshot(
         theme=str(payload.get("theme", "dark")),
@@ -354,6 +372,7 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         vault_path=str(payload.get("vault_path", "")),
         overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
         telemetry_enabled=_coerce_bool(payload.get("telemetry_enabled", True)),
+        model_tier_map=_coerce_model_tier_map(payload.get("model_tier_map", {})),
         schema_version=_coerce_int(payload.get("schema_version", 1), 1),
     )
 

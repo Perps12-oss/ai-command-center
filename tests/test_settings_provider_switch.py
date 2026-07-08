@@ -31,6 +31,25 @@ class SettingsProviderSwitchTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_model_tier_map_round_trips_through_settings_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "settings.db"
+            db = connect(db_path)
+            init_database(db)
+            try:
+                bus = EventBus(debug_mode=True)
+                service = SettingsService(bus, SettingsRepository(db))
+                service.load()
+                service.set(
+                    "model_tier_map",
+                    {"entity:note": "qwen2.5:7b", "summarize": "llama3.1:8b"},
+                )
+                snap = service.get_snapshot()
+                self.assertEqual("qwen2.5:7b", snap.model_tier_map["entity:note"])
+                self.assertEqual("llama3.1:8b", snap.to_payload()["model_tier_map"]["summarize"])
+            finally:
+                db.close()
+
 
 if __name__ == "__main__":
     unittest.main()

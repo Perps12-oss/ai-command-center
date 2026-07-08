@@ -20,10 +20,22 @@ def get_install_dir() -> Path:
 
 
 def get_runtime_data_dir() -> Path:
-    """Application data directory (not in repo)."""
-    appdata = os.environ.get("APPDATA")
-    if not appdata:
-        raise OSError("APPDATA environment variable is not set")
-    path = Path(appdata) / "AICommandCenter"
+    """Application data directory (not in repo), selected by host OS."""
+    path = get_platform_data_root() / "AICommandCenter"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def get_platform_data_root() -> Path:
+    """Return the OS-specific user data root."""
+    if sys.platform.startswith("win"):
+        appdata = os.environ.get("APPDATA")
+        if not appdata:
+            raise OSError("APPDATA environment variable is not set")
+        return Path(appdata)
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    xdg = os.environ.get("XDG_DATA_HOME")
+    if xdg:
+        return Path(xdg)
+    return Path.home() / ".local" / "share"

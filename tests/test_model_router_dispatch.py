@@ -9,6 +9,7 @@ from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
     COMMAND_ROUTED,
     LLM_REQUEST,
+    MODEL_SELECTED,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
     MODEL_RESOLVE_REQUEST,
@@ -94,6 +95,45 @@ def test_model_router_resolves_provider_and_single_llm_handler() -> None:
     finally:
         ollama.stop()
         openai.stop()
+        router.stop()
+
+
+def test_model_router_uses_settings_backed_workspace_task_hint() -> None:
+    bus = EventBus()
+    router = ModelRouterService(bus, build_default_registry())
+    selected: list[dict] = []
+    resolved: list[dict] = []
+    bus.subscribe(MODEL_SELECTED, lambda e: selected.append(dict(e.payload)))
+    bus.subscribe(MODEL_RESOLVE_RESULT, lambda e: resolved.append(dict(e.payload)))
+
+    router.start()
+    try:
+        bus.publish(
+            SETTINGS_SNAPSHOT,
+            {
+                "default_model": "llama3.2:3b",
+                "provider": "ollama",
+                "model_tier_map": {"entity:note": "qwen2.5:7b", "summarize": "llama3.1:8b"},
+            },
+            source="test",
+        )
+        bus.publish(
+            MODEL_RESOLVE_REQUEST,
+            {
+                "request_id": "note-1",
+                "intent": "chat",
+                "query": "explain this note",
+                "workspace_task_hint": "entity:note",
+                "workspace_entity_type": "note",
+            },
+            source="test",
+        )
+
+        assert resolved[0]["model"] == "qwen2.5:7b"
+        assert resolved[0]["reason"] == "tier_map:entity:note"
+        assert selected[0]["workspace_task_hint"] == "entity:note"
+        assert selected[0]["workspace_entity_type"] == "note"
+    finally:
         router.stop()
 
 

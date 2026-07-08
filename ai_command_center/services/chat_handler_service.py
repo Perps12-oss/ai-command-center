@@ -192,11 +192,19 @@ class ChatHandlerService(BaseService):
             memory_scope["workspace_id"] = workspace_id
         self._publish_request(MEMORY_LOOKUP_REQUEST, request_id, memory_scope)
         self._publish_request(SESSION_HISTORY_REQUEST, request_id, session_scope)
-        self._publish_request(MODEL_RESOLVE_REQUEST, request_id, {"intent": INTENT_CHAT, "query": query})
-
         workspace_entity_id = str(
             event.payload.get("workspace_entity_id") or args.get("workspace_entity_id", "")
         ).strip()
+        workspace_entity_type = str(
+            event.payload.get("workspace_entity_type")
+            or args.get("workspace_entity_type", "")
+        ).strip()
+        model_payload: dict[str, object] = {"intent": INTENT_CHAT, "query": query}
+        if workspace_entity_type:
+            model_payload["workspace_entity_type"] = workspace_entity_type
+            model_payload["workspace_task_hint"] = f"entity:{workspace_entity_type}"
+        self._publish_request(MODEL_RESOLVE_REQUEST, request_id, model_payload)
+
         if workspace_entity_id:
             self._publish_request(
                 ENTITY_CONTEXT_REQUEST,
@@ -215,10 +223,7 @@ class ChatHandlerService(BaseService):
             fallback = format_entity_context(
                 {
                     "entity_id": workspace_entity_id,
-                    "entity_type": str(
-                        event.payload.get("workspace_entity_type")
-                        or args.get("workspace_entity_type", "entity")
-                    ),
+                    "entity_type": workspace_entity_type or "entity",
                     "entity_title": str(
                         event.payload.get("workspace_entity_title")
                         or args.get("workspace_entity_title", workspace_entity_id)

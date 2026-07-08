@@ -24,6 +24,7 @@ _DEFAULTS: dict[str, str] = {
     "ollama_keep_alive": "10m",
     "default_model": "llama3.2:3b",
     "summarize_model": "llama3.2:3b",
+    "model_tier_map": "{}",
     "hotkey": "alt+space",
     "low_memory_mode": "false",
     "window_width": "1100",

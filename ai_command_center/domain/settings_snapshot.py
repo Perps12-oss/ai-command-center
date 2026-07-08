@@ -32,6 +32,7 @@ class SettingsSnapshot:
     vault_path: str | Path = ""
     overlay_hotkey: str = "alt+space"
     telemetry_enabled: bool = True
+    model_tier_map: dict[str, str] | None = None
     schema_version: int = 1
 
     def to_payload(self) -> dict[str, Any]:
@@ -55,5 +56,6 @@ class SettingsSnapshot:
             "vault_path": str(self.vault_path),
             "overlay_hotkey": self.overlay_hotkey,
             "telemetry_enabled": self.telemetry_enabled,
+            "model_tier_map": dict(self.model_tier_map or {}),
             "schema_version": self.schema_version,
         }

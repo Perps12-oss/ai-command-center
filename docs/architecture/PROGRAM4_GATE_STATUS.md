@@ -8,12 +8,17 @@ Program 4 may not expand platform capabilities until:
 2. Program 2 local/CI enforcement remains active.
 3. Program 3 reports workspace-scoped adoption at or above the transition-plan midpoint.
 
+## Program 4 slice 1 status
+
+| Capability | Status |
+|------------|--------|
+| Model tiers | Implemented as settings-backed `model_tier_map` plus workspace task hints through `ModelRouterService` |
+| Platform paths | Implemented in `platform.runtime_paths` for Windows `%APPDATA%`, Linux XDG, and macOS Application Support |
+
 ## Allowed after Program 3 midpoint
 
 | Capability | Allowed scope |
 |------------|---------------|
-| Model tiers | Settings-backed tier map and workspace task hints through `ModelRouterService` |
-| Platform paths | OS-specific runtime directories behind `platform/` abstractions |
 | Tool workflows | Tool-only workflow persistence and AppState projection |
 | Plugin canvas entities | Publish plugin catalog items into Workspace OS entity topics |
 | Large context | Entity graph assembly through EventBus before `ContextManager.build_context()` |
