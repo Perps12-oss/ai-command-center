@@ -32,13 +32,15 @@ credentials.json
 
 data/
 
-# Cursor - UCGS kit is tracked under .cursor/rules and .cursor/hooks
+# Cursor - UCGS kit is tracked under .cursor/rules, .cursor/hooks, and .cursor/skills
 .cursor/*
 !.cursor/hooks.json
 !.cursor/hooks/
 !.cursor/hooks/**
 !.cursor/rules/
 !.cursor/rules/**
+!.cursor/skills/
+!.cursor/skills/**
 
 .vscode/
 .idea/

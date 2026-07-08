@@ -149,8 +149,10 @@ def test_command_router_classifies_spawn_and_multi_intents() -> None:
     bus.subscribe(COMMAND_ROUTED, lambda e: routed.append(dict(e.payload)))
     CommandRouterService(bus).start()
 
-    bus.publish(UI_COMMAND, {"text": "agent: spawn research"}, source="ui")
-    bus.publish(UI_COMMAND, {"text": "agents: demo"}, source="ui")
+    bus.publish(
+        UI_COMMAND, {"text": "agent: spawn research", "workspace_id": "ws-router"}, source="ui"
+    )
+    bus.publish(UI_COMMAND, {"text": "agents: demo", "workspace_id": "ws-router"}, source="ui")
 
     assert routed[0]["intent"] == INTENT_AGENT
     assert routed[0]["contract_version"] == COMMAND_ROUTED_VERSION
@@ -161,7 +163,9 @@ def test_command_router_classifies_spawn_and_multi_intents() -> None:
     assert routed[1]["args"]["spawn_mode"] == "multi"
     assert routed[1]["args"]["task"] == "multi-demo"
 
-    bus.publish(UI_COMMAND, {"text": "agents: pipeline demo"}, source="ui")
+    bus.publish(
+        UI_COMMAND, {"text": "agents: pipeline demo", "workspace_id": "ws-router"}, source="ui"
+    )
     assert routed[2]["intent"] == INTENT_AGENT
     assert routed[2]["args"]["spawn_mode"] == "pipeline"
     assert routed[2]["args"]["task"] == "pipeline-demo"

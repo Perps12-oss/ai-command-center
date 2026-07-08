@@ -28,6 +28,7 @@ AI Command Center is a **Workspace OS** — an ambient desktop command surface w
 | Document | Purpose |
 |----------|---------|
 | [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md) | **Only execution backlog** — Programs 1–4, audit, enforcement, gates |
+| [architecture/AGENT_RUNTIME_INTERFACE.md](architecture/AGENT_RUNTIME_INTERFACE.md) | **Capability provider contract** — host vs sidecar; integration gate for QwenPaw and future runtimes |
 
 ---
 
@@ -60,6 +61,7 @@ flowchart TB
     end
     subgraph Services
         CR[CommandRouter]
+        CapR[CapabilityRouter]
         CH[ChatHandler]
         MR[ModelRouter]
         TE[ToolExecutor]
@@ -87,6 +89,7 @@ flowchart TB
 | Agents (planned) | topics in `core/event_bus.py` | [AGENT_FRAMEWORK.md](architecture/AGENT_FRAMEWORK.md) |
 | Workflows (planned) | `core/workflow/` | [WORKFLOW_ENGINE.md](architecture/WORKFLOW_ENGINE.md) |
 | Chat | `services/chat_handler_service.py`, `ui/views/chat_view.py` | [CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md) |
+| UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [ACC_UI_REFURBISHMENT.md](architecture/ACC_UI_REFURBISHMENT.md) |
 | Platform | `platform/`, `utils/hotkey.py` | [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md), [PACKAGING_MSI_DESIGN.md](architecture/PACKAGING_MSI_DESIGN.md) |
 | EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — sync today; async dispatch design complete |
 | Tools | `tools/`, `services/tool_executor_service.py` | Phase 4B flow below |
@@ -396,7 +399,7 @@ Phase gates (Tracks 1–3, 4–5, 6.1–6.3): **complete**. All open work is in 
 
 | Program | Focus | Status |
 |---------|-------|--------|
-| 1 — Stabilization | Execution reliability, model router, shell hardening | **Active** — S3/S4/S2 remain |
+| 1 — Stabilization | Execution reliability, model router, shell hardening | **Mostly complete** — S1/S2 shell async + sandbox remain |
 | 2 — Enforcement | UCGS block local, arch baseline, contracts | After P1 exit |
 | 3 — Workspace Adoption | Shift gravity chat → workspace | After P1 exit |
 | 4 — Platform Expansion | Vectors, multi-agent, MSI, Linux | Gated on P3 |
@@ -406,7 +409,9 @@ Phase gates (Tracks 1–3, 4–5, 6.1–6.3): **complete**. All open work is in 
 | 6.4 Vector search | Program 4 — constitutional gate required |
 | 6.5 Multi-agent | Program 4 — Appendix C gate in transition plan |
 
-**Residual risks** (mapped to transition plan): settings re-export confusion (S7); `app.py` bus subscriptions (W4); `tools/tool_executor.py` stub (S7); hero_panel/layout violations **closed** in code.
+**Residual risks** (mapped to transition plan): `app.py` direct bus subscriptions (W4 measure); Inspector `after(0)` vs UIQueue (S4 minor); hero_panel/layout violations **closed** in code.
+
+Settings re-export (`core/settings/settings_repository.py`), `tools/tool_executor.py` execution contract, and telemetry re-export are **documented** (S7 closed 2026-07-06).
 
 ---
 

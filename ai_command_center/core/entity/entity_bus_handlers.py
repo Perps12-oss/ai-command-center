@@ -12,7 +12,9 @@ from uuid import UUID
 
 from ai_command_center.core.entity.entity_context import format_entity_context
 from ai_command_center.core.entity.entity import (
+    ENTITY_TYPE_CARD,
     ENTITY_TYPE_RESOURCE,
+    ENTITY_TYPE_WORKSPACE,
     RESOURCE_TYPE_COMMAND,
     RESOURCE_TYPE_FOLDER,
     RESOURCE_TYPE_URL,
@@ -31,8 +33,13 @@ from ai_command_center.core.events.topics import (
     RELATIONSHIP_CREATE_RESULT,
     TIMELINE_RECORD_REQUEST,
     TIMELINE_RECORD_RESULT,
+    SERVICE_READY,
+    UI_SELECT_ENTITY,
+    UI_SELECT_WORKSPACE,
     WORKSPACE_ADD_ENTITY_REQUEST,
     WORKSPACE_ADD_ENTITY_RESULT,
+    WORKSPACE_CONTEXT_REQUEST,
+    WORKSPACE_CONTEXT_RESULT,
     WORKSPACE_CREATE_REQUEST,
     WORKSPACE_CREATE_RESULT,
 )
@@ -54,6 +61,61 @@ def _publish_result(
     if not request_id:
         return
     bus.publish(topic, {"request_id": request_id, **payload}, source=source)
+
+
+def _resolve_parent_workspace_id(
+    entity_service: Any,
+    relationship_service: Any,
+    entity_id: UUID,
+    entity_type: str,
+) -> UUID | None:
+    """Resolve the parent workspace for a canvas entity (card, resource, note)."""
+    if entity_type == ENTITY_TYPE_WORKSPACE:
+        return entity_id
+    entity = entity_service.get(entity_id)
+    if entity is not None:
+        meta = dict(entity.metadata)
+        ws_raw = str(meta.get("workspace_id", "")).strip()
+        if ws_raw:
+            try:
+                return UUID(ws_raw)
+            except ValueError:
+                pass
+        card_raw = str(meta.get("card_id", "")).strip()
+        if card_raw:
+            try:
+                card_id = UUID(card_raw)
+            except ValueError:
+                card_id = None
+            if card_id is not None:
+                parent = _resolve_parent_workspace_id(
+                    entity_service,
+                    relationship_service,
+                    card_id,
+                    ENTITY_TYPE_CARD,
+                )
+                if parent is not None:
+                    return parent
+    if entity_type == ENTITY_TYPE_CARD:
+        for workspace in entity_service.get_by_type(ENTITY_TYPE_WORKSPACE):
+            child_ids = [
+                UUID(str(child))
+                for child in workspace.metadata.get("entities", [])
+            ]
+            if entity_id in child_ids:
+                return workspace.id
+    if entity_type == ENTITY_TYPE_RESOURCE:
+        for rel in relationship_service.get_by_target(entity_id):
+            if rel.relationship_type == RelationshipType.CONTAINS:
+                parent = _resolve_parent_workspace_id(
+                    entity_service,
+                    relationship_service,
+                    rel.source_id,
+                    ENTITY_TYPE_CARD,
+                )
+                if parent is not None:
+                    return parent
+    return None
 
 
 def register_entity_bus_handlers(
@@ -206,6 +268,103 @@ def register_entity_bus_handlers(
             source=source,
         )
 
+    def on_workspace_context_request(event: Event) -> None:
+        rid = _request_id(event)
+        workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
+        focus_entity_raw = str(event.payload.get("entity_id", "")).strip()
+        max_depth = int(event.payload.get("max_depth", 2) or 2)
+        if not workspace_id_raw:
+            _publish_result(
+                bus,
+                WORKSPACE_CONTEXT_RESULT,
+                rid,
+                {"snippets": []},
+                source=source,
+            )
+            return
+        try:
+            workspace_uuid = UUID(workspace_id_raw)
+        except ValueError:
+            _publish_result(
+                bus,
+                WORKSPACE_CONTEXT_RESULT,
+                rid,
+                {"snippets": [], "error": "invalid workspace_id"},
+                source=source,
+            )
+            return
+
+        workspace = entity_service.get(workspace_uuid)
+        if workspace is None or workspace.entity_type != ENTITY_TYPE_WORKSPACE:
+            _publish_result(
+                bus,
+                WORKSPACE_CONTEXT_RESULT,
+                rid,
+                {"snippets": []},
+                source=source,
+            )
+            return
+
+        snippets: list[str] = [
+            f"Active workspace: {workspace.title} (workspace_id={workspace.id})"
+        ]
+        child_ids_raw = workspace.metadata.get("entities", [])
+        child_lines: list[str] = []
+        for child_raw in child_ids_raw:
+            try:
+                child_id = UUID(str(child_raw))
+            except ValueError:
+                continue
+            child = entity_service.get(child_id)
+            if child is None:
+                continue
+            child_lines.append(
+                f"  - {child.entity_type}: \"{child.title}\" ({child.id})"
+            )
+        if child_lines:
+            snippets.append("Workspace entities:\n" + "\n".join(child_lines))
+
+        focus_uuid: UUID | None = None
+        if focus_entity_raw:
+            try:
+                focus_uuid = UUID(focus_entity_raw)
+            except ValueError:
+                focus_uuid = None
+        if focus_uuid is None:
+            focus_uuid = workspace_uuid
+
+        focus_entity = entity_service.get(focus_uuid)
+        if focus_entity is not None and focus_uuid != workspace_uuid:
+            focus_payload: dict[str, object] = {
+                "entity_id": str(focus_entity.id),
+                "entity_type": focus_entity.entity_type,
+                "entity_title": focus_entity.title,
+                "entity_description": focus_entity.description,
+            }
+            focus_snippet = format_entity_context(focus_payload)
+            if focus_snippet:
+                snippets.append(f"Selected entity:\n{focus_snippet}")
+
+        graph_lines = relationship_service.traverse_context_snippets(
+            focus_uuid,
+            entity_service,
+            max_depth=max_depth,
+        )
+        if graph_lines:
+            snippets.append("Relationship graph:\n" + "\n".join(graph_lines))
+
+        _publish_result(
+            bus,
+            WORKSPACE_CONTEXT_RESULT,
+            rid,
+            {
+                "snippets": snippets,
+                "workspace_id": workspace_id_raw,
+                "entity_id": str(focus_uuid),
+            },
+            source=source,
+        )
+
     def on_relationship_create_request(event: Event) -> None:
         rid = _request_id(event)
         payload = event.payload
@@ -246,6 +405,7 @@ def register_entity_bus_handlers(
                 title=str(payload["title"]),
                 description=str(payload.get("description", "")),
             )
+            workspace_service.activate(workspace.id)
             _publish_result(
                 bus,
                 WORKSPACE_CREATE_RESULT,
@@ -291,6 +451,56 @@ def register_entity_bus_handlers(
                 {"error": str(exc)},
                 source=source,
             )
+
+    def on_ui_select_entity(event: Event) -> None:
+        entity_id_raw = str(event.payload.get("entity_id", "")).strip()
+        entity_type = str(event.payload.get("entity_type", "")).strip()
+        workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
+        target_ws: UUID | None = None
+        if workspace_id_raw:
+            try:
+                target_ws = UUID(workspace_id_raw)
+            except ValueError:
+                target_ws = None
+        elif entity_type == ENTITY_TYPE_WORKSPACE and entity_id_raw:
+            try:
+                target_ws = UUID(entity_id_raw)
+            except ValueError:
+                target_ws = None
+        elif entity_id_raw:
+            try:
+                target_ws = _resolve_parent_workspace_id(
+                    entity_service,
+                    relationship_service,
+                    UUID(entity_id_raw),
+                    entity_type,
+                )
+            except ValueError:
+                target_ws = None
+        if target_ws is not None:
+            try:
+                workspace_service.activate(target_ws)
+            except ValueError:
+                pass
+
+    def on_ui_select_workspace(event: Event) -> None:
+        workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
+        if not workspace_id_raw:
+            workspace_service.deactivate()
+            return
+        try:
+            workspace_service.activate(UUID(workspace_id_raw))
+        except ValueError:
+            pass
+
+    def on_service_ready(event: Event) -> None:
+        if str(event.payload.get("service", "")).strip() != "workspace_os":
+            return
+        if workspace_service.get_active() is not None:
+            return
+        workspaces = workspace_service.get_all()
+        if workspaces:
+            workspace_service.activate(workspaces[0].id)
 
     def on_timeline_record_request(event: Event) -> None:
         rid = _request_id(event)
@@ -360,9 +570,13 @@ def register_entity_bus_handlers(
         bus.subscribe(ENTITY_CREATE_REQUEST, on_entity_create_request),
         bus.subscribe(ENTITY_SEARCH_REQUEST, on_entity_search_request),
         bus.subscribe(ENTITY_CONTEXT_REQUEST, on_entity_context_request),
+        bus.subscribe(WORKSPACE_CONTEXT_REQUEST, on_workspace_context_request),
         bus.subscribe(RELATIONSHIP_CREATE_REQUEST, on_relationship_create_request),
         bus.subscribe(WORKSPACE_CREATE_REQUEST, on_workspace_create_request),
         bus.subscribe(WORKSPACE_ADD_ENTITY_REQUEST, on_workspace_add_entity_request),
+        bus.subscribe(UI_SELECT_ENTITY, on_ui_select_entity),
+        bus.subscribe(UI_SELECT_WORKSPACE, on_ui_select_workspace),
+        bus.subscribe(SERVICE_READY, on_service_ready),
         bus.subscribe(TIMELINE_RECORD_REQUEST, on_timeline_record_request),
         bus.subscribe(ACTION_INVOKE_REQUEST, on_action_invoke_request),
     ]

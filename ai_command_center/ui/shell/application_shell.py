@@ -244,6 +244,25 @@ class ApplicationShellMixin:
 
         if workspace_entity is None:
             workspace_entity = self._controller.active_chat_workspace_entity()
+        if workspace_entity is None:
+            scope = self._controller.current_workspace_scope()
+            selected_id = str(
+                scope.get("workspace_entity_id") or scope.get("selected_entity_id") or ""
+            ).strip()
+            if selected_id:
+                workspace_entity = {
+                    "entity_id": selected_id,
+                    "entity_type": str(
+                        scope.get("workspace_entity_type")
+                        or scope.get("selected_entity_type")
+                        or "entity"
+                    ),
+                    "entity_title": str(
+                        scope.get("workspace_entity_title")
+                        or scope.get("selected_entity_title")
+                        or ""
+                    ),
+                }
         self._controller.publish_command(text, clipboard=clipboard, workspace_entity=workspace_entity)
 
     def _show_capability_help(self) -> None:

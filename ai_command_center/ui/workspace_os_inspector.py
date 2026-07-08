@@ -33,7 +33,7 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         bus: EventBus,
         state_store: AppStateStore,
         *,
-        ui_queue: UIQueue | None = None,
+        ui_queue: UIQueue,
     ) -> None:
         super().__init__(master)
         self._bus = bus
@@ -142,11 +142,8 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         )
 
     def _schedule_refresh(self) -> None:
-        """Marshal UI refresh onto the Tk main thread via UIQueue when available."""
-        if self._ui_queue is not None:
-            self._ui_queue.enqueue(self._refresh)
-        elif self.winfo_exists():
-            self.after(0, self._refresh)
+        """Marshal UI refresh onto the Tk main thread via UIQueue."""
+        self._ui_queue.enqueue(self._refresh)
 
     def _on_close(self) -> None:
         """Close the inspector and clean up subscriptions."""

@@ -113,7 +113,11 @@ def test_model_router_uses_settings_backed_workspace_task_hint() -> None:
             {
                 "default_model": "llama3.2:3b",
                 "provider": "ollama",
-                "model_tier_map": {"entity:note": "qwen2.5:7b", "summarize": "llama3.1:8b"},
+                "model_tier_map": {
+                    "fast": "llama3.2:3b",
+                    "balanced": "llama3.2:3b",
+                    "reasoning": "qwen2.5:7b",
+                },
             },
             source="test",
         )
@@ -122,17 +126,18 @@ def test_model_router_uses_settings_backed_workspace_task_hint() -> None:
             {
                 "request_id": "note-1",
                 "intent": "chat",
-                "query": "explain this note",
-                "workspace_task_hint": "entity:note",
-                "workspace_entity_type": "note",
+                "query": "implement this card",
+                "workspace_id": "ws-1",
+                "selected_entity_id": "card-1",
+                "selected_entity_type": "card",
             },
             source="test",
         )
 
         assert resolved[0]["model"] == "qwen2.5:7b"
-        assert resolved[0]["reason"] == "tier_map:entity:note"
-        assert selected[0]["workspace_task_hint"] == "entity:note"
-        assert selected[0]["workspace_entity_type"] == "note"
+        assert selected[0]["reason"] == "workspace_task_hint"
+        assert selected[0]["routing_tier"] == "reasoning"
+        assert selected[0]["selected_entity_type"] == "card"
     finally:
         router.stop()
 

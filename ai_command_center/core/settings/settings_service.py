@@ -1,4 +1,11 @@
-﻿"""Settings service placeholder for the architecture enforcement spec."""
+﻿"""Core settings schema and repository facade (not the EventBus service).
+
+Canonical persistence: ``repositories.settings_repository.SettingsRepository``.
+Bus-facing I/O: ``services.settings_service.SettingsService``.
+
+This module owns schema validation, migration, and snapshot projection helpers
+used by the services-layer SettingsService — it is not a duplicate stub.
+"""
 
 from __future__ import annotations
 
@@ -10,24 +17,11 @@ from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT, SETTINGS_UPD
 from ai_command_center.core.settings.migration_manager import MigrationManager
 from ai_command_center.core.settings.settings_repository import SettingsRepository
 from ai_command_center.core.settings.settings_schema import SettingsSchema
+from ai_command_center.domain.capability_provider_settings import (
+    capability_provider_map_from_payload,
+)
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
-
-
-def _model_tier_map_from_payload(value: Any) -> dict[str, str]:
-    if isinstance(value, dict):
-        return {str(k): str(v) for k, v in value.items() if str(k).strip() and str(v).strip()}
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value or "{}")
-        except json.JSONDecodeError:
-            return {}
-        if isinstance(parsed, dict):
-            return {
-                str(k): str(v)
-                for k, v in parsed.items()
-                if str(k).strip() and str(v).strip()
-            }
-    return {}
+from ai_command_center.platform.model_registry import normalize_tier_map
 
 
 class SettingsService:
@@ -52,6 +46,10 @@ class SettingsService:
             accent=str(payload.get("accent", "#3B82F6")),
             default_model=str(payload.get("default_model", "llama3.2:3b")),
             summarize_model=str(payload.get("summarize_model", "llama3.2:3b")),
+            model_tier_map=normalize_tier_map(
+                payload.get("model_tier_map"),
+                default_model=str(payload.get("default_model", "llama3.2:3b")),
+            ),
             ollama_url=str(payload.get("ollama_url", "http://localhost:11434")),
             hotkey=str(payload.get("hotkey", "alt+space")),
             low_memory_mode=bool(payload.get("low_memory_mode", False)),
@@ -69,8 +67,17 @@ class SettingsService:
             vault_path=payload.get("vault_path", ""),
             overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
             telemetry_enabled=bool(payload.get("telemetry_enabled", True)),
-            model_tier_map=_model_tier_map_from_payload(payload.get("model_tier_map", {})),
+            otel_enabled=bool(payload.get("otel_enabled", False)),
+            otel_endpoint=str(payload.get("otel_endpoint", "http://127.0.0.1:4318")),
             schema_version=int(payload.get("schema_version", 1)),
+            capability_provider_map=capability_provider_map_from_payload(payload),
+            qwenpaw_enabled=bool(payload.get("qwenpaw_enabled", False)),
+            qwenpaw_url=str(payload.get("qwenpaw_url", "http://127.0.0.1:8088")),
+            qwenpaw_agent_id=str(payload.get("qwenpaw_agent_id", "default")),
+            qwenpaw_auto_start=bool(payload.get("qwenpaw_auto_start", False)),
+            qwenpaw_python=str(payload.get("qwenpaw_python", "")),
+            qwenpaw_auth_token=str(payload.get("qwenpaw_auth_token", "")),
+            mcp_servers=dict(payload.get("mcp_servers") or {}),
         )
 
     def set(self, key: str, value: Any) -> None:

@@ -131,7 +131,7 @@ def test_multi_agent_demo_still_concurrent() -> None:
     spawn_requests: list[dict] = []
 
     bus.subscribe(AGENT_SPAWN_REQUEST, lambda e: spawn_requests.append(dict(e.payload)))
-    bus.publish(UI_COMMAND, {"text": "agents: demo"}, source="ui")
+    bus.publish(UI_COMMAND, {"text": "agents: demo", "workspace_id": "ws-multi"}, source="ui")
 
     assert len(spawn_requests) == 2
     assert store.snapshot.agent_pipeline_stage == ""

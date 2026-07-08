@@ -105,6 +105,16 @@ service_b.subscribe(...)
 
 via `EventBus`.
 
+### Rule 4 — Host platform supremacy (Invariant 13)
+
+AI Command Center owns user experience, workspace, and orchestration.
+
+External runtimes (QwenPaw, OpenHands, CrewAI, hosted LLM platforms) provide **capabilities** only.
+
+No external runtime may become the system of record for application state, workspace state, platform governance, settings, authoritative memory, or conversation history.
+
+Integrate external runtimes only through `docs/architecture/AGENT_RUNTIME_INTERFACE.md` and `ai_command_center/runtime/` providers. Do not embed third-party consoles or shadow ACC persistence.
+
 ---
 
 ## Canonical Domain Models

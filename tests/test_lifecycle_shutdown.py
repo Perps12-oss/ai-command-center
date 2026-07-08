@@ -19,6 +19,19 @@ from ai_command_center.db.connection import connect, init_database
 _WIN_TK = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only Tkinter UI")
 
 
+def _ctk_root_or_skip():
+    """Create a withdrawn CTk root; skip when Tk assets are unavailable."""
+    pytest.importorskip("customtkinter")
+    import customtkinter as ctk
+
+    try:
+        root = ctk.CTk()
+    except Exception as exc:  # noqa: BLE001 — TclError varies by platform
+        pytest.skip(f"Tk unavailable in this environment: {exc}")
+    root.withdraw()
+    return root
+
+
 def test_application_shutdown_closes_state_store() -> None:
     db = init_database(connect(Path(":memory:")))
     core = create_application(db=db, workspace_os_enabled=False)
@@ -114,9 +127,6 @@ def test_eventbus_topic_counts_in_system_snapshot() -> None:
 @_WIN_TK
 def test_system_view_on_hide_stops_psutil_activity(monkeypatch) -> None:
     """S4 — after on_hide(), psutil collection must not continue."""
-    pytest.importorskip("customtkinter")
-    import customtkinter as ctk
-
     from ai_command_center.ui.views import system_view as sv_mod
     from ai_command_center.ui.views.system_view import SystemView
 
@@ -153,8 +163,7 @@ def test_system_view_on_hide_stops_psutil_activity(monkeypatch) -> None:
     monkeypatch.setattr(sv_mod._psutil, "disk_io_counters", lambda: None)
     monkeypatch.setattr(sv_mod._psutil, "net_io_counters", lambda: None)
 
-    root = ctk.CTk()
-    root.withdraw()
+    root = _ctk_root_or_skip()
     try:
         view = SystemView(root)
         view.on_show()
@@ -166,9 +175,15 @@ def test_system_view_on_hide_stops_psutil_activity(monkeypatch) -> None:
         assert psutil_calls["n"] > 0, "expected psutil activity while visible"
 
         view.on_hide()
+        # Drain in-flight collector before sampling the post-hide baseline.
+        for _ in range(60):
+            root.update()
+            if not getattr(view, "_poll_in_flight", False):
+                break
+            root.after(25)
         count_at_hide = psutil_calls["n"]
 
-        for _ in range(40):
+        for _ in range(60):
             root.update()
             root.after(25)
 
@@ -182,13 +197,9 @@ def test_system_view_on_hide_stops_psutil_activity(monkeypatch) -> None:
 
 @_WIN_TK
 def test_system_view_on_hide_stops_poll_generation() -> None:
-    pytest.importorskip("customtkinter")
-    import customtkinter as ctk
-
     from ai_command_center.ui.views.system_view import SystemView
 
-    root = ctk.CTk()
-    root.withdraw()
+    root = _ctk_root_or_skip()
     try:
         view = SystemView(root)
         gen_before = view._poll_generation

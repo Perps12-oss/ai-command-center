@@ -15,6 +15,8 @@ from ai_command_center.core.events.topics import (
     SESSION_UPDATE_RESULT,
     UI_CHAT_NEW_SESSION,
     UI_OPEN_CHAT,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
 )
 from ai_command_center.repositories.conversation_repository import (
     CONTEXT_HISTORY_LIMIT,
@@ -38,6 +40,7 @@ class SessionService(BaseService):
         self._scope_entity_id = ""
         self._scope_entity_type = ""
         self._scope_entity_title = ""
+        self._active_workspace_id = ""
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -61,6 +64,20 @@ class SessionService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(UI_CHAT_NEW_SESSION, self._on_new_session)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_ACTIVE, self._on_workspace_active)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(WORKSPACE_DEACTIVATED, self._on_workspace_deactivated)
+        )
+
+    def _on_workspace_active(self, event: Event) -> None:
+        self._active_workspace_id = str(event.payload.get("workspace_id", "")).strip()
+
+    def _on_workspace_deactivated(self, event: Event) -> None:
+        cleared = str(event.payload.get("workspace_id", "")).strip()
+        if not cleared or cleared == self._active_workspace_id:
+            self._active_workspace_id = ""
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -100,6 +117,8 @@ class SessionService(BaseService):
             entity_type = self._scope_entity_type or "entity"
         if entity_id:
             return entity_conversation_id(entity_type, entity_id)
+        if self._active_workspace_id:
+            return entity_conversation_id("workspace", self._active_workspace_id)
         return DEFAULT_CONVERSATION_ID
 
     def _ensure_active_conversation(self, payload: dict) -> None:
@@ -128,7 +147,16 @@ class SessionService(BaseService):
             self._scope_entity_id = ""
             self._scope_entity_type = ""
             self._scope_entity_title = ""
-            self._switch_conversation(DEFAULT_CONVERSATION_ID)
+            workspace_id = (
+                self._active_workspace_id
+                or str(event.payload.get("workspace_id", "")).strip()
+            )
+            if workspace_id:
+                title = str(event.payload.get("title", "")).strip() or "Workspace"
+                cid = entity_conversation_id("workspace", workspace_id)
+                self._switch_conversation(cid, title=title[:80] or "Workspace")
+            else:
+                self._switch_conversation(DEFAULT_CONVERSATION_ID)
             return
         entity_type = str(event.payload.get("entity_type", "entity"))
         title = str(event.payload.get("title", entity_id))
