@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ai_command_center.core.event_bus import EventBus
@@ -10,6 +11,23 @@ from ai_command_center.core.settings.migration_manager import MigrationManager
 from ai_command_center.core.settings.settings_repository import SettingsRepository
 from ai_command_center.core.settings.settings_schema import SettingsSchema
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
+
+
+def _model_tier_map_from_payload(value: Any) -> dict[str, str]:
+    if isinstance(value, dict):
+        return {str(k): str(v) for k, v in value.items() if str(k).strip() and str(v).strip()}
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value or "{}")
+        except json.JSONDecodeError:
+            return {}
+        if isinstance(parsed, dict):
+            return {
+                str(k): str(v)
+                for k, v in parsed.items()
+                if str(k).strip() and str(v).strip()
+            }
+    return {}
 
 
 class SettingsService:
@@ -51,6 +69,7 @@ class SettingsService:
             vault_path=payload.get("vault_path", ""),
             overlay_hotkey=str(payload.get("overlay_hotkey", "alt+space")),
             telemetry_enabled=bool(payload.get("telemetry_enabled", True)),
+            model_tier_map=_model_tier_map_from_payload(payload.get("model_tier_map", {})),
             schema_version=int(payload.get("schema_version", 1)),
         )
 
@@ -61,6 +80,8 @@ class SettingsService:
                 validated = self._schema.validate(key, value)
             except (TypeError, ValueError):
                 validated = self._schema.fields[key].default
+        if isinstance(validated, dict):
+            validated = json.dumps(validated, sort_keys=True, separators=(",", ":"))
         self._repo.set(key, validated)
         if self._bus is not None:
             self._bus.publish(SETTINGS_UPDATED, {"key": key, "value": validated}, source="settings")

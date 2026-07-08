@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Callable
+from typing import Any, Callable
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
@@ -29,6 +30,7 @@ class ModelRouterService(BaseService):
         self._registry = provider_registry or build_default_registry()
         self._default_model = "llama3.2:3b"
         self._summarize_model = "llama3.2:3b"
+        self._model_tier_map: dict[str, str] = {}
         self._provider = "ollama"
         self._unsubscribers: list[Callable[[], None]] = []
 
@@ -55,32 +57,109 @@ class ModelRouterService(BaseService):
         provider = str(event.payload.get("provider", "")).strip()
         if provider:
             self._provider = provider
+        tier_map = event.payload.get("model_tier_map", {})
+        self._model_tier_map = self._parse_model_tier_map(tier_map)
 
     def _on_resolve_request(self, event: Event) -> None:
         intent = str(event.payload.get("intent", "chat"))
         query = str(event.payload.get("query", ""))
-        model, provider = self.resolve(intent=intent, query=query)
+        workspace_task_hint = str(event.payload.get("workspace_task_hint", "")).strip()
+        workspace_entity_type = str(event.payload.get("workspace_entity_type", "")).strip()
+        model, provider, reason = self._resolve_with_reason(
+            intent=intent,
+            query=query,
+            workspace_task_hint=workspace_task_hint,
+            workspace_entity_type=workspace_entity_type,
+        )
         self._bus.publish(
             MODEL_RESOLVE_RESULT,
             {
                 "request_id": event.payload.get("request_id", ""),
                 "model": model,
                 "provider": provider,
+                "reason": reason,
             },
             source=self.name,
         )
 
-    def resolve(self, *, intent: str, query: str) -> tuple[str, str]:
+    @staticmethod
+    def _parse_model_tier_map(value: Any) -> dict[str, str]:
+        if isinstance(value, dict):
+            return {
+                str(k).strip().lower(): str(v).strip()
+                for k, v in value.items()
+                if str(k).strip() and str(v).strip()
+            }
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value or "{}")
+            except json.JSONDecodeError:
+                return {}
+            if isinstance(parsed, dict):
+                return ModelRouterService._parse_model_tier_map(parsed)
+        return {}
+
+    def _mapped_model(self, *keys: str) -> tuple[str, str] | None:
+        for key in keys:
+            normalized = key.strip().lower()
+            if not normalized:
+                continue
+            model = self._model_tier_map.get(normalized)
+            if model:
+                return model, f"tier_map:{normalized}"
+        return None
+
+    def resolve(
+        self,
+        *,
+        intent: str,
+        query: str,
+        workspace_task_hint: str = "",
+        workspace_entity_type: str = "",
+    ) -> str:
+        """Return the selected model name; legacy verification scripts use this."""
+        model, _provider, _reason = self._resolve_with_reason(
+            intent=intent,
+            query=query,
+            workspace_task_hint=workspace_task_hint,
+            workspace_entity_type=workspace_entity_type,
+        )
+        return model
+
+    def _resolve_with_reason(
+        self,
+        *,
+        intent: str,
+        query: str,
+        workspace_task_hint: str = "",
+        workspace_entity_type: str = "",
+    ) -> tuple[str, str, str]:
         """Pick (model, provider) for a chat request via ProviderRegistry."""
         lower = query.lower()
-        if intent == "chat" and any(
+        mapped = self._mapped_model(
+            workspace_task_hint,
+            f"entity:{workspace_entity_type}" if workspace_entity_type else "",
+            workspace_entity_type,
+            intent,
+        )
+        if mapped is not None:
+            model, reason = mapped
+        elif intent == "chat" and any(
             token in lower for token in ("summarize", "summary", "tl;dr", "tldr")
         ):
-            model = self._summarize_model
-            reason = "summarize_intent"
+            mapped = self._mapped_model("summarize", "summary")
+            if mapped is not None:
+                model, reason = mapped
+            else:
+                model = self._summarize_model
+                reason = "summarize_intent"
         else:
-            model = self._default_model
-            reason = "default"
+            mapped = self._mapped_model("default")
+            if mapped is not None:
+                model, reason = mapped
+            else:
+                model = self._default_model
+                reason = "default"
         provider = (
             self._registry.resolve_for_model(model, provider=self._provider)
             or self._provider
@@ -100,7 +179,9 @@ class ModelRouterService(BaseService):
                 "reason": reason,
                 "provider": provider,
                 "tier": classify_model(model).value,
+                "workspace_task_hint": workspace_task_hint,
+                "workspace_entity_type": workspace_entity_type,
             },
             source=self.name,
         )
-        return model, provider
+        return model, provider, reason

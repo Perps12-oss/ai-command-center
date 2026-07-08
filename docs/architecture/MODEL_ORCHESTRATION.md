@@ -17,7 +17,7 @@ Define how AI Command Center selects, routes, and executes model requests withou
 | Component | Location | Status |
 |-----------|----------|--------|
 | ModelRouterService | `services/model_router_service.py` | Implemented; **wired in service_factory** |
-| Model registry / tiers | `platform/model_registry.py` | Static classification |
+| Model registry / tiers | `platform/model_registry.py`, settings `model_tier_map` | Static classification plus task-hint model map |
 | Chat integration | `services/chat_handler_service.py` | Publishes `model.resolve.request` and dispatches `llm.request` with provider |
 | Ollama/OpenAI execution | `services/ollama_http_service.py`, `services/openai_http_service.py` | Provider-filtered `llm.request` subscribers |
 
@@ -55,7 +55,7 @@ sequenceDiagram
 
 | Topic | Direction | Payload |
 |-------|-----------|---------|
-| `model.resolve.request` | ChatHandler → ModelRouter | `{request_id, intent, query}` |
+| `model.resolve.request` | ChatHandler → ModelRouter | `{request_id, intent, query, workspace_task_hint?, workspace_entity_type?}` |
 | `model.resolve.result` | ModelRouter → ChatHandler | `{request_id, model, provider}` |
 | `model.selected` | ModelRouter → AppState/Telemetry | `{model, provider, intent, reason, tier}` |
 | `settings.snapshot` | Settings → ModelRouter | `{default_model, summarize_model}` |
@@ -69,12 +69,12 @@ No service calls `ModelRouterService.resolve()` directly — only via bus reques
 | Phase | Scope | Acceptance |
 |-------|-------|------------|
 | **M0** | Static map; summarize keyword → summarize_model | Factory registration; tests pass |
-| **M1** | Tier table in settings; registry-driven | Settings schema v2 field `model_tier_map` |
+| **M1** | Tier table in settings; registry-driven | **Complete:** settings-backed `model_tier_map` |
 | **M2** | Context budget influences tier | Subscribe `context.over_budget` |
 | **M3** | Multi-provider router | **Complete for Ollama/OpenAI provider dispatch** |
 
-Program 4 may extend this with tier maps and workspace task hints only after the
-gate in `PROGRAM4_GATE_STATUS.md` is satisfied.
+Program 4 may further extend this with context-budget tier downgrade after the
+gate in `PROGRAM4_GATE_STATUS.md` remains satisfied.
 
 ---
 

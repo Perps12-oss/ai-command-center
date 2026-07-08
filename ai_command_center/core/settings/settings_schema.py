@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -33,6 +34,7 @@ class SettingsSchema:
             "accent": SettingsField("accent", str, "#3B82F6"),
             "default_model": SettingsField("default_model", str, "llama3.2:3b"),
             "summarize_model": SettingsField("summarize_model", str, "llama3.2:3b"),
+            "model_tier_map": SettingsField("model_tier_map", dict, {}),
             "ollama_url": SettingsField("ollama_url", str, "http://localhost:11434"),
             "ollama_keep_alive": SettingsField("ollama_keep_alive", str, "10m"),
             "hotkey": SettingsField("hotkey", str, "alt+space"),
@@ -70,6 +72,18 @@ class SettingsSchema:
             return value
         if field.value_type is Path:
             return Path(value) if not isinstance(value, Path) else value
+        if field.value_type is dict:
+            if isinstance(value, dict):
+                return {str(k): str(v) for k, v in value.items() if str(k).strip() and str(v).strip()}
+            if isinstance(value, str):
+                try:
+                    parsed = json.loads(value or "{}")
+                except json.JSONDecodeError as exc:
+                    raise TypeError(f"{field.name} must be a JSON object") from exc
+                if not isinstance(parsed, dict):
+                    raise TypeError(f"{field.name} must be a JSON object")
+                return {str(k): str(v) for k, v in parsed.items() if str(k).strip() and str(v).strip()}
+            raise TypeError(f"{field.name} must be a dict")
         if issubclass(field.value_type, Enum):
             if isinstance(value, field.value_type):
                 return value
