@@ -315,8 +315,27 @@ class EventCoordinatorMixin:
         )
 
     def _on_system_snapshot(self, event: Event) -> None:
-        """System snapshot is projected into AppState; view renders from there."""
-        self._ui_queue.enqueue(self._apply_state)
+        """Refresh system meters only; AppState owns structural projection."""
+        payload = event.payload or {}
+
+        def update() -> None:
+            if getattr(self, "_current_view", "") != "system":
+                return
+            system = self._system_view()
+            if system is None:
+                return
+            from ai_command_center.domain.system_snapshot import SystemSnapshot
+
+            system.apply_system_snapshot(
+                SystemSnapshot(
+                    cpu_percent=float(payload.get("cpu_percent", 0.0)),
+                    ram_percent=float(payload.get("ram_percent", 0.0)),
+                    ollama_online=bool(payload.get("ollama_online", False)),
+                    extra=dict(payload.get("extra", {})),
+                )
+            )
+
+        self._ui_queue.enqueue(update)
 
     def _on_ollama_status(self, event: Event) -> None:
         online = bool(event.payload.get("online", False))

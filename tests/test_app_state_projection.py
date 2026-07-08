@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from ai_command_center.core.app_state import AppStateStore
+from ai_command_center.core.app_state import AppStateStore, system_snapshot_metrics_only_delta
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     ENTITY_CREATED,
@@ -17,6 +17,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_STATE_CHANGED,
     SYSTEM_SNAPSHOT,
 )
+from ai_command_center.domain.system_snapshot import SystemSnapshot
 
 
 class AppStateProjectionTest(unittest.TestCase):
@@ -112,6 +113,45 @@ class AppStateProjectionTest(unittest.TestCase):
         self.assertEqual(snap.workspace_os.entity_count, 2)
         self.assertEqual(len(snap.workspace_os.entities), 2)
         self.assertEqual(snap.workspace_os.entities[0].title, "Proj")
+
+    def test_system_snapshot_metrics_only_delta_detects_polling_drift(self):
+        base = SystemSnapshot(
+            cpu_percent=10.0,
+            ram_percent=40.0,
+            ollama_online=True,
+            extra={"openai_online": True},
+        )
+        polled = SystemSnapshot(
+            cpu_percent=12.5,
+            ram_percent=41.2,
+            ollama_online=True,
+            extra={"openai_online": True, "eventbus_topic_counts": {"ui.command": 3}},
+        )
+        self.assertTrue(system_snapshot_metrics_only_delta(base, polled))
+
+    def test_system_snapshot_metrics_only_delta_false_when_ollama_changes(self):
+        base = SystemSnapshot(cpu_percent=10.0, ram_percent=40.0, ollama_online=True)
+        offline = SystemSnapshot(cpu_percent=10.0, ram_percent=40.0, ollama_online=False)
+        self.assertFalse(system_snapshot_metrics_only_delta(base, offline))
+
+    def test_metrics_only_system_snapshot_does_not_notify_listeners(self):
+        notifications: list[object] = []
+        self.store.subscribe(lambda _state: notifications.append(True))
+        self._publish(
+            SYSTEM_SNAPSHOT,
+            {"cpu_percent": 1.0, "ram_percent": 2.0, "ollama_online": True},
+        )
+        self.assertEqual(len(notifications), 1)
+        self._publish(
+            SYSTEM_SNAPSHOT,
+            {"cpu_percent": 3.0, "ram_percent": 4.0, "ollama_online": True},
+        )
+        self.assertEqual(len(notifications), 1)
+        self._publish(
+            SYSTEM_SNAPSHOT,
+            {"cpu_percent": 3.0, "ram_percent": 4.0, "ollama_online": False},
+        )
+        self.assertEqual(len(notifications), 2)
 
 
 if __name__ == "__main__":

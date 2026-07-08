@@ -686,6 +686,16 @@ class SystemView(ctk.CTkFrame):
         """Render agent and workflow run feeds from AppState projections."""
         if not hasattr(self, "_runs_log"):
             return
+        runs_key = (
+            getattr(snap, "agent_runs", ()),
+            getattr(snap, "workflow_runs", ()),
+            str(getattr(snap, "active_agent_run_id", "") or ""),
+            tuple(getattr(snap, "active_agent_run_ids", ()) or ()),
+            str(getattr(snap, "active_workflow_run_id", "") or ""),
+        )
+        if runs_key == getattr(self, "_last_runs_key", None):
+            return
+        self._last_runs_key = runs_key
         self._runs_log.clear()
         active_agent = str(getattr(snap, "active_agent_run_id", "") or "")
         active_agents = set(getattr(snap, "active_agent_run_ids", ()) or ())
