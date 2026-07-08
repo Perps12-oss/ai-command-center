@@ -16,12 +16,11 @@ def main() -> int:
     print("=== Contract Version Gate ===")
     failures: list[str] = []
 
-    from ai_command_center.core.context_manager import ContextBundle, ContextManager
+    from ai_command_center.core.context_manager import ContextManager
     from ai_command_center.core.contracts import (
         COMMAND_ROUTED_VERSION,
         CONTEXT_BUNDLE_VERSION,
         OLLAMA_SERVICE_API_VERSION,
-        SUPPORTED_VERSIONS,
     )
     from ai_command_center.core.event_bus import EventBus
     from ai_command_center.services.command_router_service import CommandRouterService
@@ -36,6 +35,7 @@ def main() -> int:
     bus.subscribe("command.routed", lambda e: payloads.append(dict(e.payload)))
     router = CommandRouterService(bus)
     router.load()
+    bus.publish("workspace.active", {"workspace_id": "contract-test"}, source="test")
     bus.publish("ui.command", {"text": "hello"}, source="test")
     router.unload()
 
