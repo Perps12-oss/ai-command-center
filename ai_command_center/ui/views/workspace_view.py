@@ -433,6 +433,16 @@ class WorkspaceView(ctk.CTkFrame):
 
     def load_from_appstate(self, snap) -> None:
         ws = snap.workspace_os
+        workspace_key = (
+            ws.entity_count,
+            ws.relationship_count,
+            ws.event_count,
+            ws.entities,
+            ws.recent_events,
+        )
+        if workspace_key == getattr(self, "_last_workspace_key", None):
+            return
+        self._last_workspace_key = workspace_key
         self._entities = ws.entities
         self._stats_label.configure(
             text=(
