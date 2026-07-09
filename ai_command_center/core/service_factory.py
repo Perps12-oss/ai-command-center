@@ -18,6 +18,7 @@ from ai_command_center.core.capability_context_assembler import CapabilityContex
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_bus_handlers import register_entity_bus_handlers
+from ai_command_center.core.timeline.timeline_undo_handlers import register_timeline_undo_handlers
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.feature.feature import Feature
@@ -238,7 +239,7 @@ def build_services(
         command_palette_service = CommandPaletteService(bus)
         search_provider = FTSSearchProvider(entity_service)
 
-        register_entity_bus_handlers(
+        entity_subs = register_entity_bus_handlers(
             bus,
             entity_service=entity_service,
             relationship_service=relationship_service,
@@ -246,6 +247,13 @@ def build_services(
             timeline_service=timeline_service,
             action_registry=action_registry,
         )
+        undo_subs = register_timeline_undo_handlers(
+            bus,
+            entity_service=entity_service,
+            relationship_service=relationship_service,
+            workspace_service=workspace_service,
+        )
+        _ = entity_subs, undo_subs
 
         workspace_os = WorkspaceOsService(
             bus=bus,

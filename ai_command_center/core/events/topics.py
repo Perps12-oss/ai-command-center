@@ -271,6 +271,7 @@ UI_AUTOMATION_SCHEDULE_TOGGLE = "ui.automation.schedule.toggle"
 
 # Timeline undo (workspace OS)
 TIMELINE_UNDO_REQUEST = "timeline.undo.request"
+TIMELINE_UNDO_RESULT = "timeline.undo.result"
 
 # UI artifact actions (TODO 5/6 — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
@@ -467,5 +468,6 @@ __all__ = [
     "UI_AUTOMATION_SELECT",
     "UI_AUTOMATION_SCHEDULE_TOGGLE",
     "TIMELINE_UNDO_REQUEST",
+    "TIMELINE_UNDO_RESULT",
     "UI_ARTIFACT_ACTION",
 ]

@@ -234,8 +234,9 @@ class WorkspaceOsWalkingSkeletonTests(unittest.TestCase):
             )
 
             events = wos.timeline_service.get_by_entity(resources[0].id)
-            self.assertEqual(1, len(events))
-            self.assertEqual("Launch URL", events[0].event_type)
+            launch_events = [event for event in events if event.event_type == "Launch URL"]
+            self.assertEqual(1, len(launch_events))
+            self.assertEqual("Launch URL", launch_events[0].event_type)
         finally:
             app.shutdown()
 

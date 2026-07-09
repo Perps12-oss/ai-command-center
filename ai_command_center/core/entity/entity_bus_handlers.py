@@ -44,6 +44,30 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CREATE_RESULT,
 )
 from ai_command_center.core.relationship.relationship import RelationshipType
+from ai_command_center.core.timeline.timeline_undo_handlers import (
+    UNDO_DELETE_ENTITY,
+    UNDO_DELETE_RELATIONSHIP,
+    UNDO_REMOVE_WORKSPACE_ENTITY,
+)
+
+
+def _record_reversible_timeline(
+    timeline_service: Any,
+    *,
+    event_type: str,
+    entity_id: UUID | None,
+    entity_type: str | None,
+    payload: dict[str, object],
+    undo_data: dict[str, object],
+) -> None:
+    timeline_service.record(
+        event_type=event_type,
+        entity_id=entity_id,
+        entity_type=entity_type,
+        payload=payload,
+        reversible=True,
+        undo_data=undo_data,
+    )
 
 
 def _request_id(event: Event) -> str:
@@ -151,6 +175,20 @@ def register_entity_bus_handlers(
                     "metadata": dict(entity.metadata),
                 },
                 source=source,
+            )
+            _record_reversible_timeline(
+                timeline_service,
+                event_type="entity.created",
+                entity_id=entity.id,
+                entity_type=entity.entity_type,
+                payload={
+                    "title": entity.title,
+                    "entity_type": entity.entity_type,
+                },
+                undo_data={
+                    "action": UNDO_DELETE_ENTITY,
+                    "entity_id": str(entity.id),
+                },
             )
         except Exception as exc:  # noqa: BLE001 — bus handler surfaces error to caller
             _publish_result(
@@ -388,6 +426,21 @@ def register_entity_bus_handlers(
                 },
                 source=source,
             )
+            _record_reversible_timeline(
+                timeline_service,
+                event_type="relationship.created",
+                entity_id=relationship.source_id,
+                entity_type=None,
+                payload={
+                    "relationship_id": str(relationship.id),
+                    "target_id": str(relationship.target_id),
+                    "relationship_type": relationship.relationship_type.value,
+                },
+                undo_data={
+                    "action": UNDO_DELETE_RELATIONSHIP,
+                    "relationship_id": str(relationship.id),
+                },
+            )
         except Exception as exc:  # noqa: BLE001
             _publish_result(
                 bus,
@@ -416,6 +469,17 @@ def register_entity_bus_handlers(
                 },
                 source=source,
             )
+            _record_reversible_timeline(
+                timeline_service,
+                event_type="workspace.created",
+                entity_id=workspace.id,
+                entity_type=ENTITY_TYPE_WORKSPACE,
+                payload={"title": workspace.title},
+                undo_data={
+                    "action": UNDO_DELETE_ENTITY,
+                    "entity_id": str(workspace.id),
+                },
+            )
         except Exception as exc:  # noqa: BLE001
             _publish_result(
                 bus,
@@ -442,6 +506,22 @@ def register_entity_bus_handlers(
                     "entity_id": str(payload["entity_id"]),
                 },
                 source=source,
+            )
+            entity_id = UUID(str(payload["entity_id"]))
+            _record_reversible_timeline(
+                timeline_service,
+                event_type="workspace.entity.added",
+                entity_id=entity_id,
+                entity_type=None,
+                payload={
+                    "workspace_id": str(workspace.id),
+                    "entity_id": str(entity_id),
+                },
+                undo_data={
+                    "action": UNDO_REMOVE_WORKSPACE_ENTITY,
+                    "workspace_id": str(workspace.id),
+                    "entity_id": str(entity_id),
+                },
             )
         except Exception as exc:  # noqa: BLE001
             _publish_result(
@@ -513,6 +593,8 @@ def register_entity_bus_handlers(
                 entity_id=entity_id,
                 entity_type=str(payload.get("entity_type", "")) or None,
                 payload=dict(payload.get("payload") or {}),
+                reversible=bool(payload.get("reversible", False)),
+                undo_data=dict(payload["undo_data"]) if payload.get("undo_data") else None,
             )
             _publish_result(
                 bus,

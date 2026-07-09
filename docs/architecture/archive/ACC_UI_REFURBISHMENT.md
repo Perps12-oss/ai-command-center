@@ -1,7 +1,11 @@
-# ACC UI Refurbishment — Implementation Plan
+# ACC UI Refurbishment — Implementation Plan (ARCHIVED)
 
-**Status:** Architecture specification (source of truth)  
-**Related:** [CHAT_MODERNIZATION_SPEC.md](CHAT_MODERNIZATION_SPEC.md), [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md), [PROVIDER_PLATFORM.md](PROVIDER_PLATFORM.md), [PROGRAM4_GATE_STATUS.md](PROGRAM4_GATE_STATUS.md)
+**Status:** COMPLETE — PR 1–15 + polish merged to `main` @ `35bed6e` (Jul 2026)  
+**Active follow-on:** [UI_REFURBISHMENT_BACKLOG.md](../UI_REFURBISHMENT_BACKLOG.md)  
+**Related:** [CHAT_MODERNIZATION_SPEC.md](../CHAT_MODERNIZATION_SPEC.md), [WORKFLOW_ENGINE.md](../WORKFLOW_ENGINE.md), [PROVIDER_PLATFORM.md](../PROVIDER_PLATFORM.md), [PROGRAM4_GATE_STATUS.md](../PROGRAM4_GATE_STATUS.md)
+
+> Retained for architectural constraints (no-regression covenant, naming rules).
+> Do not treat as an active implementation checklist.
 
 ---
 
