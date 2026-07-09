@@ -27,17 +27,7 @@ class WorldModel:
 
     def apply(self, mutation: Mutation) -> None:
         """Apply one mutation through the repository and then update cache."""
-        correlation = mutation.correlation
-        if mutation.type in {MutationType.CREATE_NODE, MutationType.UPDATE_NODE}:
-            node = _node_from_payload(mutation.payload)
-            self._repository.save_node(node, correlation)
-        elif mutation.type == MutationType.DELETE_NODE:
-            self._repository.delete_node(str(mutation.payload.get("node_id", "")), correlation)
-        elif mutation.type == MutationType.CREATE_EDGE:
-            edge = _edge_from_payload(mutation.payload)
-            self._repository.save_edge(edge, correlation)
-        elif mutation.type == MutationType.DELETE_EDGE:
-            self._repository.delete_edge(str(mutation.payload.get("edge_id", "")), correlation)
+        self._repository.apply_mutation(mutation)
         self._apply_to_cache(mutation)
 
     def get_node(self, node_id: str) -> Node | None:

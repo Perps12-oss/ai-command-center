@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import sqlite3
+from types import SimpleNamespace
 
 from ai_command_center.core.event_bus import Event, EventBus
+from ai_command_center.core.app_state import AppStateStore
+from ai_command_center.core.service_factory import _observer_roots_from_settings
 from ai_command_center.core.events.topics import (
     EXECUTION_RUN_COMPLETE,
     EXECUTION_RUN_FAILED,
     GOAL_COMPLETED,
     GOAL_FAILED,
+    GOAL_SUBMITTED,
     GOAL_SUBMIT_REQUEST,
     KERNEL_STATE_CHANGED,
     KERNEL_TRANSITION_REJECTED,
@@ -18,6 +22,7 @@ from ai_command_center.core.events.topics import (
     RUNTIME_ACTION_COMPLETED,
     RUNTIME_ACTION_DENIED,
     RUNTIME_ACTION_REQUEST,
+    RUNTIME_ACTION_STARTED,
     RUNTIME_APPROVAL_DECIDED,
     RUNTIME_APPROVAL_REQUESTED,
 )
@@ -36,6 +41,7 @@ from ai_command_center.services.execution_orchestrator_service import (
 )
 from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.observer_service import ObserverService
+from ai_command_center.services.planner_service import parse_structured_plan_response
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
@@ -47,23 +53,32 @@ def _conn() -> sqlite3.Connection:
 
 
 def test_world_model_repository_replays_last_five_mutations() -> None:
-    repo = SQLiteWorldModelRepository(_conn())
+    conn = _conn()
+    repo = SQLiteWorldModelRepository(conn)
     correlation = CorrelationContext.new(goal_id="goal-1")
 
     for index in range(7):
         node = Node(id=f"node-{index}", type="resource", attributes={"index": index})
-        repo.save_node(node, correlation.with_action(f"action-{index}"))
+        mutation = Mutation(
+            id=f"mutation-{index}",
+            correlation=correlation.with_action(f"action-{index}"),
+            type=MutationType.CREATE_NODE,
+            payload={"node": node.to_payload()},
+        )
+        repo.apply_mutation(mutation)
 
     replay = repo.replay_mutations(limit=5)
 
-    assert [item.payload["node"]["id"] for item in replay] == [
-        "node-2",
-        "node-3",
-        "node-4",
-        "node-5",
-        "node-6",
-    ]
+    assert [item.id for item in replay] == [f"mutation-{index}" for index in range(2, 7)]
+    assert all(item.type == MutationType.CREATE_NODE for item in replay)
     assert replay[-1].correlation.goal_id == "goal-1"
+    assert conn.execute("SELECT COUNT(*) FROM entities").fetchone()[0] == 7
+    assert (
+        conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='world_nodes'"
+        ).fetchone()
+        is None
+    )
 
 
 def test_runtime_applies_world_model_mutation_and_requires_destroy_approval() -> None:
@@ -144,6 +159,54 @@ def test_runtime_does_not_auto_approve_destructive_actions() -> None:
     assert not completed
 
 
+def test_app_state_projects_brain_events() -> None:
+    bus = EventBus()
+    state_store = AppStateStore(bus)
+
+    bus.publish(
+        KERNEL_STATE_CHANGED,
+        {"from": "boot", "to": "idle"},
+        source="test",
+    )
+    bus.publish(
+        GOAL_SUBMITTED,
+        {"goal": {"id": "goal-1", "title": "Organize Downloads"}},
+        source="test",
+    )
+    bus.publish(
+        RUNTIME_ACTION_STARTED,
+        {"action_id": "action-1", "status": "started"},
+        source="test",
+    )
+
+    snapshot = state_store.snapshot
+    assert snapshot.brain_kernel_state == "idle"
+    assert snapshot.brain_recent_goals[0]["id"] == "goal-1"
+    assert snapshot.brain_recent_runtime_actions[0]["action_id"] == "action-1"
+
+
+def test_structured_planner_response_parses_llm_manifest() -> None:
+    plan = parse_structured_plan_response(
+        """
+        {
+          "goal": "Organize Downloads",
+          "confidence": 0.9,
+          "steps": [
+            {
+              "step_id": "s1",
+              "capability": "create_task",
+              "args": {"title": "Organize Downloads"},
+              "require_approval": false
+            }
+          ]
+        }
+        """
+    )
+
+    assert plan.goal == "Organize Downloads"
+    assert plan.steps[0].capability == "create_task"
+
+
 def test_observer_startup_sync_emits_file_observation_into_world_model(tmp_path) -> None:
     watched = tmp_path / "downloads"
     watched.mkdir()
@@ -161,6 +224,18 @@ def test_observer_startup_sync_emits_file_observation_into_world_model(tmp_path)
 
     assert node is not None
     assert node.attributes["path"] == str(file_path)
+
+
+def test_observer_roots_resolve_from_environment_and_settings(tmp_path, monkeypatch) -> None:
+    env_root = tmp_path / "env-root"
+    settings_root = tmp_path / "settings-root"
+    monkeypatch.setenv("ACC_OBSERVER_ROOTS", str(env_root))
+
+    roots = _observer_roots_from_settings(
+        SimpleNamespace(vault_path=str(settings_root), obsidian_vault_path="")
+    )
+
+    assert roots == [env_root, settings_root]
 
 
 def test_single_goal_scheduler_runs_goal_to_completion() -> None:

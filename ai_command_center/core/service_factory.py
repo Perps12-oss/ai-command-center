@@ -8,7 +8,9 @@ the shared singletons (ollama, workspace_os) that callers may need.
 from __future__ import annotations
 
 import sqlite3
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from ai_command_center.core.action.action_registry import ActionRegistry
 from ai_command_center.core.ai.capability_registry_service import (
@@ -139,7 +141,13 @@ def build_services(
     conv_repo = ConversationRepository(db)
     plugin_repo = PluginManifestRepository(db)
     runtime_provider_repo = RuntimeProviderManifestRepository(db)
-    world_model_repo = SQLiteWorldModelRepository(db)
+    entity_repo = EntityRepository(db)
+    relationship_repo = RelationshipRepository(db)
+    world_model_repo = SQLiteWorldModelRepository(
+        db,
+        entity_repo=entity_repo,
+        relationship_repo=relationship_repo,
+    )
     goal_repo = GoalRepository(db)
 
     # ── shared singletons ─────────────────────────────────────────────────────
@@ -179,7 +187,10 @@ def build_services(
     brain_runtime = BrainRuntimeService(bus, world_model)
     brain_kernel = BrainKernelService(bus, world_model)
     goal_scheduler = SingleGoalScheduler(bus, goal_repo)
-    observer = ObserverService(bus)
+    observer = ObserverService(
+        bus,
+        filesystem_roots=_observer_roots_from_settings(settings_snapshot),
+    )
     planner = PlannerService(bus, context_manager=context_manager)
     execution_orchestrator = ExecutionOrchestratorService(bus)
     external_capability_bridge = ExternalCapabilityBridgeService(bus)
@@ -261,8 +272,6 @@ def build_services(
     # ── Workspace OS (optional) ───────────────────────────────────────────────
     workspace_os: WorkspaceOsService | None = None
     if workspace_os_enabled:
-        entity_repo = EntityRepository(db)
-        relationship_repo = RelationshipRepository(db)
         timeline_repo = TimelineRepository(db)
 
         entity_service = EntityService(entity_repo, bus)
@@ -310,4 +319,28 @@ def build_services(
         provider_registry=provider_registry,
         workspace_os=workspace_os,
     )
+
+
+def _observer_roots_from_settings(settings_snapshot) -> list[Path]:
+    roots: list[Path] = []
+    raw_env = os.environ.get("ACC_OBSERVER_ROOTS", "")
+    for item in raw_env.split(os.pathsep):
+        text = item.strip()
+        if text:
+            roots.append(Path(text))
+    for raw in (
+        getattr(settings_snapshot, "vault_path", ""),
+        getattr(settings_snapshot, "obsidian_vault_path", ""),
+    ):
+        text = str(raw or "").strip()
+        if text:
+            roots.append(Path(text))
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        key = str(root)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(root)
+    return deduped
 

@@ -43,6 +43,15 @@ from ai_command_center.core.events.topics import (
     ENTITY_DELETED,
     ENTITY_RELATIONSHIPS_CHANGED,
     ENTITY_UPDATED,
+    GOAL_ACTIVATED,
+    GOAL_CANCELLED,
+    GOAL_COMPLETED,
+    GOAL_FAILED,
+    GOAL_PAUSED,
+    GOAL_RESUMED,
+    GOAL_SUBMITTED,
+    KERNEL_STATE_CHANGED,
+    OBSERVATION_RECEIVED,
     MEMORY_CLEARED,
     MEMORY_SELECTED,
     MEMORY_STORED,
@@ -58,6 +67,11 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_LIFECYCLE_SNAPSHOT,
     CAPABILITY_CATALOG_RESULT,
     PLAN_GENERATED,
+    RUNTIME_ACTION_COMPLETED,
+    RUNTIME_ACTION_DENIED,
+    RUNTIME_ACTION_FAILED,
+    RUNTIME_ACTION_STARTED,
+    RUNTIME_APPROVAL_REQUESTED,
     EXECUTION_RUN_STARTED,
     EXECUTION_RUN_COMPLETE,
     EXECUTION_RUN_FAILED,
@@ -173,6 +187,20 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     CAPABILITY_LIFECYCLE_SNAPSHOT,
     CAPABILITY_CATALOG_RESULT,
     PLAN_GENERATED,
+    KERNEL_STATE_CHANGED,
+    GOAL_SUBMITTED,
+    GOAL_ACTIVATED,
+    GOAL_PAUSED,
+    GOAL_RESUMED,
+    GOAL_CANCELLED,
+    GOAL_COMPLETED,
+    GOAL_FAILED,
+    OBSERVATION_RECEIVED,
+    RUNTIME_ACTION_STARTED,
+    RUNTIME_APPROVAL_REQUESTED,
+    RUNTIME_ACTION_COMPLETED,
+    RUNTIME_ACTION_FAILED,
+    RUNTIME_ACTION_DENIED,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -461,6 +489,10 @@ class AppState:
     automation_workspace: AutomationWorkspaceState = field(
         default_factory=lambda: AutomationWorkspaceProjector.project_state(())
     )
+    brain_kernel_state: str = "boot"
+    brain_recent_goals: tuple[dict[str, object], ...] = ()
+    brain_recent_observations: tuple[dict[str, object], ...] = ()
+    brain_recent_runtime_actions: tuple[dict[str, object], ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1593,6 +1625,88 @@ def _reduce_automation_workspace(state: AppState, event: Event) -> AppState:
     )
 
 
+def _trim_dict_feed(
+    feed: tuple[dict[str, object], ...],
+    item: dict[str, object],
+    *,
+    limit: int = 20,
+) -> tuple[dict[str, object], ...]:
+    return (item, *feed)[:limit]
+
+
+def _reduce_brain_state(state: AppState, event: Event) -> AppState:
+    payload = dict(event.payload)
+    if event.topic == KERNEL_STATE_CHANGED:
+        return replace(
+            state,
+            brain_kernel_state=str(payload.get("to") or state.brain_kernel_state),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic in {
+        GOAL_SUBMITTED,
+        GOAL_ACTIVATED,
+        GOAL_PAUSED,
+        GOAL_RESUMED,
+        GOAL_CANCELLED,
+        GOAL_COMPLETED,
+        GOAL_FAILED,
+    }:
+        goal_payload = payload.get("goal")
+        goal_id = str(payload.get("goal_id") or "")
+        item: dict[str, object] = {
+            "topic": event.topic,
+            "goal_id": goal_id,
+            "status": event.topic.removeprefix("goal."),
+        }
+        if isinstance(goal_payload, dict):
+            item.update(goal_payload)
+        return replace(
+            state,
+            brain_recent_goals=_trim_dict_feed(state.brain_recent_goals, item),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic == OBSERVATION_RECEIVED:
+        item = {
+            "id": str(payload.get("id", "")),
+            "source": str(payload.get("source", "")),
+            "subject": str(payload.get("subject", "")),
+            "change_type": str(payload.get("change_type", "")),
+        }
+        return replace(
+            state,
+            brain_recent_observations=_trim_dict_feed(
+                state.brain_recent_observations,
+                item,
+            ),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic in {
+        RUNTIME_ACTION_STARTED,
+        RUNTIME_APPROVAL_REQUESTED,
+        RUNTIME_ACTION_COMPLETED,
+        RUNTIME_ACTION_FAILED,
+        RUNTIME_ACTION_DENIED,
+    }:
+        item = {
+            "topic": event.topic,
+            "action_id": str(payload.get("action_id", "")),
+            "status": str(payload.get("status") or event.topic.removeprefix("runtime.")),
+        }
+        return replace(
+            state,
+            brain_recent_runtime_actions=_trim_dict_feed(
+                state.brain_recent_runtime_actions,
+                item,
+            ),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    return state
+
+
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
@@ -1643,6 +1757,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_inspector,
     _reduce_workflow_graph,
     _reduce_automation_workspace,
+    _reduce_brain_state,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,
