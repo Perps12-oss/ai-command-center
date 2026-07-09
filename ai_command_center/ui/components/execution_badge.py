@@ -65,7 +65,7 @@ class ExecutionBadge(ctk.CTkButton):
         self._on_inspect_navigate = on_inspect_navigate
         if self._inspect_ref is None:
             self.configure(state="disabled")
-        if on_inspect_navigate is not None:
+        elif on_inspect_navigate is not None:
             self.bind(
                 "<Double-Button-1>",
                 lambda _e: on_inspect_navigate(self._inspect_ref),
