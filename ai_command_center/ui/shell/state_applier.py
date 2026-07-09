@@ -230,6 +230,74 @@ class StateApplierMixin:
             pass
 
         self._apply_catalog_views(snap)
+        self._apply_execution_timeline(snap)
+
+    def _apply_execution_timeline(self, snap) -> None:
+        """Project execution_timeline into ExecutionsView detail scrubber."""
+        executions = self._executions_view()
+        if executions is None or not hasattr(executions, "apply_timeline"):
+            return
+        timeline = snap.execution_timeline
+        if not timeline.request_id:
+            return
+        key = (
+            timeline.request_id,
+            timeline.scrub_index,
+            tuple(event.event_id for event in timeline.events),
+            timeline.source,
+        )
+        if key == getattr(self, "_last_execution_timeline_key", None):
+            return
+        self._last_execution_timeline_key = key
+
+        steps: list[dict] = []
+        labels: list[str] = []
+        for event in timeline.events:
+            labels.append(event.event_type)
+            steps.append(
+                {
+                    "name": event.scope or event.event_type.split(".")[-1] or event.event_type,
+                    "status": "ok",
+                    "duration_ms": 0.0,
+                    "detail": dict(event.payload),
+                }
+            )
+
+        spans: list[dict] = []
+        if snap.execution_context.request_id == timeline.request_id:
+            spans = [
+                {
+                    "span_id": span.span_id,
+                    "parent_id": span.parent_id,
+                    "name": span.name,
+                    "kind": span.kind,
+                    "status": span.status,
+                    "duration_ms": span.duration_ms,
+                    "started_at": span.started_at,
+                    "attributes": dict(span.attributes),
+                }
+                for span in snap.execution_context.trace_spans
+            ]
+            if not steps:
+                for span in snap.execution_context.trace_spans:
+                    labels.append(span.name)
+                    steps.append(
+                        {
+                            "name": span.name,
+                            "status": span.status,
+                            "duration_ms": span.duration_ms,
+                            "detail": dict(span.attributes),
+                        }
+                    )
+
+        executions.apply_timeline(
+            request_id=timeline.request_id,
+            timeline_steps=steps,
+            scrub_labels=labels,
+            scrub_index=timeline.scrub_index,
+            timeline_source=timeline.source,
+            spans=spans,
+        )
 
     def _catalog_fingerprint(self, snap) -> tuple:
         """Fields that drive catalog view rebuilds (excludes polling system metrics)."""

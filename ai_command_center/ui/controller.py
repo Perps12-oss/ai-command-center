@@ -38,6 +38,8 @@ from ai_command_center.core.events.topics import (
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
     UI_SELECT_WORKSPACE,
+    EXECUTION_QUERY_REQUEST,
+    UI_EXECUTION_TIMELINE_SCRUB,
 )
 
 
@@ -215,6 +217,20 @@ class UIController:
         self._bus.publish(
             UI_ARTIFACT_ACTION,
             {"artifact_id": artifact_id, "action": action},
+            source="ui",
+        )
+
+    def publish_execution_query(self, request_id: str) -> None:
+        self._bus.publish(
+            EXECUTION_QUERY_REQUEST,
+            {"request_id": request_id},
+            source="ui",
+        )
+
+    def publish_execution_timeline_scrub(self, request_id: str, index: int) -> None:
+        self._bus.publish(
+            UI_EXECUTION_TIMELINE_SCRUB,
+            {"request_id": request_id, "index": index},
             source="ui",
         )
 
