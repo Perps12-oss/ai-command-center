@@ -99,6 +99,7 @@ class ArtifactsView(ctk.CTkFrame):
 
     def apply_state(self, artifacts: Sequence[ArtifactCatalogItem]) -> None:
         """Refresh the artifact list from typed AppState projections."""
+        self._current_artifacts = tuple(artifacts)
         for child in self._scroll.winfo_children():
             child.destroy()
 

@@ -628,7 +628,7 @@ class ChatView(ctk.CTkFrame):
             block = AssistantMessageBlock(
                 self._scroll,
                 on_regenerate=self._on_regenerate,
-                on_rate=lambda rating: None,
+                on_rate=self._rate_block,
                 inspect_ref=ref,
                 on_inspect_select=self._on_inspect_select,
                 on_inspect_navigate=self._on_inspect_navigate,
@@ -722,6 +722,18 @@ class ChatView(ctk.CTkFrame):
             pass
         if self._on_send:
             snippet = bubble.get_raw_text()[:60].replace("\n", " ")
+            self._on_send(f".rating:{rating} \"{snippet}\"")
+
+    def _rate_block(self, rating: str) -> None:
+        if self._streaming_bubble is not None and hasattr(self._streaming_bubble, "configure"):
+            color = T.STATUS_READY if rating == "up" else T.STATUS_ERROR
+            try:
+                self._streaming_bubble.configure(border_width=1, border_color=color)
+            except Exception:
+                pass
+        if self._on_send and self._streaming_bubble is not None:
+            text = getattr(self._streaming_bubble, "get_raw_text", lambda: "")()
+            snippet = str(text)[:60].replace("\n", " ")
             self._on_send(f".rating:{rating} \"{snippet}\"")
 
     def update_artifact_stream(

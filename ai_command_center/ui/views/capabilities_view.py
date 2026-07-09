@@ -134,10 +134,11 @@ class CapabilitiesView(ctk.CTkFrame):
 
         for rec in records:
             name = str(getattr(rec, "capability_id", "") or getattr(rec, "name", ""))
-            kind = str(getattr(rec, "kind", ""))
-            stage = str(getattr(rec, "stage", getattr(rec, "state", "unknown")))
+            kind = str(getattr(rec, "capability_kind", "") or getattr(rec, "kind", ""))
+            lifecycle = getattr(rec, "lifecycle_state", getattr(rec, "stage", getattr(rec, "state", "unknown")))
+            stage = str(getattr(lifecycle, "value", lifecycle))
             provider = str(getattr(rec, "provider_id", ""))
-            version = str(getattr(rec, "version", ""))
+            version = str(getattr(rec, "version", kind or ""))
 
             _CapabilityRow(
                 self._scroll,

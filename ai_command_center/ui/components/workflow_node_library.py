@@ -67,7 +67,7 @@ class WorkflowNodeLibrary(ctk.CTkFrame):
                     hover_color=T.BG_GLASS_BORDER,
                     text_color=T.TEXT_MUTED,
                     anchor="w",
-                    command=lambda c=category, l=label: self._on_preview(c, l),
+                    command=lambda c=category, lbl=label: self._on_preview(c, lbl),
                 ).pack(fill="x", padx=6, pady=1)
 
 

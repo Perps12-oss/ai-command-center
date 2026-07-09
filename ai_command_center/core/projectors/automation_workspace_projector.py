@@ -66,6 +66,7 @@ _STATIC_TEMPLATES: tuple[AutomationTemplateItem, ...] = (
         description="Plan, execute, and publish onboarding artifacts.",
         category="Getting Started",
         step_count=3,
+        workflow_id="demo-linear",
     ),
     AutomationTemplateItem(
         template_id="tpl-incident",
@@ -73,6 +74,7 @@ _STATIC_TEMPLATES: tuple[AutomationTemplateItem, ...] = (
         description="Collect traces, inspect providers, and file a decision.",
         category="Reliability",
         step_count=4,
+        workflow_id="weekly-report",
     ),
     AutomationTemplateItem(
         template_id="tpl-research",
@@ -80,6 +82,7 @@ _STATIC_TEMPLATES: tuple[AutomationTemplateItem, ...] = (
         description="Search notes, summarize memory, and draft a report.",
         category="Knowledge",
         step_count=5,
+        workflow_id="daily-sync",
     ),
 )
 
@@ -166,12 +169,18 @@ class AutomationWorkspaceProjector:
         *,
         selected_failure_run_id: str = "",
         revision: int = 0,
+        schedules: Sequence[AutomationScheduleItem] | None = None,
     ) -> AutomationWorkspaceState:
         active, failures = AutomationWorkspaceProjector.project_runs(workflow_runs)
+        sched = (
+            tuple(schedules)
+            if schedules is not None
+            else AutomationWorkspaceProjector.schedules()
+        )
         return AutomationWorkspaceState(
             catalog=AutomationWorkspaceProjector.catalog(),
             active_runs=active,
-            schedules=AutomationWorkspaceProjector.schedules(),
+            schedules=sched,
             failures=failures,
             templates=AutomationWorkspaceProjector.templates(),
             selected_failure_run_id=selected_failure_run_id,
