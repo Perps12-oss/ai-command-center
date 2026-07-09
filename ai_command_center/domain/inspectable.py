@@ -46,5 +46,13 @@ class InspectableRef:
         payload_items = _coerce_payload_pairs(payload)
         return cls(kind=kind, ref_id=ref_id, label=label, payload=payload_items)
 
+    def as_dict(self) -> dict[str, str]:
+        """Return payload key/value pairs as a plain dict."""
+        return dict(self.payload)
+
+    def get(self, key: str, default: str = "") -> str:
+        """Look up a payload field by key."""
+        return self.as_dict().get(key, default)
+
 
 __all__ = ["InspectableRef"]

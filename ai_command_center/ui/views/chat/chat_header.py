@@ -1,4 +1,4 @@
-"""ChatHeader — conversation title with favorite, share, and more menu."""
+"""ChatHeader — title, metadata, search, and actions."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -16,13 +16,6 @@ _STATUS_COLORS: dict[str, str] = {
     "cancelled": T.TEXT_MUTED,
 }
 
-_PROVIDER_COLORS: dict[str, str] = {
-    "ollama": T.SUCCESS_GREEN,
-    "openai": T.ACCENT_BLUE,
-    "local": T.ACCENT_PURPLE,
-    "default": T.TEXT_MUTED,
-}
-
 
 class ChatHeader(ctk.CTkFrame):
     """Horizontal header bar for the chat center pane."""
@@ -36,6 +29,7 @@ class ChatHeader(ctk.CTkFrame):
         on_pin: Callable[[], None] | None = None,
         on_archive: Callable[[], None] | None = None,
         on_share: Callable[[], None] | None = None,
+        on_search: Callable[[], None] | None = None,
         on_toggle_history: Callable[[], None] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -43,7 +37,7 @@ class ChatHeader(ctk.CTkFrame):
             master,
             fg_color=T.SURFACE_PRIMARY,
             corner_radius=0,
-            height=48,
+            height=56,
             border_width=0,
             **kwargs,
         )
@@ -54,46 +48,47 @@ class ChatHeader(ctk.CTkFrame):
         self._on_pin = on_pin
         self._on_archive = on_archive
         self._on_share = on_share
+        self._on_search = on_search
         self._on_toggle_history = on_toggle_history
 
         self._title_text = "New Chat"
-        self._provider = ""
         self._model = ""
-        self._status = "idle"
+        self._message_count = 0
         self._pinned = False
         self._more_menu: ctk.CTkToplevel | None = None
 
         self._build()
 
     def _build(self) -> None:
+        left = ctk.CTkFrame(self, fg_color="transparent")
+        left.pack(side="left", fill="both", expand=True, padx=(16, 0), pady=8)
+
         self._title_lbl = ctk.CTkLabel(
-            self,
+            left,
             text=self._title_text,
             font=(T.FONT_FAMILY, 14, "bold"),
             text_color=T.TEXT_PRIMARY,
             anchor="w",
         )
-        self._title_lbl.pack(side="left", padx=(16, 0), pady=12)
+        self._title_lbl.pack(fill="x", anchor="w")
         self._title_lbl.bind("<Double-Button-1>", self._start_rename)
 
-        self._provider_badge = ctk.CTkLabel(
-            self,
-            text="",
-            font=(T.FONT_FAMILY, 9),
-            text_color=T.TEXT_MUTED,
-            fg_color=T.SURFACE_ELEVATED,
-            corner_radius=T.SMALL_RADIUS,
-            width=60,
-        )
-        self._provider_badge.pack(side="left", padx=(8, 0), pady=12)
-
-        self._status_lbl = ctk.CTkLabel(
-            self,
+        self._meta_lbl = ctk.CTkLabel(
+            left,
             text="",
             font=(T.FONT_FAMILY, 10),
             text_color=T.TEXT_MUTED,
+            anchor="w",
         )
-        self._status_lbl.pack(side="left", padx=(6, 0), pady=12)
+        self._meta_lbl.pack(fill="x", anchor="w", pady=(2, 0))
+
+        self._status_lbl = ctk.CTkLabel(
+            left,
+            text="",
+            font=(T.FONT_FAMILY, 9),
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        )
 
         self._build_actions()
 
@@ -110,18 +105,23 @@ class ChatHeader(ctk.CTkFrame):
 
         ctk.CTkButton(
             self, text="⋯", command=self._show_more_menu, **btn_cfg
-        ).pack(side="right", padx=(4, 12), pady=9)
+        ).pack(side="right", padx=(4, 12), pady=12)
 
         if self._on_share:
             ctk.CTkButton(
                 self, text="↗", command=self._on_share, **btn_cfg
-            ).pack(side="right", padx=2, pady=9)
+            ).pack(side="right", padx=2, pady=12)
 
         if self._on_pin:
             self._fav_btn = ctk.CTkButton(
                 self, text="☆", command=self._on_pin, **btn_cfg
             )
-            self._fav_btn.pack(side="right", padx=2, pady=9)
+            self._fav_btn.pack(side="right", padx=2, pady=12)
+
+        if self._on_search:
+            ctk.CTkButton(
+                self, text="🔍", command=self._on_search, **btn_cfg
+            ).pack(side="right", padx=2, pady=12)
 
     def _show_more_menu(self) -> None:
         if self._more_menu and self._more_menu.winfo_exists():
@@ -158,28 +158,48 @@ class ChatHeader(ctk.CTkFrame):
     def update_title(self, title: str) -> None:
         self._title_text = title or "New Chat"
         self._title_lbl.configure(text=self._title_text)
+        self._refresh_meta()
+
+    def update_metadata(self, *, model: str, message_count: int) -> None:
+        self._model = model
+        self._message_count = message_count
+        self._refresh_meta()
+
+    def update_model(self, model: str) -> None:
+        self._model = model
+        self._refresh_meta()
+
+    def _refresh_meta(self) -> None:
+        parts: list[str] = []
+        if self._model:
+            parts.append(self._model)
+        if self._message_count:
+            n = self._message_count
+            parts.append(f"{n} message{'s' if n != 1 else ''}")
+        parts.append("Today")
+        self._meta_lbl.configure(text=" · ".join(parts))
 
     def update_provider(self, provider: str, model: str) -> None:
-        self._provider = provider
+        del provider
         self._model = model
-        color = _PROVIDER_COLORS.get(provider.lower(), _PROVIDER_COLORS["default"])
-        badge_text = provider.upper()[:8] if provider else "—"
-        self._provider_badge.configure(text=badge_text, text_color=color)
+        self._refresh_meta()
 
     def update_status(self, status: str) -> None:
-        self._status = status
         color = _STATUS_COLORS.get(status, T.TEXT_MUTED)
         icons = {
             "streaming": "● streaming",
             "error": "✕ error",
-            "ready": "✓ ready",
+            "ready": "",
             "idle": "",
             "cancelled": "✕ cancelled",
         }
-        self._status_lbl.configure(text=icons.get(status, ""), text_color=color)
-
-    def update_model(self, model: str) -> None:
-        self._model = model
+        text = icons.get(status, "")
+        if text:
+            self._status_lbl.configure(text=text, text_color=color)
+            if not self._status_lbl.winfo_ismapped():
+                self._status_lbl.pack(fill="x", anchor="w", pady=(2, 0))
+        elif self._status_lbl.winfo_ismapped():
+            self._status_lbl.pack_forget()
 
     def set_pinned(self, pinned: bool) -> None:
         self._pinned = pinned
@@ -197,28 +217,24 @@ class ChatHeader(ctk.CTkFrame):
         self._rename_entry = ctk.CTkEntry(
             self,
             textvariable=self._entry_var,
-            width=240,
-            height=28,
-            font=(T.FONT_FAMILY, 12),
-            fg_color=T.BG_INPUT,
-            border_color=T.ACCENT_PURPLE,
+            font=(T.FONT_FAMILY, 14, "bold"),
+            fg_color=T.SURFACE_ELEVATED,
+            border_color=T.BORDER_SUBTLE,
             text_color=T.TEXT_PRIMARY,
+            width=280,
         )
-        self._rename_entry.pack(side="left", padx=(16, 6), pady=10)
+        self._rename_entry.pack(side="left", padx=(16, 0), pady=12)
         self._rename_entry.focus_set()
         self._rename_entry.bind("<Return>", self._commit_rename)
         self._rename_entry.bind("<Escape>", self._cancel_rename)
-        self._rename_entry.bind("<FocusOut>", self._commit_rename)
 
     def _commit_rename(self, _: Any = None) -> None:
-        new_title = getattr(self, "_entry_var", ctk.StringVar()).get().strip()
-        self._cancel_rename()
+        new_title = self._entry_var.get().strip()
         if new_title and self._on_rename:
             self._on_rename(new_title)
-            self.update_title(new_title)
+        self._cancel_rename()
 
     def _cancel_rename(self, _: Any = None) -> None:
         if hasattr(self, "_rename_entry"):
             self._rename_entry.destroy()
-            del self._rename_entry
-        self._title_lbl.pack(side="left", padx=(16, 0), pady=12)
+        self._title_lbl.pack(fill="x", anchor="w")

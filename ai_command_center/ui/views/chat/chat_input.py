@@ -102,7 +102,7 @@ class InputPill(ctk.CTkFrame):
             master,
             fg_color=T.SURFACE_PRIMARY,
             corner_radius=0,
-            height=T.COMPOSER_HEIGHT + 28,
+            height=T.COMPOSER_HEIGHT + 18,
         )
         self.pack_propagate(False)
         self._on_send = on_send

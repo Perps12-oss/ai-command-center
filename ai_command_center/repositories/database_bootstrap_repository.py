@@ -156,6 +156,42 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v8(conn: sqlite3.Connection) -> None:
+    """Repair artifacts table schema drift — add missing columns on legacy DBs."""
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='artifacts'"
+    ).fetchone()
+    if row is None:
+        _migrate_v7(conn)
+        return
+
+    cols = {
+        str(r[1] if isinstance(r, tuple) else r["name"])
+        for r in conn.execute("PRAGMA table_info(artifacts)").fetchall()
+    }
+    additions: tuple[tuple[str, str], ...] = (
+        ("content", "TEXT NOT NULL DEFAULT ''"),
+        ("size_bytes", "INTEGER NOT NULL DEFAULT 0"),
+        ("mime_type", "TEXT NOT NULL DEFAULT ''"),
+        ("request_id", "TEXT NOT NULL DEFAULT ''"),
+        ("workspace_id", "TEXT NOT NULL DEFAULT ''"),
+        ("entity_id", "TEXT NOT NULL DEFAULT ''"),
+        ("source", "TEXT NOT NULL DEFAULT ''"),
+        ("created_at", "REAL NOT NULL DEFAULT 0"),
+        ("updated_at", "REAL NOT NULL DEFAULT 0"),
+    )
+    for name, typedef in additions:
+        if name not in cols:
+            conn.execute(f"ALTER TABLE artifacts ADD COLUMN {name} {typedef}")
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_artifacts_updated ON artifacts(updated_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_artifacts_request ON artifacts(request_id)"
+    )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
@@ -164,6 +200,7 @@ _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (5, _migrate_v5),
     (6, _migrate_v6),
     (7, _migrate_v7),
+    (8, _migrate_v8),
 ]
 
 

@@ -1,4 +1,4 @@
-"""ChatInspector — structured chat session inspector panel."""
+"""WorkspaceInspector — conversation workspace panel for the chat right rail."""
 from __future__ import annotations
 
 import time
@@ -7,6 +7,7 @@ from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.inspector.base_inspector import BaseInspector
 from ai_command_center.ui.design_system import theme_v2 as T
 
@@ -16,7 +17,7 @@ _VALUE_FONT = (T.FONT_FAMILY, 11)
 
 
 class ChatInspector(BaseInspector):
-    """Default chat inspector: message info, tools, metadata, actions."""
+    """Workspace inspector: conversation stats, workspace objects, actions."""
 
     def __init__(
         self,
@@ -25,6 +26,8 @@ class ChatInspector(BaseInspector):
         on_export: Callable[[], None] | None = None,
         on_pin: Callable[[], None] | None = None,
         on_clear: Callable[[], None] | None = None,
+        on_copy_message: Callable[[], None] | None = None,
+        on_create_note: Callable[[], None] | None = None,
         on_artifact_stub: Callable[[], None] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -32,95 +35,85 @@ class ChatInspector(BaseInspector):
         self._on_export = on_export
         self._on_pin = on_pin
         self._on_clear = on_clear
+        self._on_copy_message = on_copy_message
+        self._on_create_note = on_create_note
         self._on_artifact_stub = on_artifact_stub
-        self._session_id = ""
-        self._message_id = ""
-        self._model = ""
-        self._tokens = 0
-        self._tools: tuple[str, ...] = ()
+        self._selected_content = ""
 
         self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
         self._scroll.pack(fill="both", expand=True, padx=12, pady=8)
 
-        self._info_section = self._section("Message Information")
-        self._model_lbl = self._kv_row(self._info_section, "Model", "—")
-        self._created_lbl = self._kv_row(self._info_section, "Created", "—")
-        self._tokens_lbl = self._kv_row(self._info_section, "Tokens", "—")
+        convo = self._section("Conversation")
+        self._messages_lbl = self._stat_row(convo, "Messages", "0")
+        self._model_lbl = self._stat_row(convo, "Model", "—")
+        self._tokens_lbl = self._stat_row(convo, "Tokens", "—")
+        self._created_lbl = self._stat_row(convo, "Created", "—")
 
-        self._tools_section = self._section("Tools Used")
-        self._tools_frame = ctk.CTkFrame(self._tools_section, fg_color="transparent")
-        self._tools_frame.pack(fill="x", padx=8, pady=(0, 8))
-        self._tools_placeholder = ctk.CTkLabel(
-            self._tools_frame,
-            text="No tools used",
-            font=_LABEL_FONT,
+        artifacts = self._section("Artifacts")
+        self._artifacts_frame = ctk.CTkFrame(artifacts, fg_color="transparent")
+        self._artifacts_frame.pack(fill="x", padx=8, pady=8)
+        self._artifacts_count = ctk.CTkLabel(
+            self._artifacts_frame,
+            text="0",
+            font=_VALUE_FONT,
             text_color=T.TEXT_MUTED,
             anchor="w",
         )
-        self._tools_placeholder.pack(fill="x")
+        self._artifacts_count.pack(fill="x")
 
-        self._meta_section = self._section("Metadata")
-        self._session_row = self._copy_row(self._meta_section, "Session ID", "")
-        self._message_row = self._copy_row(self._meta_section, "Message ID", "")
+        notes = self._section("Notes")
+        self._notes_lbl = ctk.CTkLabel(
+            notes,
+            text="0",
+            font=_VALUE_FONT,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        )
+        self._notes_lbl.pack(fill="x", padx=10, pady=8)
 
-        self._actions_section = self._section("Actions")
-        actions = ctk.CTkFrame(self._actions_section, fg_color="transparent")
-        actions.pack(fill="x", padx=8, pady=(0, 12))
+        exec_sec = self._section("Executions")
+        self._exec_lbl = ctk.CTkLabel(
+            exec_sec,
+            text="0",
+            font=_VALUE_FONT,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        )
+        self._exec_lbl.pack(fill="x", padx=10, pady=8)
 
-        if on_export:
+        tools_sec = self._section("Tools Used")
+        self._tools_frame = ctk.CTkFrame(tools_sec, fg_color="transparent")
+        self._tools_frame.pack(fill="x", padx=8, pady=8)
+
+        actions = self._section("Actions")
+        btn_frame = ctk.CTkFrame(actions, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=8, pady=(0, 12))
+
+        for label, cmd, danger in (
+            ("Copy Message", on_copy_message, False),
+            ("Export Chat", on_export, False),
+            ("Create Note", on_create_note, False),
+            ("Create Artifact", on_artifact_stub, False),
+            ("Pin", on_pin, False),
+            ("Clear Chat", on_clear, True),
+        ):
+            if not cmd:
+                continue
             ctk.CTkButton(
-                actions,
-                text="Export Chat",
-                height=32,
+                btn_frame,
+                text=label,
+                height=30,
                 font=T.FONT_SMALL,
-                fg_color=T.SURFACE_ELEVATED,
-                hover_color=T.SURFACE_SECONDARY,
-                text_color=T.TEXT_PRIMARY,
+                fg_color="transparent" if danger else T.SURFACE_ELEVATED,
+                hover_color=T.STATUS_ERROR_BG if danger else T.SURFACE_SECONDARY,
+                text_color=T.ERROR_RED if danger else T.TEXT_PRIMARY,
                 corner_radius=T.BUTTON_RADIUS,
-                command=on_export,
-            ).pack(fill="x", pady=(0, 6))
-
-        if on_pin:
-            ctk.CTkButton(
-                actions,
-                text="Pin Message",
-                height=32,
-                font=T.FONT_SMALL,
-                fg_color=T.SURFACE_ELEVATED,
-                hover_color=T.SURFACE_SECONDARY,
-                text_color=T.TEXT_PRIMARY,
-                corner_radius=T.BUTTON_RADIUS,
-                command=on_pin,
-            ).pack(fill="x", pady=(0, 6))
-
-        ctk.CTkButton(
-            actions,
-            text="Create Artifact",
-            height=32,
-            font=T.FONT_SMALL,
-            fg_color=T.SURFACE_ELEVATED,
-            hover_color=T.SURFACE_SECONDARY,
-            text_color=T.TEXT_PRIMARY,
-            corner_radius=T.BUTTON_RADIUS,
-            command=lambda: on_artifact_stub() if on_artifact_stub else None,
-        ).pack(fill="x", pady=(0, 6))
-
-        if on_clear:
-            ctk.CTkButton(
-                actions,
-                text="Clear Chat",
-                height=32,
-                font=T.FONT_SMALL,
-                fg_color="transparent",
-                hover_color=T.STATUS_ERROR_BG,
-                text_color=T.ERROR_RED,
-                corner_radius=T.BUTTON_RADIUS,
-                command=on_clear,
-            ).pack(fill="x")
+                command=cmd,
+            ).pack(fill="x", pady=(0, 4))
 
     def _section(self, title: str) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(self._scroll, fg_color="transparent")
-        frame.pack(fill="x", pady=(8, 0))
+        frame.pack(fill="x", pady=(6, 0))
         ctk.CTkLabel(
             frame,
             text=title,
@@ -138,15 +131,15 @@ class ChatInspector(BaseInspector):
         body.pack(fill="x")
         return body
 
-    def _kv_row(self, parent: ctk.CTkFrame, key: str, value: str) -> ctk.CTkLabel:
+    def _stat_row(self, parent: ctk.CTkFrame, key: str, value: str) -> ctk.CTkLabel:
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", padx=10, pady=4)
+        row.pack(fill="x", padx=10, pady=3)
         ctk.CTkLabel(
             row,
             text=key,
             font=_LABEL_FONT,
             text_color=T.TEXT_MUTED,
-            width=70,
+            width=72,
             anchor="w",
         ).pack(side="left")
         val = ctk.CTkLabel(
@@ -159,48 +152,6 @@ class ChatInspector(BaseInspector):
         val.pack(side="left", fill="x", expand=True)
         return val
 
-    def _copy_row(self, parent: ctk.CTkFrame, key: str, value: str) -> ctk.CTkFrame:
-        row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", padx=10, pady=4)
-        ctk.CTkLabel(
-            row,
-            text=key,
-            font=_LABEL_FONT,
-            text_color=T.TEXT_MUTED,
-            width=80,
-            anchor="w",
-        ).pack(side="left")
-        val_lbl = ctk.CTkLabel(
-            row,
-            text=value or "—",
-            font=(T.FONT_FAMILY, 9),
-            text_color=T.TEXT_SECONDARY,
-            anchor="w",
-        )
-        val_lbl.pack(side="left", fill="x", expand=True)
-
-        def _copy() -> None:
-            try:
-                self.clipboard_clear()
-                self.clipboard_append(value)
-            except Exception:
-                pass
-
-        ctk.CTkButton(
-            row,
-            text="⎘",
-            width=24,
-            height=22,
-            font=(T.FONT_FAMILY, 10),
-            fg_color="transparent",
-            hover_color=T.SURFACE_SECONDARY,
-            text_color=T.TEXT_MUTED,
-            corner_radius=4,
-            command=_copy,
-        ).pack(side="right")
-        row._value_lbl = val_lbl  # type: ignore[attr-defined]
-        return row
-
     def update_session(
         self,
         *,
@@ -208,73 +159,120 @@ class ChatInspector(BaseInspector):
         message_id: str = "",
         model: str = "",
         tokens: int = 0,
+        message_count: int = 0,
         tools: tuple[str, ...] = (),
+        artifacts: tuple[str, ...] = (),
+        notes_count: int = 0,
+        executions_count: int = 0,
         created_ts: float | None = None,
+        selected_content: str = "",
     ) -> None:
-        self._session_id = session_id
-        self._message_id = message_id
-        self._model = model
-        self._tokens = tokens
-        self._tools = tools
-
+        del session_id, message_id
+        self._selected_content = selected_content
+        self._messages_lbl.configure(text=str(message_count))
         self._model_lbl.configure(text=model or "—")
-        if created_ts:
-            created = time.strftime("%b %d, %Y %I:%M %p", time.localtime(created_ts)).lstrip("0")
-        else:
-            created = time.strftime("%b %d, %Y %I:%M %p", time.localtime()).lstrip("0")
-        self._created_lbl.configure(text=created)
         self._tokens_lbl.configure(text=f"~{tokens}" if tokens else "—")
+        if created_ts:
+            created = time.strftime("%I:%M %p", time.localtime(created_ts)).lstrip("0")
+        else:
+            created = time.strftime("%I:%M %p", time.localtime()).lstrip("0")
+        self._created_lbl.configure(text=created)
 
-        self._session_row._value_lbl.configure(  # type: ignore[attr-defined]
-            text=(session_id[:16] + "…") if len(session_id) > 16 else (session_id or "—")
-        )
-        self._message_row._value_lbl.configure(  # type: ignore[attr-defined]
-            text=(message_id[:16] + "…") if len(message_id) > 16 else (message_id or "—")
-        )
+        for child in self._artifacts_frame.winfo_children():
+            child.destroy()
+        if artifacts:
+            self._artifacts_count = ctk.CTkLabel(
+                self._artifacts_frame,
+                text=str(len(artifacts)),
+                font=_VALUE_FONT,
+                text_color=T.TEXT_PRIMARY,
+                anchor="w",
+            )
+            self._artifacts_count.pack(fill="x")
+            for name in artifacts[:6]:
+                ctk.CTkLabel(
+                    self._artifacts_frame,
+                    text=f"· {name}",
+                    font=_LABEL_FONT,
+                    text_color=T.TEXT_SECONDARY,
+                    anchor="w",
+                ).pack(fill="x", pady=1)
+        else:
+            ctk.CTkLabel(
+                self._artifacts_frame,
+                text="0",
+                font=_VALUE_FONT,
+                text_color=T.TEXT_MUTED,
+                anchor="w",
+            ).pack(fill="x")
+
+        self._notes_lbl.configure(text=str(notes_count))
+        self._exec_lbl.configure(text=str(executions_count))
 
         for child in self._tools_frame.winfo_children():
             child.destroy()
         if tools:
-            badge_row = ctk.CTkFrame(self._tools_frame, fg_color="transparent")
-            badge_row.pack(fill="x", padx=8, pady=8)
+            row = ctk.CTkFrame(self._tools_frame, fg_color="transparent")
+            row.pack(fill="x")
             for tool in tools:
                 ctk.CTkLabel(
-                    badge_row,
+                    row,
                     text=tool,
                     font=(T.FONT_FAMILY, 9),
                     fg_color=T.SURFACE_SECONDARY,
                     text_color=T.ACCENT_BLUE,
                     corner_radius=8,
-                    width=60,
                     height=22,
-                ).pack(side="left", padx=(0, 4))
+                ).pack(side="left", padx=(0, 4), pady=2)
         else:
             ctk.CTkLabel(
                 self._tools_frame,
-                text="No tools used",
+                text="None",
                 font=_LABEL_FONT,
                 text_color=T.TEXT_MUTED,
                 anchor="w",
-            ).pack(fill="x", padx=8, pady=8)
+            ).pack(fill="x")
+
+    def update_selected_message(self, ref: InspectableRef) -> None:
+        content = ""
+        for key in ("content", "text", "body"):
+            val = ref.get(key)
+            if val:
+                content = val
+                break
+        index_raw = ref.get("index", "0")
+        try:
+            message_count = int(index_raw) + 1
+        except ValueError:
+            message_count = 0
+        self.update_session(
+            selected_content=content,
+            message_count=message_count,
+        )
 
     def update_context(self, context: Any) -> None:
-        """Project ExecutionContext into chat inspector fields."""
         model = str(getattr(context, "model", "") or "")
-        request_id = str(getattr(context, "request_id", "") or "")
-        session_id = str(getattr(context, "session_id", "") or "")
         tokens = int(getattr(context, "token_count", 0) or 0)
         tools: list[str] = []
         for run in getattr(context, "tool_runs", ()) or ():
             name = getattr(run, "tool_name", None) or getattr(run, "name", None)
             if name:
                 tools.append(str(name))
+        artifacts: list[str] = []
+        for art in getattr(context, "artifacts", ()) or ():
+            title = getattr(art, "title", None) or getattr(art, "name", None) or getattr(art, "artifact_id", "")
+            if title:
+                artifacts.append(str(title))
         self.update_session(
-            session_id=session_id,
-            message_id=request_id,
             model=model,
             tokens=tokens,
             tools=tuple(tools),
+            artifacts=tuple(artifacts),
+            executions_count=1 if getattr(context, "request_id", "") else 0,
         )
+
+    def get_selected_content(self) -> str:
+        return self._selected_content
 
 
 __all__ = ["ChatInspector"]

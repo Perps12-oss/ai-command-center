@@ -214,6 +214,8 @@ class ChatView(ctk.CTkFrame):
         center = ctk.CTkFrame(self._workspace.center_host(), fg_color="transparent")
         center.pack(fill="both", expand=True)
 
+        self._search = None
+
         self._chat_header = ChatHeader(
             center,
             on_rename=self._rename_conversation,
@@ -221,6 +223,7 @@ class ChatView(ctk.CTkFrame):
             on_pin=self._toggle_pin,
             on_archive=self._toggle_archive,
             on_share=self._handle_share,
+            on_search=self._toggle_search,
         )
         self._chat_header.pack(fill="x", side="top")
 
@@ -243,7 +246,7 @@ class ChatView(ctk.CTkFrame):
         self._templates_overlay = TemplatesOverlay(self, on_select=self._pill.insert_template)
         self._pill.set_templates_overlay(self._templates_overlay)
 
-        self._empty = EmptyState(self._scroll)
+        self._empty = EmptyState(self._scroll, on_prompt=self._pill.insert_template)
         self._empty.pack(fill="both", expand=True, pady=30)
 
         self._execution_inspector = ExecutionInspector(
@@ -255,6 +258,8 @@ class ChatView(ctk.CTkFrame):
             on_export=self._handle_export,
             on_pin=self._toggle_pin,
             on_clear=self._handle_clear_chat,
+            on_copy_message=self._copy_selected_message,
+            on_create_note=lambda: self._notify("Create Note — coming soon"),
             on_artifact_stub=lambda: self._toolbar_stub("artifact"),
         )
         self._chat_inspector.update_session(session_id=self._store.session_id)
@@ -291,6 +296,10 @@ class ChatView(ctk.CTkFrame):
         root = self.winfo_toplevel()
         self._search.bind_shortcuts(root)
         self._refresh_session_bar()
+
+    def _toggle_search(self) -> None:
+        if self._search is not None:
+            self._search.toggle()
 
     def _build_legacy(self) -> None:
         self._session_bar = _SessionBar(
@@ -411,15 +420,31 @@ class ChatView(ctk.CTkFrame):
             self._execution_inspector.update_context(context)
         if self._chat_inspector is not None:
             self._chat_inspector.update_context(context)
-            if context is None:
+            self._chat_inspector.update_session(
+                session_id=self._store.session_id,
+                model=self._model,
+                message_count=len(self._history),
+                tokens=int(getattr(context, "token_count", 0) or 0) if context else 0,
+            )
+
+    def show_inspector(self, ref: InspectableRef) -> None:
+        if self._chat_inspector is not None:
+            self._chat_inspector.update_selected_message(ref)
+            content = ""
+            for key in ("content", "text", "body"):
+                val = ref.get(key)
+                if val:
+                    content = val
+                    break
+            if content:
                 self._chat_inspector.update_session(
                     session_id=self._store.session_id,
                     model=self._model,
+                    message_count=len(self._history),
+                    selected_content=content,
                 )
-
-    def show_inspector(self, ref: InspectableRef) -> None:
         if self._inspector_host is not None:
-            self._inspector_host.show(ref)
+            self._inspector_host._title.configure(text="Workspace Inspector")  # noqa: SLF001
 
     def clear_inspector(self) -> None:
         if self._inspector_host is not None:
@@ -553,10 +578,16 @@ class ChatView(ctk.CTkFrame):
         title = session_title(self._history) or "New Chat"
         if self._chat_header is not None:
             self._chat_header.update_title(title)
-            self._chat_header.update_model(self._model)
+            self._chat_header.update_metadata(model=self._model, message_count=count)
             meta = self._store.get_metadata(self._store.session_id)
             if meta:
                 self._chat_header.set_pinned(meta.pinned)
+            if self._chat_inspector is not None:
+                self._chat_inspector.update_session(
+                    session_id=self._store.session_id,
+                    model=self._model,
+                    message_count=count,
+                )
         elif self._session_bar is not None:
             self._session_bar.update(self._model, count, self._history_open)
             self._session_bar.update_entity(self._entity_type, self._entity_title)
@@ -601,7 +632,7 @@ class ChatView(ctk.CTkFrame):
                 inspect_ref=ref,
                 on_inspect_select=self._on_inspect_select,
                 on_inspect_navigate=self._on_inspect_navigate,
-            ).pack(fill="x", padx=SIDE_PAD, pady=(0, 8))
+            ).pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
             return
         outer = ctk.CTkFrame(self._scroll, fg_color="transparent")
         outer.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
@@ -929,6 +960,25 @@ class ChatView(ctk.CTkFrame):
         self._refresh_session_bar()
         if self._chat_inspector is not None:
             self._chat_inspector.update_session(session_id=self._store.session_id, model=self._model)
+
+    def _copy_selected_message(self) -> None:
+        content = ""
+        if self._chat_inspector is not None:
+            content = self._chat_inspector.get_selected_content()
+        if not content and self._history:
+            for msg in reversed(self._history):
+                if msg.get("role") == "assistant":
+                    content = str(msg.get("content", ""))
+                    break
+        if content:
+            try:
+                self.clipboard_clear()
+                self.clipboard_append(content)
+                self._notify("Message copied", kind="success")
+            except Exception:
+                self._notify("Could not copy", kind="error")
+        else:
+            self._notify("No message to copy")
 
     def _notify(self, message: str, *, kind: str = "info") -> None:
         if self._on_notify:

@@ -58,3 +58,47 @@ def test_artifact_repository_insert_list_get_update() -> None:
             assert recent[0].artifact_id == "art-1"
         finally:
             conn.close()
+
+
+def test_artifact_migration_v8_repairs_legacy_schema() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = Path(tmp) / "legacy.db"
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("CREATE TABLE schema_version (version INTEGER NOT NULL)")
+        conn.execute("INSERT INTO schema_version (version) VALUES (7)")
+        conn.execute(
+            """
+            CREATE TABLE artifacts (
+                artifact_id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                label TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+        try:
+            DatabaseBootstrapRepository().apply(conn)
+            cols = {
+                str(r[1])
+                for r in conn.execute("PRAGMA table_info(artifacts)").fetchall()
+            }
+            assert "content" in cols
+
+            repo = ArtifactRepository(conn)
+            created = repo.insert(
+                Artifact(
+                    artifact_id="legacy-1",
+                    kind="text",
+                    label="Legacy",
+                    content="body",
+                    request_id="req-legacy",
+                    source="chat",
+                )
+            )
+            assert created.content == "body"
+            loaded = repo.get("legacy-1")
+            assert loaded is not None
+            assert loaded.content == "body"
+        finally:
+            conn.close()

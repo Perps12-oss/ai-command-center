@@ -32,6 +32,9 @@ def test_inspectable_ref_helper_from_payload() -> None:
     assert ref.ref_id == "msg-1"
     assert ref.label == "Hello"
     assert ref.payload == (("role", "user"), ("content", "Hi there"), ("tokens", "12"))
+    assert ref.as_dict() == {"role": "user", "content": "Hi there", "tokens": "12"}
+    assert ref.get("content") == "Hi there"
+    assert ref.get("missing", "fallback") == "fallback"
 
     with pytest.raises(FrozenInstanceError):
         ref.ref_id = "mutated"  # type: ignore[misc]

@@ -6,20 +6,25 @@ import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
 
-NAV_ITEMS: tuple[tuple[str, str, str], ...] = (
+NAV_WORKSPACE: tuple[tuple[str, str, str], ...] = (
     ("workspace", "▦", "Workspace"),
     ("home", "⌂", "Home"),
     ("chat", "💬", "Chat"),
     ("executions", "⚡", "Executions"),
-    ("providers", "🔌", "Providers"),
-    ("capabilities", "🧩", "Capabilities"),
     ("artifacts", "📦", "Artifacts"),
     ("notes", "📝", "Notes"),
+)
+
+NAV_SYSTEM: tuple[tuple[str, str, str], ...] = (
+    ("providers", "🔌", "Providers"),
+    ("capabilities", "🧩", "Capabilities"),
     ("memory", "🧠", "Memory"),
     ("system", "⚙", "System"),
     ("plugins", "🔧", "Plugins"),
     ("settings", "◈", "Settings"),
 )
+
+NAV_ITEMS: tuple[tuple[str, str, str], ...] = NAV_WORKSPACE + NAV_SYSTEM
 
 FEATURE_NAV_ITEMS: dict[str, tuple[str, str, str]] = {
     "capabilities": ("capabilities", "🧩", "Capabilities"),
@@ -51,27 +56,13 @@ class Sidebar(ctk.CTkFrame):
             text_color=T.TEXT_SECONDARY,
         ).pack(anchor="w", padx=T.PAD, pady=(T.PAD, 8))
 
-        for view_id, icon, label in NAV_ITEMS:
-            self._labels[view_id] = label
-            row = ctk.CTkFrame(self, fg_color="transparent", height=40)
-            row.pack(fill="x", padx=8, pady=2)
-            row.pack_propagate(False)
+        self._add_section("AI Workspace")
+        for view_id, icon, label in NAV_WORKSPACE:
+            self._add_nav_row(view_id, icon, label, on_navigate)
 
-            btn = ctk.CTkButton(
-                row,
-                text=f"  {icon}  {label}",
-                anchor="w",
-                font=T.FONT_BODY,
-                fg_color="transparent",
-                text_color=T.TEXT_SECONDARY,
-                hover_color=T.SURFACE_ELEVATED,
-                height=36,
-                corner_radius=12,
-                command=lambda v=view_id: self._select(v, on_navigate),
-            )
-            btn.pack(fill="both", expand=True, padx=4)
-            self._rows[view_id] = row
-            self._buttons[view_id] = btn
+        self._add_section("System")
+        for view_id, icon, label in NAV_SYSTEM:
+            self._add_nav_row(view_id, icon, label, on_navigate)
 
         user = ctk.CTkFrame(
             self,
@@ -112,6 +103,37 @@ class Sidebar(ctk.CTkFrame):
         ).pack(fill="x")
 
         self._highlight()
+
+    def _add_section(self, title: str) -> None:
+        ctk.CTkLabel(
+            self,
+            text=title.upper(),
+            font=(T.FONT_FAMILY, 9, "bold"),
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(anchor="w", padx=T.PAD, pady=(10, 4))
+
+    def _add_nav_row(self, view_id: str, icon: str, label: str, on_navigate) -> None:
+        self._labels[view_id] = label
+        row = ctk.CTkFrame(self, fg_color="transparent", height=40)
+        row.pack(fill="x", padx=8, pady=2)
+        row.pack_propagate(False)
+
+        btn = ctk.CTkButton(
+            row,
+            text=f"  {icon}  {label}",
+            anchor="w",
+            font=T.FONT_BODY,
+            fg_color="transparent",
+            text_color=T.TEXT_SECONDARY,
+            hover_color=T.SURFACE_ELEVATED,
+            height=36,
+            corner_radius=12,
+            command=lambda v=view_id: self._select(v, on_navigate),
+        )
+        btn.pack(fill="both", expand=True, padx=4)
+        self._rows[view_id] = row
+        self._buttons[view_id] = btn
 
     def _select(self, view_id: str, on_navigate) -> None:
         self._active = view_id

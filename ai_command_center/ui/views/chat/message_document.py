@@ -1,4 +1,4 @@
-"""MessageDocument — Claude Desktop-style documentation layout (no bubbles)."""
+"""MessageDocument — compact two-sided conversation layout (Claude/Cursor style)."""
 from __future__ import annotations
 
 import time
@@ -16,9 +16,10 @@ from ai_command_center.ui.markdown_view import parse_markdown
 from ai_command_center.ui.views.chat.message_block import _apply_markdown_segments
 from ai_command_center.ui.views.chat.response_action_strip import ResponseActionStrip
 
-_AVATAR_SIZE = 32
+_MAX_MSG_WIDTH = 560
+_AVATAR_SIZE = 28
 _META_FONT = (T.FONT_FAMILY, 9)
-_BODY_WIDTH = 720
+_BODY_FONT = (T.FONT_FAMILY, 12)
 _CURSOR_CHAR = "▌"
 _PLACEHOLDER = "●  ●  ●"
 
@@ -30,8 +31,7 @@ def _hhmm() -> str:
 def _model_display(model: str) -> str:
     if not model:
         return "Assistant"
-    name = model.replace(":", " ").replace("-", " ")
-    return name.title()
+    return model.replace(":", " ").replace("-", " ").title()
 
 
 class _CopyBtn(ctk.CTkButton):
@@ -39,8 +39,8 @@ class _CopyBtn(ctk.CTkButton):
         super().__init__(
             master,
             text="⎘",
-            width=26,
-            height=22,
+            width=24,
+            height=20,
             font=(T.FONT_FAMILY, 10),
             fg_color="transparent",
             hover_color=T.SURFACE_ELEVATED,
@@ -67,7 +67,7 @@ def _avatar(master: Any, letter: str, color: str) -> ctk.CTkLabel:
         text=letter,
         width=_AVATAR_SIZE,
         height=_AVATAR_SIZE,
-        font=(T.FONT_FAMILY, 12, "bold"),
+        font=(T.FONT_FAMILY, 11, "bold"),
         fg_color=color,
         text_color="#FFFFFF",
         corner_radius=_AVATAR_SIZE // 2,
@@ -75,7 +75,7 @@ def _avatar(master: Any, letter: str, color: str) -> ctk.CTkLabel:
 
 
 class UserDocumentBlock(ctk.CTkFrame):
-    """Documentation-style user message — avatar, name, timestamp, body."""
+    """Right-aligned compact user message."""
 
     def __init__(
         self,
@@ -93,42 +93,43 @@ class UserDocumentBlock(ctk.CTkFrame):
         self._inspect_ref = inspect_ref
         ts = timestamp or _hhmm()
 
-        row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="x", pady=(0, 16))
+        outer = ctk.CTkFrame(self, fg_color="transparent")
+        outer.pack(fill="x", pady=(2, 8))
+        ctk.CTkFrame(outer, fg_color="transparent").pack(side="left", fill="x", expand=True)
 
-        _avatar(row, "U", T.ACCENT_PURPLE).pack(side="left", anchor="n", padx=(0, 10))
+        col = ctk.CTkFrame(outer, fg_color="transparent")
+        col.pack(side="right", anchor="e")
 
-        body_col = ctk.CTkFrame(row, fg_color="transparent")
-        body_col.pack(side="left", fill="x", expand=True)
-
-        header = ctk.CTkFrame(body_col, fg_color="transparent")
-        header.pack(fill="x")
+        header = ctk.CTkFrame(col, fg_color="transparent")
+        header.pack(anchor="e")
         ctk.CTkLabel(
             header,
-            text="You",
-            font=(T.FONT_FAMILY, 12, "bold"),
+            text=f"You  {ts}",
+            font=(T.FONT_FAMILY, 11, "bold"),
             text_color=T.TEXT_PRIMARY,
-            anchor="w",
-        ).pack(side="left")
-        ctk.CTkLabel(
-            header,
-            text=ts,
-            font=_META_FONT,
-            text_color=T.TEXT_MUTED,
-        ).pack(side="left", padx=(8, 0))
+        ).pack(side="right")
+
+        bubble = ctk.CTkFrame(
+            col,
+            fg_color=T.SURFACE_ELEVATED,
+            corner_radius=12,
+            border_width=1,
+            border_color=T.BORDER_SUBTLE,
+        )
+        bubble.pack(anchor="e", pady=(4, 0))
 
         ctk.CTkLabel(
-            body_col,
+            bubble,
             text=text,
-            font=T.FONT_BODY,
+            font=_BODY_FONT,
             text_color=T.TEXT_PRIMARY,
-            wraplength=_BODY_WIDTH,
+            wraplength=_MAX_MSG_WIDTH - 28,
             justify="left",
             anchor="w",
-        ).pack(fill="x", pady=(6, 0), anchor="w")
+        ).pack(padx=14, pady=10, anchor="w")
 
         bind_inspect_gestures(
-            (self, row, body_col),
+            (self, col, bubble),
             get_ref=lambda: self._inspect_ref,
             on_select=on_inspect_select,
             on_navigate=on_inspect_navigate,
@@ -139,7 +140,7 @@ class UserDocumentBlock(ctk.CTkFrame):
 
 
 class AssistantDocumentBlock(ctk.CTkFrame):
-    """Documentation-style assistant message with streaming and action row."""
+    """Left-aligned assistant message with markdown rendering."""
 
     def __init__(
         self,
@@ -171,20 +172,20 @@ class AssistantDocumentBlock(ctk.CTkFrame):
         self._execution_id = ""
 
         row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="x", pady=(0, 16))
+        row.pack(fill="x", pady=(2, 8), anchor="w")
 
-        _avatar(row, "AI", T.ACCENT_BLUE).pack(side="left", anchor="n", padx=(0, 10))
+        _avatar(row, "AI", T.ACCENT_BLUE).pack(side="left", anchor="n", padx=(0, 8))
 
         self._body_col = ctk.CTkFrame(row, fg_color="transparent")
-        self._body_col.pack(side="left", fill="x", expand=True)
+        self._body_col.pack(side="left", anchor="w")
 
         header = ctk.CTkFrame(self._body_col, fg_color="transparent")
-        header.pack(fill="x")
+        header.pack(fill="x", anchor="w")
         self._name_lbl = ctk.CTkLabel(
             header,
             text=_model_display(model_name),
-            font=(T.FONT_FAMILY, 12, "bold"),
-            text_color=T.TEXT_PRIMARY,
+            font=(T.FONT_FAMILY, 11, "bold"),
+            text_color=T.ACCENT_PURPLE,
             anchor="w",
         )
         self._name_lbl.pack(side="left")
@@ -197,22 +198,22 @@ class AssistantDocumentBlock(ctk.CTkFrame):
 
         self._textbox = ctk.CTkTextbox(
             self._body_col,
-            width=_BODY_WIDTH,
+            width=_MAX_MSG_WIDTH,
             wrap="word",
-            font=T.FONT_BODY,
+            font=_BODY_FONT,
             fg_color="transparent",
             text_color=T.TEXT_PRIMARY,
             border_width=0,
             activate_scrollbars=False,
-            height=40,
+            height=32,
         )
-        self._textbox.pack(fill="x", pady=(6, 0))
+        self._textbox.pack(anchor="w", pady=(4, 0))
         self._textbox.configure(state="normal")
         self._textbox.insert("end", _PLACEHOLDER)
         self._textbox.configure(state="disabled")
 
         self._actions = ctk.CTkFrame(self._body_col, fg_color="transparent")
-        self._actions.pack(fill="x", pady=(6, 0))
+        self._actions.pack(fill="x", pady=(4, 0))
 
         bind_inspect_gestures(
             (self, row, self._body_col),
@@ -248,6 +249,7 @@ class AssistantDocumentBlock(ctk.CTkFrame):
         artifact_count: int = 0,
         decision_count: int = 0,
     ) -> None:
+        del duration_ms, tokens
         self._streaming = False
         self._raw_text = text
         if model:
@@ -300,8 +302,8 @@ class AssistantDocumentBlock(ctk.CTkFrame):
             ctk.CTkButton(
                 self._actions,
                 text="↺",
-                width=26,
-                height=22,
+                width=24,
+                height=20,
                 font=(T.FONT_FAMILY, 10),
                 fg_color="transparent",
                 hover_color=T.SURFACE_ELEVATED,
@@ -313,8 +315,8 @@ class AssistantDocumentBlock(ctk.CTkFrame):
             ctk.CTkButton(
                 self._actions,
                 text=emoji,
-                width=26,
-                height=22,
+                width=24,
+                height=20,
                 font=(T.FONT_FAMILY, 10),
                 fg_color="transparent",
                 hover_color=T.SURFACE_ELEVATED,
@@ -364,7 +366,7 @@ class AssistantDocumentBlock(ctk.CTkFrame):
     def _resize_textbox(self) -> None:
         try:
             lines = int(self._textbox.index("end-1c").split(".")[0])
-            h = max(40, min(lines * 20 + 10, 600))
+            h = max(32, min(lines * 18 + 8, 480))
             self._textbox.configure(height=h)
         except Exception:
             pass

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -328,39 +329,61 @@ class SystemStrip(ctk.CTkFrame):
 
 
 class EmptyState(ctk.CTkFrame):
-    def __init__(self, master) -> None:
+    def __init__(self, master, on_prompt: Callable[[str], None] | None = None) -> None:
         super().__init__(master, fg_color="transparent")
+        self._on_prompt = on_prompt
 
         inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.place(relx=0.5, rely=0.44, anchor="center")
+        inner.place(relx=0.5, rely=0.42, anchor="center")
 
-        ctk.CTkLabel(
-            inner, text="◇",
-            font=(T.FONT_FAMILY, 52),
-            text_color=T.BG_GLASS_BORDER,
-        ).pack()
-        ctk.CTkLabel(
-            inner, text="Start a conversation",
-            font=ctk.CTkFont(size=18, weight="bold"),
-            text_color=T.TEXT_MUTED,
-        ).pack(pady=(12, 5))
+        greeting = time.strftime("%H").lstrip("0")
+        try:
+            hour = int(greeting or "12")
+        except ValueError:
+            hour = 12
+        if hour < 12:
+            salutation = "Good morning"
+        elif hour < 17:
+            salutation = "Good afternoon"
+        else:
+            salutation = "Good evening"
+
         ctk.CTkLabel(
             inner,
-            text="Ask anything · search notes · run commands · store memories",
-            font=(T.FONT_FAMILY, 11),
-            text_color=CLR_META,
-            justify="center",
+            text=salutation,
+            font=(T.FONT_FAMILY, 22, "bold"),
+            text_color=T.TEXT_PRIMARY,
         ).pack()
+        ctk.CTkLabel(
+            inner,
+            text="What would you like to accomplish?",
+            font=(T.FONT_FAMILY, 12),
+            text_color=T.TEXT_MUTED,
+        ).pack(pady=(8, 16))
 
         chips = ctk.CTkFrame(inner, fg_color="transparent")
-        chips.pack(pady=(20, 0))
-        for hint in ("Ask anything", "note: …", "remember: …", "> shell"):
-            ctk.CTkLabel(
+        chips.pack()
+        for label, prefix in (
+            ("Analyze Code", "Analyze this code: "),
+            ("Review PR", "Review this pull request: "),
+            ("Research", "Research the following topic: "),
+            ("Create Workflow", "Help me create a workflow for: "),
+        ):
+            chip = ctk.CTkButton(
                 chips,
-                text=hint,
+                text=label,
                 font=(T.FONT_FAMILY, 11),
-                text_color=T.TEXT_MUTED,
-                fg_color=T.BG_GLASS,
+                text_color=T.TEXT_SECONDARY,
+                fg_color=T.SURFACE_ELEVATED,
+                hover_color=T.SURFACE_SECONDARY,
+                border_width=1,
+                border_color=T.BORDER_SUBTLE,
                 corner_radius=14,
-                padx=12, pady=5,
-            ).pack(side="left", padx=5)
+                height=32,
+                command=lambda p=prefix: self._pick(p),
+            )
+            chip.pack(side="left", padx=5, pady=4)
+
+    def _pick(self, prefix: str) -> None:
+        if self._on_prompt:
+            self._on_prompt(prefix)

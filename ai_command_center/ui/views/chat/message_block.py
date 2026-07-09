@@ -447,12 +447,12 @@ class AssistantMessageBlock(ctk.CTkFrame):
 
 def _apply_markdown_segments(
     textbox: ctk.CTkTextbox,
-    segments: list[tuple[str, str]],
+    segments: list[tuple[str, str | None]],
 ) -> None:
     """Apply parsed markdown segments to a CTkTextbox.
 
-    Segments are (tag, text) tuples where tag is one of:
-    normal, bold, italic, code, code_block, header, list.
+    ``parse_markdown`` yields ``(text, tag_kind)`` tuples where tag_kind is one of:
+    bold, italic, code, code_block, header, list, or None for plain text.
     """
     try:
         tk_text = textbox._textbox
@@ -469,17 +469,23 @@ def _apply_markdown_segments(
             font=("Consolas", 11),
             foreground=T.CODE_TEXT,
             background=T.CODE_BG,
-            lmargin1=8, lmargin2=8,
+            lmargin1=8,
+            lmargin2=8,
+            spacing1=4,
+            spacing3=4,
         )
         tk_text.tag_config(
             "header",
             font=(T.FONT_FAMILY, 16, "bold"),
             foreground=T.TEXT_HEADING,
         )
+        tk_text.tag_config("list", foreground=T.TEXT_PRIMARY)
     except Exception:
         pass
 
-    for tag, text in segments:
+    for text, tag in segments:
+        if not text:
+            continue
         try:
             textbox.configure(state="normal")
             if tag in {"bold", "italic", "code", "code_block", "header", "list"}:

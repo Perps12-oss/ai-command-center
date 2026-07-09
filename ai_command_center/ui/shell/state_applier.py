@@ -116,11 +116,14 @@ class StateApplierMixin:
                 chat.update_inspector(snap.execution_context)
             if hasattr(chat, "show_inspector") and hasattr(chat, "clear_inspector"):
                 if snap.inspector.revision != getattr(self, "_last_inspector_revision", 0):
-                    if snap.inspector.selected is not None:
-                        chat.show_inspector(snap.inspector.selected)
-                    else:
-                        chat.clear_inspector()
                     self._last_inspector_revision = snap.inspector.revision
+                    try:
+                        if snap.inspector.selected is not None:
+                            chat.show_inspector(snap.inspector.selected)
+                        else:
+                            chat.clear_inspector()
+                    except Exception:
+                        pass
             if hasattr(chat, "update_chat_execution_status"):
                 status = "streaming" if snap.chat_streaming else str(snap.chat_status or "idle")
                 chat.update_chat_execution_status(
