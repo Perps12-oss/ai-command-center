@@ -64,12 +64,17 @@ class StateApplierMixin:
         self._overlay_mode = snap.settings.overlay_mode
         try:
             if self._overlay_mode == "compact":
-                self._apply_overlay_geometry("compact", 0, 0)
+                geom_key = ("compact", 0, 0)
             else:
                 w = int(snap.settings.window_width)
                 h = int(snap.settings.window_height)
-                if w >= 900 and h >= 560:
-                    self.geometry(f"{w}x{h}")
+                geom_key = ("window", w, h)
+            if geom_key != getattr(self, "_applied_geometry_key", None):
+                self._applied_geometry_key = geom_key
+                if self._overlay_mode == "compact":
+                    self._apply_overlay_geometry("compact", 0, 0)
+                elif geom_key[1] >= 900 and geom_key[2] >= 560:
+                    self.geometry(f"{geom_key[1]}x{geom_key[2]}")
         except ValueError:
             pass
 
@@ -187,18 +192,52 @@ class StateApplierMixin:
             self._last_inspector_navigate_revision = snap.inspector.navigate_revision
 
         try:
-            theme_manager.apply(
-                self,
-                theme_name=snap.settings.theme,
-                alpha=snap.settings.window_alpha,
-            )
+            theme_name = snap.settings.theme
+            alpha = snap.settings.window_alpha
+            if (
+                theme_name != getattr(self, "_applied_theme_name", None)
+                or alpha != getattr(self, "_applied_alpha", None)
+            ):
+                self._applied_theme_name = theme_name
+                self._applied_alpha = alpha
+                theme_manager.apply(
+                    self,
+                    theme_name=theme_name,
+                    alpha=alpha,
+                )
         except Exception:
             pass
 
         self._apply_catalog_views(snap)
 
+    def _catalog_fingerprint(self, snap) -> tuple:
+        """Fields that drive catalog view rebuilds (excludes polling system metrics)."""
+        return (
+            snap.memory_catalog,
+            snap.memory_selected,
+            snap.notes_catalog,
+            snap.note_selected,
+            snap.plugin_catalog,
+            snap.errors,
+            snap.agent_runs,
+            snap.workflow_runs,
+            snap.workspace_os,
+            snap.execution_runs,
+            snap.provider_health_map,
+            snap.runtime_capability_providers,
+            snap.capability_lifecycle,
+            getattr(snap.execution_context, "artifacts", ()),
+        )
+
     def _apply_catalog_views(self, snap) -> None:
         """Render Memory, Notes, Plugins, and System views from AppState."""
+        fingerprint = self._catalog_fingerprint(snap)
+        if fingerprint == getattr(self, "_last_catalog_fingerprint", None):
+            system = self._system_view()
+            if system:
+                system.apply_system_snapshot(snap.system_snapshot)
+            return
+        self._last_catalog_fingerprint = fingerprint
         memory = self._memory_view()
         if memory:
             memory.load_from_appstate(snap)

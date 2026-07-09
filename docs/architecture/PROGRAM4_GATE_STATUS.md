@@ -81,6 +81,14 @@ Program 4 may not expand platform capabilities until:
 
 ---
 
+## Program 4 large-context acceptance (2026-07-08)
+
+| Deliverable | Status | Evidence |
+|-------------|--------|----------|
+| Workspace graph context before prompt assembly | **Done** | `CapabilityContextAssembler` publishes `workspace.context.request` before `ContextManager.build_context`; `tests/test_large_context_assembly.py` |
+
+---
+
 ## Recommended Program 4 next slice
 
 1. **Further W4 splits** — telemetry or orchestration projections if needed.

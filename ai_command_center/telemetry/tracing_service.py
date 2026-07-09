@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import socket
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlparse
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
@@ -37,6 +39,26 @@ except ImportError:  # pragma: no cover - optional dependency
     trace = None  # type: ignore[assignment]
     SpanExporter = object  # type: ignore[assignment,misc]
     _OTEL_AVAILABLE = False
+
+
+def _otlp_endpoint_reachable(endpoint: str, *, timeout_s: float = 0.5) -> bool:
+    """Best-effort probe so we do not spam retries when no collector is running."""
+    raw = endpoint.strip()
+    if not raw:
+        return False
+    parsed = urlparse(raw if "://" in raw else f"http://{raw}")
+    host = parsed.hostname or "127.0.0.1"
+    if parsed.port is not None:
+        port = parsed.port
+    elif parsed.scheme == "https":
+        port = 443
+    else:
+        port = 4318
+    try:
+        with socket.create_connection((host, port), timeout=timeout_s):
+            return True
+    except OSError:
+        return False
 
 
 def _reset_tracer_provider() -> None:
@@ -108,6 +130,18 @@ class TracingService(BaseService):
         span_exporter: SpanExporter | None = None,
     ) -> None:
         super().__init__(bus)
+        if (
+            enabled
+            and span_exporter is None
+            and otel_endpoint.strip()
+            and not _otlp_endpoint_reachable(otel_endpoint)
+        ):
+            _logger.warning(
+                "tracing: OTLP endpoint %s unreachable; tracing disabled "
+                "(start a collector or disable otel_enabled in Settings)",
+                otel_endpoint.strip(),
+            )
+            enabled = False
         self._enabled = enabled and _OTEL_AVAILABLE
         self._tracer = (
             _init_tracer(span_exporter, otel_endpoint=otel_endpoint)
