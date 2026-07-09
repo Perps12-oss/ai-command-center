@@ -231,6 +231,23 @@ class StateApplierMixin:
 
         self._apply_catalog_views(snap)
         self._apply_execution_timeline(snap)
+        self._apply_workflow_graph(snap)
+
+    def _apply_workflow_graph(self, snap) -> None:
+        """Project workflow_graph into WorkflowGraphView and inspector dock."""
+        workflow = self._workflow_graph_view()
+        if workflow is None or not hasattr(workflow, "apply_state"):
+            return
+        graph = snap.workflow_graph
+        if graph.revision != getattr(self, "_last_workflow_graph_revision", 0):
+            workflow.apply_state(graph)
+            self._last_workflow_graph_revision = graph.revision
+        if snap.inspector.revision != getattr(self, "_last_workflow_inspector_revision", 0):
+            if snap.inspector.selected is not None and snap.inspector.selected.kind == "workflow":
+                workflow.show_inspector(snap.inspector.selected)
+            else:
+                workflow.clear_inspector()
+            self._last_workflow_inspector_revision = snap.inspector.revision
 
     def _apply_execution_timeline(self, snap) -> None:
         """Project execution_scrubber into ExecutionsView detail scrubber."""

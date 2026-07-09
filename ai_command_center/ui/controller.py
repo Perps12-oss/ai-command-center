@@ -40,6 +40,8 @@ from ai_command_center.core.events.topics import (
     UI_SELECT_WORKSPACE,
     EXECUTION_QUERY_REQUEST,
     UI_EXECUTION_TIMELINE_SCRUB,
+    UI_WORKFLOW_NODE_SELECT,
+    WORKFLOW_START,
 )
 
 
@@ -233,6 +235,42 @@ class UIController:
             {"request_id": request_id, "index": index},
             source="ui",
         )
+
+    def publish_workflow_node_select(
+        self,
+        node_id: str,
+        *,
+        workflow_id: str = "",
+        label: str = "",
+        kind: str = "step",
+        state: str = "",
+    ) -> None:
+        self._bus.publish(
+            UI_WORKFLOW_NODE_SELECT,
+            {
+                "node_id": node_id,
+                "workflow_id": workflow_id,
+                "label": label,
+                "kind": kind,
+                "state": state,
+            },
+            source="ui",
+        )
+
+    def publish_workflow_run(
+        self,
+        workflow_id: str,
+        steps: list[dict[str, object]],
+        *,
+        run_id: str = "",
+    ) -> None:
+        payload: dict[str, object] = {
+            "workflow_id": workflow_id,
+            "steps": steps,
+        }
+        if run_id:
+            payload["run_id"] = run_id
+        self._bus.publish(WORKFLOW_START, payload, source="ui")
 
     def publish_palette_open(self) -> None:
         self._bus.publish(UI_PALETTE_OPEN, {}, source="ui")

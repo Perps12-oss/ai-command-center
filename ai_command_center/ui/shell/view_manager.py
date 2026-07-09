@@ -19,6 +19,7 @@ from ai_command_center.ui.views.artifacts_view import ArtifactsView
 from ai_command_center.ui.views.execution_timeline_view import ExecutionTimelineView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
+from ai_command_center.ui.views.workflow_graph_view import WorkflowGraphView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 
@@ -30,6 +31,7 @@ VIEW_IDS: tuple[str, ...] = (
     "chat",
     "executions",
     "timeline",
+    "workflow",
     "providers",
     "capabilities",
     "artifacts",
@@ -99,6 +101,12 @@ class ViewManagerMixin:
             self._content,
             on_inspect_select=self._on_chat_inspect_select,
             on_inspect_navigate=self._on_chat_inspect_navigate,
+        )
+        self._view_registry["workflow"] = lambda: WorkflowGraphView(
+            self._content,
+            on_run=self._on_workflow_run,
+            on_node_select=self._on_workflow_node_select,
+            on_scrub=self._on_workflow_timeline_scrub,
         )
         self._view_registry["providers"] = lambda: ProvidersView(self._content)
         self._view_registry["capabilities"] = lambda: CapabilitiesView(self._content)
@@ -262,6 +270,31 @@ class ViewManagerMixin:
     def _on_execution_timeline_scrub(self, request_id: str, index: int) -> None:
         self._controller.publish_execution_timeline_scrub(request_id, index)
 
+    def _on_workflow_run(self, workflow_id: str, steps: list[dict]) -> None:
+        self._controller.publish_workflow_run(workflow_id, steps)
+
+    def _on_workflow_node_select(self, node_id: str, label: str, workflow_id: str) -> None:
+        self._controller.publish_workflow_node_select(
+            node_id,
+            workflow_id=workflow_id,
+            label=label,
+        )
+        self._controller.publish_inspect_select(
+            "workflow",
+            node_id,
+            label=label or node_id,
+            payload={
+                "workflow_id": workflow_id,
+                "node_id": node_id,
+            },
+        )
+
+    def _on_workflow_timeline_scrub(self, index: int) -> None:
+        snap = self._controller.snapshot()
+        request_id = snap.workflow_graph.run_id or snap.active_workflow_run_id
+        if request_id:
+            self._controller.publish_execution_timeline_scrub(request_id, index)
+
     def _executions_view(self) -> "ExecutionsView | None":
         v = self._views.get("executions")
         return v if isinstance(v, ExecutionsView) else None
@@ -269,6 +302,10 @@ class ViewManagerMixin:
     def _timeline_view(self) -> ExecutionTimelineView | None:
         v = self._views.get("timeline")
         return v if isinstance(v, ExecutionTimelineView) else None
+
+    def _workflow_graph_view(self) -> WorkflowGraphView | None:
+        v = self._views.get("workflow")
+        return v if isinstance(v, WorkflowGraphView) else None
 
     def _providers_view(self) -> ProvidersView | None:
         v = self._views.get("providers")
