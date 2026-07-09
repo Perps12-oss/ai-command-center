@@ -57,6 +57,7 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
     CAPABILITY_CATALOG_RESULT,
+    PLAN_GENERATED,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_EVENT_APPENDED,
@@ -164,6 +165,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
     CAPABILITY_CATALOG_RESULT,
+    PLAN_GENERATED,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -436,6 +438,7 @@ class AppState:
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     capability_prompt_catalog: tuple[dict[str, object], ...] = ()
+    planner_last_plan: dict[str, object] = field(default_factory=dict)
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
@@ -926,6 +929,21 @@ def _reduce_capability_prompt_catalog(state: AppState, event: Event) -> AppState
     return replace(
         state,
         capability_prompt_catalog=tuple(specs),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_planner_last_plan(state: AppState, event: Event) -> AppState:
+    if event.topic != PLAN_GENERATED:
+        return state
+    raw_plan = event.payload.get("plan")
+    plan_dict: dict[str, object] = {}
+    if isinstance(raw_plan, dict):
+        plan_dict = dict(raw_plan)
+    return replace(
+        state,
+        planner_last_plan=plan_dict,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1506,6 +1524,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_capability_providers_ready,
     _reduce_capability_lifecycle_snapshot,
     _reduce_capability_prompt_catalog,
+    _reduce_planner_last_plan,
     _reduce_orchestration_provider_health,
     _reduce_execution_run_feed,
     _reduce_plugin_state_changed,

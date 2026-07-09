@@ -199,6 +199,11 @@ CAPABILITY_LIFECYCLE_SNAPSHOT = "capability.lifecycle.snapshot"
 CAPABILITY_CATALOG_REQUEST = "capability.catalog.request"
 CAPABILITY_CATALOG_RESULT = "capability.catalog.result"
 
+# Planner layer (vNext L4 — goal to plan DAG, no execution)
+PLAN_REQUEST = "plan.request"
+PLAN_GENERATED = "plan.generated"
+PLAN_FAILED = "plan.failed"
+
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
 ORCHESTRATION_ROUTING_COMPLETED = "orchestration.routing.completed"
@@ -421,6 +426,9 @@ __all__ = [
     "CAPABILITY_LIFECYCLE_SNAPSHOT",
     "CAPABILITY_CATALOG_REQUEST",
     "CAPABILITY_CATALOG_RESULT",
+    "PLAN_REQUEST",
+    "PLAN_GENERATED",
+    "PLAN_FAILED",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",
