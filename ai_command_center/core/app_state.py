@@ -1653,14 +1653,21 @@ def _reduce_brain_state(state: AppState, event: Event) -> AppState:
         GOAL_FAILED,
     }:
         goal_payload = payload.get("goal")
-        goal_id = str(payload.get("goal_id") or "")
+        goal_id = str(
+            payload.get("goal_id")
+            or (goal_payload.get("id") if isinstance(goal_payload, dict) else "")
+            or ""
+        )
+        status = event.topic.removeprefix("goal.")
         item: dict[str, object] = {
             "topic": event.topic,
             "goal_id": goal_id,
-            "status": event.topic.removeprefix("goal."),
+            "status": status,
         }
         if isinstance(goal_payload, dict):
             item.update(goal_payload)
+            item["goal_id"] = goal_id
+            item["status"] = status
         return replace(
             state,
             brain_recent_goals=_trim_dict_feed(state.brain_recent_goals, item),
