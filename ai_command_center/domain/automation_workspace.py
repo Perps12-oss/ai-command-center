@@ -55,6 +55,7 @@ class AutomationTemplateItem:
     description: str = ""
     category: str = ""
     step_count: int = 0
+    workflow_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)

@@ -85,8 +85,16 @@ class FailureExplorer(ctk.CTkFrame):
         failures = [
             ph for ph in providers
             if (
-                str(getattr(ph, "state", "") or (ph.get("state", ph.get("health_state", "")) if isinstance(ph, dict) else ""))
-                .lower() in {"error", "degraded", "offline"}
+                str(
+                    getattr(ph, "status", "")
+                    or getattr(ph, "state", "")
+                    or (
+                        ph.get("status", ph.get("state", ph.get("health_state", "")))
+                        if isinstance(ph, dict)
+                        else ""
+                    )
+                )
+                .lower() in {"degraded", "offline", "error"}
             )
         ]
 
@@ -100,8 +108,23 @@ class FailureExplorer(ctk.CTkFrame):
             return
 
         for ph in failures:
-            name = str(getattr(ph, "name", "") or (ph.get("name", ph.get("provider_id", "unknown")) if isinstance(ph, dict) else "unknown"))
-            detail = str(getattr(ph, "detail", "") or (ph.get("detail", ph.get("health_detail", "")) if isinstance(ph, dict) else ""))
+            name = str(
+                getattr(ph, "display_name", "")
+                or getattr(ph, "name", "")
+                or (
+                    ph.get("display_name", ph.get("name", ph.get("provider_id", "unknown")))
+                    if isinstance(ph, dict)
+                    else "unknown"
+                )
+            )
+            detail = str(
+                getattr(ph, "detail", "")
+                or (
+                    ph.get("detail", ph.get("health_detail", ""))
+                    if isinstance(ph, dict)
+                    else ""
+                )
+            )
             errors = int(getattr(ph, "error_count", 0) or (ph.get("error_count", 0) if isinstance(ph, dict) else 0))
 
             _FailureRow(

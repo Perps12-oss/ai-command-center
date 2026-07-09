@@ -267,6 +267,10 @@ UI_WORKFLOW_RUN = "ui.workflow.run"
 # Automation workspace (ACC UI Refurbishment PR 14–15)
 UI_AUTOMATION_RUN = "ui.automation.run"
 UI_AUTOMATION_SELECT = "ui.automation.select"
+UI_AUTOMATION_SCHEDULE_TOGGLE = "ui.automation.schedule.toggle"
+
+# Timeline undo (workspace OS)
+TIMELINE_UNDO_REQUEST = "timeline.undo.request"
 
 # UI artifact actions (TODO 5/6 — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
@@ -461,5 +465,7 @@ __all__ = [
     "UI_WORKFLOW_RUN",
     "UI_AUTOMATION_RUN",
     "UI_AUTOMATION_SELECT",
+    "UI_AUTOMATION_SCHEDULE_TOGGLE",
+    "TIMELINE_UNDO_REQUEST",
     "UI_ARTIFACT_ACTION",
 ]

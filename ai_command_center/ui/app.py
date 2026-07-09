@@ -51,7 +51,11 @@ class CommandPaletteApp(
         self._last_started_request_id: str | None = None
         self._last_stream_buffer_len: int = 0
         self._last_chat_history_revision: int = 0
-        self._last_inspector_revision: int = 0
+        self._last_inspector_revision: int = -1
+        self._last_workflow_graph_revision: int = -1
+        self._last_automation_workspace_revision: int = -1
+        self._last_execution_timeline_revision: int = -1
+        self._last_execution_timeline_view_revision: int = -1
         self._shown_permission_check_id: str | None = None
         self._overlay_mode = "palette"
         self._bus_unsubs: list = []

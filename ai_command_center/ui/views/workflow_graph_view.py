@@ -8,8 +8,14 @@ from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.core.projectors.automation_workspace_projector import (
+    AutomationWorkspaceProjector,
+)
 from ai_command_center.core.projectors.workflow_graph_projector import WorkflowGraphProjector
-from ai_command_center.core.state.workflow_graph_state import WorkflowGraphState
+from ai_command_center.core.state.workflow_graph_state import (
+    WorkflowGraphState,
+    decode_workflow_steps,
+)
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.domain.workflow_graph import GraphNode, WorkflowGraph
 from ai_command_center.ui.components.docks.execution_timeline_dock import ExecutionTimelineDock
@@ -58,12 +64,14 @@ class WorkflowGraphView(ctk.CTkFrame):
         *,
         on_run: Callable[[str, list[dict[str, Any]]], None] | None = None,
         on_node_select: Callable[[str, str, str], None] | None = None,
+        on_compare: Callable[[], None] | None = None,
         on_scrub: Callable[[int], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color=T.BG_DEEP, **kwargs)
         self._on_run = on_run or (lambda _workflow_id, _steps: None)
         self._on_node_select = on_node_select or (lambda _node_id, _label, _workflow_id: None)
+        self._on_compare = on_compare or (lambda: None)
         self._on_scrub = on_scrub or (lambda _index: None)
         self._graph_state: WorkflowGraphState | None = None
         self._build()
@@ -72,7 +80,7 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._toolbar = WorkflowToolbar(
             self,
             on_run=self._handle_run,
-            on_compare=lambda: None,
+            on_compare=self._on_compare,
         )
         self._toolbar.pack(fill="x")
 
@@ -95,7 +103,7 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._paned.add(left, minsize=160, stretch="never")
         self._paned.add(center, minsize=360, stretch="always")
 
-        self._library = WorkflowNodeLibrary(left)
+        self._library = WorkflowNodeLibrary(left, on_preview=self._handle_node_preview)
         self._library.pack(fill="both", expand=True)
 
         self._canvas = GraphCanvas(center, on_node_select=self._handle_node_select)
@@ -134,17 +142,27 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._inspector_dock.set_default(self._workflow_inspector)
         self._inspector_dock.pack(fill="both", expand=True)
 
-        preview = WorkflowGraphProjector.from_workflow_steps(
-            DEMO_WORKFLOW_ID,
-            DEMO_WORKFLOW_STEPS,
-        )
-        self._canvas.render(preview)
+    def _resolve_run_target(self) -> tuple[str, list[dict[str, Any]]]:
+        if self._graph_state is not None:
+            workflow_id = self._graph_state.workflow_id or DEMO_WORKFLOW_ID
+            steps = decode_workflow_steps(self._graph_state.step_payload_json)
+            if steps:
+                return workflow_id, [dict(step) for step in steps]
+            return workflow_id, AutomationWorkspaceProjector.steps_for_workflow(workflow_id)
+        return DEMO_WORKFLOW_ID, [dict(step) for step in DEMO_WORKFLOW_STEPS]
 
     def _handle_run(self) -> None:
-        self._on_run(DEMO_WORKFLOW_ID, [dict(step) for step in DEMO_WORKFLOW_STEPS])
+        workflow_id, steps = self._resolve_run_target()
+        self._on_run(workflow_id, steps)
+
+    def _handle_node_preview(self, category: str, label: str) -> None:
+        node_id = f"lib-{category.lower()}-{label.lower().replace(' ', '-')}"
+        workflow_id = self._graph_state.workflow_id if self._graph_state else DEMO_WORKFLOW_ID
+        self._on_node_select(node_id, f"{category}: {label}", workflow_id)
 
     def _handle_node_select(self, node: GraphNode) -> None:
-        self._on_node_select(node.node_id, node.label, self._graph_state.workflow_id if self._graph_state else DEMO_WORKFLOW_ID)
+        workflow_id = self._graph_state.workflow_id if self._graph_state else DEMO_WORKFLOW_ID
+        self._on_node_select(node.node_id, node.label, workflow_id)
         if self._graph_state is not None:
             graph = self._graph_from_state(self._graph_state)
             self._canvas.render(graph, selected_node_id=node.node_id)
