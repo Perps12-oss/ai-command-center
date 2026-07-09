@@ -258,6 +258,8 @@ class ChatView(ctk.CTkFrame):
 
         self._execution_inspector = ExecutionInspector(
             self._workspace.right_host(),
+            on_inspect_select=self._on_inspect_select,
+            on_inspect_navigate=self._on_inspect_navigate,
             on_artifact_action=self._on_artifact_action,
         )
         self._inspector_host = InspectorHost(self._workspace.right_host())
@@ -411,6 +413,10 @@ class ChatView(ctk.CTkFrame):
         self._execution_context = context
         if self._execution_inspector is not None:
             self._execution_inspector.update_context(context)
+
+    def update_timeline(self, events) -> None:
+        if self._execution_inspector is not None:
+            self._execution_inspector.update_timeline(events)
 
     def show_inspector(self, ref: InspectableRef) -> None:
         if self._inspector_host is not None:

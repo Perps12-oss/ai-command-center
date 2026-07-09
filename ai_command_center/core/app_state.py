@@ -58,6 +58,8 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_LIFECYCLE_SNAPSHOT,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
+    EXECUTION_EVENT_APPENDED,
+    EXECUTION_EVENTS_LOADED,
     EXECUTION_QUERY_RESULT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
@@ -95,6 +97,10 @@ from ai_command_center.core.state.execution_state import (
     ExecutionContext,
     SpanItem,
     reduce_execution_query_result,
+)
+from ai_command_center.core.state.execution_timeline_state import (
+    ExecutionTimelineState,
+    reduce_execution_timeline_state,
 )
 from ai_command_center.core.state.inspector_state import (
     InspectorState,
@@ -149,6 +155,8 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     UI_INSPECT_CLEAR,
     UI_INSPECT_NAVIGATE,
     UI_SELECT_ENTITY,
+    EXECUTION_EVENT_APPENDED,
+    EXECUTION_EVENTS_LOADED,
     # Agent / workflow runs (Track R7)
     AGENT_SPAWNED,
     AGENT_TASK_REQUEST,
@@ -398,6 +406,7 @@ class AppState:
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
+    execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
     inspector: InspectorState = field(default_factory=InspectorState)
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
@@ -1362,6 +1371,18 @@ def _reduce_execution_context(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_execution_timeline(state: AppState, event: Event) -> AppState:
+    new_timeline = reduce_execution_timeline_state(state.execution_timeline, event)
+    if new_timeline == state.execution_timeline:
+        return state
+    return replace(
+        state,
+        execution_timeline=new_timeline,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_inspector(state: AppState, event: Event) -> AppState:
     new_inspector = reduce_inspector_state(state.inspector, event)
     if new_inspector == state.inspector:
@@ -1417,6 +1438,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_permission_check,
     _reduce_orchestration_run,
     _reduce_execution_context,
+    _reduce_execution_timeline,
     _reduce_inspector,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
