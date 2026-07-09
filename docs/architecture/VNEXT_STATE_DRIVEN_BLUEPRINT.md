@@ -240,7 +240,7 @@ Governed enum in `core/relationship/relationship.py`: `CONTAINS`, `DEPENDS_ON`, 
 | `OrchestrationService` | Deterministic intent classification only |
 | `RuntimeCapabilityRouterService` | Routes `CapabilityKind.PLANNING` to native/QwenPaw |
 | `AgentRuntimeService` | Stub pipeline (`"planner": "stub"` on `agent.pipeline.planned`) |
-| `PlannerService` | **Not implemented** |
+| `PlannerService` | **In progress** — deterministic skeleton on EventBus |
 
 **Phase C deliverable:** `PlannerService` on EventBus:
 
@@ -345,7 +345,7 @@ Aligned with [ARCHITECTURE_TRANSITION_PLAN.md](ARCHITECTURE_TRANSITION_PLAN.md).
 |-------|-------|-------------|------------|
 | **A — Foundation** | World model → prompt | `context_compiler.py`, `workspace_state` context priority | Complete (Milestone 1) |
 | **B — Capability facade** | Planner-facing registry API | `CapabilityPromptCatalogService` | Phase A |
-| **C — Planner** | LLM plan DAG | `PlannerService`, `plan.request` / `plan.generated` topics | Phase B |
+| **C — Planner** | LLM plan DAG | `PlannerService`, `plan.request` / `plan.generated` topics (in progress) | Phase B |
 | **D — Execution gates** | Approval across capabilities | Extend `WorkflowEngineService` + `PermissionService` | Phase C |
 | **E — Integrations** | MCP, email, calendar | ARI extensions per [AGENT_RUNTIME_INTERFACE.md](AGENT_RUNTIME_INTERFACE.md) | Program 4 exit |
 
