@@ -62,6 +62,7 @@ from ai_command_center.core.events.topics import (
     EXECUTION_EVENTS_LOADED,
     EXECUTION_QUERY_RESULT,
     UI_EXECUTION_TIMELINE_SCRUB,
+    UI_WORKFLOW_NODE_SELECT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -111,6 +112,10 @@ from ai_command_center.core.state.execution_timeline_state import (
 from ai_command_center.core.state.inspector_state import (
     InspectorState,
     reduce_inspector_state,
+)
+from ai_command_center.core.state.workflow_graph_state import (
+    WorkflowGraphState,
+    reduce_workflow_graph_state,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
@@ -188,6 +193,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ARTIFACT_UPDATED,
     ARTIFACTS_LOADED,
     UI_EXECUTION_TIMELINE_SCRUB,
+    UI_WORKFLOW_NODE_SELECT,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -420,6 +426,7 @@ class AppState:
     recent_artifacts: tuple[ArtifactCatalogItem, ...] = ()
     recent_execution_events: tuple[ExecutionEventItem, ...] = ()
     execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
+    workflow_graph: WorkflowGraphState = field(default_factory=WorkflowGraphState)
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1404,6 +1411,18 @@ def _reduce_inspector(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_workflow_graph(state: AppState, event: Event) -> AppState:
+    new_graph = reduce_workflow_graph_state(state.workflow_graph, event)
+    if new_graph == state.workflow_graph:
+        return state
+    return replace(
+        state,
+        workflow_graph=new_graph,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
@@ -1449,6 +1468,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_execution_context,
     _reduce_execution_timeline,
     _reduce_inspector,
+    _reduce_workflow_graph,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,
