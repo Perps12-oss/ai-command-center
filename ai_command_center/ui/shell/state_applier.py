@@ -102,6 +102,12 @@ class StateApplierMixin:
             chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
             if hasattr(chat, "update_inspector"):
                 chat.update_inspector(snap.execution_context)
+            if hasattr(chat, "update_timeline"):
+                if snap.execution_timeline.revision != getattr(
+                    self, "_last_execution_timeline_revision", 0
+                ):
+                    chat.update_timeline(list(snap.execution_timeline.events))
+                    self._last_execution_timeline_revision = snap.execution_timeline.revision
             if hasattr(chat, "show_inspector") and hasattr(chat, "clear_inspector"):
                 if snap.inspector.revision != getattr(self, "_last_inspector_revision", 0):
                     if snap.inspector.selected is not None:
@@ -197,6 +203,14 @@ class StateApplierMixin:
                     self._navigate(view_id)
                     self._focus_inspect_navigate_target(target)
             self._last_inspector_navigate_revision = snap.inspector.navigate_revision
+
+        timeline = self._timeline_view()
+        if timeline and hasattr(timeline, "apply_state"):
+            if snap.execution_timeline.revision != getattr(
+                self, "_last_execution_timeline_view_revision", 0
+            ):
+                timeline.apply_state(list(snap.execution_timeline.events))
+                self._last_execution_timeline_view_revision = snap.execution_timeline.revision
 
         try:
             theme_name = snap.settings.theme

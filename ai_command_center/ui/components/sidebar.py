@@ -11,6 +11,7 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("home", "Home"),
     ("chat", "Chat"),
     ("executions", "Executions"),
+    ("timeline", "Timeline"),
     ("providers", "Providers"),
     ("capabilities", "Capabilities"),
     ("artifacts", "Artifacts"),
