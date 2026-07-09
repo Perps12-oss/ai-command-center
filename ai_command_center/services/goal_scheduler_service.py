@@ -50,6 +50,7 @@ class SingleGoalScheduler(BaseService):
         self._unsubscribers: list[Callable[[], None]] = []
         self._queue: list[Goal] = []
         self._active_goal: Goal | None = None
+        self._active_task_id = ""
         self._paused_goal_id = ""
 
     def _on_load(self) -> None:
@@ -71,6 +72,7 @@ class SingleGoalScheduler(BaseService):
         self._unsubscribers.clear()
         self._queue.clear()
         self._active_goal = None
+        self._active_task_id = ""
         self._paused_goal_id = ""
 
     def submit_goal(self, goal: Goal) -> None:
@@ -145,6 +147,7 @@ class SingleGoalScheduler(BaseService):
             status=TaskStatus.READY,
             correlation=correlation.with_goal(self._active_goal.id),
         )
+        self._active_task_id = task.id
         self._bus.publish(
             TASK_READY,
             {"task": task.to_payload(), "correlation": task.correlation.to_payload()},
@@ -238,7 +241,7 @@ class SingleGoalScheduler(BaseService):
         self._activate_next_if_idle()
 
     def _on_execution_complete(self, event: Event) -> None:
-        if self._active_goal is None:
+        if not self._event_matches_active_goal(event):
             return
         self._bus.publish(
             TASK_COMPLETED,
@@ -251,7 +254,7 @@ class SingleGoalScheduler(BaseService):
         )
 
     def _on_execution_failed(self, event: Event) -> None:
-        if self._active_goal is None:
+        if not self._event_matches_active_goal(event):
             return
         self._bus.publish(
             TASK_FAILED,
@@ -276,6 +279,7 @@ class SingleGoalScheduler(BaseService):
             source=self.name,
         )
         self._active_goal = None
+        self._active_task_id = ""
         self._activate_next_if_idle()
 
     def _on_task_failed(self, event: Event) -> None:
@@ -294,6 +298,7 @@ class SingleGoalScheduler(BaseService):
             source=self.name,
         )
         self._active_goal = None
+        self._active_task_id = ""
         self._activate_next_if_idle()
 
     def _has_unresolved_dependencies(self, goal: Goal) -> bool:
@@ -301,6 +306,18 @@ class SingleGoalScheduler(BaseService):
             return False
         completed = {item.id for item in self._repo.list_goals(GoalStatus.COMPLETE.value)}
         return any(dep not in completed for dep in goal.depends_on)
+
+    def _event_matches_active_goal(self, event: Event) -> bool:
+        if self._active_goal is None:
+            return False
+        run_id = str(event.payload.get("run_id") or "")
+        if run_id and self._active_task_id and run_id != self._active_task_id:
+            return False
+        correlation = CorrelationContext.from_payload(event.payload)
+        if correlation.goal_id:
+            return correlation.goal_id == self._active_goal.id
+        request_id = str(event.payload.get("request_id") or "")
+        return bool(request_id and request_id == self._active_goal.correlation.correlation_id)
 
 
 def _parse_priority(value: object) -> Priority:
