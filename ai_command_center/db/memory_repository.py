@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ class MemoryNode:
 class MemoryRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
+        self._lock = threading.Lock()
 
     def remember(
         self,
@@ -39,9 +41,58 @@ class MemoryRepository:
     ) -> str:
         node_id = uuid.uuid4().hex
         now = time.time()
+        with self._lock:
+            try:
+                self._remember_once(
+                    node_id=node_id,
+                    label=label,
+                    content=content,
+                    kind=kind,
+                    tier=tier,
+                    now=now,
+                    workspace_id=workspace_id,
+                    entity_id=entity_id,
+                    related_to=related_to,
+                    relation=relation,
+                )
+            except sqlite3.DatabaseError as exc:
+                if "cannot start a transaction within a transaction" not in str(exc):
+                    raise
+                self._conn.rollback()
+                self._remember_once(
+                    node_id=node_id,
+                    label=label,
+                    content=content,
+                    kind=kind,
+                    tier=tier,
+                    now=now,
+                    workspace_id=workspace_id,
+                    entity_id=entity_id,
+                    related_to=related_to,
+                    relation=relation,
+                )
+            self._conn.commit()
+        return node_id
+
+    def _remember_once(
+        self,
+        *,
+        node_id: str,
+        label: str,
+        content: str,
+        kind: str,
+        tier: str,
+        now: float,
+        workspace_id: str,
+        entity_id: str,
+        related_to: str | None,
+        relation: str,
+    ) -> None:
         self._conn.execute(
             """
-            INSERT INTO memory_nodes (id, label, kind, content, tier, created_at, workspace_id, entity_id)
+            INSERT INTO memory_nodes (
+                id, label, kind, content, tier, created_at, workspace_id, entity_id
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -63,8 +114,6 @@ class MemoryRepository:
                 """,
                 (node_id, related_to, relation, now),
             )
-        self._conn.commit()
-        return node_id
 
     def search(
         self,

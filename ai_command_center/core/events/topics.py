@@ -215,6 +215,45 @@ EXECUTION_STEP_APPROVED = "execution.step.approved"
 EXECUTION_STEP_COMPLETED = "execution.step.completed"
 EXECUTION_STEP_FAILED = "execution.step.failed"
 
+# Brain v1 goal scheduler (single-active-goal queue)
+GOAL_SUBMIT_REQUEST = "goal.submit.request"
+GOAL_SUBMITTED = "goal.submitted"
+GOAL_ACTIVATED = "goal.activated"
+GOAL_PAUSED = "goal.paused"
+GOAL_RESUMED = "goal.resumed"
+GOAL_CANCELLED = "goal.cancelled"
+GOAL_COMPLETED = "goal.completed"
+GOAL_FAILED = "goal.failed"
+TASK_READY = "task.ready"
+TASK_COMPLETED = "task.completed"
+TASK_FAILED = "task.failed"
+
+# Brain v1 observer framework
+OBSERVATION_RECEIVED = "observation.received"
+OBSERVATION_BATCH_RECEIVED = "observation.batch_received"
+OBSERVATION_FAILED = "observation.failed"
+OBSERVER_STARTED = "observer.started"
+OBSERVER_STOPPED = "observer.stopped"
+OBSERVER_ERROR = "observer.error"
+
+# Brain v1 runtime safety gateway
+RUNTIME_ACTION_REQUEST = "runtime.action.request"
+RUNTIME_ACTION_STARTED = "runtime.action_started"
+RUNTIME_APPROVAL_REQUESTED = "runtime.approval_requested"
+RUNTIME_APPROVAL_DECIDED = "runtime.approval_decided"
+RUNTIME_ACTION_COMPLETED = "runtime.action_completed"
+RUNTIME_ACTION_FAILED = "runtime.action_failed"
+RUNTIME_ACTION_DENIED = "runtime.action_denied"
+RUNTIME_WORLD_MODEL_APPLY_REQUESTED = "runtime.world_model_apply_requested"
+RUNTIME_WORLD_MODEL_APPLY_COMPLETED = "runtime.world_model_apply_completed"
+
+# Brain v1 kernel state machine
+KERNEL_STATE_CHANGED = "kernel.state_changed"
+KERNEL_TRANSITION_REJECTED = "kernel.transition_rejected"
+KERNEL_RECOVERY_STARTED = "kernel.recovery_started"
+KERNEL_RECOVERY_COMPLETED = "kernel.recovery_completed"
+KERNEL_TIMEOUT = "kernel.timeout"
+
 # External integrations (vNext Phase E — MCP/email/calendar via ARI)
 EXTERNAL_CAPABILITY_REGISTER = "external.capability.register"
 EXTERNAL_CAPABILITY_UNREGISTER = "external.capability.unregister"
@@ -455,6 +494,37 @@ __all__ = [
     "EXECUTION_STEP_APPROVED",
     "EXECUTION_STEP_COMPLETED",
     "EXECUTION_STEP_FAILED",
+    "GOAL_SUBMIT_REQUEST",
+    "GOAL_SUBMITTED",
+    "GOAL_ACTIVATED",
+    "GOAL_PAUSED",
+    "GOAL_RESUMED",
+    "GOAL_CANCELLED",
+    "GOAL_COMPLETED",
+    "GOAL_FAILED",
+    "TASK_READY",
+    "TASK_COMPLETED",
+    "TASK_FAILED",
+    "OBSERVATION_RECEIVED",
+    "OBSERVATION_BATCH_RECEIVED",
+    "OBSERVATION_FAILED",
+    "OBSERVER_STARTED",
+    "OBSERVER_STOPPED",
+    "OBSERVER_ERROR",
+    "RUNTIME_ACTION_REQUEST",
+    "RUNTIME_ACTION_STARTED",
+    "RUNTIME_APPROVAL_REQUESTED",
+    "RUNTIME_APPROVAL_DECIDED",
+    "RUNTIME_ACTION_COMPLETED",
+    "RUNTIME_ACTION_FAILED",
+    "RUNTIME_ACTION_DENIED",
+    "RUNTIME_WORLD_MODEL_APPLY_REQUESTED",
+    "RUNTIME_WORLD_MODEL_APPLY_COMPLETED",
+    "KERNEL_STATE_CHANGED",
+    "KERNEL_TRANSITION_REJECTED",
+    "KERNEL_RECOVERY_STARTED",
+    "KERNEL_RECOVERY_COMPLETED",
+    "KERNEL_TIMEOUT",
     "EXTERNAL_CAPABILITY_REGISTER",
     "EXTERNAL_CAPABILITY_UNREGISTER",
     "EXTERNAL_CAPABILITY_REGISTERED",

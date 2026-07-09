@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import json
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -18,6 +19,7 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CONTEXT_REQUEST,
     WORKSPACE_CONTEXT_RESULT,
 )
+from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
 from ai_command_center.services.base import BaseService
 
@@ -119,6 +121,30 @@ def build_deterministic_plan(goal: str, specs: list[dict[str, Any]]) -> Executio
     )
 
 
+def parse_structured_plan_response(raw_response: str) -> ExecutionPlan:
+    """Parse a planner LLM JSON response into a safe execution manifest."""
+    text = raw_response.strip()
+    if not text:
+        return ExecutionPlan(goal="", steps=())
+    if text.startswith("```"):
+        text = text.strip("`")
+        first_newline = text.find("\n")
+        if first_newline >= 0 and not text[:first_newline].strip().startswith("{"):
+            text = text[first_newline:].strip()
+        elif text.lower().startswith("json"):
+            text = text[4:].strip()
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError("planner response must be a JSON object")
+    confidence = float(data.get("confidence", 0.0) or 0.0)
+    if confidence < 0.1:
+        return ExecutionPlan(goal=str(data.get("goal", "")), steps=())
+    action = data.get("action")
+    if isinstance(action, dict) and "steps" not in data:
+        data["steps"] = [action]
+    return ExecutionPlan.from_dict(data)
+
+
 class PlannerService(BaseService):
     """Subscribes to plan.request and publishes plan.generated — never executes."""
 
@@ -193,6 +219,8 @@ class PlannerService(BaseService):
     def _on_plan_request(self, event: Event) -> None:
         request_id = str(event.payload.get("request_id") or uuid.uuid4())
         goal = str(event.payload.get("goal", "")).strip()
+        goal_id = str(event.payload.get("goal_id") or "")
+        correlation = CorrelationContext.from_payload(event.payload)
         workspace_id = str(event.payload.get("workspace_id", "")).strip()
         entity_id = str(
             event.payload.get("entity_id")
@@ -215,7 +243,9 @@ class PlannerService(BaseService):
                 {
                     "request_id": request_id,
                     "goal": goal,
+                    "goal_id": goal_id,
                     "error": "goal is required",
+                    "correlation": correlation.to_payload(),
                 },
                 source=self.name,
             )
@@ -237,15 +267,26 @@ class PlannerService(BaseService):
                 workspace_snippets=workspace_snippets or None,
             )
 
-            # TODO(Phase C): parse structured JSON plan from LLM via ModelRouter/Ollama.
-            plan = build_deterministic_plan(goal, specs)
+            raw_plan_response = str(
+                event.payload.get("planner_response")
+                or event.payload.get("llm_plan_response")
+                or ""
+            )
+            if raw_plan_response:
+                plan = parse_structured_plan_response(raw_plan_response)
+                planner_mode = "llm_structured"
+            else:
+                plan = build_deterministic_plan(goal, specs)
+                planner_mode = "deterministic"
             if not plan.steps:
                 self._bus.publish(
                     PLAN_FAILED,
                     {
                         "request_id": request_id,
                         "goal": goal,
+                        "goal_id": goal_id,
                         "error": "no capabilities available for goal",
+                        "correlation": correlation.to_payload(),
                     },
                     source=self.name,
                 )
@@ -256,10 +297,12 @@ class PlannerService(BaseService):
                 {
                     "request_id": request_id,
                     "goal": goal,
+                    "goal_id": goal_id,
                     "plan": plan.to_dict(),
-                    "planner_mode": "deterministic",
+                    "planner_mode": planner_mode,
                     "context_version": bundle.version,
                     "context_token_estimate": bundle.token_estimate,
+                    "correlation": correlation.to_payload(),
                 },
                 source=self.name,
             )
@@ -269,7 +312,9 @@ class PlannerService(BaseService):
                 {
                     "request_id": request_id,
                     "goal": goal,
+                    "goal_id": goal_id,
                     "error": str(exc),
+                    "correlation": correlation.to_payload(),
                 },
                 source=self.name,
             )
