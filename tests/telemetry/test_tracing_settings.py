@@ -45,17 +45,15 @@ def test_tracing_disabled_via_settings(span_exporter: InMemorySpanExporter) -> N
     assert len(span_exporter.get_finished_spans()) == 0
 
 
-def test_unreachable_otlp_endpoint_disables_tracing(
-    span_exporter: InMemorySpanExporter,
-) -> None:
+def test_unreachable_otlp_endpoint_disables_tracing() -> None:
     assert _otlp_endpoint_reachable("http://127.0.0.1:1") is False
     bus = EventBus()
     tracing = TracingService(
         bus,
         enabled=True,
         otel_endpoint="http://127.0.0.1:1",
-        span_exporter=span_exporter,
     )
+    assert tracing._enabled is False
     tracing.start()
     bus.publish(
         ORCHESTRATION_INTENT_CLASSIFIED,
@@ -63,4 +61,3 @@ def test_unreachable_otlp_endpoint_disables_tracing(
         source="test",
     )
     tracing.stop()
-    assert len(span_exporter.get_finished_spans()) == 0
