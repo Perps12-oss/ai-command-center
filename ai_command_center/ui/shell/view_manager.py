@@ -93,6 +93,7 @@ class ViewManagerMixin:
         self._view_registry["executions"] = lambda: ExecutionsView(
             self._content,
             on_select=self._on_execution_select,
+            on_scrub=self._on_execution_timeline_scrub,
         )
         self._view_registry["timeline"] = lambda: ExecutionTimelineView(
             self._content,
@@ -253,9 +254,13 @@ class ViewManagerMixin:
             if chat is not None:
                 chat.focus_input()
 
-    def _on_execution_select(self, run_id: str) -> None:
-        """Navigate to execution detail — placeholder until ExecutionDetailView is wired."""
-        pass
+    def _on_execution_select(self, request_id: str) -> None:
+        """Open execution detail and request timeline projection."""
+        self._navigate("executions")
+        self._controller.publish_execution_query(request_id)
+
+    def _on_execution_timeline_scrub(self, request_id: str, index: int) -> None:
+        self._controller.publish_execution_timeline_scrub(request_id, index)
 
     def _executions_view(self) -> "ExecutionsView | None":
         v = self._views.get("executions")
