@@ -54,6 +54,7 @@ class ArtifactCard(ctk.CTkFrame):
         label: str,
         *,
         size_bytes: int = 0,
+        preview_snippet: str = "",
         on_action: Callable[[str, str], None] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -107,6 +108,18 @@ class ArtifactCard(ctk.CTkFrame):
             text_color=T.TEXT_MUTED,
             anchor="w",
         ).pack(anchor="w")
+
+        snippet = (preview_snippet or "").strip()
+        if snippet:
+            ctk.CTkLabel(
+                info,
+                text=snippet,
+                font=(T.FONT_FAMILY, 9),
+                text_color=T.TEXT_SECONDARY,
+                anchor="w",
+                wraplength=360,
+                justify="left",
+            ).pack(anchor="w", pady=(2, 0))
 
         # Action buttons
         btn_cfg: dict[str, Any] = dict(

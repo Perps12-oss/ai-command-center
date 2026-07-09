@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ai_command_center.core.state.inspector_state import resolve_inspect_navigate_view
+from ai_command_center.core.state.artifact_state import artifacts_for_request
 from ai_command_center.platform.secret_store import openai_api_key_configured
 from ai_command_center.ui.components.permission_dialog import PermissionDialog
 from ai_command_center.ui.design_system import theme_manager
@@ -179,6 +180,12 @@ class StateApplierMixin:
                     self._last_stream_buffer_len = 0
                     self._top.update_status("error", snap.settings.default_model)
                     self._last_terminal_chat_key = terminal_key
+
+            if chat and hasattr(chat, "update_artifact_stream"):
+                req_id = snap.active_chat_request_id or snap.last_chat_request_id
+                if req_id:
+                    scoped = artifacts_for_request(snap.recent_artifacts, str(req_id))
+                    chat.update_artifact_stream(str(req_id), scoped)
 
         if snap.inspector.navigate_revision != getattr(
             self, "_last_inspector_navigate_revision", 0
