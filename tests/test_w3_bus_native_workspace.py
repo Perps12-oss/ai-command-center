@@ -160,7 +160,7 @@ class W3EntityBusHandlerTests(unittest.TestCase):
         self.assertTrue(snippets)
         combined = "\n".join(snippets)
         self.assertIn("Ctx Card", combined)
-        self.assertIn("Related entities", combined)
+        self.assertIn("EDGES:", combined)
         self.assertIn("workspace", combined.lower())
 
     def test_workspace_create_via_bus_request(self) -> None:
@@ -404,3 +404,4 @@ class W3HandlerErrorResultTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

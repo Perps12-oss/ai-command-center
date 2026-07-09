@@ -196,6 +196,30 @@ CAPABILITY_ERROR = "capability.error"
 CAPABILITY_FALLBACK = "capability.fallback"
 CAPABILITY_PROVIDERS_READY = "capability.providers.ready"
 CAPABILITY_LIFECYCLE_SNAPSHOT = "capability.lifecycle.snapshot"
+CAPABILITY_CATALOG_REQUEST = "capability.catalog.request"
+CAPABILITY_CATALOG_RESULT = "capability.catalog.result"
+
+# Planner layer (vNext L4 — goal to plan DAG, no execution)
+PLAN_REQUEST = "plan.request"
+PLAN_GENERATED = "plan.generated"
+PLAN_FAILED = "plan.failed"
+
+# Execution orchestrator (vNext L5 — approved plan execution with gates)
+EXECUTION_RUN_REQUEST = "execution.run.request"
+EXECUTION_RUN_STARTED = "execution.run.started"
+EXECUTION_RUN_COMPLETE = "execution.run.complete"
+EXECUTION_RUN_FAILED = "execution.run.failed"
+EXECUTION_STEP_STARTED = "execution.step.started"
+EXECUTION_STEP_AWAITING_APPROVAL = "execution.step.awaiting_approval"
+EXECUTION_STEP_APPROVED = "execution.step.approved"
+EXECUTION_STEP_COMPLETED = "execution.step.completed"
+EXECUTION_STEP_FAILED = "execution.step.failed"
+
+# External integrations (vNext Phase E — MCP/email/calendar via ARI)
+EXTERNAL_CAPABILITY_REGISTER = "external.capability.register"
+EXTERNAL_CAPABILITY_UNREGISTER = "external.capability.unregister"
+EXTERNAL_CAPABILITY_REGISTERED = "external.capability.registered"
+EXTERNAL_CAPABILITY_CATALOG_UPDATED = "external.capability.catalog_updated"
 
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
@@ -417,6 +441,24 @@ __all__ = [
     "CAPABILITY_FALLBACK",
     "CAPABILITY_PROVIDERS_READY",
     "CAPABILITY_LIFECYCLE_SNAPSHOT",
+    "CAPABILITY_CATALOG_REQUEST",
+    "CAPABILITY_CATALOG_RESULT",
+    "PLAN_REQUEST",
+    "PLAN_GENERATED",
+    "PLAN_FAILED",
+    "EXECUTION_RUN_REQUEST",
+    "EXECUTION_RUN_STARTED",
+    "EXECUTION_RUN_COMPLETE",
+    "EXECUTION_RUN_FAILED",
+    "EXECUTION_STEP_STARTED",
+    "EXECUTION_STEP_AWAITING_APPROVAL",
+    "EXECUTION_STEP_APPROVED",
+    "EXECUTION_STEP_COMPLETED",
+    "EXECUTION_STEP_FAILED",
+    "EXTERNAL_CAPABILITY_REGISTER",
+    "EXTERNAL_CAPABILITY_UNREGISTER",
+    "EXTERNAL_CAPABILITY_REGISTERED",
+    "EXTERNAL_CAPABILITY_CATALOG_UPDATED",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",
