@@ -14,6 +14,14 @@ from ai_command_center.core.contracts import (
     SUPPORTED_VERSIONS,
 )
 
+# Locked contract surface (UCGS); anchors imports used by assembly boundaries.
+_CONTEXT_MANAGER_CONTRACT = (
+    COMMAND_ROUTED_VERSION,
+    CONTEXT_BUNDLE_VERSION,
+    OLLAMA_SERVICE_API_VERSION,
+    *SUPPORTED_VERSIONS,
+)
+
 MAX_CONTEXT_FILL_RATIO = 0.70
 
 
