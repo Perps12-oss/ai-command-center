@@ -156,6 +156,29 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v8(conn: sqlite3.Connection) -> None:
+    """Add execution_events table for ACC UI execution timeline stream (PR 8)."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS execution_events (
+            event_id TEXT PRIMARY KEY,
+            trace_id TEXT NOT NULL DEFAULT '',
+            parent_event_id TEXT,
+            timestamp REAL NOT NULL,
+            event_type TEXT NOT NULL,
+            actor TEXT NOT NULL DEFAULT '',
+            scope TEXT NOT NULL DEFAULT '',
+            request_id TEXT NOT NULL DEFAULT '',
+            payload TEXT NOT NULL DEFAULT '{}',
+            state_diff TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_execution_events_request ON execution_events(request_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_events_trace ON execution_events(trace_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_events_timestamp ON execution_events(timestamp);
+        """
+    )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
@@ -164,6 +187,7 @@ _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (5, _migrate_v5),
     (6, _migrate_v6),
     (7, _migrate_v7),
+    (8, _migrate_v8),
 ]
 
 
