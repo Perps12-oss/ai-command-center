@@ -18,6 +18,7 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CONTEXT_REQUEST,
     WORKSPACE_CONTEXT_RESULT,
 )
+from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
 from ai_command_center.services.base import BaseService
 
@@ -193,6 +194,8 @@ class PlannerService(BaseService):
     def _on_plan_request(self, event: Event) -> None:
         request_id = str(event.payload.get("request_id") or uuid.uuid4())
         goal = str(event.payload.get("goal", "")).strip()
+        goal_id = str(event.payload.get("goal_id") or "")
+        correlation = CorrelationContext.from_payload(event.payload)
         workspace_id = str(event.payload.get("workspace_id", "")).strip()
         entity_id = str(
             event.payload.get("entity_id")
@@ -215,7 +218,9 @@ class PlannerService(BaseService):
                 {
                     "request_id": request_id,
                     "goal": goal,
+                    "goal_id": goal_id,
                     "error": "goal is required",
+                    "correlation": correlation.to_payload(),
                 },
                 source=self.name,
             )
@@ -245,7 +250,9 @@ class PlannerService(BaseService):
                     {
                         "request_id": request_id,
                         "goal": goal,
+                        "goal_id": goal_id,
                         "error": "no capabilities available for goal",
+                        "correlation": correlation.to_payload(),
                     },
                     source=self.name,
                 )
@@ -256,10 +263,12 @@ class PlannerService(BaseService):
                 {
                     "request_id": request_id,
                     "goal": goal,
+                    "goal_id": goal_id,
                     "plan": plan.to_dict(),
                     "planner_mode": "deterministic",
                     "context_version": bundle.version,
                     "context_token_estimate": bundle.token_estimate,
+                    "correlation": correlation.to_payload(),
                 },
                 source=self.name,
             )
@@ -269,7 +278,9 @@ class PlannerService(BaseService):
                 {
                     "request_id": request_id,
                     "goal": goal,
+                    "goal_id": goal_id,
                     "error": str(exc),
+                    "correlation": correlation.to_payload(),
                 },
                 source=self.name,
             )

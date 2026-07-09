@@ -36,9 +36,11 @@ from ai_command_center.core.service_manager import ServiceManager
 from ai_command_center.core.snapshot.snapshot_service import SnapshotService
 from ai_command_center.core.timeline.timeline_repository import TimelineRepository
 from ai_command_center.core.timeline.timeline_service import TimelineService
+from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.core.workspace.workspace_service import WorkspaceService
 from ai_command_center.core.workspace_os_service import WorkspaceOsService
 from ai_command_center.repositories.conversation_repository import ConversationRepository
+from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.repositories.plugin_manifest_repository import (
@@ -49,6 +51,7 @@ from ai_command_center.repositories.runtime_provider_manifest_repository import 
 )
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from ai_command_center.repositories.world_model_repository import SQLiteWorldModelRepository
 from ai_command_center.repositories.artifact_repository import ArtifactRepository
 from ai_command_center.repositories.execution_event_repository import ExecutionEventRepository
 from ai_command_center.repositories.execution_run_repository import ExecutionRunRepository
@@ -57,6 +60,8 @@ from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
 from ai_command_center.services.artifact_service import ArtifactService
+from ai_command_center.services.brain_kernel_service import BrainKernelService
+from ai_command_center.services.brain_runtime_service import BrainRuntimeService
 from ai_command_center.services.execution_event_service import ExecutionEventService
 from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.orchestration_service import OrchestrationService
@@ -71,6 +76,7 @@ from ai_command_center.services.external_capability_bridge_service import (
     ExternalCapabilityBridgeService,
 )
 from ai_command_center.services.planner_service import PlannerService
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -80,6 +86,7 @@ from ai_command_center.providers.provider_registry import ProviderRegistry, buil
 from ai_command_center.services.obsidian_service import ObsidianService
 from ai_command_center.services.ollama_http_service import OllamaHttpService
 from ai_command_center.services.openai_http_service import OpenAIHttpService
+from ai_command_center.services.observer_service import ObserverService
 from ai_command_center.services.plugin_registry_service import PluginRegistryService
 from ai_command_center.services.qwenpaw_sidecar_service import QwenPawSidecarService
 from ai_command_center.services.runtime_provider_registry_service import (
@@ -132,9 +139,12 @@ def build_services(
     conv_repo = ConversationRepository(db)
     plugin_repo = PluginManifestRepository(db)
     runtime_provider_repo = RuntimeProviderManifestRepository(db)
+    world_model_repo = SQLiteWorldModelRepository(db)
+    goal_repo = GoalRepository(db)
 
     # ── shared singletons ─────────────────────────────────────────────────────
     context_manager = ContextManager()
+    world_model = WorldModel(world_model_repo)
     shared_tool_registry = ToolRegistry()
     provider_registry = build_default_registry()
     ollama = OllamaHttpService(bus)
@@ -166,6 +176,10 @@ def build_services(
         tool_registry=shared_tool_registry,
         ai_capability_registry=ai_capability_registry_service,
     )
+    brain_runtime = BrainRuntimeService(bus, world_model)
+    brain_kernel = BrainKernelService(bus, world_model)
+    goal_scheduler = SingleGoalScheduler(bus, goal_repo)
+    observer = ObserverService(bus)
     planner = PlannerService(bus, context_manager=context_manager)
     execution_orchestrator = ExecutionOrchestratorService(bus)
     external_capability_bridge = ExternalCapabilityBridgeService(bus)
@@ -206,6 +220,10 @@ def build_services(
     for svc in (
         telemetry,
         tracing,
+        brain_runtime,
+        brain_kernel,
+        goal_scheduler,
+        observer,
         capability_lifecycle,
         capability_prompt_catalog,
         planner,
