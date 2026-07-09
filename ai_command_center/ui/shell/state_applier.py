@@ -233,11 +233,11 @@ class StateApplierMixin:
         self._apply_execution_timeline(snap)
 
     def _apply_execution_timeline(self, snap) -> None:
-        """Project execution_timeline into ExecutionsView detail scrubber."""
+        """Project execution_scrubber into ExecutionsView detail scrubber."""
         executions = self._executions_view()
         if executions is None or not hasattr(executions, "apply_timeline"):
             return
-        timeline = snap.execution_timeline
+        timeline = snap.execution_scrubber
         if not timeline.request_id:
             return
         key = (
