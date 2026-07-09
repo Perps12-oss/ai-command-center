@@ -196,6 +196,8 @@ CAPABILITY_ERROR = "capability.error"
 CAPABILITY_FALLBACK = "capability.fallback"
 CAPABILITY_PROVIDERS_READY = "capability.providers.ready"
 CAPABILITY_LIFECYCLE_SNAPSHOT = "capability.lifecycle.snapshot"
+CAPABILITY_CATALOG_REQUEST = "capability.catalog.request"
+CAPABILITY_CATALOG_RESULT = "capability.catalog.result"
 
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
@@ -417,6 +419,8 @@ __all__ = [
     "CAPABILITY_FALLBACK",
     "CAPABILITY_PROVIDERS_READY",
     "CAPABILITY_LIFECYCLE_SNAPSHOT",
+    "CAPABILITY_CATALOG_REQUEST",
+    "CAPABILITY_CATALOG_RESULT",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",

@@ -211,7 +211,7 @@ Governed enum in `core/relationship/relationship.py`: `CONTAINS`, `DEPENDS_ON`, 
 | Runtime providers | `services/runtime_capability_router_service.py` | ARI `CapabilityKind` routing (planning/coding/research) |
 | Orchestration providers | `orchestration/providers/provider_registry.py` | Truth-bound intents (calendar, system facts, MCP) |
 
-**Phase B deliverable:** `CapabilityPromptCatalogService` — unified `get_available_prompt_specs(entity_types)` for the planner, stripping internal handlers.
+**Phase B deliverable:** `CapabilityPromptCatalogService` — unified `get_available_prompt_specs(entity_types)` for the planner, stripping internal handlers. **Status: complete** (`capability.catalog.request` / `capability.catalog.result` topics).
 
 **Capability metadata shape (planner-facing):**
 
@@ -343,7 +343,7 @@ Aligned with [ARCHITECTURE_TRANSITION_PLAN.md](ARCHITECTURE_TRANSITION_PLAN.md).
 
 | Phase | Scope | Deliverable | Depends on |
 |-------|-------|-------------|------------|
-| **A — Foundation** | World model → prompt | `context_compiler.py`, `workspace_state` context priority | Program 3 W3 (done) |
+| **A — Foundation** | World model → prompt | `context_compiler.py`, `workspace_state` context priority | Complete (Milestone 1) |
 | **B — Capability facade** | Planner-facing registry API | `CapabilityPromptCatalogService` | Phase A |
 | **C — Planner** | LLM plan DAG | `PlannerService`, `plan.request` / `plan.generated` topics | Phase B |
 | **D — Execution gates** | Approval across capabilities | Extend `WorkflowEngineService` + `PermissionService` | Phase C |

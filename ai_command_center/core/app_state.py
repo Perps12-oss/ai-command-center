@@ -56,6 +56,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
+    CAPABILITY_CATALOG_RESULT,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_EVENT_APPENDED,
@@ -162,6 +163,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
+    CAPABILITY_CATALOG_RESULT,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -433,6 +435,7 @@ class AppState:
     provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
+    capability_prompt_catalog: tuple[dict[str, object], ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
@@ -907,6 +910,22 @@ def _reduce_capability_lifecycle_snapshot(state: AppState, event: Event) -> AppS
     return replace(
         state,
         capability_lifecycle=tuple(records),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_capability_prompt_catalog(state: AppState, event: Event) -> AppState:
+    if event.topic != CAPABILITY_CATALOG_RESULT:
+        return state
+    raw_specs = event.payload.get("specs") or []
+    specs: list[dict[str, object]] = []
+    for item in raw_specs:
+        if isinstance(item, dict):
+            specs.append(dict(item))
+    return replace(
+        state,
+        capability_prompt_catalog=tuple(specs),
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1486,6 +1505,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
     _reduce_capability_lifecycle_snapshot,
+    _reduce_capability_prompt_catalog,
     _reduce_orchestration_provider_health,
     _reduce_execution_run_feed,
     _reduce_plugin_state_changed,
