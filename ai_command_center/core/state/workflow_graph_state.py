@@ -12,6 +12,7 @@ from ai_command_center.core.events.topics import (
     AGENT_PIPELINE_STAGE,
     AGENT_PIPELINE_STARTED,
     UI_WORKFLOW_NODE_SELECT,
+    UI_WORKFLOW_NODE_MOVE,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
     WORKFLOW_STARTED,
@@ -290,6 +291,20 @@ def reduce_workflow_graph_state(state: WorkflowGraphState, event: Event) -> Work
             selected_node_id=node_id,
             revision=state.revision + 1,
         )
+
+    if event.topic == UI_WORKFLOW_NODE_MOVE:
+        node_id = str(event.payload.get("node_id") or "")
+        if not node_id:
+            return state
+        x = float(event.payload.get("x", 0.0))
+        y = float(event.payload.get("y", 0.0))
+        nodes = tuple(
+            replace(node, x=x, y=y) if node.node_id == node_id else node
+            for node in state.nodes
+        )
+        if nodes == state.nodes:
+            return state
+        return replace(state, nodes=nodes, revision=state.revision + 1)
 
     return state
 

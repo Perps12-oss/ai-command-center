@@ -262,6 +262,7 @@ UI_EXECUTION_TIMELINE_SCRUB = "ui.execution.timeline.scrub"
 
 # Workflow graph workspace (ACC UI Refurbishment PR 12–13)
 UI_WORKFLOW_NODE_SELECT = "ui.workflow.node.select"
+UI_WORKFLOW_NODE_MOVE = "ui.workflow.node.move"
 UI_WORKFLOW_RUN = "ui.workflow.run"
 
 # Automation workspace (ACC UI Refurbishment PR 14–15)
@@ -462,6 +463,7 @@ __all__ = [
     "EXECUTION_EVENTS_LOADED",
     "UI_EXECUTION_TIMELINE_SCRUB",
     "UI_WORKFLOW_NODE_SELECT",
+    "UI_WORKFLOW_NODE_MOVE",
     "UI_WORKFLOW_RUN",
     "UI_AUTOMATION_RUN",
     "UI_AUTOMATION_SELECT",

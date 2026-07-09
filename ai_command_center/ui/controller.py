@@ -41,6 +41,7 @@ from ai_command_center.core.events.topics import (
     EXECUTION_QUERY_REQUEST,
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
+    UI_WORKFLOW_NODE_MOVE,
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SCHEDULE_TOGGLE,
     UI_AUTOMATION_SELECT,
@@ -257,6 +258,25 @@ class UIController:
                 "label": label,
                 "kind": kind,
                 "state": state,
+            },
+            source="ui",
+        )
+
+    def publish_workflow_node_move(
+        self,
+        node_id: str,
+        x: float,
+        y: float,
+        *,
+        workflow_id: str = "",
+    ) -> None:
+        self._bus.publish(
+            UI_WORKFLOW_NODE_MOVE,
+            {
+                "node_id": node_id,
+                "x": x,
+                "y": y,
+                "workflow_id": workflow_id,
             },
             source="ui",
         )

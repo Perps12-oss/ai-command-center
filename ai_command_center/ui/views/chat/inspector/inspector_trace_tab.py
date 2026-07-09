@@ -6,10 +6,12 @@ Architecture contract: pure display widget, data supplied via update().
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.core.state.execution_state import SpanItem
 from ai_command_center.ui.design_system import theme_v2 as T
 
 _MONO_FONT = ("Consolas", 10)
@@ -79,8 +81,8 @@ class InspectorTraceTab(ctk.CTkFrame):
         )
         self._empty_lbl.pack(pady=20)
 
-    def update(self, spans: list[dict]) -> None:
-        """Refresh the span list from a list of SpanItem-like dicts."""
+    def update(self, spans: Sequence[SpanItem]) -> None:
+        """Refresh the span list from typed :class:`SpanItem` projections."""
         for child in self._scroll.winfo_children():
             child.destroy()
 
@@ -93,15 +95,14 @@ class InspectorTraceTab(ctk.CTkFrame):
             ).pack(pady=20)
             return
 
-        # Simple flat list — determine indent from parent_id
-        span_ids = {s.get("span_id", ""): i for i, s in enumerate(spans)}
+        span_ids = {span.span_id: index for index, span in enumerate(spans)}
         for span in spans:
-            indent = 1 if span.get("parent_id") and span.get("parent_id") in span_ids else 0
+            indent = 1 if span.parent_id and span.parent_id in span_ids else 0
             _SpanRow(
                 self._scroll,
-                name=str(span.get("name", "span")),
-                kind=str(span.get("kind", "internal")),
-                status=str(span.get("status", "ok")),
-                duration_ms=float(span.get("duration_ms", 0)),
+                name=span.name or "span",
+                kind=span.kind or "internal",
+                status=span.status or "ok",
+                duration_ms=float(span.duration_ms),
                 indent=indent,
             ).pack(fill="x", padx=4, pady=2)
