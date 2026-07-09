@@ -49,11 +49,13 @@ from ai_command_center.repositories.runtime_provider_manifest_repository import 
 )
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from ai_command_center.repositories.artifact_repository import ArtifactRepository
 from ai_command_center.repositories.execution_run_repository import ExecutionRunRepository
 from ai_command_center.repositories.workflow_run_repository import WorkflowRunRepository
 from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
+from ai_command_center.services.artifact_service import ArtifactService
 from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.services.capability_lifecycle_manager import CapabilityLifecycleManager
@@ -149,6 +151,7 @@ def build_services(
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     execution_query = ExecutionQueryService(bus, repo=ExecutionRunRepository(db))
     workflow_persistence = WorkflowPersistenceService(bus, repo=WorkflowRunRepository(db))
+    artifact = ArtifactService(bus, repo=ArtifactRepository(db))
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
 
@@ -180,6 +183,7 @@ def build_services(
         execution_run,
         execution_query,
         workflow_persistence,
+        artifact,
         chat_export,
         system_monitor,
         SettingsService(bus, settings_repo),
