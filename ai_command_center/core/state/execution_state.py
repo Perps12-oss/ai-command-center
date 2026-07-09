@@ -1,7 +1,7 @@
 """ExecutionState — active execution context reducer for the inspector panel.
 
 Subscribes to execution.query.result and maintains the current execution
-context snapshot surfaced to the InspectorPanel via AppState.
+context snapshot surfaced to the ExecutionInspector via AppState.
 
 This module is imported by app_state.py as part of the reducer chain.
 """

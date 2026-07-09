@@ -15,10 +15,7 @@ from typing import Any
 
 import customtkinter as ctk
 
-from ai_command_center.ui.components.execution_timeline_scrubber import (
-    ExecutionTimelineScrubber,
-)
-from ai_command_center.ui.components.timeline_renderer import TimelineRenderer
+from ai_command_center.ui.components.docks.execution_timeline_dock import ExecutionTimelineDock
 from ai_command_center.ui.components.trace_tree import TraceTree
 from ai_command_center.ui.design_system import theme_v2 as T
 
@@ -38,6 +35,7 @@ class ExecutionDetailView(ctk.CTkFrame):
         self._on_scrub = on_scrub or (lambda _index: None)
         self._steps: list[dict[str, Any]] = []
         self._spans: list[Any] = []
+        self._timeline_dock: ExecutionTimelineDock | None = None
         self._build()
 
     def _build(self) -> None:
@@ -75,22 +73,11 @@ class ExecutionDetailView(ctk.CTkFrame):
         )
         self._source_lbl.pack(side="right", padx=T.PAD)
 
-        ctk.CTkLabel(
-            self,
-            text="TIMELINE",
-            font=(T.FONT_FAMILY, 9),
-            text_color=T.TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 4))
-
-        self._timeline = TimelineRenderer(self, height=98)
-        self._timeline.pack(fill="x", padx=T.PAD)
-
-        self._scrubber = ExecutionTimelineScrubber(
+        self._timeline_dock = ExecutionTimelineDock(
             self,
             on_scrub=self._handle_scrub,
         )
-        self._scrubber.pack(fill="x", padx=T.PAD, pady=(8, 0))
+        self._timeline_dock.pack(fill="x")
 
         ctk.CTkLabel(
             self,
@@ -107,7 +94,6 @@ class ExecutionDetailView(ctk.CTkFrame):
         self._meta_frame.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
     def _handle_scrub(self, index: int) -> None:
-        self._timeline.render(self._steps, active_index=index)
         self._on_scrub(index)
 
     def show_execution(
@@ -143,15 +129,13 @@ class ExecutionDetailView(ctk.CTkFrame):
                 for s in spans
             ]
 
-        active_index = scrub_index
-        if self._steps:
-            active_index = max(0, min(scrub_index, len(self._steps) - 1))
-            self._timeline.render(self._steps, active_index=active_index)
-        else:
-            self._timeline.render([])
-
-        labels = list(scrub_labels or [str(step.get("name", "")) for step in self._steps])
-        self._scrubber.set_timeline(labels, active_index=active_index)
+        active_index = 0
+        if self._timeline_dock is not None:
+            active_index = self._timeline_dock.render(
+                self._steps,
+                scrub_labels=scrub_labels,
+                scrub_index=scrub_index,
+            )
 
         self._spans = list(spans or [])
         if self._spans:

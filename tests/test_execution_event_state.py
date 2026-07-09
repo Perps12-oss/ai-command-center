@@ -46,7 +46,7 @@ def test_execution_event_appended_projects_catalog() -> None:
         snap = store.snapshot
         assert len(snap.recent_execution_events) == 1
         assert snap.recent_execution_events[0].event_id == "evt-1"
-        assert snap.execution_timeline.request_id == "req-1"
+        assert snap.execution_scrubber.request_id == "req-1"
     finally:
         store.close()
 
@@ -84,10 +84,10 @@ def test_execution_query_result_sets_timeline() -> None:
             source="test",
         )
         snap = store.snapshot
-        assert snap.execution_timeline.request_id == "req-9"
-        assert len(snap.execution_timeline.events) == 2
-        assert snap.execution_timeline.scrub_index == 1
-        assert snap.execution_timeline.source == "events"
+        assert snap.execution_scrubber.request_id == "req-9"
+        assert len(snap.execution_scrubber.events) == 2
+        assert snap.execution_scrubber.scrub_index == 1
+        assert snap.execution_scrubber.source == "events"
     finally:
         store.close()
 
@@ -123,7 +123,7 @@ def test_execution_timeline_scrub_updates_index() -> None:
             source="ui",
         )
         snap = store.snapshot
-        assert snap.execution_timeline.scrub_index == 0
+        assert snap.execution_scrubber.scrub_index == 0
     finally:
         store.close()
 

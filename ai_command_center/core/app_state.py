@@ -61,8 +61,6 @@ from ai_command_center.core.events.topics import (
     EXECUTION_EVENT_APPENDED,
     EXECUTION_EVENTS_LOADED,
     EXECUTION_QUERY_RESULT,
-    EXECUTION_EVENT_APPENDED,
-    EXECUTION_EVENTS_LOADED,
     UI_EXECUTION_TIMELINE_SCRUB,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
@@ -97,7 +95,7 @@ from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, Artif
 from ai_command_center.core.state.execution_event_state import (
     EXECUTION_EVENT_REDUCERS,
     ExecutionEventItem,
-    ExecutionTimelineState,
+    ExecutionScrubberState,
 )
 from ai_command_center.core.state.model_state import ModelSelectionSnapshot
 from ai_command_center.core.state.tool_state import ToolRunItem
@@ -189,8 +187,6 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ARTIFACT_CREATED,
     ARTIFACT_UPDATED,
     ARTIFACTS_LOADED,
-    EXECUTION_EVENT_APPENDED,
-    EXECUTION_EVENTS_LOADED,
     UI_EXECUTION_TIMELINE_SCRUB,
     TOOL_COMPLETED,
     TOOL_FAILED,
@@ -417,7 +413,7 @@ class AppState:
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
-    execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
+    execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
     inspector: InspectorState = field(default_factory=InspectorState)
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
