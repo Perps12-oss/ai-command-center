@@ -204,6 +204,17 @@ PLAN_REQUEST = "plan.request"
 PLAN_GENERATED = "plan.generated"
 PLAN_FAILED = "plan.failed"
 
+# Execution orchestrator (vNext L5 — approved plan execution with gates)
+EXECUTION_RUN_REQUEST = "execution.run.request"
+EXECUTION_RUN_STARTED = "execution.run.started"
+EXECUTION_RUN_COMPLETE = "execution.run.complete"
+EXECUTION_RUN_FAILED = "execution.run.failed"
+EXECUTION_STEP_STARTED = "execution.step.started"
+EXECUTION_STEP_AWAITING_APPROVAL = "execution.step.awaiting_approval"
+EXECUTION_STEP_APPROVED = "execution.step.approved"
+EXECUTION_STEP_COMPLETED = "execution.step.completed"
+EXECUTION_STEP_FAILED = "execution.step.failed"
+
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
 ORCHESTRATION_ROUTING_COMPLETED = "orchestration.routing.completed"
@@ -429,6 +440,15 @@ __all__ = [
     "PLAN_REQUEST",
     "PLAN_GENERATED",
     "PLAN_FAILED",
+    "EXECUTION_RUN_REQUEST",
+    "EXECUTION_RUN_STARTED",
+    "EXECUTION_RUN_COMPLETE",
+    "EXECUTION_RUN_FAILED",
+    "EXECUTION_STEP_STARTED",
+    "EXECUTION_STEP_AWAITING_APPROVAL",
+    "EXECUTION_STEP_APPROVED",
+    "EXECUTION_STEP_COMPLETED",
+    "EXECUTION_STEP_FAILED",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",

@@ -240,7 +240,7 @@ Governed enum in `core/relationship/relationship.py`: `CONTAINS`, `DEPENDS_ON`, 
 | `OrchestrationService` | Deterministic intent classification only |
 | `RuntimeCapabilityRouterService` | Routes `CapabilityKind.PLANNING` to native/QwenPaw |
 | `AgentRuntimeService` | Stub pipeline (`"planner": "stub"` on `agent.pipeline.planned`) |
-| `PlannerService` | **In progress** — deterministic skeleton on EventBus |
+| `PlannerService` | **Complete** — deterministic skeleton on EventBus |
 
 **Phase C deliverable:** `PlannerService` on EventBus:
 
@@ -267,15 +267,15 @@ Governed enum in `core/relationship/relationship.py`: `CONTAINS`, `DEPENDS_ON`, 
 | Orchestration | `orchestration/execution/executor.py` |
 | Execution persistence | `services/execution_run_service.py`, `execution_event_service.py` |
 
-**Phase D deliverable:** Unified approval gates across all executors via `PermissionService`:
+**Phase D deliverable:** `ExecutionOrchestratorService` runs approved planner manifests with risk-tier gates via EventBus (`execution.run.*`, `execution.step.*`). `PermissionService` backs high-risk pre-checks; `WorkflowEngineService` remains for linear tool workflows.
 
 | Risk tier | Examples | Gate |
 |-----------|----------|------|
 | Low | Create note, search files | Auto-approved |
-| Medium | Modify files, send email | User confirmation |
-| High | Delete files, git push, system settings | Explicit approval |
+| Medium | Modify files, send email | User confirmation (`execution.step.awaiting_approval`) |
+| High | Delete files, git push, system settings | Explicit approval + permission check |
 
-**EventBus topics (proposed):** `execution.step.started`, `execution.step.awaiting_approval`, `execution.step.completed`, `execution.step.failed`
+**EventBus topics:** `execution.run.request`, `execution.run.started`, `execution.run.complete`, `execution.run.failed`, `execution.step.started`, `execution.step.awaiting_approval`, `execution.step.approved`, `execution.step.completed`, `execution.step.failed`
 
 **UI:** `ui/views/executions_view.py`, `execution_timeline_view.py`, `ExecutionTimelineDock`
 
@@ -333,7 +333,7 @@ sequenceDiagram
     AppState->>UI: Workspace + Chat update
 ```
 
-**Milestone 1 (this branch):** Steps through workspace context injection are live. Planner and unified execution gates are Phase B–D.
+**Milestone 1 (this branch):** Steps through workspace context injection are live. Planner (Phase C) and execution gates (Phase D MVP) are implemented on the bus.
 
 ---
 
@@ -345,8 +345,8 @@ Aligned with [ARCHITECTURE_TRANSITION_PLAN.md](ARCHITECTURE_TRANSITION_PLAN.md).
 |-------|-------|-------------|------------|
 | **A — Foundation** | World model → prompt | `context_compiler.py`, `workspace_state` context priority | Complete (Milestone 1) |
 | **B — Capability facade** | Planner-facing registry API | `CapabilityPromptCatalogService` | Phase A |
-| **C — Planner** | LLM plan DAG | `PlannerService`, `plan.request` / `plan.generated` topics (in progress) | Phase B |
-| **D — Execution gates** | Approval across capabilities | Extend `WorkflowEngineService` + `PermissionService` | Phase C |
+| **C — Planner** | LLM plan DAG | `PlannerService`, `plan.request` / `plan.generated` topics | Phase B |
+| **D — Execution gates** | Approval across capabilities | `ExecutionOrchestratorService`, `execution.run.*` / `execution.step.*` topics | Phase C |
 | **E — Integrations** | MCP, email, calendar | ARI extensions per [AGENT_RUNTIME_INTERFACE.md](AGENT_RUNTIME_INTERFACE.md) | Program 4 exit |
 
 **Explicit non-goals (Phase A–C):**
