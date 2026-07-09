@@ -253,6 +253,10 @@ ARTIFACT_CREATED = "artifact.created"
 ARTIFACT_UPDATED = "artifact.updated"
 ARTIFACTS_LOADED = "artifacts.loaded"
 
+# Execution timeline stream (ACC UI Refurbishment PR 8)
+EXECUTION_EVENT_APPENDED = "execution.event.appended"
+EXECUTION_EVENTS_LOADED = "execution.events.loaded"
+
 # UI artifact actions (TODO 5/6 — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
 
@@ -439,5 +443,7 @@ __all__ = [
     "ARTIFACT_CREATED",
     "ARTIFACT_UPDATED",
     "ARTIFACTS_LOADED",
+    "EXECUTION_EVENT_APPENDED",
+    "EXECUTION_EVENTS_LOADED",
     "UI_ARTIFACT_ACTION",
 ]
