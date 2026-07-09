@@ -21,103 +21,115 @@ from ai_command_center.repositories.database_bootstrap_repository import Databas
 from ai_command_center.services.artifact_service import ArtifactService
 
 
-def _service(tmp_path: Path) -> tuple[EventBus, ArtifactService, ArtifactRepository]:
+def _service(tmp_path: Path) -> tuple[EventBus, ArtifactService, ArtifactRepository, sqlite3.Connection]:
     conn = sqlite3.connect(tmp_path / "artifact_service.db")
     conn.row_factory = sqlite3.Row
     DatabaseBootstrapRepository().apply(conn)
     repo = ArtifactRepository(conn)
     bus = EventBus()
     service = ArtifactService(bus, repo=repo)
-    return bus, service, repo
+    return bus, service, repo, conn
 
 
 def test_tool_result_creates_artifact() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        bus, service, repo = _service(Path(tmp))
-        created: list[dict] = []
-        bus.subscribe(ARTIFACT_CREATED, lambda e: created.append(dict(e.payload)))
-        service.start()
-        bus.publish(
-            TOOL_RESULT,
-            {
-                "success": True,
-                "tool": "shell",
-                "invoke_id": "inv-1",
-                "output": "echo hello",
-                "request_id": "req-tool",
-            },
-            source="test",
-        )
-        service.stop()
-        assert created
-        assert created[0]["artifact_id"] == "tool:inv-1"
-        assert created[0]["kind"] == "code"
-        assert repo.get("tool:inv-1") is not None
+        bus, service, repo, conn = _service(Path(tmp))
+        try:
+            created: list[dict] = []
+            bus.subscribe(ARTIFACT_CREATED, lambda e: created.append(dict(e.payload)))
+            service.start()
+            bus.publish(
+                TOOL_RESULT,
+                {
+                    "success": True,
+                    "tool": "shell",
+                    "invoke_id": "inv-1",
+                    "output": "echo hello",
+                    "request_id": "req-tool",
+                },
+                source="test",
+            )
+            service.stop()
+            assert created
+            assert created[0]["artifact_id"] == "tool:inv-1"
+            assert created[0]["kind"] == "code"
+            assert repo.get("tool:inv-1") is not None
+        finally:
+            conn.close()
 
 
 def test_chat_complete_creates_artifact() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        bus, service, repo = _service(Path(tmp))
-        created: list[dict] = []
-        bus.subscribe(ARTIFACT_CREATED, lambda e: created.append(dict(e.payload)))
-        service.start()
-        bus.publish(
-            CHAT_COMPLETE,
-            {
-                "request_id": "req-chat",
-                "text": "# Answer\nDone.",
-            },
-            source="test",
-        )
-        service.stop()
-        assert created
-        assert created[0]["artifact_id"] == "chat:req-chat"
-        assert created[0]["kind"] == "markdown"
-        assert repo.get("chat:req-chat") is not None
+        bus, service, repo, conn = _service(Path(tmp))
+        try:
+            created: list[dict] = []
+            bus.subscribe(ARTIFACT_CREATED, lambda e: created.append(dict(e.payload)))
+            service.start()
+            bus.publish(
+                CHAT_COMPLETE,
+                {
+                    "request_id": "req-chat",
+                    "text": "# Answer\nDone.",
+                },
+                source="test",
+            )
+            service.stop()
+            assert created
+            assert created[0]["artifact_id"] == "chat:req-chat"
+            assert created[0]["kind"] == "markdown"
+            assert repo.get("chat:req-chat") is not None
+        finally:
+            conn.close()
 
 
 def test_startup_publishes_recent_artifacts() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        bus, service, repo = _service(Path(tmp))
-        repo.insert(
-            Artifact(
-                artifact_id="seed-1",
-                kind="text",
-                label="Seed",
-                content="seed",
-                source="chat",
+        bus, service, repo, conn = _service(Path(tmp))
+        try:
+            repo.insert(
+                Artifact(
+                    artifact_id="seed-1",
+                    kind="text",
+                    label="Seed",
+                    content="seed",
+                    source="chat",
+                )
             )
-        )
-        loaded: list[dict] = []
-        bus.subscribe(ARTIFACTS_LOADED, lambda e: loaded.append(dict(e.payload)))
-        service.start()
-        service.stop()
-        assert loaded
-        artifacts = loaded[0]["artifacts"]
-        assert len(artifacts) == 1
-        assert artifacts[0]["artifact_id"] == "seed-1"
+            loaded: list[dict] = []
+            bus.subscribe(ARTIFACTS_LOADED, lambda e: loaded.append(dict(e.payload)))
+            service.start()
+            service.stop()
+            assert loaded
+            artifacts = loaded[0]["artifacts"]
+            assert len(artifacts) == 1
+            assert artifacts[0]["artifact_id"] == "seed-1"
+        finally:
+            conn.close()
 
 
 def test_ui_artifact_action_publishes_updated_event() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        bus, service, repo = _service(Path(tmp))
-        repo.insert(
-            Artifact(
-                artifact_id="art-ui",
-                kind="text",
-                label="Preview",
-                content="body",
-                source="chat",
+        bus, service, repo, conn = _service(Path(tmp))
+        try:
+            repo.insert(
+                Artifact(
+                    artifact_id="art-ui",
+                    kind="text",
+                    label="Preview",
+                    content="body",
+                    source="chat",
+                )
             )
-        )
-        updated: list[dict] = []
-        bus.subscribe(ARTIFACT_UPDATED, lambda e: updated.append(dict(e.payload)))
-        service.start()
-        bus.publish(
-            UI_ARTIFACT_ACTION,
-            {"artifact_id": "art-ui", "action": "preview"},
-            source="ui",
-        )
-        service.stop()
-        assert updated
-        assert updated[0]["artifact_id"] == "art-ui"
+            updated: list[dict] = []
+            bus.subscribe(ARTIFACT_UPDATED, lambda e: updated.append(dict(e.payload)))
+            service.start()
+            bus.publish(
+                UI_ARTIFACT_ACTION,
+                {"artifact_id": "art-ui", "action": "preview"},
+                source="ui",
+            )
+            service.stop()
+            assert updated
+            assert updated[0]["artifact_id"] == "art-ui"
+        finally:
+            conn.close()

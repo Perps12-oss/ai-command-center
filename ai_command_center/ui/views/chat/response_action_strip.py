@@ -13,23 +13,8 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.ui.components.execution_badge import ExecutionBadge
 from ai_command_center.ui.design_system import theme_v2 as T
-
-
-def _execution_ref(execution_id: str, execution_index: int) -> InspectableRef:
-    ref_id = execution_id or (f"exec-{execution_index}" if execution_index else "execution-stub")
-    label = f"Execution #{execution_index}" if execution_index else "Execution"
-    return InspectableRef.from_payload(
-        {
-            "kind": "execution",
-            "ref_id": ref_id,
-            "label": label,
-            "payload": {
-                "execution_id": execution_id,
-                "index": str(execution_index),
-            },
-        }
-    )
 
 
 def _artifact_ref(execution_id: str, count: int) -> InspectableRef:
@@ -122,13 +107,12 @@ class ResponseActionStrip(ctk.CTkFrame):
         self._on_inspect_navigate = on_inspect_navigate
 
         if execution_id or execution_index:
-            label = f"⚡ Execution #{execution_index}" if execution_index else "⚡ Execution"
-            _ActionPill(
+            ExecutionBadge(
                 self,
-                label,
-                _execution_ref(execution_id, execution_index),
-                on_inspect_select,
-                on_inspect_navigate,
+                execution_id=execution_id,
+                execution_index=execution_index,
+                on_inspect_select=on_inspect_select,
+                on_inspect_navigate=on_inspect_navigate,
             ).pack(side="left", padx=(0, 4))
 
         if artifact_count:

@@ -9,6 +9,10 @@ from ai_command_center.core.events.topics import (
     ARTIFACTS_LOADED,
     ARTIFACT_UPDATED,
 )
+from ai_command_center.core.state.artifact_state import (
+    ArtifactCatalogItem,
+    artifacts_for_request,
+)
 
 
 def test_artifact_created_projects_recent_catalog() -> None:
@@ -75,3 +79,15 @@ def test_artifacts_loaded_replaces_catalog() -> None:
         assert [item.artifact_id for item in snap.recent_artifacts] == ["a", "b"]
     finally:
         store.close()
+
+
+def test_artifacts_for_request_filters_by_request_id() -> None:
+    catalog = (
+        ArtifactCatalogItem(artifact_id="a1", request_id="req-1", label="One"),
+        ArtifactCatalogItem(artifact_id="a2", request_id="req-2", label="Two"),
+        ArtifactCatalogItem(artifact_id="a3", request_id="req-1", label="Three"),
+    )
+    scoped = artifacts_for_request(catalog, "req-1")
+    assert [item.artifact_id for item in scoped] == ["a1", "a3"]
+    assert artifacts_for_request(catalog, "") == ()
+    assert artifacts_for_request(catalog, "missing") == ()
