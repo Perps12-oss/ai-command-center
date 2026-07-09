@@ -141,7 +141,7 @@ timeline
 - [ ] All features reachable via command palette without view switching
 - [ ] Chat sessions attach to workspace entities (cards, resources)
 - [ ] Agents and workflows visible in system monitor / timeline
-- [ ] Plugin catalog exposes workspace extensions
+- [x] Plugin catalog exposes workspace extensions
 
 ---
 

@@ -1,8 +1,8 @@
 # Program 4 Gate Status
 
-**Status:** **READY** — Program 3 **COMPLETE**; Program 1 S1–S6 **COMPLETE**; Program 4 slice 2 landed.
+**Status:** **READY** — Program 3 **COMPLETE**; Program 1 S1–S6 **COMPLETE**; Program 4 slices 1–4 landed.
 
-**Last assessed:** 2026-07-06 (`feat/program4-slice3-hotkey-workflows-uiqueue`)
+**Last assessed:** 2026-07-09 (`feat/program4-slice4-context-plugin-entities`)
 
 Program 4 may not expand platform capabilities until:
 
@@ -23,7 +23,7 @@ Program 4 may not expand platform capabilities until:
 | **S5** | State & lifecycle | **Done** | `application.shutdown()` → `state_store.close()`; palette destroy unsubscribes |
 | **S6** | Observability | **Done** | `eventbus_topic_counts` in `system.snapshot`; `test_eventbus_topic_counts_in_system_snapshot` |
 | **S7** | Settings / telemetry / tool_executor clarity | **Done** | Module docstrings; `ARCHITECTURE.md` settings chain; `requirements.txt` verified |
-| **W4** | AppState domain split | **Partial** | `chat_state.py` + `workspace_state.py` + `model_state.py` + `tool_state.py` (slice 2); further splits deferred |
+| **W4** | AppState domain split | **Partial** | `chat_state` + `workspace_state` + `model_state` + `tool_state` + `workflow_state` (slice 4); further splits deferred |
 
 ---
 
@@ -32,8 +32,8 @@ Program 4 may not expand platform capabilities until:
 | Question | Answer |
 |----------|--------|
 | **Program 3 dependency** | **Complete** — exit gate closed (WII ≥60%, adoption ~7.0); see `PROGRAM_3_WORKSPACE_ADOPTION.md` |
-| **Backlog completion** | **100%** Program 1; Program 4 slices 1–3 landed |
-| **Program 4 ready?** | **READY** — S1–S6 satisfied; slices 1–3 landed |
+| **Backlog completion** | **100%** Program 1; Program 4 slices 1–4 landed |
+| **Program 4 ready?** | **READY** — S1–S6 satisfied; slices 1–4 landed |
 
 ### Quality scores (1–10)
 
@@ -46,7 +46,7 @@ Program 4 may not expand platform capabilities until:
 | S5 State & lifecycle | 9 | Shutdown teardown verified |
 | S6 Observability | 8 | Topic counters in system snapshot |
 | S7 Dependency cleanup | 8 | Documented; `PluginManifest` dual-path retained by design |
-| W4 AppState split | 9 | Chat + workspace + model + tool reducers |
+| W4 AppState split | 9 | Chat + workspace + model + tool + workflow reducers |
 
 ---
 
@@ -81,18 +81,21 @@ Program 4 may not expand platform capabilities until:
 
 ---
 
-## Program 4 large-context acceptance (2026-07-08)
+## Program 4 slice 4 (2026-07-09)
 
 | Deliverable | Status | Evidence |
 |-------------|--------|----------|
-| Workspace graph context before prompt assembly | **Done** | `CapabilityContextAssembler` publishes `workspace.context.request` before `ContextManager.build_context`; `tests/test_large_context_assembly.py` |
+| Large context entity graph depth | **Done** | `CapabilityContextAssembler` default `max_depth=4` (override via payload); `entity_bus_handlers` workspace graph; `tests/test_program4_slice4.py` |
+| Plugin catalog → Workspace OS entities | **Done** | `plugin.registered.entity` → resource/`plugin` upsert; canvas Plugins group; `tests/test_program4_slice4.py` |
+| Workflow AppState W4 split | **Done** | `core/state/workflow_state.py` (`WORKFLOW_REDUCERS`); persistence + projection unchanged |
+
 
 ---
 
 ## Recommended Program 4 next slice
 
-1. **Further W4 splits** — telemetry or orchestration projections if needed.
-2. **macOS HotkeyProvider** — CGEvent tap behind `HotkeyProvider` (packaging track).
+1. **macOS HotkeyProvider** — CGEvent tap behind `HotkeyProvider` (packaging track).
+2. **Further W4 splits** — telemetry or orchestration projections if needed.
 
 Do **not** start: semantic/vector memory, multi-agent expansion, or distributed execution until explicit gates in this doc and Appendix C pass.
 
@@ -107,11 +110,14 @@ Do **not** start: semantic/vector memory, multi-agent expansion, or distributed 
 
 ## Allowed after Program 3 midpoint
 
-| Capability | Allowed scope |
-|------------|---------------|
-| Tool workflows | Tool-only workflow persistence and AppState projection |
-| Plugin canvas entities | Publish plugin catalog items into Workspace OS entity topics |
-| Large context | Entity graph assembly through EventBus before `ContextManager.build_context()` |
+| Capability | Allowed scope | Slice status |
+|------------|---------------|--------------|
+| Model tiers | Settings-backed tier map and workspace task hints through `ModelRouterService` | Slice 1 **Done** |
+| Platform paths | OS-specific runtime directories behind `platform/` abstractions | Slice 1 **Done** |
+| Tool workflows | Tool-only workflow persistence and AppState projection | Slice 3 **Done** (+ W4 `workflow_state` in slice 4) |
+| Plugin canvas entities | Publish plugin catalog items into Workspace OS entity topics | Slice 4 **Done** |
+| Large context | Entity graph assembly through EventBus before `ContextManager.build_context()` | Slice 4 **Done** |
+
 
 ## Still gated after midpoint
 
@@ -129,9 +135,13 @@ Do **not** start: semantic/vector memory, multi-agent expansion, or distributed 
 |--------|---------|
 | `ai_command_center.core.state.model_state` | `model.selected` AppState projection (**active** — slice 1) |
 | `ai_command_center.core.state.tool_state` | `recent_tool_runs` AppState projection (**active** — slice 2) |
+| `ai_command_center.core.state.workflow_state` | `workflow_runs` AppState projection (**active** — slice 4) |
 | `ai_command_center.repositories.workflow_run_repository` | Workflow run metadata persistence (**active** — slice 3) |
 | `ai_command_center.platform.hotkey_provider` | Cross-platform overlay hotkey registration (**active** — slice 3) |
 | `ai_command_center.core.state.chat_state` | Chat reducers (W4 — **active**) |
 | `ai_command_center.core.state.workspace_state` | Workspace reducers (W4 — **active**) |
 
 `tool_state` is active for `recent_tool_runs` projection (Program 4 slice 2).
+`workflow_state` is active for `workflow_runs` projection (Program 4 slice 4).
+Plugin catalog items publish `plugin.registered.entity` → Workspace OS `resource`/`plugin` entities (slice 4).
+Large-context graph assembly defaults to `max_depth=4` via EventBus before `ContextManager.build_context()` (slice 4).

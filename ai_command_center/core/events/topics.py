@@ -140,6 +140,7 @@ PLUGIN_DISABLE_REQUEST = "plugin.disable_request"
 PLUGIN_CATALOG = "plugin.catalog"
 PLUGIN_STATE_CHANGED = "plugin.state_changed"
 PLUGIN_ERROR = "plugin.error"
+PLUGIN_REGISTERED_ENTITY = "plugin.registered.entity"
 
 LLM_REQUEST = "llm.request"
 LLM_CHUNK = "llm.chunk"
@@ -353,6 +354,7 @@ __all__ = [
     "PLUGIN_CATALOG",
     "PLUGIN_STATE_CHANGED",
     "PLUGIN_ERROR",
+    "PLUGIN_REGISTERED_ENTITY",
     "LLM_REQUEST",
     "LLM_CHUNK",
     "LLM_COMPLETE",

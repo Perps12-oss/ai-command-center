@@ -17,6 +17,7 @@ from ai_command_center.core.entity.entity import (
     ENTITY_TYPE_WORKSPACE,
     RESOURCE_TYPE_COMMAND,
     RESOURCE_TYPE_FOLDER,
+    RESOURCE_TYPE_PLUGIN,
     RESOURCE_TYPE_URL,
 )
 from ai_command_center.core.event_bus import Event
@@ -29,6 +30,7 @@ from ai_command_center.core.events.topics import (
     ENTITY_CREATE_RESULT,
     ENTITY_SEARCH_REQUEST,
     ENTITY_SEARCH_RESULT,
+    PLUGIN_REGISTERED_ENTITY,
     RELATIONSHIP_CREATE_REQUEST,
     RELATIONSHIP_CREATE_RESULT,
     TIMELINE_RECORD_REQUEST,
@@ -251,7 +253,7 @@ def register_entity_bus_handlers(
             meta = dict(entity.metadata)
             resource_type = str(meta.get("resource_type", ""))
             entity_payload["resource_type"] = resource_type
-            for key in ("url", "path", "command"):
+            for key in ("url", "path", "command", "plugin_id"):
                 if meta.get(key):
                     entity_payload[key] = str(meta[key])
 
@@ -272,7 +274,7 @@ def register_entity_bus_handlers(
         rid = _request_id(event)
         workspace_id_raw = str(event.payload.get("workspace_id", "")).strip()
         focus_entity_raw = str(event.payload.get("entity_id", "")).strip()
-        max_depth = int(event.payload.get("max_depth", 2) or 2)
+        max_depth = int(event.payload.get("max_depth", 4) or 4)
         if not workspace_id_raw:
             _publish_result(
                 bus,
@@ -530,6 +532,54 @@ def register_entity_bus_handlers(
                 source=source,
             )
 
+    def on_plugin_registered_entity(event: Event) -> None:
+        """Upsert a plugin catalog item as a Workspace OS resource entity."""
+        payload = event.payload
+        plugin_id = str(payload.get("plugin_id") or payload.get("id", "")).strip()
+        if not plugin_id:
+            return
+        title = str(payload.get("name") or plugin_id).strip() or plugin_id
+        description = str(payload.get("description", "")).strip()
+        kind = str(payload.get("kind", "extension")).strip() or "extension"
+        enabled = bool(payload.get("enabled", True))
+        service = str(payload.get("service", "")).strip()
+        metadata = {
+            "resource_type": RESOURCE_TYPE_PLUGIN,
+            "plugin_id": plugin_id,
+            "plugin_kind": kind,
+            "enabled": str(enabled).lower(),
+        }
+        if service:
+            metadata["service"] = service
+
+        existing = None
+        for candidate in entity_service.get_by_type(ENTITY_TYPE_RESOURCE):
+            meta = dict(candidate.metadata)
+            if (
+                str(meta.get("resource_type", "")) == RESOURCE_TYPE_PLUGIN
+                and str(meta.get("plugin_id", "")) == plugin_id
+            ):
+                existing = candidate
+                break
+
+        try:
+            if existing is None:
+                entity_service.create(
+                    entity_type=ENTITY_TYPE_RESOURCE,
+                    title=title,
+                    description=description,
+                    metadata=metadata,
+                )
+            else:
+                entity_service.update(
+                    existing.id,
+                    title=title,
+                    description=description,
+                    metadata={**dict(existing.metadata), **metadata},
+                )
+        except Exception:  # noqa: BLE001 — catalog projection must not fail registry
+            return
+
     def on_action_invoke_request(event: Event) -> None:
         rid = _request_id(event)
         payload = event.payload
@@ -579,6 +629,7 @@ def register_entity_bus_handlers(
         bus.subscribe(SERVICE_READY, on_service_ready),
         bus.subscribe(TIMELINE_RECORD_REQUEST, on_timeline_record_request),
         bus.subscribe(ACTION_INVOKE_REQUEST, on_action_invoke_request),
+        bus.subscribe(PLUGIN_REGISTERED_ENTITY, on_plugin_registered_entity),
     ]
     return subs
 
@@ -588,4 +639,5 @@ RESOURCE_VALUE_KEYS = {
     RESOURCE_TYPE_URL: "url",
     RESOURCE_TYPE_FOLDER: "path",
     RESOURCE_TYPE_COMMAND: "command",
+    RESOURCE_TYPE_PLUGIN: "plugin_id",
 }

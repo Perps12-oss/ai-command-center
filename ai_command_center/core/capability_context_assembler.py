@@ -5,6 +5,10 @@ Sync cascade contract: ``assemble_for_command`` publishes ``MEMORY_LOOKUP_REQUES
 ``WORKSPACE_CONTEXT_REQUEST``, and ``ENTITY_CONTEXT_REQUEST`` synchronously. Handlers for those topics must populate
 results before ``publish`` returns so assembly can read notes, history, model,
 and entity scope inline. Do not defer those lookups without changing this contract.
+
+Large-context defaults (Program 4 slice 4): workspace relationship traversal uses
+``DEFAULT_GRAPH_MAX_DEPTH`` unless the caller overrides ``max_depth`` /
+``graph_max_depth`` on the event or args payload.
 """
 
 from __future__ import annotations
@@ -30,6 +34,11 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CONTEXT_RESULT,
 )
 
+# Default relationship-graph depth for workspace context assembly (large context).
+DEFAULT_GRAPH_MAX_DEPTH = 4
+_MIN_GRAPH_MAX_DEPTH = 1
+_MAX_GRAPH_MAX_DEPTH = 8
+
 
 @dataclass(frozen=True, slots=True)
 class AssembledContext:
@@ -52,6 +61,29 @@ def context_bundle_to_dict(bundle: ContextBundle) -> dict[str, object]:
     }
 
 
+def resolve_graph_max_depth(
+    event_payload: dict[str, object],
+    args: dict[str, object],
+    *,
+    default: int = DEFAULT_GRAPH_MAX_DEPTH,
+) -> int:
+    """Resolve relationship traversal depth from payload/args with safe bounds."""
+    raw = event_payload.get("max_depth")
+    if raw is None:
+        raw = event_payload.get("graph_max_depth")
+    if raw is None:
+        raw = args.get("max_depth")
+    if raw is None:
+        raw = args.get("graph_max_depth")
+    if raw is None:
+        return default
+    try:
+        depth = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(_MIN_GRAPH_MAX_DEPTH, min(_MAX_GRAPH_MAX_DEPTH, depth))
+
+
 class CapabilityContextAssembler:
     """Builds ContextBundle via synchronous EventBus cascade (Invariant 6)."""
 
@@ -63,12 +95,17 @@ class CapabilityContextAssembler:
         obsidian: Any | None = None,
         default_model: str = "llama3.2:3b",
         default_provider: str = "ollama",
+        default_graph_max_depth: int = DEFAULT_GRAPH_MAX_DEPTH,
     ) -> None:
         self._bus = bus
         self._context_manager = context_manager
         self._obsidian = obsidian
         self._default_model = default_model
         self._default_provider = default_provider
+        self._default_graph_max_depth = max(
+            _MIN_GRAPH_MAX_DEPTH,
+            min(_MAX_GRAPH_MAX_DEPTH, int(default_graph_max_depth)),
+        )
 
     @staticmethod
     def session_scope_from_payload(event_payload: dict, args: dict) -> dict[str, str]:
@@ -214,10 +251,15 @@ class CapabilityContextAssembler:
             )
             if workspace_id:
                 focus_entity = self.resolve_workspace_entity_id(event_payload, args)
+                graph_depth = resolve_graph_max_depth(
+                    event_payload,
+                    args,
+                    default=self._default_graph_max_depth,
+                )
                 workspace_request: dict[str, object] = {
                     "request_id": request_id,
                     "workspace_id": workspace_id,
-                    "max_depth": 2,
+                    "max_depth": graph_depth,
                 }
                 if focus_entity:
                     workspace_request["entity_id"] = focus_entity

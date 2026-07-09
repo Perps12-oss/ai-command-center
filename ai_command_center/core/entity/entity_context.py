@@ -12,11 +12,17 @@ def format_entity_context(entity: dict[str, object]) -> str | None:
     entity_title = str(entity.get("entity_title", entity_id))
     lines = [f"Workspace {entity_type}: {entity_title} (entity_id={entity_id})"]
     description = str(entity.get("entity_description", "")).strip()
+    resource_type = str(entity.get("resource_type", "")).strip()
+    plugin_id = str(entity.get("plugin_id", "")).strip()
     url = str(entity.get("url", "")).strip()
     path = str(entity.get("path", "")).strip()
     command = str(entity.get("command", "")).strip()
     if description:
         lines.append(f"Description: {description}")
+    if resource_type:
+        lines.append(f"Resource type: {resource_type}")
+    if plugin_id:
+        lines.append(f"Plugin id: {plugin_id}")
     if url:
         lines.append(f"URL: {url}")
     if path:

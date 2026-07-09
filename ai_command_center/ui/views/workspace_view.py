@@ -21,6 +21,7 @@ _TYPE_ICON = {
     "workspace": "◈",
     "card": "▢",
     "resource": "🔗",
+    "plugin": "⬡",
     "note": "📝",
 }
 
@@ -28,6 +29,7 @@ _GROUP_ORDER: tuple[tuple[str, str], ...] = (
     ("workspace", "Workspaces"),
     ("card", "Cards"),
     ("resource", "Resources"),
+    ("plugin", "Plugins"),
     ("note", "Notes"),
 )
 
@@ -372,6 +374,7 @@ class WorkspaceView(ctk.CTkFrame):
             meta = dict(entity.metadata)
             subtitle = (
                 meta.get("description")
+                or meta.get("plugin_id")
                 or meta.get("url")
                 or meta.get("path")
                 or meta.get("command")
@@ -462,7 +465,12 @@ class WorkspaceView(ctk.CTkFrame):
 
         grouped: dict[str, list] = {key: [] for key, _ in _GROUP_ORDER}
         for entity in ws.entities:
-            bucket = grouped.get(entity.entity_type)
+            type_key = entity.entity_type
+            if type_key == "resource":
+                meta = dict(entity.metadata)
+                if str(meta.get("resource_type", "")) == "plugin":
+                    type_key = "plugin"
+            bucket = grouped.get(type_key)
             if bucket is not None:
                 bucket.append(entity)
 

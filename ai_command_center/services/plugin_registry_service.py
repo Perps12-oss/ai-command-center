@@ -11,6 +11,7 @@ from ai_command_center.core.events.topics import (
     PLUGIN_DISABLE_REQUEST,
     PLUGIN_ENABLE_REQUEST,
     PLUGIN_ERROR,
+    PLUGIN_REGISTERED_ENTITY,
     PLUGIN_STATE_CHANGED,
     SERVICE_RESTART_REQUEST,
 )
@@ -28,6 +29,9 @@ class PluginRegistryService(BaseService):
 
     Core plugins cannot be disabled. Extension plugin changes are persisted to SQLite
     and may trigger a `service.restart_request` for the plugin's declared primary service.
+
+    On catalog publish, each plugin is also projected as a Workspace OS resource entity
+    via ``plugin.registered.entity`` (Program 4 slice 4).
     """
 
     name = "plugin_registry"
@@ -83,12 +87,30 @@ class PluginRegistryService(BaseService):
     def list_plugins(self) -> list[PluginManifest]:
         return sorted(self._plugins.values(), key=lambda p: p.id)
 
+    def _publish_plugin_entities(self) -> None:
+        for plugin in self.list_plugins():
+            self._bus.publish(
+                PLUGIN_REGISTERED_ENTITY,
+                {
+                    "plugin_id": plugin.id,
+                    "id": plugin.id,
+                    "name": plugin.name,
+                    "description": plugin.description,
+                    "kind": plugin.kind,
+                    "enabled": plugin.enabled,
+                    "service": plugin.service or "",
+                    "version": plugin.version,
+                },
+                source=self.name,
+            )
+
     def _publish_catalog(self) -> None:
         self._bus.publish(
             PLUGIN_CATALOG,
             {"plugins": [p.to_dict() for p in self.list_plugins()]},
             source=self.name,
         )
+        self._publish_plugin_entities()
 
     def _set_enabled(self, plugin_id: str, enabled: bool) -> None:
         current = self._plugins.get(plugin_id)
