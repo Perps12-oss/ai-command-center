@@ -260,6 +260,10 @@ EXECUTION_EVENTS_LOADED = "execution.events.loaded"
 # Execution timeline UI (ACC UI Refurbishment PR 9)
 UI_EXECUTION_TIMELINE_SCRUB = "ui.execution.timeline.scrub"
 
+# Workflow graph workspace (ACC UI Refurbishment PR 12–13)
+UI_WORKFLOW_NODE_SELECT = "ui.workflow.node.select"
+UI_WORKFLOW_RUN = "ui.workflow.run"
+
 # UI artifact actions (TODO 5/6 — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
 
@@ -449,5 +453,7 @@ __all__ = [
     "EXECUTION_EVENT_APPENDED",
     "EXECUTION_EVENTS_LOADED",
     "UI_EXECUTION_TIMELINE_SCRUB",
+    "UI_WORKFLOW_NODE_SELECT",
+    "UI_WORKFLOW_RUN",
     "UI_ARTIFACT_ACTION",
 ]

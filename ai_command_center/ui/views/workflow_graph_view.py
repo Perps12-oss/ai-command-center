@@ -1,174 +1,201 @@
-"""WorkflowGraphView — visual canvas for workflow graph rendering.
+"""WorkflowGraphView — n8n-style workflow graph workspace."""
 
-Renders WorkflowGraph nodes and edges on a tkinter Canvas.
-Includes RetryVisualization and ApprovalNode sub-components.
-
-Architecture contract: pure display view, no bus/service imports.
-"""
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from typing import Any
 
 import customtkinter as ctk
 
-from ai_command_center.domain.workflow_graph import GraphNode, NodeState, WorkflowGraph
+from ai_command_center.core.projectors.workflow_graph_projector import WorkflowGraphProjector
+from ai_command_center.core.state.workflow_graph_state import WorkflowGraphState
+from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.domain.workflow_graph import GraphNode, WorkflowGraph
+from ai_command_center.ui.components.docks.execution_timeline_dock import ExecutionTimelineDock
+from ai_command_center.ui.components.docks.inspector_dock import InspectorDock
+from ai_command_center.ui.components.graph_canvas import GraphCanvas
+from ai_command_center.ui.components.inspector.workflow_node_inspector import WorkflowNodeInspector
+from ai_command_center.ui.components.workflow_node_library import WorkflowNodeLibrary
+from ai_command_center.ui.components.workflow_toolbar import WorkflowToolbar
 from ai_command_center.ui.design_system import theme_v2 as T
 
-_NODE_W = 120
-_NODE_H = 48
-_NODE_RADIUS = 8
-
-_STATE_COLORS: dict[NodeState, str] = {
-    NodeState.PENDING:   T.TEXT_MUTED,
-    NodeState.RUNNING:   T.STATUS_BUSY,
-    NodeState.COMPLETED: T.STATUS_READY,
-    NodeState.FAILED:    T.STATUS_ERROR,
-    NodeState.SKIPPED:   T.TEXT_MUTED,
-    NodeState.WAITING:   T.ACCENT_DEFAULT,
-    NodeState.CANCELLED: T.TEXT_MUTED,
-}
-
-_STATE_FILL: dict[NodeState, str] = {
-    NodeState.PENDING:   T.BG_GLASS,
-    NodeState.RUNNING:   T.STATUS_BUSY_BG,
-    NodeState.COMPLETED: T.STATUS_READY_BG,
-    NodeState.FAILED:    T.STATUS_ERROR_BG,
-    NodeState.SKIPPED:   T.BG_PANEL,
-    NodeState.WAITING:   T.BG_GLASS,
-    NodeState.CANCELLED: T.BG_PANEL,
-}
+DEMO_WORKFLOW_ID = "demo-linear"
+DEMO_WORKFLOW_STEPS: tuple[dict[str, Any], ...] = (
+    {
+        "id": "plan",
+        "name": "Plan",
+        "kind": "planning",
+        "type": "tool",
+        "tool": "shell",
+        "args": {"command": "echo plan"},
+    },
+    {
+        "id": "execute",
+        "name": "Execute",
+        "kind": "tool",
+        "type": "tool",
+        "tool": "shell",
+        "args": {"command": "echo execute"},
+    },
+    {
+        "id": "report",
+        "name": "Report",
+        "kind": "artifact",
+        "type": "tool",
+        "tool": "shell",
+        "args": {"command": "echo report"},
+    },
+)
 
 
 class WorkflowGraphView(ctk.CTkFrame):
-    """Canvas-based workflow graph renderer.
+    """Workflow graph workspace with library, canvas, and bottom docks."""
 
-    Usage::
-
-        view = WorkflowGraphView(parent)
-        graph = WorkflowGraph.from_workflow_steps("wf1", steps)
-        view.render(graph)
-    """
-
-    def __init__(self, master: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        master: Any,
+        *,
+        on_run: Callable[[str, list[dict[str, Any]]], None] | None = None,
+        on_node_select: Callable[[str, str, str], None] | None = None,
+        on_scrub: Callable[[int], None] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(master, fg_color=T.BG_DEEP, **kwargs)
+        self._on_run = on_run or (lambda _workflow_id, _steps: None)
+        self._on_node_select = on_node_select or (lambda _node_id, _label, _workflow_id: None)
+        self._on_scrub = on_scrub or (lambda _index: None)
+        self._graph_state: WorkflowGraphState | None = None
+        self._build()
 
-        header = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=0, height=46)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-        ctk.CTkLabel(
-            header,
-            text="Workflow Graph",
-            font=T.FONT_HEADER,
-            text_color=T.TEXT_PRIMARY,
-            anchor="w",
-        ).pack(side="left", padx=T.PAD, pady=12)
-
-        canvas_host = ctk.CTkFrame(self, fg_color=T.BG_DEEP, corner_radius=0)
-        canvas_host.pack(fill="both", expand=True)
-
-        self._canvas = tk.Canvas(
-            canvas_host,
-            bg=T.BG_DEEP,
-            highlightthickness=0,
+    def _build(self) -> None:
+        self._toolbar = WorkflowToolbar(
+            self,
+            on_run=self._handle_run,
+            on_compare=lambda: None,
         )
-        h_scroll = tk.Scrollbar(canvas_host, orient="horizontal", command=self._canvas.xview)
-        v_scroll = tk.Scrollbar(canvas_host, orient="vertical", command=self._canvas.yview)
-        self._canvas.configure(
-            xscrollcommand=h_scroll.set,
-            yscrollcommand=v_scroll.set,
+        self._toolbar.pack(fill="x")
+
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True)
+
+        self._paned = tk.PanedWindow(
+            body,
+            orient=tk.HORIZONTAL,
+            sashwidth=4,
+            sashrelief=tk.FLAT,
+            background=T.BG_GLASS_BORDER,
+            handlesize=0,
+            showhandle=False,
         )
-        h_scroll.pack(side="bottom", fill="x")
-        v_scroll.pack(side="right", fill="y")
-        self._canvas.pack(side="left", fill="both", expand=True)
-        self._graph: WorkflowGraph | None = None
+        self._paned.pack(fill="both", expand=True)
 
-    def render(self, graph: WorkflowGraph) -> None:
-        """Render the workflow graph on the canvas."""
-        self._graph = graph
-        self._canvas.delete("all")
+        left = ctk.CTkFrame(self._paned, fg_color=T.BG_PANEL, corner_radius=0)
+        center = ctk.CTkFrame(self._paned, fg_color=T.BG_DEEP, corner_radius=0)
+        self._paned.add(left, minsize=160, stretch="never")
+        self._paned.add(center, minsize=360, stretch="always")
 
-        if not graph.nodes:
-            self._canvas.create_text(
-                100, 60,
-                text="No nodes",
-                fill=T.TEXT_MUTED,
-                font=(T.FONT_FAMILY, 12),
-            )
-            return
+        self._library = WorkflowNodeLibrary(left)
+        self._library.pack(fill="both", expand=True)
 
-        # Draw edges first
-        for edge in graph.edges:
-            src = graph.node_by_id(edge.source_id)
-            tgt = graph.node_by_id(edge.target_id)
-            if src and tgt:
-                sx = src.x + _NODE_W
-                sy = src.y + _NODE_H / 2
-                tx = tgt.x
-                ty = tgt.y + _NODE_H / 2
-                self._canvas.create_line(
-                    sx, sy, tx, ty,
-                    fill=T.BG_GLASS_BORDER,
-                    width=2,
-                    arrow=tk.LAST,
-                    arrowshape=(8, 10, 4),
-                )
-                if edge.label:
-                    mx = (sx + tx) / 2
-                    my = (sy + ty) / 2
-                    self._canvas.create_text(
-                        mx, my - 8,
-                        text=edge.label,
-                        fill=T.TEXT_MUTED,
-                        font=(T.FONT_FAMILY, 8),
-                    )
+        self._canvas = GraphCanvas(center, on_node_select=self._handle_node_select)
+        self._canvas.pack(fill="both", expand=True)
 
-        # Draw nodes
-        for node in graph.nodes:
-            self._draw_node(node)
+        bottom = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=0, height=220)
+        bottom.pack(fill="x")
+        bottom.pack_propagate(False)
 
-        # Update scroll region
-        max_x = max((n.x + _NODE_W + 40) for n in graph.nodes) if graph.nodes else 400
-        max_y = max((n.y + _NODE_H + 40) for n in graph.nodes) if graph.nodes else 200
-        self._canvas.configure(scrollregion=(0, 0, max_x, max_y))
-
-    def _draw_node(self, node: GraphNode) -> None:
-        x, y = node.x, node.y
-        color = _STATE_COLORS.get(node.state, T.TEXT_MUTED)
-        fill = _STATE_FILL.get(node.state, T.BG_GLASS)
-
-        # Node rectangle
-        self._canvas.create_rectangle(
-            x, y, x + _NODE_W, y + _NODE_H,
-            fill=fill,
-            outline=color,
-            width=1,
+        bottom_split = tk.PanedWindow(
+            bottom,
+            orient=tk.HORIZONTAL,
+            sashwidth=4,
+            sashrelief=tk.FLAT,
+            background=T.BG_GLASS_BORDER,
+            handlesize=0,
+            showhandle=False,
         )
+        bottom_split.pack(fill="both", expand=True)
 
-        # State dot
-        self._canvas.create_oval(
-            x + 8, y + _NODE_H / 2 - 5,
-            x + 18, y + _NODE_H / 2 + 5,
-            fill=color,
-            outline="",
+        timeline_host = ctk.CTkFrame(bottom_split, fg_color=T.BG_DEEP, corner_radius=0)
+        inspector_host = ctk.CTkFrame(bottom_split, fg_color=T.BG_PANEL, corner_radius=0)
+        bottom_split.add(timeline_host, minsize=280, stretch="always")
+        bottom_split.add(inspector_host, minsize=220, stretch="never")
+
+        self._timeline_dock = ExecutionTimelineDock(
+            timeline_host,
+            on_scrub=self._on_scrub,
+            timeline_height=72,
+        )
+        self._timeline_dock.pack(fill="both", expand=True)
+
+        self._inspector_dock = InspectorDock(inspector_host)
+        self._workflow_inspector = WorkflowNodeInspector(self._inspector_dock.host)
+        self._inspector_dock.register("workflow", self._workflow_inspector)
+        self._inspector_dock.set_default(self._workflow_inspector)
+        self._inspector_dock.pack(fill="both", expand=True)
+
+        preview = WorkflowGraphProjector.from_workflow_steps(
+            DEMO_WORKFLOW_ID,
+            DEMO_WORKFLOW_STEPS,
+        )
+        self._canvas.render(preview)
+
+    def _handle_run(self) -> None:
+        self._on_run(DEMO_WORKFLOW_ID, [dict(step) for step in DEMO_WORKFLOW_STEPS])
+
+    def _handle_node_select(self, node: GraphNode) -> None:
+        self._on_node_select(node.node_id, node.label, self._graph_state.workflow_id if self._graph_state else DEMO_WORKFLOW_ID)
+        if self._graph_state is not None:
+            graph = self._graph_from_state(self._graph_state)
+            self._canvas.render(graph, selected_node_id=node.node_id)
+
+    def _graph_from_state(self, state: WorkflowGraphState) -> WorkflowGraph:
+        return WorkflowGraphProjector.from_state_items(
+            state.workflow_id or DEMO_WORKFLOW_ID,
+            run_id=state.run_id,
+            nodes=state.nodes,
+            edges=state.edges,
         )
 
-        # Label
-        self._canvas.create_text(
-            x + _NODE_W / 2 + 5,
-            y + _NODE_H / 2,
-            text=node.label[:16],
-            fill=T.TEXT_PRIMARY,
-            font=(T.FONT_FAMILY, 10),
-            anchor="center",
+    def apply_state(self, state: WorkflowGraphState) -> None:
+        """Project AppState.workflow_graph into the workspace."""
+        self._graph_state = state
+        self._toolbar.set_workflow_name(state.workflow_name)
+        self._toolbar.set_running(state.running)
+        graph = self._graph_from_state(state)
+        self._canvas.render(graph, selected_node_id=state.selected_node_id)
+
+        steps = [
+            {
+                "name": node.label,
+                "status": node.state.value,
+                "duration_ms": 0.0,
+            }
+            for node in graph.nodes
+        ]
+        labels = [node.label for node in graph.nodes]
+        active_index = 0
+        if state.selected_node_id:
+            for index, node in enumerate(graph.nodes):
+                if node.node_id == state.selected_node_id:
+                    active_index = index
+                    break
+        elif state.running:
+            for index, node in enumerate(graph.nodes):
+                if node.state.value == "running":
+                    active_index = index
+                    break
+        self._timeline_dock.render(
+            steps,
+            scrub_labels=labels,
+            scrub_index=active_index,
         )
 
-        # Kind tag for decision/approval nodes
-        if node.kind in ("decision", "approval"):
-            self._canvas.create_text(
-                x + _NODE_W - 8, y + 8,
-                text="?" if node.kind == "decision" else "✓",
-                fill=T.ACCENT_DEFAULT,
-                font=(T.FONT_FAMILY, 9, "bold"),
-                anchor="ne",
-            )
+    def show_inspector(self, ref: InspectableRef) -> None:
+        self._inspector_dock.show(ref)
+
+    def clear_inspector(self) -> None:
+        self._inspector_dock.clear()
+
+
+__all__ = ["DEMO_WORKFLOW_ID", "DEMO_WORKFLOW_STEPS", "WorkflowGraphView"]
