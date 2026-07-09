@@ -63,6 +63,8 @@ from ai_command_center.core.events.topics import (
     EXECUTION_QUERY_RESULT,
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
+    UI_AUTOMATION_RUN,
+    UI_AUTOMATION_SELECT,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -117,6 +119,13 @@ from ai_command_center.core.state.workflow_graph_state import (
     WorkflowGraphState,
     reduce_workflow_graph_state,
 )
+from ai_command_center.core.projectors.automation_workspace_projector import (
+    AutomationWorkspaceProjector,
+)
+from ai_command_center.core.state.automation_workspace_state import (
+    reduce_automation_workspace_state,
+)
+from ai_command_center.domain.automation_workspace import AutomationWorkspaceState
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -194,6 +203,8 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ARTIFACTS_LOADED,
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
+    UI_AUTOMATION_RUN,
+    UI_AUTOMATION_SELECT,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -427,6 +438,9 @@ class AppState:
     recent_execution_events: tuple[ExecutionEventItem, ...] = ()
     execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
     workflow_graph: WorkflowGraphState = field(default_factory=WorkflowGraphState)
+    automation_workspace: AutomationWorkspaceState = field(
+        default_factory=lambda: AutomationWorkspaceProjector.project_state(())
+    )
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1423,6 +1437,17 @@ def _reduce_workflow_graph(state: AppState, event: Event) -> AppState:
     )
 
 
+def _reduce_automation_workspace(state: AppState, event: Event) -> AppState:
+    new_workspace = reduce_automation_workspace_state(state, event)
+    if new_workspace == state:
+        return state
+    return replace(
+        new_workspace,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
@@ -1469,6 +1494,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_execution_timeline,
     _reduce_inspector,
     _reduce_workflow_graph,
+    _reduce_automation_workspace,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,

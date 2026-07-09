@@ -264,6 +264,10 @@ UI_EXECUTION_TIMELINE_SCRUB = "ui.execution.timeline.scrub"
 UI_WORKFLOW_NODE_SELECT = "ui.workflow.node.select"
 UI_WORKFLOW_RUN = "ui.workflow.run"
 
+# Automation workspace (ACC UI Refurbishment PR 14–15)
+UI_AUTOMATION_RUN = "ui.automation.run"
+UI_AUTOMATION_SELECT = "ui.automation.select"
+
 # UI artifact actions (TODO 5/6 — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
 
@@ -455,5 +459,7 @@ __all__ = [
     "UI_EXECUTION_TIMELINE_SCRUB",
     "UI_WORKFLOW_NODE_SELECT",
     "UI_WORKFLOW_RUN",
+    "UI_AUTOMATION_RUN",
+    "UI_AUTOMATION_SELECT",
     "UI_ARTIFACT_ACTION",
 ]
