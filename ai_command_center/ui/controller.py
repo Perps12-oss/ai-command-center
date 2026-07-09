@@ -42,7 +42,9 @@ from ai_command_center.core.events.topics import (
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
     UI_AUTOMATION_RUN,
+    UI_AUTOMATION_SCHEDULE_TOGGLE,
     UI_AUTOMATION_SELECT,
+    UI_WORKFLOW_RUN,
     WORKFLOW_START,
 )
 
@@ -272,6 +274,11 @@ class UIController:
         }
         if run_id:
             payload["run_id"] = run_id
+        self._bus.publish(
+            UI_WORKFLOW_RUN,
+            {"workflow_id": workflow_id, "steps": steps},
+            source="ui",
+        )
         self._bus.publish(WORKFLOW_START, payload, source="ui")
 
     def publish_automation_run(self, workflow_id: str) -> None:
@@ -291,6 +298,13 @@ class UIController:
         self._bus.publish(
             UI_AUTOMATION_SELECT,
             {"run_id": run_id, "workflow_id": workflow_id, "label": label},
+            source="ui",
+        )
+
+    def publish_automation_schedule_toggle(self, schedule_id: str) -> None:
+        self._bus.publish(
+            UI_AUTOMATION_SCHEDULE_TOGGLE,
+            {"schedule_id": schedule_id},
             source="ui",
         )
 

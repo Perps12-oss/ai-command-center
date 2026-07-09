@@ -17,12 +17,13 @@ from ai_command_center.ui.components.execution_badge import ExecutionBadge
 from ai_command_center.ui.design_system import theme_v2 as T
 
 
-def _artifact_ref(execution_id: str, count: int) -> InspectableRef:
-    ref_id = f"{execution_id}-artifacts" if execution_id else "artifacts-stub"
+def _artifact_ref(execution_id: str, count: int) -> InspectableRef | None:
+    if not execution_id:
+        return None
     return InspectableRef.from_payload(
         {
             "kind": "artifact",
-            "ref_id": ref_id,
+            "ref_id": f"{execution_id}-artifacts",
             "label": f"{count} Artifacts" if count else "Artifacts",
             "payload": {
                 "artifact_count": str(count),
@@ -32,12 +33,13 @@ def _artifact_ref(execution_id: str, count: int) -> InspectableRef:
     )
 
 
-def _decision_ref(execution_id: str, count: int) -> InspectableRef:
-    ref_id = f"{execution_id}-decisions" if execution_id else "decisions-stub"
+def _decision_ref(execution_id: str, count: int) -> InspectableRef | None:
+    if not execution_id:
+        return None
     return InspectableRef.from_payload(
         {
             "kind": "decision",
-            "ref_id": ref_id,
+            "ref_id": f"{execution_id}-decisions",
             "label": f"{count} Decisions" if count else "Decisions",
             "payload": {
                 "decision_count": str(count),
@@ -115,22 +117,26 @@ class ResponseActionStrip(ctk.CTkFrame):
                 on_inspect_navigate=on_inspect_navigate,
             ).pack(side="left", padx=(0, 4))
 
-        if artifact_count:
-            _ActionPill(
-                self,
-                "📄 Artifacts",
-                _artifact_ref(execution_id, artifact_count),
-                on_inspect_select,
-                on_inspect_navigate,
-                count=artifact_count,
-            ).pack(side="left", padx=(0, 4))
+        if artifact_count and execution_id:
+            artifact_ref = _artifact_ref(execution_id, artifact_count)
+            if artifact_ref is not None:
+                _ActionPill(
+                    self,
+                    "📄 Artifacts",
+                    artifact_ref,
+                    on_inspect_select,
+                    on_inspect_navigate,
+                    count=artifact_count,
+                ).pack(side="left", padx=(0, 4))
 
-        if decision_count:
-            _ActionPill(
-                self,
-                "✓ Decisions",
-                _decision_ref(execution_id, decision_count),
-                on_inspect_select,
-                on_inspect_navigate,
-                count=decision_count,
-            ).pack(side="left", padx=(0, 4))
+        if decision_count and execution_id:
+            decision_ref = _decision_ref(execution_id, decision_count)
+            if decision_ref is not None:
+                _ActionPill(
+                    self,
+                    "✓ Decisions",
+                    decision_ref,
+                    on_inspect_select,
+                    on_inspect_navigate,
+                    count=decision_count,
+                ).pack(side="left", padx=(0, 4))

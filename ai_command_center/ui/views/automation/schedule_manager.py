@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import customtkinter as ctk
@@ -14,8 +14,15 @@ from ai_command_center.ui.design_system import theme_v2 as T
 class ScheduleManager(ctk.CTkFrame):
     """Cron schedule list for automations."""
 
-    def __init__(self, master: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        master: Any,
+        *,
+        on_toggle: Callable[[str], None] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(master, fg_color=T.BG_PANEL, corner_radius=0, **kwargs)
+        self._on_toggle = on_toggle or (lambda _schedule_id: None)
         ctk.CTkLabel(
             self,
             text="SCHEDULES",
@@ -43,11 +50,16 @@ class ScheduleManager(ctk.CTkFrame):
             ).pack(side="left", fill="x", expand=True)
             status = "On" if schedule.enabled else "Off"
             color = T.STATUS_READY if schedule.enabled else T.TEXT_MUTED
-            ctk.CTkLabel(
+            ctk.CTkButton(
                 top,
                 text=status,
+                width=44,
+                height=22,
                 font=(T.FONT_FAMILY, 9),
+                fg_color=T.BG_GLASS_BORDER if schedule.enabled else "transparent",
+                hover_color=T.BG_GLASS,
                 text_color=color,
+                command=lambda sid=schedule.schedule_id: self._on_toggle(sid),
             ).pack(side="right")
             ctk.CTkLabel(
                 row,
