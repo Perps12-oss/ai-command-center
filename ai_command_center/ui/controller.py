@@ -41,6 +41,8 @@ from ai_command_center.core.events.topics import (
     EXECUTION_QUERY_REQUEST,
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
+    UI_AUTOMATION_RUN,
+    UI_AUTOMATION_SELECT,
     WORKFLOW_START,
 )
 
@@ -271,6 +273,26 @@ class UIController:
         if run_id:
             payload["run_id"] = run_id
         self._bus.publish(WORKFLOW_START, payload, source="ui")
+
+    def publish_automation_run(self, workflow_id: str) -> None:
+        from ai_command_center.core.projectors.automation_workspace_projector import (
+            AutomationWorkspaceProjector,
+        )
+
+        steps = AutomationWorkspaceProjector.steps_for_workflow(workflow_id)
+        self._bus.publish(
+            UI_AUTOMATION_RUN,
+            {"workflow_id": workflow_id},
+            source="ui",
+        )
+        self.publish_workflow_run(workflow_id, steps)
+
+    def publish_automation_select(self, run_id: str, *, workflow_id: str = "", label: str = "") -> None:
+        self._bus.publish(
+            UI_AUTOMATION_SELECT,
+            {"run_id": run_id, "workflow_id": workflow_id, "label": label},
+            source="ui",
+        )
 
     def publish_palette_open(self) -> None:
         self._bus.publish(UI_PALETTE_OPEN, {}, source="ui")
