@@ -25,8 +25,10 @@ Task
   id: string
   goal_id: string
   title: string
-  status: pending | active | blocked | complete | failed | cancelled
+  description: string
+  status: pending | ready | active | blocked | complete | failed | cancelled
   depends_on: list[string]
+  success_criteria: list[SuccessCriteria]
   correlation: CorrelationContext
 ```
 
