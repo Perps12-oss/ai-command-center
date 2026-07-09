@@ -66,6 +66,7 @@ class ViewManagerMixin:
             on_new_session=self._on_chat_new_session,
             on_inspect_select=self._on_chat_inspect_select,
             on_inspect_navigate=self._on_chat_inspect_navigate,
+            on_artifact_action=self._controller.publish_artifact_action,
         )
         self._view_registry["notes"] = lambda: NotesView(
             self._content,
