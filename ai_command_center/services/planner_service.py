@@ -128,7 +128,10 @@ def parse_structured_plan_response(raw_response: str) -> ExecutionPlan:
         return ExecutionPlan(goal="", steps=())
     if text.startswith("```"):
         text = text.strip("`")
-        if text.lower().startswith("json"):
+        first_newline = text.find("\n")
+        if first_newline >= 0 and not text[:first_newline].strip().startswith("{"):
+            text = text[first_newline:].strip()
+        elif text.lower().startswith("json"):
             text = text[4:].strip()
     data = json.loads(text)
     if not isinstance(data, dict):

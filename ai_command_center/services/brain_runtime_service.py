@@ -48,6 +48,7 @@ class BrainRuntimeService(BaseService):
         self._unsubscribers: list[Callable[[], None]] = []
         self._pending: dict[str, dict] = {}
         self._timers: dict[str, threading.Timer] = {}
+        self._approval_lock = threading.Lock()
 
     def _on_load(self) -> None:
         self._unsubscribers.extend(
@@ -110,17 +111,18 @@ class BrainRuntimeService(BaseService):
             timeout_seconds=int(payload.get("timeout_seconds") or 60),
             correlation=correlation,
         )
-        self._pending[approval.id] = {
-            "action_id": action_id,
-            "payload": payload,
-            "correlation": correlation,
-        }
         timer = threading.Timer(
             approval.timeout_seconds,
             lambda: self._deny_approval(approval.id, "approval timeout"),
         )
         timer.daemon = True
-        self._timers[approval.id] = timer
+        with self._approval_lock:
+            self._pending[approval.id] = {
+                "action_id": action_id,
+                "payload": payload,
+                "correlation": correlation,
+            }
+            self._timers[approval.id] = timer
         timer.start()
         self._bus.publish(
             RUNTIME_APPROVAL_REQUESTED,
@@ -132,10 +134,11 @@ class BrainRuntimeService(BaseService):
         approval_id = str(event.payload.get("approval_id") or event.payload.get("id") or "")
         if not approval_id:
             return
-        timer = self._timers.pop(approval_id, None)
+        with self._approval_lock:
+            timer = self._timers.pop(approval_id, None)
+            pending = self._pending.pop(approval_id, None)
         if timer is not None:
             timer.cancel()
-        pending = self._pending.pop(approval_id, None)
         if pending is None:
             return
         correlation: CorrelationContext = pending["correlation"]
@@ -156,8 +159,9 @@ class BrainRuntimeService(BaseService):
         self._execute_action(pending["action_id"], pending["payload"], correlation)
 
     def _deny_approval(self, approval_id: str, reason: str) -> None:
-        pending = self._pending.pop(approval_id, None)
-        self._timers.pop(approval_id, None)
+        with self._approval_lock:
+            pending = self._pending.pop(approval_id, None)
+            self._timers.pop(approval_id, None)
         if pending is None:
             return
         correlation: CorrelationContext = pending["correlation"]
