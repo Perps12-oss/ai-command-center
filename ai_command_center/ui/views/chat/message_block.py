@@ -17,11 +17,14 @@ Architecture contract
 from __future__ import annotations
 
 import time
-from typing import Any, Callable
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.core.state.artifact_state import ArtifactCatalogItem
 from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.ui.components.artifact_list_view import ArtifactListView
 from ai_command_center.ui.components.inspector.inspect_gestures import bind_inspect_gestures
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.markdown_view import parse_markdown
@@ -164,6 +167,7 @@ class AssistantMessageBlock(ctk.CTkFrame):
         inspect_ref: InspectableRef | None = None,
         on_inspect_select: Callable[[InspectableRef], None] | None = None,
         on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
+        on_artifact_action: Callable[[str, str], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -172,10 +176,15 @@ class AssistantMessageBlock(ctk.CTkFrame):
         self._inspect_ref = inspect_ref
         self._on_inspect_select = on_inspect_select
         self._on_inspect_navigate = on_inspect_navigate
+        self._on_artifact_action = on_artifact_action or (lambda _a, _k: None)
         self._raw_text: str = ""
         self._timestamp: str = _hhmm()
         self._streaming: bool = False
         self._footer_visible: bool = False
+        self._action_strip: ResponseActionStrip | None = None
+        self._artifact_list: ArtifactListView | None = None
+        self._artifact_count: int = 0
+        self._execution_id: str = ""
 
         self._build()
 
@@ -260,17 +269,59 @@ class AssistantMessageBlock(ctk.CTkFrame):
             self._textbox.insert("end", text)
         self._textbox.configure(state="disabled")
         self._resize_textbox()
+        self._execution_id = execution_id
+        self._artifact_count = artifact_count
         self._build_meta_row(model=model, duration_ms=duration_ms, tokens=tokens)
-        if execution_id or execution_index or artifact_count or decision_count:
-            ResponseActionStrip(
+        self._rebuild_action_strip(
+            execution_id=execution_id,
+            execution_index=execution_index,
+            artifact_count=artifact_count,
+            decision_count=decision_count,
+        )
+
+    def set_artifacts(self, artifacts: Sequence[ArtifactCatalogItem]) -> None:
+        """Render or refresh inline artifact cards below the assistant bubble."""
+        catalog = tuple(artifacts)
+        count = len(catalog)
+        if count == 0 and self._artifact_list is None:
+            return
+        if self._artifact_list is None:
+            self._artifact_list = ArtifactListView(
                 self,
-                execution_id=execution_id,
-                execution_index=execution_index,
-                artifact_count=artifact_count,
-                decision_count=decision_count,
-                on_inspect_select=self._on_inspect_select,
-                on_inspect_navigate=self._on_inspect_navigate,
-            ).pack(fill="x", padx=14, pady=(0, 6))
+                on_action=self._on_artifact_action,
+            )
+            self._artifact_list.pack(fill="x", padx=14, pady=(0, 4))
+        self._artifact_list.set_artifacts(catalog)
+        if count != self._artifact_count:
+            self._artifact_count = count
+            self._rebuild_action_strip(
+                execution_id=self._execution_id,
+                artifact_count=count,
+            )
+
+    def _rebuild_action_strip(
+        self,
+        *,
+        execution_id: str = "",
+        execution_index: int = 0,
+        artifact_count: int = 0,
+        decision_count: int = 0,
+    ) -> None:
+        if self._action_strip is not None:
+            self._action_strip.destroy()
+            self._action_strip = None
+        if not (execution_id or execution_index or artifact_count or decision_count):
+            return
+        self._action_strip = ResponseActionStrip(
+            self,
+            execution_id=execution_id,
+            execution_index=execution_index,
+            artifact_count=artifact_count,
+            decision_count=decision_count,
+            on_inspect_select=self._on_inspect_select,
+            on_inspect_navigate=self._on_inspect_navigate,
+        )
+        self._action_strip.pack(fill="x", padx=14, pady=(0, 6))
 
     def get_raw_text(self) -> str:
         return self._raw_text

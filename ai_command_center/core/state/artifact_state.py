@@ -55,6 +55,17 @@ class ArtifactCatalogItem:
         return cls.from_artifact(Artifact.from_bus_payload(payload))
 
 
+def artifacts_for_request(
+    catalog: tuple[ArtifactCatalogItem, ...],
+    request_id: str,
+) -> tuple[ArtifactCatalogItem, ...]:
+    """Return artifacts scoped to a chat/tool request id."""
+    rid = str(request_id or "").strip()
+    if not rid:
+        return ()
+    return tuple(item for item in catalog if item.request_id == rid)
+
+
 def _parse_catalog(payload: dict[str, Any]) -> tuple[ArtifactCatalogItem, ...]:
     raw = payload.get("artifacts") or []
     items: list[ArtifactCatalogItem] = []
@@ -129,4 +140,5 @@ ARTIFACT_REDUCERS: tuple[Any, ...] = (
 __all__ = [
     "ARTIFACT_REDUCERS",
     "ArtifactCatalogItem",
+    "artifacts_for_request",
 ]

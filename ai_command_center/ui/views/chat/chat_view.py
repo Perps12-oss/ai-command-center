@@ -1,9 +1,12 @@
 """Chat view — premium minimalist messaging UI, consumer-facing only."""
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import customtkinter as ctk
+
+from ai_command_center.core.state.artifact_state import ArtifactCatalogItem
 
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
@@ -136,6 +139,7 @@ class ChatView(ctk.CTkFrame):
         on_new_session: Callable[[], None]           | None = None,
         on_inspect_select: Callable[[InspectableRef], None] | None = None,
         on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
+        on_artifact_action: Callable[[str, str], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -146,6 +150,7 @@ class ChatView(ctk.CTkFrame):
         self._on_new_session = on_new_session
         self._on_inspect_select = on_inspect_select
         self._on_inspect_navigate = on_inspect_navigate
+        self._on_artifact_action = on_artifact_action or (lambda _a, _k: None)
 
         self._request_id:       str | None              = None
         self._streaming:        bool                    = False
@@ -166,6 +171,8 @@ class ChatView(ctk.CTkFrame):
         self._use_v2_blocks = False
         self._session_bar: _SessionBar | None = None
         self._execution_context: Any = None
+        self._blocks_by_request: dict[str, AssistantMessageBlock] = {}
+        self._artifact_fingerprints: dict[str, tuple[str, ...]] = {}
 
         self._build()
 
@@ -249,7 +256,10 @@ class ChatView(ctk.CTkFrame):
         self._empty = EmptyState(self._scroll)
         self._empty.pack(fill="both", expand=True, pady=30)
 
-        self._execution_inspector = ExecutionInspector(self._workspace.right_host())
+        self._execution_inspector = ExecutionInspector(
+            self._workspace.right_host(),
+            on_artifact_action=self._on_artifact_action,
+        )
         self._inspector_host = InspectorHost(self._workspace.right_host())
         self._inspector_host.register("execution", self._execution_inspector)
         self._inspector_host.set_default(self._execution_inspector)
@@ -616,8 +626,11 @@ class ChatView(ctk.CTkFrame):
                 inspect_ref=ref,
                 on_inspect_select=self._on_inspect_select,
                 on_inspect_navigate=self._on_inspect_navigate,
+                on_artifact_action=self._on_artifact_action,
             )
             block.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
+            if self._request_id:
+                self._blocks_by_request[self._request_id] = block
             return block
         outer = ctk.CTkFrame(self._scroll, fg_color="transparent")
         outer.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
@@ -641,6 +654,8 @@ class ChatView(ctk.CTkFrame):
                 artifact_count = len(
                     getattr(self._execution_context, "artifacts", ()) or ()
                 )
+            if execution_id in self._artifact_fingerprints:
+                artifact_count = len(self._artifact_fingerprints[execution_id])
             bubble.finalize(
                 bubble.get_raw_text(),
                 model=self._model,
@@ -702,6 +717,28 @@ class ChatView(ctk.CTkFrame):
         if self._on_send:
             snippet = bubble.get_raw_text()[:60].replace("\n", " ")
             self._on_send(f".rating:{rating} \"{snippet}\"")
+
+    def update_artifact_stream(
+        self,
+        request_id: str,
+        artifacts: Sequence[ArtifactCatalogItem],
+    ) -> None:
+        """Push scoped artifacts into the assistant message for a request."""
+        rid = str(request_id or "").strip()
+        if not rid:
+            return
+        fingerprint = tuple(item.artifact_id for item in artifacts)
+        if self._artifact_fingerprints.get(rid) == fingerprint:
+            return
+        self._artifact_fingerprints[rid] = fingerprint
+
+        block = self._blocks_by_request.get(rid)
+        if block is None and self._streaming_bubble is not None and self._request_id == rid:
+            block = self._streaming_bubble
+        if block is None or not isinstance(block, AssistantMessageBlock):
+            return
+        block.set_artifacts(artifacts)
+        self._scroll_to_bottom()
 
     def set_model(self, name: str) -> None:
         self._model = name
@@ -840,6 +877,8 @@ class ChatView(ctk.CTkFrame):
         clear_children(self._scroll)
         self._streaming_bubble = None
         self._streaming = False
+        self._blocks_by_request.clear()
+        self._artifact_fingerprints.clear()
         self._empty = EmptyState(self._scroll)
         self._empty.pack(fill="both", expand=True, pady=30)
 

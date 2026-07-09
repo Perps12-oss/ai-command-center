@@ -17,6 +17,7 @@ except Exception as exc:  # pragma: no cover - environment specific
 from ai_command_center.domain.decision import Decision
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.inspector import DecisionInspector, InspectorHost
+from ai_command_center.ui.components.execution_badge import ExecutionBadge
 from ai_command_center.ui.views.chat import response_action_strip as strip_module
 from ai_command_center.ui.views.chat.response_action_strip import ResponseActionStrip
 
@@ -90,16 +91,20 @@ def test_response_action_strip_calls_on_inspect_select_with_kind(
         root.update_idletasks()
 
         pills = [w for w in strip.winfo_children() if isinstance(w, strip_module._ActionPill)]
-        assert len(pills) == 3
+        badges = [w for w in strip.winfo_children() if isinstance(w, ExecutionBadge)]
+        assert len(pills) == 2
+        assert len(badges) == 1
 
         for pill in pills:
             pill.invoke()
+        badges[0].invoke()
         root.update_idletasks()
 
-        kinds = [ref.kind for ref in selected]
-        assert kinds == ["execution", "artifact", "decision"]
-        assert selected[0].ref_id == "exec-1"
-        assert selected[1].kind == "artifact"
-        assert selected[2].kind == "decision"
+        kinds = sorted(ref.kind for ref in selected)
+        assert kinds == ["artifact", "decision", "execution"]
+        by_kind = {ref.kind: ref for ref in selected}
+        assert by_kind["execution"].ref_id == "exec-1"
+        assert by_kind["artifact"].kind == "artifact"
+        assert by_kind["decision"].kind == "decision"
     finally:
         root.destroy()
