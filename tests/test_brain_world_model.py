@@ -160,6 +160,35 @@ def test_runtime_does_not_auto_approve_destructive_actions() -> None:
     assert not completed
 
 
+def test_runtime_approval_decision_after_timeout_is_ignored_safely() -> None:
+    bus = EventBus()
+    runtime = BrainRuntimeService(bus, WorldModel(SQLiteWorldModelRepository(_conn())))
+    runtime.start()
+    approvals: list[dict] = []
+    denied: list[dict] = []
+    bus.subscribe(RUNTIME_APPROVAL_REQUESTED, lambda e: approvals.append(dict(e.payload)))
+    bus.subscribe(RUNTIME_ACTION_DENIED, lambda e: denied.append(dict(e.payload)))
+
+    bus.publish(
+        RUNTIME_ACTION_REQUEST,
+        {
+            "action_id": "destroy-2",
+            "tier": SecurityTier.WRITE_DESTROY.value,
+            "timeout_seconds": 60,
+        },
+        source="test",
+    )
+    approval_id = approvals[0]["id"]
+    runtime._deny_approval(approval_id, "approval timeout")
+    bus.publish(
+        RUNTIME_APPROVAL_DECIDED,
+        {"approval_id": approval_id, "approved": True},
+        source="test",
+    )
+
+    assert denied[0]["status"] == "timed_out"
+
+
 def test_app_state_projects_brain_events() -> None:
     bus = EventBus()
     state_store = AppStateStore(bus)
@@ -208,6 +237,20 @@ def test_structured_planner_response_parses_llm_manifest() -> None:
 
     assert plan.goal == "Organize Downloads"
     assert plan.steps[0].capability == "create_task"
+
+
+def test_structured_planner_response_strips_non_json_fence_language() -> None:
+    plan = parse_structured_plan_response(
+        """```typescript
+        {
+          "goal": "Organize Downloads",
+          "confidence": 0.9,
+          "steps": [{"step_id": "s1", "capability": "create_task"}]
+        }
+        ```"""
+    )
+
+    assert plan.steps[0].step_id == "s1"
 
 
 def test_observer_startup_sync_emits_file_observation_into_world_model(tmp_path) -> None:
