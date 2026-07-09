@@ -735,8 +735,8 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
-| **A — Foundation** | `core/world_model/context_compiler.py`; `workspace_state` context priority in `ContextManager` | In progress (`feature/vnext-state-driven-blueprint`) |
-| **B — Capability facade** | `CapabilityPromptCatalogService` — unified planner-facing specs | Not started |
+| **A — Foundation** | `core/world_model/context_compiler.py`; `workspace_state` context priority in `ContextManager` | Complete (Milestone 1) |
+| **B — Capability facade** | `CapabilityPromptCatalogService` — unified planner-facing specs | Complete |
 | **C — Planner** | `PlannerService` on bus; `plan.request` / `plan.generated` topics | Not started |
 | **D — Execution gates** | Approval tiers across `WorkflowEngineService` + `PermissionService` | Not started |
 | **E — Integrations** | MCP, email, calendar via ARI | After Program 4 |

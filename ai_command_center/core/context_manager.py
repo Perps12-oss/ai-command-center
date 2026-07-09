@@ -19,7 +19,7 @@ MAX_CONTEXT_FILL_RATIO = 0.70
 
 @dataclass(frozen=True, slots=True)
 class ContextBundle:
-    """Assembled prompt ready for OllamaService (contract v1.1)."""
+    """Assembled prompt ready for OllamaService (contract v1.2)."""
 
     prompt: str
     sources: tuple[str, ...]
