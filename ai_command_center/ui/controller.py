@@ -34,6 +34,7 @@ from ai_command_center.core.events.topics import (
     UI_LAUNCH_RESOURCE,
     UI_NAVIGATE,
     UI_OPEN_CHAT,
+    UI_ARTIFACT_ACTION,
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
     UI_SELECT_WORKSPACE,
@@ -207,6 +208,13 @@ class UIController:
         self._bus.publish(
             UI_INSPECT_NAVIGATE,
             payload,
+            source="ui",
+        )
+
+    def publish_artifact_action(self, artifact_id: str, action: str) -> None:
+        self._bus.publish(
+            UI_ARTIFACT_ACTION,
+            {"artifact_id": artifact_id, "action": action},
             source="ui",
         )
 

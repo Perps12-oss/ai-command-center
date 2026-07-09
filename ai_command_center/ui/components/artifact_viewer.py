@@ -13,13 +13,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_STUB_MSG: dict[str, str] = {
-    "pdf":      "PDF preview requires a PDF renderer plugin.",
-    "image":    "Image preview not available in this build.",
-    "calendar": "Calendar viewer coming soon.",
-    "email":    "Email preview coming soon.",
-}
+from ai_command_center.ui.renderers.artifact_renderer_factory import ArtifactRendererFactory
 
 
 class ArtifactViewer(ctk.CTkFrame):
@@ -92,12 +86,26 @@ class ArtifactViewer(ctk.CTkFrame):
         for child in self._content.winfo_children():
             child.destroy()
 
-        if kind in _STUB_MSG:
-            self._show_stub(kind)
-        elif kind in {"code", "markdown", "text"}:
-            self._show_text(content, monospace=(kind == "code"))
+        normalized = ArtifactRendererFactory.normalize_kind(kind)
+        if ArtifactRendererFactory.is_stub_kind(normalized):
+            self._show_stub(normalized)
+        elif ArtifactRendererFactory.uses_text_preview(normalized):
+            preview = ArtifactRendererFactory.preview_content(
+                kind=normalized,
+                content=content,
+                label=label,
+            )
+            self._show_text(
+                preview,
+                monospace=ArtifactRendererFactory.uses_monospace(normalized),
+            )
         else:
-            self._show_text(content or f"[{kind} preview]", monospace=False)
+            preview = ArtifactRendererFactory.preview_content(
+                kind=normalized,
+                content=content,
+                label=label,
+            )
+            self._show_text(preview, monospace=False)
 
     def _show_text(self, content: str, *, monospace: bool) -> None:
         font = ("Consolas", 11) if monospace else T.FONT_BODY
@@ -114,7 +122,7 @@ class ArtifactViewer(ctk.CTkFrame):
         tb.configure(state="disabled")
 
     def _show_stub(self, kind: str) -> None:
-        msg = _STUB_MSG.get(kind, f"No preview for {kind}")
+        msg = ArtifactRendererFactory.stub_message(kind)
         ctk.CTkLabel(
             self._content,
             text=msg,
