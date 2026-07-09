@@ -1,7 +1,7 @@
 """ExecutionQueryService — reads execution run metadata and publishes results.
 
 Subscribes to execution.query.request and publishes execution.query.result.
-Reads ExecutionRunRepository via the service layer (never from UI).
+Reads ExecutionRunRepository and ExecutionEventRepository via ReplayRunner.
 
 Architecture contract
 ─────────────────────
@@ -21,6 +21,7 @@ from ai_command_center.core.events.topics import (
     EXECUTION_QUERY_RESULT,
 )
 from ai_command_center.orchestration.replay.replay_runner import ReplayRunner
+from ai_command_center.repositories.execution_event_repository import ExecutionEventRepository
 from ai_command_center.repositories.execution_run_repository import ExecutionRunRepository
 from ai_command_center.services.base import BaseService
 
@@ -32,10 +33,16 @@ class ExecutionQueryService(BaseService):
 
     name = "execution_query"
 
-    def __init__(self, bus: EventBus, *, repo: ExecutionRunRepository) -> None:
+    def __init__(
+        self,
+        bus: EventBus,
+        *,
+        run_repo: ExecutionRunRepository,
+        event_repo: ExecutionEventRepository | None = None,
+    ) -> None:
         super().__init__(bus)
-        self._repo = repo
-        self._replay = ReplayRunner(repo)
+        self._run_repo = run_repo
+        self._replay = ReplayRunner(run_repo, event_repo=event_repo)
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -57,11 +64,14 @@ class ExecutionQueryService(BaseService):
 
         timeline = self._replay.build_timeline(request_id)
         trace_spans: list[dict] = []
-        for stage in timeline.stages:
+        for index, stage in enumerate(timeline.stages):
+            parent_id = ""
+            if index > 0 and timeline.stages[index - 1].event_id:
+                parent_id = timeline.stages[index - 1].event_id
             trace_spans.append(
                 {
-                    "span_id": f"{request_id}:{stage.stage}",
-                    "parent_id": "",
+                    "span_id": stage.event_id or f"{request_id}:{stage.stage}:{index}",
+                    "parent_id": parent_id,
                     "name": stage.stage,
                     "kind": stage.source,
                     "status": "ok",
@@ -76,10 +86,14 @@ class ExecutionQueryService(BaseService):
         if timeline.provider_ids:
             provider_id = provider_id or timeline.provider_ids[-1]
 
-        for run in self._repo.list_by_request(request_id):
+        for run in self._run_repo.list_by_request(request_id):
             snap = run.snapshot
             provider_id = provider_id or str(snap.get("provider_id", ""))
             model = model or str(snap.get("model", ""))
+
+        execution_events = [
+            event.to_bus_payload() for event in timeline.events
+        ]
 
         result_payload: dict = {
             "request_id": request_id,
@@ -96,6 +110,8 @@ class ExecutionQueryService(BaseService):
             "trace_spans": trace_spans,
             "artifacts": payload.get("artifacts") or [],
             "metrics": payload.get("metrics") or {},
+            "execution_events": execution_events,
+            "timeline_source": timeline.source,
         }
         self._bus.publish(
             EXECUTION_QUERY_RESULT,

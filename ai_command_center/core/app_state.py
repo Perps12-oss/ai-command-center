@@ -59,6 +59,9 @@ from ai_command_center.core.events.topics import (
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_QUERY_RESULT,
+    EXECUTION_EVENT_APPENDED,
+    EXECUTION_EVENTS_LOADED,
+    UI_EXECUTION_TIMELINE_SCRUB,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -89,6 +92,11 @@ from ai_command_center.platform.model_registry import normalize_tier_map
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
 from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, ArtifactCatalogItem
+from ai_command_center.core.state.execution_event_state import (
+    EXECUTION_EVENT_REDUCERS,
+    ExecutionEventItem,
+    ExecutionTimelineState,
+)
 from ai_command_center.core.state.model_state import ModelSelectionSnapshot
 from ai_command_center.core.state.tool_state import ToolRunItem
 from ai_command_center.core.state.execution_state import (
@@ -173,6 +181,9 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ARTIFACT_CREATED,
     ARTIFACT_UPDATED,
     ARTIFACTS_LOADED,
+    EXECUTION_EVENT_APPENDED,
+    EXECUTION_EVENTS_LOADED,
+    UI_EXECUTION_TIMELINE_SCRUB,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -402,6 +413,8 @@ class AppState:
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
     recent_artifacts: tuple[ArtifactCatalogItem, ...] = ()
+    recent_execution_events: tuple[ExecutionEventItem, ...] = ()
+    execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1421,6 +1434,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,
+    *EXECUTION_EVENT_REDUCERS,
 )
 
 
