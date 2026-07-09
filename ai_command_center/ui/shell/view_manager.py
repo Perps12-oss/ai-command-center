@@ -93,7 +93,10 @@ class ViewManagerMixin:
         )
         self._view_registry["providers"] = lambda: ProvidersView(self._content)
         self._view_registry["capabilities"] = lambda: CapabilitiesView(self._content)
-        self._view_registry["artifacts"] = lambda: ArtifactsView(self._content)
+        self._view_registry["artifacts"] = lambda: ArtifactsView(
+            self._content,
+            on_artifact_action=self._controller.publish_artifact_action,
+        )
         self._view_registry["gallery"] = lambda: ComponentGalleryView(self._content)
 
     def _ensure_view(self, view_id: str) -> object:

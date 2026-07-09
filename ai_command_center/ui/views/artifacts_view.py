@@ -8,10 +8,12 @@ Data supplied via apply_state() from the UIQueue.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import customtkinter as ctk
+
+from ai_command_center.core.state.artifact_state import ArtifactCatalogItem
 
 from ai_command_center.ui.components.artifact_viewer import ArtifactViewer
 from ai_command_center.ui.design_system import theme_v2 as T
@@ -95,8 +97,8 @@ class ArtifactsView(ctk.CTkFrame):
             text_color=T.TEXT_MUTED,
         ).pack(pady=40)
 
-    def apply_state(self, artifacts: list[dict]) -> None:
-        """Refresh the artifact list from a list of artifact dicts."""
+    def apply_state(self, artifacts: Sequence[ArtifactCatalogItem]) -> None:
+        """Refresh the artifact list from typed AppState projections."""
         for child in self._scroll.winfo_children():
             child.destroy()
 
@@ -110,18 +112,33 @@ class ArtifactsView(ctk.CTkFrame):
             return
 
         for art in artifacts:
-            if not isinstance(art, dict):
-                continue
             ArtifactCard(
                 self._scroll,
-                artifact_id=str(art.get("artifact_id", "")),
-                kind=str(art.get("kind", "text")),
-                label=str(art.get("label", "")),
-                size_bytes=int(art.get("size_bytes", 0)),
+                artifact_id=art.artifact_id,
+                kind=art.kind,
+                label=art.label,
+                size_bytes=art.size_bytes,
                 on_action=self._handle_artifact_action,
             ).pack(fill="x", pady=3)
 
     def _handle_artifact_action(self, artifact_id: str, action: str) -> None:
+        selected = next(
+            (art for art in getattr(self, "_current_artifacts", ()) if art.artifact_id == artifact_id),
+            None,
+        )
         if action == "preview":
-            self._viewer.show(artifact_id, kind="text", label=artifact_id)
+            if selected is not None:
+                self._viewer.show(
+                    selected.artifact_id,
+                    kind=selected.kind,
+                    label=selected.label,
+                    content=selected.content,
+                )
+            else:
+                self._viewer.show(artifact_id, kind="text", label=artifact_id)
         self._on_artifact_action(artifact_id, action)
+
+    def set_artifacts(self, artifacts: Sequence[ArtifactCatalogItem]) -> None:
+        """Store the latest catalog for preview actions."""
+        self._current_artifacts = tuple(artifacts)
+        self.apply_state(artifacts)

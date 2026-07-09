@@ -226,6 +226,7 @@ class StateApplierMixin:
             snap.provider_health_map,
             snap.runtime_capability_providers,
             snap.capability_lifecycle,
+            snap.recent_artifacts,
             getattr(snap.execution_context, "artifacts", ()),
         )
 
@@ -275,16 +276,10 @@ class StateApplierMixin:
             capabilities.apply_state(snap.capability_lifecycle)
 
         artifacts = self._artifacts_view()
-        if artifacts and hasattr(artifacts, "apply_state"):
-            artifact_items = [
-                {
-                    "artifact_id": str(getattr(a, "artifact_id", "")),
-                    "kind": str(getattr(a, "kind", "text")),
-                    "label": str(getattr(a, "label", "")),
-                }
-                for a in getattr(snap.execution_context, "artifacts", ())
-            ]
-            artifacts.apply_state(artifact_items)
+        if artifacts and hasattr(artifacts, "set_artifacts"):
+            artifacts.set_artifacts(snap.recent_artifacts)
+        elif artifacts and hasattr(artifacts, "apply_state"):
+            artifacts.apply_state(snap.recent_artifacts)
 
         home = self._home_view()
         if home:
@@ -299,7 +294,9 @@ class StateApplierMixin:
                 if str(getattr(r, "source", "")) == "orchestration"
             )
             provider_health = "healthy" if snap.provider_health_map else ""
-            artifact_count = len(getattr(snap.execution_context, "artifacts", ()))
+            artifact_count = len(snap.recent_artifacts) or len(
+                getattr(snap.execution_context, "artifacts", ())
+            )
             pending = 1 if snap.pending_permission_check else 0
             if hasattr(home, "update_execution_summary"):
                 home.update_execution_summary(
