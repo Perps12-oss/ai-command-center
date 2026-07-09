@@ -30,6 +30,12 @@ AI Command Center is a **Workspace OS** — an ambient desktop command surface w
 | [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md) | **Only execution backlog** — Programs 1–5, audit, enforcement, gates |
 | [architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md](architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md) | **Cognitive architecture** — state-driven reasoning stack (Memory → World Model → Capability → Planner → Executor → Workspace OS) |
 | [architecture/AGENT_RUNTIME_INTERFACE.md](architecture/AGENT_RUNTIME_INTERFACE.md) | **Capability provider contract** — host vs sidecar; integration gate for QwenPaw and future runtimes |
+| [architecture/PERSISTENCE_ABSTRACTION.md](architecture/PERSISTENCE_ABSTRACTION.md) | **Brain Phase 0** — World Model repository interface, SQLite v1, mutation journal |
+| [architecture/SCHEDULER_ABSTRACTION.md](architecture/SCHEDULER_ABSTRACTION.md) | **Brain Phase 0** — `IScheduler`, single-active-goal queue |
+| [architecture/OBSERVER_FRAMEWORK.md](architecture/OBSERVER_FRAMEWORK.md) | **Brain Phase 0** — observer lifecycle and raw observation flow |
+| [architecture/GOAL_ENGINE.md](architecture/GOAL_ENGINE.md) | **Brain Phase 0** — goal, task, success criteria contracts |
+| [architecture/RUNTIME_SAFETY.md](architecture/RUNTIME_SAFETY.md) | **Brain Phase 0** — action tiers, approval gates, error taxonomy |
+| [architecture/SYSTEM_STATE_AND_RECOVERY.md](architecture/SYSTEM_STATE_AND_RECOVERY.md) | **Brain Phase 0** — kernel state machine and crash recovery |
 
 ---
 
@@ -46,6 +52,24 @@ Constitutional ownership flow is unchanged:
 ```text
 UI → AppState → EventBus → Services → Repositories → Storage
 ```
+
+Brain v1 applies the same ownership rule to the reasoning stack:
+
+```mermaid
+flowchart LR
+    UI[UI projections] --> AppState[AppState snapshots]
+    AppState --> Bus[EventBus topics]
+    Bus --> Services[Services: planner / runtime / scheduler / observers]
+    Services --> Repositories[Repositories only]
+    Repositories --> Storage[(SQLite v1)]
+
+    Runtime[Runtime only] --> WorldModel[World Model apply]
+    WorldModel --> Repositories
+    Observers[Observers] -->|raw observations| Bus
+    Planner[Planner] -->|plans only| Bus
+```
+
+World Model authority is documented in [architecture/adr/ADR-005_WORLD_MODEL_AUTHORITY.md](architecture/adr/ADR-005_WORLD_MODEL_AUTHORITY.md): observers observe, planner reasons, runtime executes, World Model stores, and UI projects.
 
 ### Layer ownership boundaries
 
