@@ -183,6 +183,8 @@ def test_app_state_projects_brain_events() -> None:
     snapshot = state_store.snapshot
     assert snapshot.brain_kernel_state == "idle"
     assert snapshot.brain_recent_goals[0]["id"] == "goal-1"
+    assert snapshot.brain_recent_goals[0]["goal_id"] == "goal-1"
+    assert snapshot.brain_recent_goals[0]["status"] == "submitted"
     assert snapshot.brain_recent_runtime_actions[0]["action_id"] == "action-1"
 
 
