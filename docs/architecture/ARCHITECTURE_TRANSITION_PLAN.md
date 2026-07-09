@@ -49,8 +49,9 @@ Model                          Entities
 | **2 — Enforcement** | Prevent regression | Contributors cannot reintroduce debt | 1 week (immediately after P1) |
 | **3 — Workspace Adoption** | Move runtime from chat system to workspace system | >60% workspace runtime influence; five-pillar exit gate | 4–8 weeks |
 | **4 — Platform Expansion** | Add capability on correct foundation | Multi-provider, agents, workflows, Linux | After P1–P3 |
+| **5 — Reasoning Layer** | State-driven cognitive stack | World model context, capability facade, planner, execution gates | After P3 exit (see [VNEXT_STATE_DRIVEN_BLUEPRINT.md](VNEXT_STATE_DRIVEN_BLUEPRINT.md)) |
 
-**Sequencing rule:** Program 2 starts the week Program 1 exits. Program 3 runs in parallel with late P2 only after P1 exit criteria pass. Program 4 does not start until Program 3 hit **Emerging → Core** on the adoption scorecard (see §Program 3).
+**Sequencing rule:** Program 2 starts the week Program 1 exits. Program 3 runs in parallel with late P2 only after P1 exit criteria pass. Program 4 does not start until Program 3 hit **Emerging → Core** on the adoption scorecard (see §Program 3). Program 5 does not start until Program 3 exit criteria pass and Phase A foundation (context compiler) is merged.
 
 ---
 
@@ -726,6 +727,24 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 
 ---
 
+## Program 5 — Reasoning Layer (vNext)
+
+**Authority:** [VNEXT_STATE_DRIVEN_BLUEPRINT.md](VNEXT_STATE_DRIVEN_BLUEPRINT.md)  
+**Entry gate:** Program 3 exit (workspace adoption >60%); Program 1–2 stable  
+**Goal:** Invert runtime gravity from chat-driven to state-driven reasoning
+
+| Phase | Deliverable | Status |
+|-------|-------------|--------|
+| **A — Foundation** | `core/world_model/context_compiler.py`; `workspace_state` context priority in `ContextManager` | In progress (`feature/vnext-state-driven-blueprint`) |
+| **B — Capability facade** | `CapabilityPromptCatalogService` — unified planner-facing specs | Not started |
+| **C — Planner** | `PlannerService` on bus; `plan.request` / `plan.generated` topics | Not started |
+| **D — Execution gates** | Approval tiers across `WorkflowEngineService` + `PermissionService` | Not started |
+| **E — Integrations** | MCP, email, calendar via ARI | After Program 4 |
+
+**Non-goals:** No vector memory without constitutional amendment; no autonomous agent loops in Phases A–C; no `WorldModelService` duplicating `EntityService`.
+
+---
+
 ## References
 
 | Document | Role |
@@ -734,6 +753,7 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 | `AGENTS.md` | Layer ownership rules |
 | `docs/ARCHITECTURE.md` | Runtime architecture (not backlog) |
 | `docs/architecture/WORKSPACE_VISION.md` | North star vision |
+| `docs/architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md` | vNext cognitive architecture (Program 5) |
 | `docs/architecture/PROGRAM_3_WORKSPACE_ADOPTION.md` | Program 3 execution spec and exit gate |
 | `docs/architecture/MODEL_ORCHESTRATION.md` | Router sequence spec |
 | `docs/architecture/ASYNC_EVENTBUS_POLICY.md` | Dispatch tiers spec |
@@ -745,7 +765,7 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 
 | Date | Change |
 |------|--------|
-| 2026-07-03 | Initial master backlog — audit consolidation into four programs |
+| 2026-07-09 | Added Program 5 — Reasoning Layer; cross-ref vNext blueprint |
 | 2026-07-03 | Merged `TODO_NEXT_SESSION.md`; file removed — single orchestration doc |
 | 2026-07-03 | Merged and deleted all `docs/development/*` backlog docs + `ARCHITECTURE_REVIEW_MULTI_AGENT.md` |
 | 2026-07-06 | Post-Program 3 backlog: S3/S4/S7 closed; W4 partial (`chat_state`, `workspace_state`); `PROGRAM4_GATE_STATUS.md` readiness assessment |

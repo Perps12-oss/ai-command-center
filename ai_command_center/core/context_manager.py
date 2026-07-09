@@ -7,7 +7,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai_command_center.core.contracts import CONTEXT_BUNDLE_VERSION
+from ai_command_center.core.contracts import (
+    COMMAND_ROUTED_VERSION,
+    CONTEXT_BUNDLE_VERSION,
+    OLLAMA_SERVICE_API_VERSION,
+    SUPPORTED_VERSIONS,
+)
 
 MAX_CONTEXT_FILL_RATIO = 0.70
 
@@ -69,6 +74,7 @@ class ContextManager:
         clipboard: str | None = None,
         notes: list[str] | None = None,
         graph_snippets: list[str] | None = None,
+        workspace_snippets: list[str] | None = None,
         conversation_history: list[tuple[str, str]] | None = None,
         clipboard_intent: bool = False,
     ) -> ContextBundle:
@@ -95,6 +101,13 @@ class ContextManager:
             body = "\n".join(lines)
             if body.strip():
                 sections.append((1, "conversation_history", body))
+
+        if workspace_snippets:
+            for i, snippet in enumerate(workspace_snippets):
+                body = snippet.strip()
+                if body:
+                    label = "workspace_state" if i == 0 else f"workspace_state_{i}"
+                    sections.append((1, label, body))
 
         if graph_snippets:
             for i, snippet in enumerate(graph_snippets):
