@@ -628,11 +628,14 @@ class ChatView(ctk.CTkFrame):
             block = AssistantMessageBlock(
                 self._scroll,
                 on_regenerate=self._on_regenerate,
-                on_rate=self._rate_block,
+                on_rate=None,
                 inspect_ref=ref,
                 on_inspect_select=self._on_inspect_select,
                 on_inspect_navigate=self._on_inspect_navigate,
                 on_artifact_action=self._on_artifact_action,
+            )
+            block._on_rate = lambda rating, rated_block=block: self._rate_specific_block(
+                rated_block, rating
             )
             block.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
             if self._request_id:
@@ -724,16 +727,14 @@ class ChatView(ctk.CTkFrame):
             snippet = bubble.get_raw_text()[:60].replace("\n", " ")
             self._on_send(f".rating:{rating} \"{snippet}\"")
 
-    def _rate_block(self, rating: str) -> None:
-        if self._streaming_bubble is not None and hasattr(self._streaming_bubble, "configure"):
-            color = T.STATUS_READY if rating == "up" else T.STATUS_ERROR
-            try:
-                self._streaming_bubble.configure(border_width=1, border_color=color)
-            except Exception:
-                pass
-        if self._on_send and self._streaming_bubble is not None:
-            text = getattr(self._streaming_bubble, "get_raw_text", lambda: "")()
-            snippet = str(text)[:60].replace("\n", " ")
+    def _rate_specific_block(self, block: AssistantMessageBlock, rating: str) -> None:
+        color = T.STATUS_READY if rating == "up" else T.STATUS_ERROR
+        try:
+            block.configure(border_width=1, border_color=color)
+        except Exception:
+            pass
+        if self._on_send:
+            snippet = block.get_raw_text()[:60].replace("\n", " ")
             self._on_send(f".rating:{rating} \"{snippet}\"")
 
     def update_artifact_stream(
