@@ -17,10 +17,19 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.capability_lifecycle import CapabilityRecord
 from ai_command_center.domain.capability_prompt_spec import CapabilityPromptSpec
+from ai_command_center.domain.execution_plan import RiskTier, capability_risk_for
 from ai_command_center.services.base import BaseService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
 _CALLABLE_LIFECYCLE = frozenset({"callable", "trusted", "exposed"})
+
+
+def _tool_risk_metadata(tool_name: str) -> tuple[str, bool]:
+    """Return (risk, requires_approval) for a registered tool."""
+    tier = capability_risk_for(tool_name)
+    risk = tier.value
+    requires_approval = tier != RiskTier.LOW
+    return risk, requires_approval
 
 
 class CapabilityPromptCatalogService(BaseService):
@@ -52,12 +61,13 @@ class CapabilityPromptCatalogService(BaseService):
             described = self._tool_registry.describe_tool(tool_name)
             if described is None:
                 continue
+            risk, requires_approval = _tool_risk_metadata(tool_name)
             specs.append(
                 CapabilityPromptSpec(
                     name=tool_name,
                     description=str(described.get("description", tool_name)),
-                    risk="medium",
-                    requires_approval=True,
+                    risk=risk,
+                    requires_approval=requires_approval,
                     parameters={"type": "object", "properties": {}},
                     source="tool",
                 )

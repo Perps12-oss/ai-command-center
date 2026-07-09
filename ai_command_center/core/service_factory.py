@@ -64,7 +64,13 @@ from ai_command_center.services.capability_lifecycle_manager import CapabilityLi
 from ai_command_center.services.capability_prompt_catalog_service import (
     CapabilityPromptCatalogService,
 )
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
 from ai_command_center.services.planner_service import PlannerService
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -161,6 +167,11 @@ def build_services(
         ai_capability_registry=ai_capability_registry_service,
     )
     planner = PlannerService(bus, context_manager=context_manager)
+    execution_orchestrator = ExecutionOrchestratorService(bus)
+    execution_orchestrator = ExecutionOrchestratorService(
+        bus,
+        permission_service=permission_service,
+    )
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     execution_event_repo = ExecutionEventRepository(db)
     execution_query = ExecutionQueryService(
@@ -201,6 +212,7 @@ def build_services(
         capability_lifecycle,
         capability_prompt_catalog,
         planner,
+        execution_orchestrator,
         execution_run,
         execution_query,
         workflow_persistence,

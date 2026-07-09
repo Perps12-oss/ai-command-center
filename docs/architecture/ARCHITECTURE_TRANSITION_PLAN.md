@@ -737,8 +737,8 @@ Snapshot from former `TRANSFORMATION_AUDIT.md`. Open items are tracked as S/E/W/
 |-------|-------------|--------|
 | **A — Foundation** | `core/world_model/context_compiler.py`; `workspace_state` context priority in `ContextManager` | Complete (Milestone 1) |
 | **B — Capability facade** | `CapabilityPromptCatalogService` — unified planner-facing specs | Complete |
-| **C — Planner** | `PlannerService` on bus; `plan.request` / `plan.generated` topics | In progress |
-| **D — Execution gates** | Approval tiers across `WorkflowEngineService` + `PermissionService` | Not started |
+| **C — Planner** | `PlannerService` on bus; `plan.request` / `plan.generated` topics | Complete |
+| **D — Execution gates** | `ExecutionOrchestratorService` + approval tiers via EventBus | Complete (MVP) |
 | **E — Integrations** | MCP, email, calendar via ARI | After Program 4 |
 
 **Non-goals:** No vector memory without constitutional amendment; no autonomous agent loops in Phases A–C; no `WorldModelService` duplicating `EntityService`.

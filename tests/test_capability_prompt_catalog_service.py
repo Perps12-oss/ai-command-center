@@ -104,8 +104,8 @@ def test_catalog_specs_exclude_handlers() -> None:
         }
 
     tool_spec = next(s for s in specs if s["name"] == "create_note")
-    assert tool_spec["requires_approval"] is True
-    assert tool_spec["risk"] == "medium"
+    assert tool_spec["requires_approval"] is False
+    assert tool_spec["risk"] == "low"
 
     ai_spec = next(s for s in specs if s["name"] == CAPABILITY_SUMMARIZE)
     assert ai_spec["requires_approval"] is True
