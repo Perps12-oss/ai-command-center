@@ -26,6 +26,9 @@ from ai_command_center.core.events.topics import (
     AGENT_PIPELINE_STARTED,
     APP_ERROR,
     APP_PHASE,
+    ARTIFACT_CREATED,
+    ARTIFACT_UPDATED,
+    ARTIFACTS_LOADED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
     CHAT_CANCELLED,
@@ -85,6 +88,7 @@ from ai_command_center.domain.capability_provider_settings import (
 from ai_command_center.platform.model_registry import normalize_tier_map
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
+from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, ArtifactCatalogItem
 from ai_command_center.core.state.model_state import ModelSelectionSnapshot
 from ai_command_center.core.state.tool_state import ToolRunItem
 from ai_command_center.core.state.execution_state import (
@@ -166,6 +170,9 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_QUERY_RESULT,
     MODEL_SELECTED,
+    ARTIFACT_CREATED,
+    ARTIFACT_UPDATED,
+    ARTIFACTS_LOADED,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -394,6 +401,7 @@ class AppState:
     inspector: InspectorState = field(default_factory=InspectorState)
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
+    recent_artifacts: tuple[ArtifactCatalogItem, ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1412,6 +1420,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_inspector,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
+    *ARTIFACT_REDUCERS,
 )
 
 

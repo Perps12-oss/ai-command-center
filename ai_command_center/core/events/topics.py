@@ -248,6 +248,11 @@ SEARCH_RESULTS = "search.results"
 EXECUTION_QUERY_REQUEST = "execution.query.request"
 EXECUTION_QUERY_RESULT = "execution.query.result"
 
+# Artifact catalog (ACC UI Refurbishment PR 6)
+ARTIFACT_CREATED = "artifact.created"
+ARTIFACT_UPDATED = "artifact.updated"
+ARTIFACTS_LOADED = "artifacts.loaded"
+
 # UI artifact actions (TODO 5/6 — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
 
@@ -431,5 +436,8 @@ __all__ = [
     "SEARCH_RESULTS",
     "EXECUTION_QUERY_REQUEST",
     "EXECUTION_QUERY_RESULT",
+    "ARTIFACT_CREATED",
+    "ARTIFACT_UPDATED",
+    "ARTIFACTS_LOADED",
     "UI_ARTIFACT_ACTION",
 ]
