@@ -41,7 +41,7 @@ class WorkflowGraphProjector:
         node_states: Mapping[str, str] | None = None,
         active_step_id: str = "",
     ) -> WorkflowGraph:
-        """Linearize workflow steps into a graph with optional live state overlay."""
+        """Build a graph from workflow steps (linear or DAG via depends_on/next)."""
         overlays = dict(node_states or {})
         if active_step_id and active_step_id not in overlays:
             overlays[active_step_id] = NodeState.RUNNING.value
@@ -60,6 +60,8 @@ class WorkflowGraphProjector:
                     "kind": _step_kind(raw),
                     "state": state,
                     "description": str(raw.get("description", "")),
+                    "depends_on": raw.get("depends_on") or raw.get("depends"),
+                    "next": raw.get("next"),
                 }
             )
 
