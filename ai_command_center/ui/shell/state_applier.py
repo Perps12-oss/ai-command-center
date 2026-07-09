@@ -7,6 +7,7 @@ from ai_command_center.core.state.artifact_state import artifacts_for_request
 from ai_command_center.platform.secret_store import openai_api_key_configured
 from ai_command_center.ui.components.permission_dialog import PermissionDialog
 from ai_command_center.ui.design_system import theme_manager
+from ai_command_center.ui.views.settings_view import SettingsView
 
 
 class StateApplierMixin:
@@ -230,9 +231,20 @@ class StateApplierMixin:
             pass
 
         self._apply_catalog_views(snap)
+        self._apply_settings_projection(snap)
         self._apply_execution_timeline(snap)
         self._apply_workflow_graph(snap)
         self._apply_automation_workspace(snap)
+
+    def _apply_settings_projection(self, snap) -> None:
+        """Keep SettingsView in sync when settings change off-page."""
+        version = int(getattr(snap, "settings_version", 0))
+        if version == getattr(self, "_last_settings_version", -1):
+            return
+        self._last_settings_version = version
+        settings_view = self._views.get("settings")
+        if isinstance(settings_view, SettingsView):
+            settings_view.load_from_snapshot(snap.settings)
 
     def _apply_automation_workspace(self, snap) -> None:
         automation = self._automation_workspace_view()

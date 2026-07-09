@@ -46,6 +46,58 @@ Constitutional ownership flow is unchanged:
 UI → AppState → EventBus → Services → Repositories → Storage
 ```
 
+### Layer ownership boundaries
+
+Each layer may call only the layer directly below it (plus read-only snapshots from AppState).
+Services coordinate exclusively through EventBus topics — never direct service-to-service calls.
+
+```mermaid
+flowchart LR
+    subgraph UI["UI (renderer)"]
+        Views[Views / Components]
+        Ctrl[UIController]
+    end
+    subgraph State["AppState"]
+        Reducers[Pure reducers]
+        Snap[Immutable snapshots]
+    end
+    subgraph Bus["EventBus"]
+        Topics[topics.py contracts]
+    end
+    subgraph Svc["Services"]
+        Lifecycle[BaseService lifecycle]
+        Handlers[Topic handlers]
+    end
+    subgraph Data["Repositories"]
+        Repo[conversation / notes / memory / settings / telemetry]
+    end
+    subgraph Store["Storage"]
+        SQL[(SQLite / files)]
+    end
+
+    Views -->|read snapshots| Snap
+    Views -->|publish UI_*| Ctrl
+    Ctrl -->|publish| Topics
+    Topics -->|dispatch| Handlers
+    Topics -->|reduce| Reducers
+    Reducers --> Snap
+    Snap -->|subscribe| Views
+    Handlers -->|publish| Topics
+    Handlers --> Repo
+    Repo --> SQL
+```
+
+| Layer | Owns | Must not |
+|-------|------|----------|
+| UI | Rendering, input, `UI_*` publishes | SQLite, files, Ollama, direct service calls |
+| AppState | Snapshots, reducer purity | Persistence, side effects |
+| EventBus | Topic routing | Business logic |
+| Services | Domain reactions, lifecycle | Direct peer service calls |
+| Repositories | CRUD, indexing | UI or cross-service orchestration |
+| Storage | Bytes on disk | Application logic |
+
+Follow-on UI backlog: [UI_REFURBISHMENT_BACKLOG.md](architecture/UI_REFURBISHMENT_BACKLOG.md)
+
 ---
 
 ## Subsystem map
@@ -89,7 +141,7 @@ flowchart TB
 | Agents (planned) | topics in `core/event_bus.py` | [AGENT_FRAMEWORK.md](architecture/AGENT_FRAMEWORK.md) |
 | Workflows (planned) | `core/workflow/` | [WORKFLOW_ENGINE.md](architecture/WORKFLOW_ENGINE.md) |
 | Chat | `services/chat_handler_service.py`, `ui/views/chat_view.py` | [CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md) |
-| UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [ACC_UI_REFURBISHMENT.md](architecture/ACC_UI_REFURBISHMENT.md) |
+| UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [UI_REFURBISHMENT_BACKLOG.md](architecture/UI_REFURBISHMENT_BACKLOG.md) |
 | Platform | `platform/`, `utils/hotkey.py` | [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md), [PACKAGING_MSI_DESIGN.md](architecture/PACKAGING_MSI_DESIGN.md) |
 | EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — sync today; async dispatch design complete |
 | Tools | `tools/`, `services/tool_executor_service.py` | Phase 4B flow below |
