@@ -6,10 +6,12 @@ Architecture contract: pure display widget, data supplied via update().
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.ui.design_system import theme_v2 as T
 
 _STATUS_COLORS: dict[str, str] = {
@@ -97,9 +99,9 @@ class InspectorProviderTab(ctk.CTkFrame):
     def update(
         self,
         provider_id: str,
-        provider_health_map: list[dict],
+        provider_health_map: Sequence[ProviderHealthSnapshot],
     ) -> None:
-        """Refresh the provider cards."""
+        """Refresh the provider cards from typed health snapshots."""
         for child in self._scroll.winfo_children():
             child.destroy()
 
@@ -113,13 +115,11 @@ class InspectorProviderTab(ctk.CTkFrame):
             return
 
         for ph in provider_health_map:
-            if not isinstance(ph, dict):
-                continue
             _ProviderCard(
                 self._scroll,
-                provider_id=str(ph.get("provider_id", "")),
-                name=str(ph.get("name", ph.get("provider_id", "unknown"))),
-                health=str(ph.get("state", ph.get("health_state", "unknown"))),
-                latency_ms=float(ph.get("latency_ms", 0)),
-                model=str(ph.get("model", "")),
+                provider_id=ph.provider_id or provider_id,
+                name=ph.display_name or ph.provider_id or "unknown",
+                health=ph.status or "unknown",
+                latency_ms=0.0,
+                model=ph.detail,
             ).pack(fill="x", padx=4, pady=3)

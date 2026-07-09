@@ -108,6 +108,7 @@ class ViewManagerMixin:
             self._content,
             on_run=self._on_workflow_run,
             on_node_select=self._on_workflow_node_select,
+            on_node_move=self._on_workflow_node_move,
             on_compare=self._on_workflow_compare,
             on_scrub=self._on_workflow_timeline_scrub,
         )
@@ -299,6 +300,16 @@ class ViewManagerMixin:
                 "workflow_id": workflow_id,
                 "node_id": node_id,
             },
+        )
+
+    def _on_workflow_node_move(self, node_id: str, x: float, y: float) -> None:
+        snap = self._controller.snapshot()
+        workflow_id = snap.workflow_graph.workflow_id
+        self._controller.publish_workflow_node_move(
+            node_id,
+            x,
+            y,
+            workflow_id=workflow_id,
         )
 
     def _on_workflow_timeline_scrub(self, index: int) -> None:

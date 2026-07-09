@@ -10,6 +10,7 @@ import customtkinter as ctk
 from ai_command_center.core.state.execution_state import ExecutionContext
 from ai_command_center.domain.execution_event import ExecutionEvent
 from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.ui.components.inspector.base_inspector import BaseInspector
 from ai_command_center.ui.components.inspector.collapsible_section import CollapsibleSection
 from ai_command_center.ui.components.execution_timeline_list import ExecutionTimelineList
@@ -90,31 +91,25 @@ class ExecutionInspector(BaseInspector):
         self._last_context = context
         self._timeline_request_id = str(getattr(context, "request_id", "") or "").strip()
 
-        spans = [
-            {
-                "span_id": s.span_id,
-                "parent_id": s.parent_id,
-                "name": s.name,
-                "kind": s.kind,
-                "status": s.status,
-                "duration_ms": s.duration_ms,
-            }
-            for s in getattr(context, "trace_spans", ())
-        ]
+        spans = tuple(getattr(context, "trace_spans", ()))
         self._trace_tab.update(spans)
         self.trace_section.set_title(f"Trace ({len(spans)})" if spans else "Trace")
 
-        provider_health = [
-            {
-                "provider_id": getattr(context, "provider_id", ""),
-                "name": getattr(context, "provider_id", ""),
-                "health_state": "healthy",
-                "model": getattr(context, "model", ""),
-                "latency_ms": 0,
-            }
-        ]
+        provider_id = str(getattr(context, "provider_id", "") or "")
+        model = str(getattr(context, "model", "") or "")
+        provider_health: tuple[ProviderHealthSnapshot, ...] = ()
+        if provider_id:
+            provider_health = (
+                ProviderHealthSnapshot(
+                    provider_id=provider_id,
+                    status="healthy",
+                    display_name=provider_id,
+                    detail=model,
+                    source="execution",
+                ),
+            )
         self._provider_tab.update(
-            provider_id=getattr(context, "provider_id", ""),
+            provider_id=provider_id,
             provider_health_map=provider_health,
         )
         provider_title = (
@@ -122,15 +117,7 @@ class ExecutionInspector(BaseInspector):
         )
         self.provider_section.set_title(provider_title)
 
-        artifacts = [
-            {
-                "artifact_id": a.artifact_id,
-                "kind": a.kind,
-                "label": a.label,
-                "size_bytes": a.size_bytes,
-            }
-            for a in getattr(context, "artifacts", ())
-        ]
+        artifacts = tuple(getattr(context, "artifacts", ()))
         self._artifacts_tab.update(artifacts)
         self.artifacts_section.set_title(
             f"Artifacts ({len(artifacts)})" if artifacts else "Artifacts"

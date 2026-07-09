@@ -5,11 +5,12 @@ Actions publish via on_artifact_action callback (UI → UIController → bus).
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.core.state.execution_state import ArtifactItem
 from ai_command_center.ui.design_system import theme_v2 as T
 
 _KIND_ICONS: dict[str, str] = {
@@ -99,8 +100,8 @@ class InspectorArtifactsTab(ctk.CTkFrame):
         )
         self._scroll.pack(fill="both", expand=True)
 
-    def update(self, artifacts: list[dict]) -> None:
-        """Refresh the artifact list."""
+    def update(self, artifacts: Sequence[ArtifactItem]) -> None:
+        """Refresh the artifact list from typed :class:`ArtifactItem` projections."""
         for child in self._scroll.winfo_children():
             child.destroy()
 
@@ -114,13 +115,11 @@ class InspectorArtifactsTab(ctk.CTkFrame):
             return
 
         for art in artifacts:
-            if not isinstance(art, dict):
-                continue
             _ArtifactRow(
                 self._scroll,
-                artifact_id=str(art.get("artifact_id", "")),
-                kind=str(art.get("kind", "text")),
-                label=str(art.get("label", "")),
-                size_bytes=int(art.get("size_bytes", 0)),
+                artifact_id=art.artifact_id,
+                kind=art.kind or "text",
+                label=art.label,
+                size_bytes=int(art.size_bytes),
                 on_action=self._on_artifact_action,
             ).pack(fill="x", padx=4, pady=2)
