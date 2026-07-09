@@ -88,11 +88,11 @@ Use SQLite as the only Phase 1 persistence implementation.
 
 Tables:
 
-- `world_nodes(id, type, attributes_json, created_at, updated_at)`
-- `world_edges(id, from_node_id, to_node_id, type, attributes_json, created_at)`
+- `entities` owned by `core/entity/entity_repository.py`
+- `relationships` owned by `core/relationship/relationship_repository.py`
 - `mutation_journal(id, correlation_id, goal_id, action_id, type, payload_json, created_at)`
 
-`attributes_json` and `payload_json` keep the first implementation simple while preserving a stable repository interface.
+`IWorldModelRepository` is an adapter over the existing entity graph, not a parallel node/edge store. `payload_json` keeps journal replay simple while preserving exact mutation identity, type, and payload.
 
 Transactions use SQLite transactions through the repository only. The repository is responsible for atomic node, edge, and journal writes.
 
