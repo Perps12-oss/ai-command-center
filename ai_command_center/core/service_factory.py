@@ -169,10 +169,6 @@ def build_services(
     planner = PlannerService(bus, context_manager=context_manager)
     execution_orchestrator = ExecutionOrchestratorService(bus)
     external_capability_bridge = ExternalCapabilityBridgeService(bus)
-    execution_orchestrator = ExecutionOrchestratorService(
-        bus,
-        permission_service=permission_service,
-    )
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     execution_event_repo = ExecutionEventRepository(db)
     execution_query = ExecutionQueryService(
@@ -296,3 +292,4 @@ def build_services(
         provider_registry=provider_registry,
         workspace_os=workspace_os,
     )
+
