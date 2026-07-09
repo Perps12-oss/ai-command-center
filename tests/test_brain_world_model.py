@@ -29,6 +29,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.domain.correlation import CorrelationContext
+from ai_command_center.domain.goal import Goal
 from ai_command_center.domain.kernel_state import KernelState
 from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.domain.world_model import Mutation, MutationType, Node
@@ -351,6 +352,32 @@ def test_scheduler_ignores_unrelated_execution_events() -> None:
 
     assert not completed_goals
     assert not failed_goals
+
+
+def test_scheduler_cancel_queued_goal_does_not_resume_paused_active_goal() -> None:
+    bus = EventBus()
+    scheduler = SingleGoalScheduler(bus, GoalRepository(_conn()))
+    scheduler.start()
+    correlation = CorrelationContext.new(goal_id="goal-1")
+
+    scheduler.submit_goal(
+        Goal(
+            id="goal-1",
+            title="Active",
+            correlation=correlation,
+        )
+    )
+    scheduler.submit_goal(
+        Goal(
+            id="goal-2",
+            title="Queued",
+            correlation=CorrelationContext.new(goal_id="goal-2"),
+        )
+    )
+    scheduler.pause_goal("goal-1", correlation)
+    scheduler.cancel_goal("goal-2", CorrelationContext.new(goal_id="goal-2"))
+
+    assert scheduler.get_next_task(correlation) is None
 
 
 def test_kernel_recovers_and_rejects_invalid_transition() -> None:

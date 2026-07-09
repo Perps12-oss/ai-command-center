@@ -127,7 +127,8 @@ class SingleGoalScheduler(BaseService):
         self._queue = [goal for goal in self._queue if goal.id != goal_id]
         if self._active_goal is not None and self._active_goal.id == goal_id:
             self._active_goal = None
-        self._paused_goal_id = ""
+        if self._paused_goal_id == goal_id:
+            self._paused_goal_id = ""
         self._repo.update_goal_status(goal_id, GoalStatus.CANCELLED, correlation)
         self._bus.publish(
             GOAL_CANCELLED,
