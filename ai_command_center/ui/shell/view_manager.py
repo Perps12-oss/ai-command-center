@@ -16,6 +16,7 @@ from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.providers_view import ProvidersView
 from ai_command_center.ui.views.capabilities_view import CapabilitiesView
 from ai_command_center.ui.views.artifacts_view import ArtifactsView
+from ai_command_center.ui.views.execution_timeline_view import ExecutionTimelineView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
@@ -28,6 +29,7 @@ VIEW_IDS: tuple[str, ...] = (
     "home",
     "chat",
     "executions",
+    "timeline",
     "providers",
     "capabilities",
     "artifacts",
@@ -92,6 +94,11 @@ class ViewManagerMixin:
             self._content,
             on_select=self._on_execution_select,
         )
+        self._view_registry["timeline"] = lambda: ExecutionTimelineView(
+            self._content,
+            on_inspect_select=self._on_chat_inspect_select,
+            on_inspect_navigate=self._on_chat_inspect_navigate,
+        )
         self._view_registry["providers"] = lambda: ProvidersView(self._content)
         self._view_registry["capabilities"] = lambda: CapabilitiesView(self._content)
         self._view_registry["artifacts"] = lambda: ArtifactsView(
@@ -104,7 +111,10 @@ class ViewManagerMixin:
         if view_id not in self._views:
             factory = self._view_registry.get(view_id)
             if factory is not None:
-                self._views[view_id] = factory()
+                view = factory()
+                self._views[view_id] = view
+                if view_id == "timeline" and hasattr(view, "apply_state"):
+                    view.apply_state(list(self._controller.snapshot().execution_timeline.events))
             else:
                 self._views[view_id] = PlaceholderView(self._content, view_id)
         return self._views[view_id]
@@ -250,6 +260,10 @@ class ViewManagerMixin:
     def _executions_view(self) -> "ExecutionsView | None":
         v = self._views.get("executions")
         return v if isinstance(v, ExecutionsView) else None
+
+    def _timeline_view(self) -> ExecutionTimelineView | None:
+        v = self._views.get("timeline")
+        return v if isinstance(v, ExecutionTimelineView) else None
 
     def _providers_view(self) -> ProvidersView | None:
         v = self._views.get("providers")

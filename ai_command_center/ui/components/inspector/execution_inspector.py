@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import customtkinter as ctk
 
 from ai_command_center.core.state.execution_state import ExecutionContext
+from ai_command_center.domain.execution_event import ExecutionEvent
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.inspector.base_inspector import BaseInspector
 from ai_command_center.ui.components.inspector.collapsible_section import CollapsibleSection
+from ai_command_center.ui.components.execution_timeline_list import ExecutionTimelineList
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.views.chat.inspector.inspector_artifacts_tab import (
     InspectorArtifactsTab,
@@ -39,10 +41,14 @@ class ExecutionInspector(BaseInspector):
         master: Any,
         *,
         on_artifact_action: Callable[[str, str], None] | None = None,
+        on_inspect_select: Callable[[InspectableRef], None] | None = None,
+        on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color=T.BG_PANEL, corner_radius=0, **kwargs)
         self._last_context: ExecutionContext | None = None
+        self._timeline_events: tuple[ExecutionEvent, ...] = ()
+        self._timeline_request_id: str = ""
 
         self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", corner_radius=0)
         self._scroll.pack(fill="both", expand=True)
@@ -51,6 +57,15 @@ class ExecutionInspector(BaseInspector):
         self.trace_section.pack(fill="x", padx=0, pady=(0, 8))
         self._trace_tab = InspectorTraceTab(self.trace_section.body)
         self._trace_tab.pack(fill="both", expand=True)
+
+        self.timeline_section = CollapsibleSection(self._scroll, title="Timeline")
+        self.timeline_section.pack(fill="x", padx=0, pady=(0, 8))
+        self._timeline_list = ExecutionTimelineList(
+            self.timeline_section.body,
+            on_select=on_inspect_select,
+            on_navigate=on_inspect_navigate,
+        )
+        self._timeline_list.pack(fill="both", expand=True)
 
         self.provider_section = CollapsibleSection(self._scroll, title="Provider")
         self.provider_section.pack(fill="x", padx=0, pady=(0, 8))
@@ -73,6 +88,7 @@ class ExecutionInspector(BaseInspector):
     def update_context(self, context: ExecutionContext | Any) -> None:
         """Project the active ExecutionContext into the four section widgets."""
         self._last_context = context
+        self._timeline_request_id = str(getattr(context, "request_id", "") or "").strip()
 
         spans = [
             {
@@ -125,6 +141,24 @@ class ExecutionInspector(BaseInspector):
         self.metrics_section.set_title(
             f"Metrics ({len(metrics)})" if metrics else "Metrics"
         )
+        self._refresh_timeline()
+
+    def update_timeline(self, events: Sequence[ExecutionEvent]) -> None:
+        """Refresh the execution timeline section from the AppState projection."""
+        self._timeline_events = tuple(events)
+        self._refresh_timeline()
+
+    def _refresh_timeline(self) -> None:
+        request_id = self._timeline_request_id
+        if request_id:
+            filtered = tuple(
+                event for event in self._timeline_events if event.request_id == request_id
+            )
+        else:
+            filtered = self._timeline_events
+        self._timeline_list.set_events(filtered)
+        title = f"Timeline ({len(filtered)})" if filtered else "Timeline"
+        self.timeline_section.set_title(title)
 
     def update(self, ref: InspectableRef) -> None:
         """BaseInspector contract; execution content is projected via update_context()."""
