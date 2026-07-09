@@ -151,10 +151,15 @@ def build_services(
     )
     capability_lifecycle = CapabilityLifecycleManager(bus)
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
-    execution_query = ExecutionQueryService(bus, repo=ExecutionRunRepository(db))
+    execution_event_repo = ExecutionEventRepository(db)
+    execution_query = ExecutionQueryService(
+        bus,
+        run_repo=ExecutionRunRepository(db),
+        event_repo=execution_event_repo,
+    )
     workflow_persistence = WorkflowPersistenceService(bus, repo=WorkflowRunRepository(db))
     artifact = ArtifactService(bus, repo=ArtifactRepository(db))
-    execution_event = ExecutionEventService(bus, repo=ExecutionEventRepository(db))
+    execution_event = ExecutionEventService(bus, repo=execution_event_repo)
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
 
