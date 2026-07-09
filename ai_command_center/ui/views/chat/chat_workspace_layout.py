@@ -3,7 +3,7 @@
 Pane proportions (configurable, defaults to 18/62/20):
   left  (18%) — ConversationList rail
   center(62%) — message feed + composer
-  right (20%) — InspectorPanel (collapses below 900px width)
+  right (20%) — InspectorDock (collapses below 900px width)
 
 Gated behind Feature.FEATURE_DOCKING. When the flag is absent or False the
 layout falls back to a single-pane wrapper so ChatView keeps its current
