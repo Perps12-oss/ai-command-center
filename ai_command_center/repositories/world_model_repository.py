@@ -219,7 +219,6 @@ class SQLiteWorldModelRepository:
         )
 
     def list_mutations(self, limit: int = 100, after_id: str = "") -> list[Mutation]:
-        params: tuple[Any, ...]
         if after_id:
             rows = self._conn.execute(
                 """
