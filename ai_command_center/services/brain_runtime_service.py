@@ -85,7 +85,10 @@ class BrainRuntimeService(BaseService):
         requires_approval = tier == SecurityTier.WRITE_DESTROY or bool(
             payload.get("require_approval", False)
         )
-        if requires_approval and not bool(payload.get("auto_approve", False)):
+        auto_approve_allowed = tier != SecurityTier.WRITE_DESTROY and bool(
+            payload.get("auto_approve", False)
+        )
+        if requires_approval and not auto_approve_allowed:
             self._request_approval(action_id, tier, payload, correlation)
             return
 
@@ -127,12 +130,14 @@ class BrainRuntimeService(BaseService):
 
     def _on_approval_decided(self, event: Event) -> None:
         approval_id = str(event.payload.get("approval_id") or event.payload.get("id") or "")
-        if not approval_id or approval_id not in self._pending:
+        if not approval_id:
             return
         timer = self._timers.pop(approval_id, None)
         if timer is not None:
             timer.cancel()
-        pending = self._pending.pop(approval_id)
+        pending = self._pending.pop(approval_id, None)
+        if pending is None:
+            return
         correlation: CorrelationContext = pending["correlation"]
         decision = ApprovalDecision(
             approval_id=approval_id,

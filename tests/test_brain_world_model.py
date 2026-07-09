@@ -7,7 +7,9 @@ import sqlite3
 from ai_command_center.core.event_bus import Event, EventBus
 from ai_command_center.core.events.topics import (
     EXECUTION_RUN_COMPLETE,
+    EXECUTION_RUN_FAILED,
     GOAL_COMPLETED,
+    GOAL_FAILED,
     GOAL_SUBMIT_REQUEST,
     KERNEL_STATE_CHANGED,
     KERNEL_TRANSITION_REJECTED,
@@ -119,6 +121,29 @@ def test_runtime_applies_world_model_mutation_and_requires_destroy_approval() ->
     assert denied[0]["status"] == "denied"
 
 
+def test_runtime_does_not_auto_approve_destructive_actions() -> None:
+    bus = EventBus()
+    runtime = BrainRuntimeService(bus, WorldModel(SQLiteWorldModelRepository(_conn())))
+    runtime.start()
+    approvals: list[dict] = []
+    completed: list[dict] = []
+    bus.subscribe(RUNTIME_APPROVAL_REQUESTED, lambda e: approvals.append(dict(e.payload)))
+    bus.subscribe(RUNTIME_ACTION_COMPLETED, lambda e: completed.append(dict(e.payload)))
+
+    bus.publish(
+        RUNTIME_ACTION_REQUEST,
+        {
+            "action_id": "destroy-1",
+            "tier": SecurityTier.WRITE_DESTROY.value,
+            "auto_approve": True,
+        },
+        source="test",
+    )
+
+    assert approvals
+    assert not completed
+
+
 def test_observer_startup_sync_emits_file_observation_into_world_model(tmp_path) -> None:
     watched = tmp_path / "downloads"
     watched.mkdir()
@@ -189,6 +214,68 @@ def test_single_goal_scheduler_runs_goal_to_completion() -> None:
 
     assert completed_runs
     assert completed_goals[0]["goal_id"] == "goal-1"
+
+
+def test_scheduler_ignores_unrelated_execution_events() -> None:
+    bus = EventBus()
+    scheduler = SingleGoalScheduler(bus, GoalRepository(_conn()))
+    scheduler.start()
+
+    def complete_plan(event: Event) -> None:
+        bus.publish(
+            PLAN_GENERATED,
+            {
+                "request_id": event.payload["request_id"],
+                "goal_id": event.payload["goal_id"],
+                "plan": {
+                    "goal": event.payload["goal"],
+                    "steps": [
+                        {
+                            "step_id": "step-1",
+                            "capability": "create_task",
+                            "args": {},
+                            "require_approval": False,
+                        }
+                    ],
+                },
+                "correlation": event.payload["correlation"],
+            },
+            source="test",
+        )
+
+    completed_goals: list[dict] = []
+    failed_goals: list[dict] = []
+    bus.subscribe(PLAN_REQUEST, complete_plan)
+    bus.subscribe(GOAL_COMPLETED, lambda e: completed_goals.append(dict(e.payload)))
+    bus.subscribe(GOAL_FAILED, lambda e: failed_goals.append(dict(e.payload)))
+
+    bus.publish(
+        GOAL_SUBMIT_REQUEST,
+        {"goal_id": "goal-1", "goal": "Organize Downloads"},
+        source="test",
+    )
+    bus.publish(
+        EXECUTION_RUN_COMPLETE,
+        {
+            "run_id": "unrelated-run",
+            "request_id": "other-request",
+            "correlation": {"correlation_id": "other", "goal_id": "other-goal"},
+        },
+        source="test",
+    )
+    bus.publish(
+        EXECUTION_RUN_FAILED,
+        {
+            "run_id": "unrelated-run",
+            "request_id": "other-request",
+            "error": "boom",
+            "correlation": {"correlation_id": "other", "goal_id": "other-goal"},
+        },
+        source="test",
+    )
+
+    assert not completed_goals
+    assert not failed_goals
 
 
 def test_kernel_recovers_and_rejects_invalid_transition() -> None:
