@@ -19,6 +19,7 @@ from ai_command_center.ui.views.artifacts_view import ArtifactsView
 from ai_command_center.ui.views.execution_timeline_view import ExecutionTimelineView
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
+from ai_command_center.ui.views.automation_workspace_view import AutomationWorkspaceView
 from ai_command_center.ui.views.workflow_graph_view import WorkflowGraphView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
@@ -32,6 +33,7 @@ VIEW_IDS: tuple[str, ...] = (
     "executions",
     "timeline",
     "workflow",
+    "automation",
     "providers",
     "capabilities",
     "artifacts",
@@ -107,6 +109,12 @@ class ViewManagerMixin:
             on_run=self._on_workflow_run,
             on_node_select=self._on_workflow_node_select,
             on_scrub=self._on_workflow_timeline_scrub,
+        )
+        self._view_registry["automation"] = lambda: AutomationWorkspaceView(
+            self._content,
+            on_run=self._on_automation_run,
+            on_select_failure=self._on_automation_select_failure,
+            on_scrub=self._on_automation_timeline_scrub,
         )
         self._view_registry["providers"] = lambda: ProvidersView(self._content)
         self._view_registry["capabilities"] = lambda: CapabilitiesView(self._content)
@@ -295,6 +303,31 @@ class ViewManagerMixin:
         if request_id:
             self._controller.publish_execution_timeline_scrub(request_id, index)
 
+    def _on_automation_run(self, workflow_id: str) -> None:
+        self._controller.publish_automation_run(workflow_id)
+
+    def _on_automation_select_failure(self, run_id: str) -> None:
+        snap = self._controller.snapshot()
+        failure = next(
+            (item for item in snap.automation_workspace.failures if item.run_id == run_id),
+            None,
+        )
+        label = failure.title if failure is not None else run_id
+        workflow_id = failure.workflow_id if failure is not None else ""
+        self._controller.publish_automation_select(run_id, workflow_id=workflow_id, label=label)
+        self._controller.publish_inspect_select(
+            "workflow",
+            run_id,
+            label=label,
+            payload={"run_id": run_id, "workflow_id": workflow_id},
+        )
+
+    def _on_automation_timeline_scrub(self, index: int) -> None:
+        snap = self._controller.snapshot()
+        run_id = snap.automation_workspace.selected_failure_run_id
+        if run_id:
+            self._controller.publish_execution_timeline_scrub(run_id, index)
+
     def _executions_view(self) -> "ExecutionsView | None":
         v = self._views.get("executions")
         return v if isinstance(v, ExecutionsView) else None
@@ -306,6 +339,10 @@ class ViewManagerMixin:
     def _workflow_graph_view(self) -> WorkflowGraphView | None:
         v = self._views.get("workflow")
         return v if isinstance(v, WorkflowGraphView) else None
+
+    def _automation_workspace_view(self) -> AutomationWorkspaceView | None:
+        v = self._views.get("automation")
+        return v if isinstance(v, AutomationWorkspaceView) else None
 
     def _providers_view(self) -> ProvidersView | None:
         v = self._views.get("providers")
