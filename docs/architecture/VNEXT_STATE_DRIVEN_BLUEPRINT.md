@@ -346,8 +346,10 @@ Aligned with [ARCHITECTURE_TRANSITION_PLAN.md](ARCHITECTURE_TRANSITION_PLAN.md).
 | **A — Foundation** | World model → prompt | `context_compiler.py`, `workspace_state` context priority | Complete (Milestone 1) |
 | **B — Capability facade** | Planner-facing registry API | `CapabilityPromptCatalogService` | Phase A |
 | **C — Planner** | LLM plan DAG | `PlannerService`, `plan.request` / `plan.generated` topics | Phase B |
-| **D — Execution gates** | Approval across capabilities | `ExecutionOrchestratorService`, `execution.run.*` / `execution.step.*` topics | Phase C |
-| **E — Integrations** | MCP, email, calendar | ARI extensions per [AGENT_RUNTIME_INTERFACE.md](AGENT_RUNTIME_INTERFACE.md) | Program 4 exit |
+| **D — Execution gates** | Approval across capabilities | `ExecutionOrchestratorService`, `execution.run.*` / `execution.step.*` topics | Phase C — complete |
+| **E — Integrations** | MCP, email, calendar | `ExternalCapabilityBridgeService` + ARI bus topics (**in progress**) | Phase D |
+
+**Phase E deliverable (scaffold):** `ExternalCapabilityBridgeService` registers MCP/external manifests on `external.capability.register`; `CapabilityPromptCatalogService` aggregates them for the planner; `ExecutionOrchestratorService` routes `mcp.*` capabilities via `capability.runtime.request`. Full MCP wire-up, email, and calendar providers remain future work.
 
 **Explicit non-goals (Phase A–C):**
 

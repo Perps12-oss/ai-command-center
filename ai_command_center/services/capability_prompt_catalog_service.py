@@ -13,10 +13,13 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_CATALOG_REQUEST,
     CAPABILITY_CATALOG_RESULT,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
+    EXTERNAL_CAPABILITY_CATALOG_UPDATED,
+    EXTERNAL_CAPABILITY_REGISTERED,
     TOOL_REGISTERED,
 )
 from ai_command_center.domain.capability_lifecycle import CapabilityRecord
 from ai_command_center.domain.capability_prompt_spec import CapabilityPromptSpec
+from ai_command_center.domain.external_capability_manifest import ExternalCapabilityManifest
 from ai_command_center.domain.execution_plan import RiskTier, capability_risk_for
 from ai_command_center.services.base import BaseService
 from ai_command_center.tools.tool_registry import ToolRegistry
@@ -48,6 +51,7 @@ class CapabilityPromptCatalogService(BaseService):
         self._tool_registry = tool_registry
         self._ai_registry = ai_capability_registry
         self._lifecycle_records: dict[str, CapabilityRecord] = {}
+        self._external_manifests: dict[str, ExternalCapabilityManifest] = {}
         self._unsubscribers: list[Callable[[], None]] = []
 
     def get_available_prompt_specs(self, entity_types: list[str]) -> list[dict[str, Any]]:
@@ -123,6 +127,25 @@ class CapabilityPromptCatalogService(BaseService):
             )
             seen.add(dedupe_key)
 
+        for manifest in self._external_manifests.values():
+            if not manifest.enabled:
+                continue
+            dedupe_key = f"external:{manifest.capability_id}"
+            if dedupe_key in seen:
+                continue
+            spec_dict = manifest.to_prompt_spec()
+            specs.append(
+                CapabilityPromptSpec(
+                    name=spec_dict["name"],
+                    description=spec_dict["description"],
+                    risk=spec_dict["risk"],
+                    requires_approval=bool(spec_dict["requires_approval"]),
+                    parameters=dict(spec_dict.get("parameters") or {}),
+                    source="external",
+                )
+            )
+            seen.add(dedupe_key)
+
         return [spec.to_dict() for spec in specs]
 
     def _on_load(self) -> None:
@@ -137,6 +160,16 @@ class CapabilityPromptCatalogService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(TOOL_REGISTERED, self._on_tool_registered)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(
+                EXTERNAL_CAPABILITY_REGISTERED, self._on_external_registered
+            )
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(
+                EXTERNAL_CAPABILITY_CATALOG_UPDATED, self._on_external_catalog_updated
+            )
+        )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -146,6 +179,24 @@ class CapabilityPromptCatalogService(BaseService):
     def _on_tool_registered(self, _event: Event) -> None:
         # Registry is authoritative; event keeps catalog reactive for AppState consumers.
         return
+
+    def _on_external_registered(self, event: Event) -> None:
+        raw = event.payload.get("manifest")
+        if isinstance(raw, dict):
+            manifest = ExternalCapabilityManifest.from_dict(raw)
+            if manifest.capability_id:
+                self._external_manifests[manifest.capability_id] = manifest
+
+    def _on_external_catalog_updated(self, event: Event) -> None:
+        raw_manifests = event.payload.get("manifests") or []
+        manifests: dict[str, ExternalCapabilityManifest] = {}
+        for item in raw_manifests:
+            if not isinstance(item, dict):
+                continue
+            manifest = ExternalCapabilityManifest.from_dict(item)
+            if manifest.capability_id:
+                manifests[manifest.capability_id] = manifest
+        self._external_manifests = manifests
 
     def _on_lifecycle_snapshot(self, event: Event) -> None:
         raw_records = event.payload.get("capability_lifecycle") or []

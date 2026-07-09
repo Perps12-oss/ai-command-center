@@ -215,6 +215,12 @@ EXECUTION_STEP_APPROVED = "execution.step.approved"
 EXECUTION_STEP_COMPLETED = "execution.step.completed"
 EXECUTION_STEP_FAILED = "execution.step.failed"
 
+# External integrations (vNext Phase E — MCP/email/calendar via ARI)
+EXTERNAL_CAPABILITY_REGISTER = "external.capability.register"
+EXTERNAL_CAPABILITY_UNREGISTER = "external.capability.unregister"
+EXTERNAL_CAPABILITY_REGISTERED = "external.capability.registered"
+EXTERNAL_CAPABILITY_CATALOG_UPDATED = "external.capability.catalog_updated"
+
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
 ORCHESTRATION_ROUTING_COMPLETED = "orchestration.routing.completed"
@@ -449,6 +455,10 @@ __all__ = [
     "EXECUTION_STEP_APPROVED",
     "EXECUTION_STEP_COMPLETED",
     "EXECUTION_STEP_FAILED",
+    "EXTERNAL_CAPABILITY_REGISTER",
+    "EXTERNAL_CAPABILITY_UNREGISTER",
+    "EXTERNAL_CAPABILITY_REGISTERED",
+    "EXTERNAL_CAPABILITY_CATALOG_UPDATED",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",
