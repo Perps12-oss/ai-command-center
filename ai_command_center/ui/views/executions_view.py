@@ -191,7 +191,7 @@ class ExecutionsView(ctk.CTkFrame):
         timeline_source: str,
         spans: Sequence[dict[str, Any]] | None = None,
     ) -> None:
-        """Update the detail panel from AppState.execution_timeline."""
+        """Update the detail panel from AppState.execution_scrubber."""
         if request_id != self._selected_request_id:
             return
         run = type(

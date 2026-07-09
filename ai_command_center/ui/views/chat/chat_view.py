@@ -10,8 +10,8 @@ from ai_command_center.core.state.artifact_state import ArtifactCatalogItem
 
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
+from ai_command_center.ui.components.docks.inspector_dock import InspectorDock
 from ai_command_center.ui.components.inspector.execution_inspector import ExecutionInspector
-from ai_command_center.ui.components.inspector.inspector_host import InspectorHost
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.views.chat.chat_header import ChatHeader
 from ai_command_center.ui.views.chat.chat_input import InputPill, TemplatesOverlay
@@ -167,7 +167,7 @@ class ChatView(ctk.CTkFrame):
         self._chat_header: ChatHeader | None = None
         self._conversation_list: ConversationList | None = None
         self._execution_inspector: ExecutionInspector | None = None
-        self._inspector_host: InspectorHost | None = None
+        self._inspector_dock: InspectorDock | None = None
         self._use_v2_blocks = False
         self._session_bar: _SessionBar | None = None
         self._execution_context: Any = None
@@ -262,10 +262,10 @@ class ChatView(ctk.CTkFrame):
             on_inspect_navigate=self._on_inspect_navigate,
             on_artifact_action=self._on_artifact_action,
         )
-        self._inspector_host = InspectorHost(self._workspace.right_host())
-        self._inspector_host.register("execution", self._execution_inspector)
-        self._inspector_host.set_default(self._execution_inspector)
-        self._workspace.set_right(self._inspector_host)
+        self._inspector_dock = InspectorDock(self._workspace.right_host())
+        self._inspector_dock.register("execution", self._execution_inspector)
+        self._inspector_dock.set_default(self._execution_inspector)
+        self._workspace.set_right(self._inspector_dock)
 
         self._scroll_btn = ctk.CTkButton(
             self,
@@ -419,12 +419,12 @@ class ChatView(ctk.CTkFrame):
             self._execution_inspector.update_timeline(events)
 
     def show_inspector(self, ref: InspectableRef) -> None:
-        if self._inspector_host is not None:
-            self._inspector_host.show(ref)
+        if self._inspector_dock is not None:
+            self._inspector_dock.show(ref)
 
     def clear_inspector(self) -> None:
-        if self._inspector_host is not None:
-            self._inspector_host.clear()
+        if self._inspector_dock is not None:
+            self._inspector_dock.clear()
 
     def update_chat_execution_status(
         self, status: str, provider: str, model: str

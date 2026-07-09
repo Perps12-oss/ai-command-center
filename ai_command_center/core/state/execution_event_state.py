@@ -51,8 +51,8 @@ class ExecutionEventItem:
 
 
 @dataclass(frozen=True, slots=True)
-class ExecutionTimelineState:
-    """Active execution timeline for scrubber + detail view."""
+class ExecutionScrubberState:
+    """Per-request execution timeline for scrubber + detail view."""
 
     request_id: str = ""
     events: tuple[ExecutionEventItem, ...] = ()
@@ -100,14 +100,14 @@ def _reduce_execution_event_appended(state: Any, event: Event) -> Any:
     item = ExecutionEventItem.from_payload(event.payload)
     if not item.event_id:
         return state
-    timeline = state.execution_timeline
+    scrubber = state.execution_scrubber
     if item.request_id and (
-        not timeline.request_id or timeline.request_id == item.request_id
+        not scrubber.request_id or scrubber.request_id == item.request_id
     ):
-        base_events = timeline.events if timeline.request_id == item.request_id else ()
+        base_events = scrubber.events if scrubber.request_id == item.request_id else ()
         events = _upsert_events(base_events, item)
         scrub_index = len(events) - 1 if events else 0
-        timeline = ExecutionTimelineState(
+        scrubber = ExecutionScrubberState(
             request_id=item.request_id,
             events=events,
             scrub_index=scrub_index,
@@ -116,7 +116,7 @@ def _reduce_execution_event_appended(state: Any, event: Event) -> Any:
     return replace(
         state,
         recent_execution_events=_upsert_events(state.recent_execution_events, item),
-        execution_timeline=timeline,
+        execution_scrubber=scrubber,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -144,7 +144,7 @@ def _reduce_execution_query_timeline(state: Any, event: Event) -> Any:
     scrub_index = len(events) - 1 if events else 0
     return replace(
         state,
-        execution_timeline=ExecutionTimelineState(
+        execution_scrubber=ExecutionScrubberState(
             request_id=request_id,
             events=events,
             scrub_index=scrub_index,
@@ -159,19 +159,19 @@ def _reduce_execution_timeline_scrub(state: Any, event: Event) -> Any:
     if event.topic != UI_EXECUTION_TIMELINE_SCRUB:
         return state
     request_id = str(event.payload.get("request_id", "")).strip()
-    if request_id and request_id != state.execution_timeline.request_id:
+    if request_id and request_id != state.execution_scrubber.request_id:
         return state
     try:
         index = int(event.payload.get("index", 0))
     except (TypeError, ValueError):
         return state
-    events = state.execution_timeline.events
+    events = state.execution_scrubber.events
     if not events:
         return state
     index = max(0, min(index, len(events) - 1))
     return replace(
         state,
-        execution_timeline=replace(state.execution_timeline, scrub_index=index),
+        execution_scrubber=replace(state.execution_scrubber, scrub_index=index),
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -187,6 +187,6 @@ EXECUTION_EVENT_REDUCERS: tuple[Any, ...] = (
 __all__ = [
     "EXECUTION_EVENT_REDUCERS",
     "ExecutionEventItem",
-    "ExecutionTimelineState",
+    "ExecutionScrubberState",
     "execution_events_for_request",
 ]
