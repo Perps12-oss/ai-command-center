@@ -65,7 +65,7 @@ class CommandPaletteApp(
         self.title("AI Command Center")
         self.configure(fg_color=T.BG_DEEP)
         self.geometry(f"{T.WINDOW_WIDTH}x{T.WINDOW_HEIGHT}")
-        self.minsize(900, 560)
+        self.minsize(1280, 720)
 
         self.withdraw()
         self._register_views()

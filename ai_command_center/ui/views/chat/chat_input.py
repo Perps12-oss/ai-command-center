@@ -1,7 +1,7 @@
-"""Input pill, templates overlay, and send/stop wiring."""
+"""Chat composer v2 — toolbar, model selector, token footer."""
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import customtkinter as ctk
 
@@ -10,31 +10,30 @@ from ai_command_center.ui.views.chat.stream_renderer import CLR_META
 
 _PILL_MAX_LINES = 4
 _LINE_H = 22
-_PLACEHOLDER = "Message…"
-_HINT_TEXT = "⏎ send  ·  Shift+⏎ new line  ·  Ctrl+K  ·  ?"
+_PLACEHOLDER = "Type your message…"
 
 PROMPT_TEMPLATES: list[tuple[str, str, str]] = [
-    ("Summarise",        "Summarise the following: ",             "Condense into key points"),
-    ("Explain simply",   "Explain this like I'm 5: ",             "Plain-language explanation"),
-    ("Bullet points",    "Give me bullet points for: ",           "List format"),
-    ("Pros & cons",      "List the pros and cons of: ",           "Balanced analysis"),
-    ("Action items",     "Extract action items from: ",           "Task extraction"),
-    ("Write email",      "Write a professional email about: ",    "Email draft"),
-    ("Debug help",       "Help me debug this issue: ",            "Code / logic debugging"),
-    ("Compare",          "Compare and contrast: ",                "Side-by-side comparison"),
+    ("Summarise", "Summarise the following: ", "Condense into key points"),
+    ("Explain simply", "Explain this like I'm 5: ", "Plain-language explanation"),
+    ("Bullet points", "Give me bullet points for: ", "List format"),
+    ("Pros & cons", "List the pros and cons of: ", "Balanced analysis"),
+    ("Action items", "Extract action items from: ", "Task extraction"),
+    ("Write email", "Write a professional email about: ", "Email draft"),
+    ("Debug help", "Help me debug this issue: ", "Code / logic debugging"),
+    ("Compare", "Compare and contrast: ", "Side-by-side comparison"),
 ]
 
-CLR_HINT = "#2E2E48"   # keyboard hint — barely visible
+CLR_HINT = "#3A3F5C"
 
 
 class TemplatesOverlay(ctk.CTkFrame):
-    """Floating chip grid of prompt templates — shown/hidden above the input pill."""
+    """Floating chip grid of prompt templates."""
 
     def __init__(self, master, on_select: Callable[[str], None]) -> None:
         super().__init__(
             master,
-            fg_color=T.BG_PANEL,
-            border_color=T.BG_GLASS_BORDER,
+            fg_color=T.SURFACE_PRIMARY,
+            border_color=T.BORDER_SUBTLE,
             border_width=1,
             corner_radius=T.CARD_RADIUS,
         )
@@ -54,8 +53,8 @@ class TemplatesOverlay(ctk.CTkFrame):
         for i, (label, prefix, hint) in enumerate(PROMPT_TEMPLATES):
             chip = ctk.CTkFrame(
                 grid,
-                fg_color=T.BG_GLASS,
-                border_color=T.BG_GLASS_BORDER,
+                fg_color=T.SURFACE_ELEVATED,
+                border_color=T.BORDER_SUBTLE,
                 border_width=1,
                 corner_radius=T.SMALL_RADIUS,
             )
@@ -79,12 +78,7 @@ class TemplatesOverlay(ctk.CTkFrame):
             self.hide()
             return
         self._visible = True
-        self.place(
-            in_=anchor_widget,
-            relx=0.0, rely=0.0,
-            anchor="sw",
-            bordermode="outside",
-        )
+        self.place(in_=anchor_widget, relx=0.0, rely=0.0, anchor="sw", bordermode="outside")
         self.lift()
 
     def hide(self) -> None:
@@ -93,43 +87,40 @@ class TemplatesOverlay(ctk.CTkFrame):
 
 
 class InputPill(ctk.CTkFrame):
+    """Chat composer v2 — 96px pinned area with toolbar and model selector."""
+
     def __init__(
         self,
         master,
         on_send: Callable[[str], None] | None,
         on_stop: Callable[[], None],
+        *,
+        on_model_change: Callable[[str], None] | None = None,
+        on_toolbar_stub: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(
             master,
-            fg_color=T.BG_PANEL,
+            fg_color=T.SURFACE_PRIMARY,
             corner_radius=0,
+            height=T.COMPOSER_HEIGHT + 28,
         )
+        self.pack_propagate(False)
         self._on_send = on_send
         self._on_stop = on_stop
+        self._on_model_change = on_model_change
+        self._on_toolbar_stub = on_toolbar_stub
         self._streaming = False
         self._ph_active = True
+        self._current_model = "llama3.2:3b"
 
         pill = ctk.CTkFrame(
             self,
-            fg_color=T.BG_GLASS,
-            corner_radius=28,
-            border_color=T.BG_GLASS_BORDER,
+            fg_color=T.SURFACE_ELEVATED,
+            corner_radius=T.INPUT_RADIUS,
+            border_color=T.BORDER_SUBTLE,
             border_width=1,
         )
-        pill.pack(fill="x", padx=16, pady=(10, 4))
-
-        self._tmpl_btn = ctk.CTkButton(
-            pill, text="⊞",
-            width=34, height=34,
-            font=(T.FONT_FAMILY, 16),
-            fg_color="transparent",
-            hover_color=T.BG_GLASS_BORDER,
-            text_color=CLR_META,
-            corner_radius=17,
-            command=self._toggle_templates,
-        )
-        self._tmpl_btn.pack(side="left", padx=(8, 0), pady=5)
-        self._templates_overlay: TemplatesOverlay | None = None
+        pill.pack(fill="x", padx=16, pady=(8, 4))
 
         self._tb = ctk.CTkTextbox(
             pill,
@@ -138,43 +129,129 @@ class InputPill(ctk.CTkFrame):
             text_color=T.TEXT_PRIMARY,
             wrap="word",
             activate_scrollbars=False,
-            height=34,
+            height=36,
             border_width=0,
             corner_radius=0,
         )
-        self._tb.pack(side="left", fill="x", expand=True, padx=6, pady=5)
+        self._tb.pack(fill="x", padx=12, pady=(10, 4))
         self._tb.insert("1.0", _PLACEHOLDER)
         self._tb.configure(text_color=CLR_META)
-        self._tb.bind("<FocusIn>",    self._focus_in)
-        self._tb.bind("<FocusOut>",   self._focus_out)
-        self._tb.bind("<Return>",     self._on_enter)
+        self._tb.bind("<FocusIn>", self._focus_in)
+        self._tb.bind("<FocusOut>", self._focus_out)
+        self._tb.bind("<Return>", self._on_enter)
         self._tb.bind("<KeyRelease>", self._grow)
 
+        toolbar = ctk.CTkFrame(pill, fg_color="transparent")
+        toolbar.pack(fill="x", padx=8, pady=(0, 8))
+
+        btn_style = dict(
+            width=28,
+            height=28,
+            font=(T.FONT_FAMILY, 12),
+            fg_color="transparent",
+            hover_color=T.SURFACE_SECONDARY,
+            text_color=T.TEXT_MUTED,
+            corner_radius=6,
+        )
+
+        self._tmpl_btn = ctk.CTkButton(
+            toolbar, text="+", command=self._toggle_templates, **btn_style
+        )
+        self._tmpl_btn.pack(side="left", padx=2)
+        self._templates_overlay: TemplatesOverlay | None = None
+
+        for icon, hint in (("@", "mention"), ("</>", "code"), ("📎", "attach")):
+            ctk.CTkButton(
+                toolbar,
+                text=icon,
+                command=lambda h=hint: self._stub(h),
+                **btn_style,
+            ).pack(side="left", padx=2)
+
+        self._model_menu = ctk.CTkOptionMenu(
+            toolbar,
+            values=["llama3.2:3b"],
+            command=self._on_model_pick,
+            width=120,
+            height=28,
+            font=(T.FONT_FAMILY, 10),
+            fg_color=T.SURFACE_SECONDARY,
+            button_color=T.ACCENT_PURPLE,
+            button_hover_color=T.ACCENT_HOVER,
+            dropdown_fg_color=T.SURFACE_ELEVATED,
+            text_color=T.TEXT_PRIMARY,
+        )
+        self._model_menu.pack(side="right", padx=(4, 4))
+        self._model_menu.set("llama3.2:3b")
+
         self._btn = ctk.CTkButton(
-            pill, text="▶",
-            width=34, height=34,
+            toolbar,
+            text="➤",
+            width=32,
+            height=28,
             font=(T.FONT_FAMILY, 13, "bold"),
-            fg_color=T.ACCENT_DEFAULT,
+            fg_color=T.ACCENT_PURPLE,
             hover_color=T.ACCENT_HOVER,
             text_color="#FFFFFF",
-            corner_radius=17,
+            corner_radius=8,
             command=self._action,
         )
-        self._btn.pack(side="right", padx=(0, 8), pady=5)
+        self._btn.pack(side="right", padx=(0, 2))
+
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=20, pady=(0, 6))
 
         ctk.CTkLabel(
-            self,
-            text=_HINT_TEXT,
+            footer,
+            text="Press Enter to send · Shift+Enter new line · Ctrl+K palette · Alt+Space",
             font=(T.FONT_FAMILY, 9),
             text_color=CLR_HINT,
-        ).pack(side="left", padx=20, pady=(0, 5))
+        ).pack(side="left")
+
+        self._context_lbl = ctk.CTkLabel(
+            footer,
+            text="Tokens: —",
+            font=(T.FONT_FAMILY, 9),
+            text_color=CLR_META,
+        )
+        self._context_lbl.pack(side="right")
 
         self._status = ctk.CTkLabel(
-            self, text="",
+            footer,
+            text="",
             font=(T.FONT_FAMILY, 10),
             text_color=CLR_META,
         )
-        self._status.pack(side="right", padx=20, pady=(0, 5))
+        self._status.pack(side="right", padx=(0, 12))
+
+    def _stub(self, hint: str) -> None:
+        if self._on_toolbar_stub:
+            self._on_toolbar_stub(hint)
+
+    def _on_model_pick(self, model: str) -> None:
+        self._current_model = model
+        if self._on_model_change:
+            self._on_model_change(model)
+
+    def set_model(self, model: str) -> None:
+        self._current_model = model
+        try:
+            self._model_menu.set(model)
+        except Exception:
+            pass
+
+    def set_models(self, models: list[str], current: str = "") -> None:
+        if models:
+            self._model_menu.configure(values=models)
+            pick = current or self._current_model
+            if pick in models:
+                self._model_menu.set(pick)
+
+    def update_context_footer(self, sources: list[str], tokens: int) -> None:
+        if tokens:
+            self._context_lbl.configure(text=f"Tokens: ~{tokens}")
+        else:
+            self._context_lbl.configure(text="Tokens: —")
 
     def _focus_in(self, _=None) -> None:
         if self._ph_active:
@@ -187,17 +264,17 @@ class InputPill(ctk.CTkFrame):
             self._tb.insert("1.0", _PLACEHOLDER)
             self._tb.configure(text_color=CLR_META)
             self._ph_active = True
-            self._tb.configure(height=34)
+            self._tb.configure(height=36)
 
     def _grow(self, _=None) -> None:
         if self._ph_active:
             return
         lines = int(self._tb.index("end-1c").split(".")[0])
-        h = max(34, min(lines * _LINE_H, _PILL_MAX_LINES * _LINE_H))
+        h = max(36, min(lines * _LINE_H, _PILL_MAX_LINES * _LINE_H))
         self._tb.configure(height=h)
 
     def _on_enter(self, event) -> str:
-        if event.state & 0x1:   # Shift → newline
+        if event.state & 0x1:
             return ""
         self._submit()
         return "break"
@@ -210,7 +287,7 @@ class InputPill(ctk.CTkFrame):
             return
         if self._on_send:
             self._tb.delete("1.0", "end")
-            self._tb.configure(height=34)
+            self._tb.configure(height=36)
             self._focus_out()
             self._on_send(text)
 
@@ -223,14 +300,10 @@ class InputPill(ctk.CTkFrame):
     def set_streaming(self, active: bool) -> None:
         self._streaming = active
         if active:
-            self._btn.configure(
-                text="■", fg_color=T.STATUS_ERROR, hover_color="#8B0000"
-            )
+            self._btn.configure(text="■", fg_color=T.ERROR_RED, hover_color="#8B0000")
             self._status.configure(text="Generating…", text_color=T.STATUS_BUSY)
         else:
-            self._btn.configure(
-                text="▶", fg_color=T.ACCENT_DEFAULT, hover_color=T.ACCENT_HOVER
-            )
+            self._btn.configure(text="➤", fg_color=T.ACCENT_PURPLE, hover_color=T.ACCENT_HOVER)
             self._status.configure(text="")
 
     def set_status(self, text: str, color: str = "") -> None:

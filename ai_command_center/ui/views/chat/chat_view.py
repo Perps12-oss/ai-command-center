@@ -10,6 +10,7 @@ from ai_command_center.core.state.artifact_state import ArtifactCatalogItem
 
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.chat_history_panel import ChatHistoryPanel
+from ai_command_center.ui.components.inspector.chat_inspector import ChatInspector
 from ai_command_center.ui.components.inspector.execution_inspector import ExecutionInspector
 from ai_command_center.ui.components.inspector.inspector_host import InspectorHost
 from ai_command_center.ui.design_system import theme_v2 as T
@@ -18,7 +19,10 @@ from ai_command_center.ui.views.chat.chat_input import InputPill, TemplatesOverl
 from ai_command_center.ui.views.chat.chat_search import ChatSearchController
 from ai_command_center.ui.views.chat.chat_workspace_layout import make_chat_workspace_layout
 from ai_command_center.ui.views.chat.conversation_list import ConversationList
-from ai_command_center.ui.views.chat.message_block import AssistantMessageBlock, UserMessageBlock
+from ai_command_center.ui.views.chat.message_document import (
+    AssistantDocumentBlock,
+    UserDocumentBlock,
+)
 from ai_command_center.ui.views.chat.session_store import SessionStore, hhmm, session_title
 from ai_command_center.ui.views.chat.stream_renderer import (
     CLR_META,
@@ -140,6 +144,8 @@ class ChatView(ctk.CTkFrame):
         on_inspect_select: Callable[[InspectableRef], None] | None = None,
         on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
         on_artifact_action: Callable[[str, str], None] | None = None,
+        on_model_change: Callable[[str], None] | None = None,
+        on_notify: Callable[..., None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -151,6 +157,8 @@ class ChatView(ctk.CTkFrame):
         self._on_inspect_select = on_inspect_select
         self._on_inspect_navigate = on_inspect_navigate
         self._on_artifact_action = on_artifact_action or (lambda _a, _k: None)
+        self._on_model_change = on_model_change
+        self._on_notify = on_notify
 
         self._request_id:       str | None              = None
         self._streaming:        bool                    = False
@@ -167,11 +175,12 @@ class ChatView(ctk.CTkFrame):
         self._chat_header: ChatHeader | None = None
         self._conversation_list: ConversationList | None = None
         self._execution_inspector: ExecutionInspector | None = None
+        self._chat_inspector: ChatInspector | None = None
         self._inspector_host: InspectorHost | None = None
-        self._use_v2_blocks = False
+        self._use_v2_blocks = True
         self._session_bar: _SessionBar | None = None
         self._execution_context: Any = None
-        self._blocks_by_request: dict[str, AssistantMessageBlock] = {}
+        self._blocks_by_request: dict[str, AssistantDocumentBlock] = {}
         self._artifact_fingerprints: dict[str, tuple[str, ...]] = {}
 
         self._build()
@@ -186,13 +195,9 @@ class ChatView(ctk.CTkFrame):
 
     def _build(self) -> None:
         self._workspace = make_chat_workspace_layout(self)
-        self._docking = self._workspace._docking_enabled
-        self._use_v2_blocks = self._docking
-
-        if self._docking:
-            self._build_docked()
-            return
-        self._build_legacy()
+        self._docking = True
+        self._use_v2_blocks = True
+        self._build_docked()
 
     def _build_docked(self) -> None:
         self._workspace.pack(fill="both", expand=True)
@@ -202,6 +207,7 @@ class ChatView(ctk.CTkFrame):
             on_new=self._new_session,
             on_select=self._load_session,
             on_delete=self._delete_session,
+            on_view_all=lambda: self._notify("Full chat history — coming soon"),
         )
         self._workspace.set_left(self._conversation_list)
 
@@ -214,6 +220,7 @@ class ChatView(ctk.CTkFrame):
             on_export=self._handle_export,
             on_pin=self._toggle_pin,
             on_archive=self._toggle_archive,
+            on_share=self._handle_share,
         )
         self._chat_header.pack(fill="x", side="top")
 
@@ -223,33 +230,16 @@ class ChatView(ctk.CTkFrame):
         self._scroll.pack(fill="both", expand=True)
         self._scroll.columnconfigure(0, weight=1)
 
-        ctx_frame = ctk.CTkFrame(center, fg_color="transparent")
-        ctx_frame.pack(fill="x", side="bottom", padx=16, pady=(0, 4))
-        self._context_bar = ctk.CTkLabel(
-            ctx_frame,
-            text="Sources: — · Tokens: —",
-            font=(T.FONT_FAMILY, 10),
-            text_color=CLR_META,
-            anchor="w",
-        )
-        self._context_bar.pack(side="left", fill="x", expand=True)
-        self._token_bar = ctk.CTkProgressBar(
-            ctx_frame,
-            width=120,
-            height=4,
-            corner_radius=2,
-            fg_color=T.BG_GLASS,
-            progress_color=T.STATUS_READY,
-        )
-        self._token_bar.set(0)
-        self._token_bar.pack(side="right", padx=(8, 0))
-
         self._pill = InputPill(
             center,
             on_send=self._on_send,
             on_stop=self._handle_stop,
+            on_model_change=self._on_model_change,
+            on_toolbar_stub=self._toolbar_stub,
         )
         self._pill.pack(fill="x", side="bottom")
+        self._context_bar = self._pill._context_lbl  # noqa: SLF001 — composer footer
+        self._token_bar = None
         self._templates_overlay = TemplatesOverlay(self, on_select=self._pill.insert_template)
         self._pill.set_templates_overlay(self._templates_overlay)
 
@@ -260,9 +250,17 @@ class ChatView(ctk.CTkFrame):
             self._workspace.right_host(),
             on_artifact_action=self._on_artifact_action,
         )
+        self._chat_inspector = ChatInspector(
+            self._workspace.right_host(),
+            on_export=self._handle_export,
+            on_pin=self._toggle_pin,
+            on_clear=self._handle_clear_chat,
+            on_artifact_stub=lambda: self._toolbar_stub("artifact"),
+        )
+        self._chat_inspector.update_session(session_id=self._store.session_id)
         self._inspector_host = InspectorHost(self._workspace.right_host())
         self._inspector_host.register("execution", self._execution_inspector)
-        self._inspector_host.set_default(self._execution_inspector)
+        self._inspector_host.set_default(self._chat_inspector)
         self._workspace.set_right(self._inspector_host)
 
         self._scroll_btn = ctk.CTkButton(
@@ -411,6 +409,13 @@ class ChatView(ctk.CTkFrame):
         self._execution_context = context
         if self._execution_inspector is not None:
             self._execution_inspector.update_context(context)
+        if self._chat_inspector is not None:
+            self._chat_inspector.update_context(context)
+            if context is None:
+                self._chat_inspector.update_session(
+                    session_id=self._store.session_id,
+                    model=self._model,
+                )
 
     def show_inspector(self, ref: InspectableRef) -> None:
         if self._inspector_host is not None:
@@ -432,6 +437,15 @@ class ChatView(ctk.CTkFrame):
             return
         badge = self._model.split("/")[0] if self._model else ""
         meta = self._store.ensure_metadata(sid, title=title, provider_badge=badge)
+        last_assistant = next(
+            (m.get("content", "") for m in reversed(self._history) if m.get("role") == "assistant"),
+            "",
+        )
+        last_user = next(
+            (m.get("content", "") for m in reversed(self._history) if m.get("role") == "user"),
+            "",
+        )
+        meta.preview = (last_assistant or last_user or title or "")[:80]
         if is_new:
             self._conversation_list.add_conversation(meta)
         else:
@@ -581,15 +595,13 @@ class ChatView(ctk.CTkFrame):
         self._hide_empty()
         if self._use_v2_blocks:
             ref = self._make_message_ref("user", text, message_index=message_index)
-            UserMessageBlock(
+            UserDocumentBlock(
                 self._scroll,
                 text,
                 inspect_ref=ref,
                 on_inspect_select=self._on_inspect_select,
                 on_inspect_navigate=self._on_inspect_navigate,
-            ).pack(
-                fill="x", padx=SIDE_PAD, pady=(0, 8)
-            )
+            ).pack(fill="x", padx=SIDE_PAD, pady=(0, 8))
             return
         outer = ctk.CTkFrame(self._scroll, fg_color="transparent")
         outer.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
@@ -610,7 +622,7 @@ class ChatView(ctk.CTkFrame):
         ).pack(side="right", padx=(0, 4))
         CopyBtn(mrow, lambda t=text: t).pack(side="right")
 
-    def _assistant_row(self, *, message_index: int | None = None) -> AssistantBubble | AssistantMessageBlock:
+    def _assistant_row(self, *, message_index: int | None = None) -> AssistantBubble | AssistantDocumentBlock:
         self._hide_empty()
         if self._use_v2_blocks:
             ref = self._make_message_ref(
@@ -619,8 +631,9 @@ class ChatView(ctk.CTkFrame):
                 request_id=self._request_id or "",
                 message_index=message_index,
             )
-            block = AssistantMessageBlock(
+            block = AssistantDocumentBlock(
                 self._scroll,
+                model_name=self._model,
                 on_regenerate=self._on_regenerate,
                 on_rate=lambda rating: None,
                 inspect_ref=ref,
@@ -645,8 +658,8 @@ class ChatView(ctk.CTkFrame):
 
         return bubble
 
-    def _finalize_meta(self, bubble: AssistantBubble | AssistantMessageBlock) -> None:
-        if isinstance(bubble, AssistantMessageBlock):
+    def _finalize_meta(self, bubble: AssistantBubble | AssistantDocumentBlock) -> None:
+        if isinstance(bubble, AssistantDocumentBlock):
             execution_id = self._request_id or ""
             artifact_count = 0
             decision_count = 0
@@ -735,14 +748,20 @@ class ChatView(ctk.CTkFrame):
         block = self._blocks_by_request.get(rid)
         if block is None and self._streaming_bubble is not None and self._request_id == rid:
             block = self._streaming_bubble
-        if block is None or not isinstance(block, AssistantMessageBlock):
+        if block is None or not isinstance(block, AssistantDocumentBlock):
             return
         block.set_artifacts(artifacts)
         self._scroll_to_bottom()
 
     def set_model(self, name: str) -> None:
         self._model = name
+        self._pill.set_model(name)
         self._refresh_session_bar()
+        if self._chat_inspector is not None:
+            self._chat_inspector.update_session(
+                session_id=self._store.session_id,
+                model=name,
+            )
 
     def update_entity_context(self, entity_id: str, entity_type: str, title: str) -> None:
         if entity_id:
@@ -762,23 +781,13 @@ class ChatView(ctk.CTkFrame):
     _TOKEN_BUDGET = 4096
 
     def update_context_bar(self, sources: list[str], tokens: int) -> None:
-        if not sources:
-            self._context_bar.configure(text=f"Sources: — · Tokens: {tokens}")
-        else:
-            names = [s.split("_")[-1].split("/")[-1][:18] for s in sources]
-            summary = ", ".join(names)
-            if len(summary) > 50:
-                summary = summary[:47] + "…"
-            self._context_bar.configure(text=f"Sources: {summary} · Tokens: {tokens}")
-        frac = min(1.0, tokens / self._TOKEN_BUDGET) if tokens > 0 else 0.0
-        if frac >= 0.85:
-            color = T.STATUS_ERROR
-        elif frac >= 0.6:
-            color = T.STATUS_BUSY
-        else:
-            color = T.STATUS_READY
-        self._token_bar.configure(progress_color=color)
-        self._token_bar.set(frac)
+        self._pill.update_context_footer(sources, tokens)
+        if self._chat_inspector is not None:
+            self._chat_inspector.update_session(
+                session_id=self._store.session_id,
+                model=self._model,
+                tokens=tokens,
+            )
 
     def load_history(self, messages: list[dict]) -> None:
         self._clear_ui()
@@ -900,6 +909,40 @@ class ChatView(ctk.CTkFrame):
     def _handle_export(self) -> None:
         if self._on_export:
             self._on_export(list(self._history))
+
+    def _handle_share(self) -> None:
+        title = session_title(self._history) or "Chat"
+        snippet = f"{title}\n\n"
+        for msg in self._history[-6:]:
+            role = msg.get("role", "")
+            content = str(msg.get("content", ""))[:200]
+            snippet += f"{role}: {content}\n"
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(snippet)
+            self._notify("Conversation copied to clipboard", kind="success")
+        except Exception:
+            self._notify("Could not copy to clipboard", kind="error")
+
+    def _handle_clear_chat(self) -> None:
+        self._reset_conversation()
+        self._refresh_session_bar()
+        if self._chat_inspector is not None:
+            self._chat_inspector.update_session(session_id=self._store.session_id, model=self._model)
+
+    def _notify(self, message: str, *, kind: str = "info") -> None:
+        if self._on_notify:
+            self._on_notify(message, kind=kind)
+
+    def _toolbar_stub(self, hint: str) -> None:
+        labels = {
+            "mention": "Mentions",
+            "code": "Code blocks",
+            "attach": "Attachments",
+            "artifact": "Artifacts",
+        }
+        name = labels.get(hint, hint.title())
+        self._notify(f"{name} — coming soon")
 
     def _end_stream(self, *, error: bool = False) -> None:
         self._streaming        = False

@@ -60,6 +60,13 @@ class StateApplierMixin:
             openai_online=openai_online,
             openai_configured=openai_configured,
         )
+        models = [snap.settings.default_model]
+        extra_models = snap.system_snapshot.extra.get("available_models")
+        if isinstance(extra_models, list):
+            for m in extra_models:
+                if m and m not in models:
+                    models.append(str(m))
+        self._top.set_models(models, snap.settings.default_model)
         if snap.chat_status == "streaming":
             self._last_terminal_chat_key = None
         self._overlay_mode = snap.settings.overlay_mode
@@ -94,6 +101,11 @@ class StateApplierMixin:
         chat = self._chat_view()
         if chat:
             chat.set_model(snap.settings.default_model)
+            if hasattr(chat, "_pill"):
+                chat._pill.set_models(  # noqa: SLF001
+                    models,
+                    snap.settings.default_model,
+                )
             chat.update_entity_context(
                 snap.chat_workspace_entity_id,
                 snap.chat_workspace_entity_type,

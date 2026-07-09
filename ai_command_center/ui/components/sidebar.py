@@ -1,4 +1,4 @@
-"""Navigation sidebar — translucent glass + cyan pill active state."""
+"""Navigation sidebar — purple active state with icons."""
 
 from __future__ import annotations
 
@@ -6,26 +6,25 @@ import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
 
-NAV_ITEMS: tuple[tuple[str, str], ...] = (
-    ("workspace", "Workspace"),
-    ("home", "Home"),
-    ("chat", "Chat"),
-    ("executions", "Executions"),
-    ("providers", "Providers"),
-    ("capabilities", "Capabilities"),
-    ("artifacts", "Artifacts"),
-    ("notes", "Notes"),
-    ("memory", "Memory"),
-    ("system", "System"),
-    ("plugins", "Plugins"),
-    ("settings", "Settings"),
+NAV_ITEMS: tuple[tuple[str, str, str], ...] = (
+    ("workspace", "▦", "Workspace"),
+    ("home", "⌂", "Home"),
+    ("chat", "💬", "Chat"),
+    ("executions", "⚡", "Executions"),
+    ("providers", "🔌", "Providers"),
+    ("capabilities", "🧩", "Capabilities"),
+    ("artifacts", "📦", "Artifacts"),
+    ("notes", "📝", "Notes"),
+    ("memory", "🧠", "Memory"),
+    ("system", "⚙", "System"),
+    ("plugins", "🔧", "Plugins"),
+    ("settings", "◈", "Settings"),
 )
 
-# Feature-flagged nav items — registered dynamically if feature is enabled
-FEATURE_NAV_ITEMS: dict[str, tuple[str, str]] = {
-    "capabilities": ("capabilities", "Capabilities"),
-    "providers":    ("providers",    "Providers"),
-    "artifacts":    ("artifacts",    "Artifacts"),
+FEATURE_NAV_ITEMS: dict[str, tuple[str, str, str]] = {
+    "capabilities": ("capabilities", "🧩", "Capabilities"),
+    "providers": ("providers", "🔌", "Providers"),
+    "artifacts": ("artifacts", "📦", "Artifacts"),
 }
 
 
@@ -34,7 +33,7 @@ class Sidebar(ctk.CTkFrame):
         super().__init__(
             master,
             width=T.SIDEBAR_WIDTH,
-            fg_color="transparent",
+            fg_color=T.SURFACE_PRIMARY,
             border_width=0,
             corner_radius=0,
             **kwargs,
@@ -43,6 +42,7 @@ class Sidebar(ctk.CTkFrame):
         self._rows: dict[str, ctk.CTkFrame] = {}
         self._buttons: dict[str, ctk.CTkButton] = {}
         self._active = "home"
+        self._labels: dict[str, str] = {}
 
         ctk.CTkLabel(
             self,
@@ -51,21 +51,22 @@ class Sidebar(ctk.CTkFrame):
             text_color=T.TEXT_SECONDARY,
         ).pack(anchor="w", padx=T.PAD, pady=(T.PAD, 8))
 
-        for view_id, label in NAV_ITEMS:
+        for view_id, icon, label in NAV_ITEMS:
+            self._labels[view_id] = label
             row = ctk.CTkFrame(self, fg_color="transparent", height=40)
             row.pack(fill="x", padx=8, pady=2)
             row.pack_propagate(False)
 
             btn = ctk.CTkButton(
                 row,
-                text=label,
+                text=f"  {icon}  {label}",
                 anchor="w",
                 font=T.FONT_BODY,
                 fg_color="transparent",
                 text_color=T.TEXT_SECONDARY,
-                hover_color=T.LIGHT_GLASS,
+                hover_color=T.SURFACE_ELEVATED,
                 height=36,
-                corner_radius=T.CORNER_RADIUS,
+                corner_radius=12,
                 command=lambda v=view_id: self._select(v, on_navigate),
             )
             btn.pack(fill="both", expand=True, padx=4)
@@ -74,18 +75,41 @@ class Sidebar(ctk.CTkFrame):
 
         user = ctk.CTkFrame(
             self,
-            fg_color=T.GLASS_BG,
+            fg_color=T.SURFACE_ELEVATED,
             corner_radius=T.PILL_RADIUS,
             border_width=1,
-            border_color=T.GLASS_BORDER,
+            border_color=T.BORDER_SUBTLE,
         )
         user.pack(side="bottom", fill="x", padx=T.PAD, pady=T.PAD)
+
+        user_row = ctk.CTkFrame(user, fg_color="transparent")
+        user_row.pack(fill="x", padx=12, pady=10)
+
         ctk.CTkLabel(
-            user,
+            user_row,
+            text="●",
+            font=(T.FONT_FAMILY, 8),
+            text_color=T.SUCCESS_GREEN,
+            width=12,
+        ).pack(side="left")
+
+        info = ctk.CTkFrame(user_row, fg_color="transparent")
+        info.pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        ctk.CTkLabel(
+            info,
             text="Local User",
             font=T.FONT_SMALL,
+            text_color=T.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x")
+        ctk.CTkLabel(
+            info,
+            text="Online",
+            font=(T.FONT_FAMILY, 9),
             text_color=T.TEXT_MUTED,
-        ).pack(anchor="w", padx=12, pady=10)
+            anchor="w",
+        ).pack(fill="x")
 
         self._highlight()
 
@@ -96,17 +120,22 @@ class Sidebar(ctk.CTkFrame):
 
     def _highlight(self) -> None:
         for vid, btn in self._buttons.items():
+            label = self._labels.get(vid, vid)
+            icon = next((i for v, i, _ in NAV_ITEMS if v == vid), "")
             if vid == self._active:
                 btn.configure(
-                    fg_color=T.HERO_CYAN_DIM,
-                    text_color=T.HERO_CYAN,
-                    border_width=0,
+                    fg_color=T.SURFACE_ELEVATED,
+                    text_color=T.ACCENT_PURPLE,
+                    border_width=1,
+                    border_color="#3B3B8C",
+                    text=f"  {icon}  {label}",
                 )
             else:
                 btn.configure(
                     fg_color="transparent",
                     text_color=T.TEXT_SECONDARY,
                     border_width=0,
+                    text=f"  {icon}  {label}",
                 )
 
     def set_active(self, view_id: str) -> None:
@@ -116,10 +145,12 @@ class Sidebar(ctk.CTkFrame):
     def toggle_collapse(self) -> None:
         if self.winfo_width() > 60:
             self.configure(width=48)
-            for btn in self._buttons.values():
-                btn.configure(text="", width=28)
+            for vid, btn in self._buttons.items():
+                icon = next((i for v, i, _ in NAV_ITEMS if v == vid), "")
+                btn.configure(text=icon, width=28)
         else:
             self.configure(width=T.SIDEBAR_WIDTH)
-            labels = dict(NAV_ITEMS)
             for vid, btn in self._buttons.items():
-                btn.configure(text=labels.get(vid, vid), width=0)
+                label = self._labels.get(vid, vid)
+                icon = next((i for v, i, _ in NAV_ITEMS if v == vid), "")
+                btn.configure(text=f"  {icon}  {label}", width=0)

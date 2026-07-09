@@ -32,8 +32,11 @@ class ApplicationShellMixin:
             self,
             on_settings=lambda: self._navigate("settings"),
             on_close=self.hide,
+            on_palette=self._show_command_palette,
+            on_model_change=lambda m: self._on_settings_save("default_model", m),
         )
         self._top.pack(fill="x", side="top")
+        self._command_box_visible = True
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
@@ -75,6 +78,15 @@ class ApplicationShellMixin:
         self.bind("<Control-h>", lambda _: self._history_drawer.toggle())
         self.bind("<Control-H>", lambda _: self._history_drawer.toggle())
         self.bind("?", self._maybe_show_shortcuts)
+
+    def _set_command_box_visible(self, visible: bool) -> None:
+        if visible == getattr(self, "_command_box_visible", True):
+            return
+        self._command_box_visible = visible
+        if visible:
+            self._command_host.pack(fill="x", before=self._content)
+        else:
+            self._command_host.pack_forget()
 
     def _show_command_palette(self) -> None:
         commands: list[tuple[str, str, Callable[[], None]]] = []
@@ -279,7 +291,7 @@ class ApplicationShellMixin:
         else:
             self.attributes("-topmost", False)
             self.geometry(f"{T.WINDOW_WIDTH}x{T.WINDOW_HEIGHT}")
-            self.minsize(900, 560)
+            self.minsize(1280, 720)
 
     def _fade_in(self, step: int = 0) -> None:
         target = theme_manager.active_alpha()
@@ -307,13 +319,23 @@ class ApplicationShellMixin:
         if self._visible:
             self.lift()
             self.focus_force()
-            self._command_box.focus()
+            if self._current_view == "chat":
+                chat = self._chat_view()
+                if chat:
+                    chat.focus_input()
+            else:
+                self._command_box.focus()
             return
         self._visible = True
         self.deiconify()
         self.lift()
         self.focus_force()
-        self._command_box.focus()
+        if self._current_view == "chat":
+            chat = self._chat_view()
+            if chat:
+                chat.focus_input()
+        else:
+            self._command_box.focus()
         self._fade_in()
 
     def hide(self) -> None:

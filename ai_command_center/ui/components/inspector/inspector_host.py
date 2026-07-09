@@ -34,7 +34,7 @@ class InspectorHost(ctk.CTkFrame):
 
         self._title = ctk.CTkLabel(
             self._header,
-            text="Inspector",
+            text="Chat Inspector",
             font=(T.FONT_FAMILY, 11, "bold"),
             text_color=T.TEXT_SECONDARY,
             anchor="w",
@@ -97,7 +97,7 @@ class InspectorHost(ctk.CTkFrame):
 
     def clear(self) -> None:
         self._current_ref = None
-        self._title.configure(text="Inspector")
+        self._title.configure(text="Chat Inspector")
         self._show_default()
 
     def set_collapsed(self, collapsed: bool) -> None:

@@ -67,6 +67,8 @@ class ViewManagerMixin:
             on_inspect_select=self._on_chat_inspect_select,
             on_inspect_navigate=self._on_chat_inspect_navigate,
             on_artifact_action=self._controller.publish_artifact_action,
+            on_model_change=lambda m: self._on_settings_save("default_model", m),
+            on_notify=lambda msg, kind="info": self._toast.show(msg, kind=kind),
         )
         self._view_registry["notes"] = lambda: NotesView(
             self._content,
@@ -165,6 +167,7 @@ class ViewManagerMixin:
         if hasattr(view, "on_show"):
             view.on_show()
         self._sidebar.set_active(view_id)
+        self._set_command_box_visible(view_id != "chat")
         if view_id == "settings":
             settings_view = self._views.get("settings")
             if isinstance(settings_view, SettingsView):

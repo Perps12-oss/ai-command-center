@@ -1,128 +1,77 @@
 {
-
-  "version": "1.3",
-
+  "version": "2.0",
   "palette": {
-
-    "bg_deep": "#0B0C15",
-
-    "bg_panel": "#111320",
-
-    "bg_glass": "#161A28",
-
-    "bg_glass_border": "#252A3D",
-
-    "bg_input": "#12121F",
-
-    "glass_bg": "#1C1F2A",
-
-    "glass_border": "#2E3240",
-
-    "glass_border_alt": "#2E3240",
-
-    "glass_border_hover": "#00FFFF",
-
-    "light_glass": "#2A2E3C",
-
-    "accent_primary": "#3B82F6",
-
-    "accent_hover": "#2563EB",
-
+    "app_bg": "#090B14",
+    "surface_primary": "#111426",
+    "surface_secondary": "#151933",
+    "surface_elevated": "#1B2040",
+    "bg_deep": "#090B14",
+    "bg_panel": "#111426",
+    "bg_glass": "#151933",
+    "bg_glass_border": "#252A45",
+    "bg_input": "#0D1022",
+    "glass_bg": "#151933",
+    "glass_border": "#252A45",
+    "glass_border_alt": "#252A45",
+    "glass_border_hover": "#6C63FF",
+    "light_glass": "#1B2040",
+    "accent_purple": "#6C63FF",
+    "accent_blue": "#4A8CFF",
+    "accent_primary": "#6C63FF",
+    "accent_hover": "#5A52E0",
     "text_primary": "#FFFFFF",
-
-    "text_secondary": "#94A3B8",
-
-    "text_muted": "#64748B",
-
-    "text_log": "#64748B",
-
+    "text_secondary": "#A5ACD0",
+    "text_muted": "#72789C",
+    "text_log": "#72789C",
     "text_shadow": "#333333",
-
-    "status_ready": "#22C55E",
-
+    "status_ready": "#21C45D",
     "status_busy": "#EAB308",
-
-    "status_error": "#EF4444",
-
-    "hero_cyan": "#00FFFF",
-
-    "hero_cyan_dim": "#1A4A52",
-
+    "status_error": "#FF5A5A",
+    "hero_cyan": "#6C63FF",
+    "hero_cyan_dim": "#2A2559",
     "ribbon_pill_bg": "#1A1D26",
-
-    "ribbon_pill_border": "#3A3F53"
-
+    "ribbon_pill_border": "#3A3F53",
+    "border_subtle": "#252A45",
+    "code_bg": "#0D1022"
   },
-
   "typography": {
-
     "family": "Segoe UI",
-
     "title_size": 18,
-
     "header_size": 13,
-
     "body_size": 12,
-
     "small_size": 11,
-
     "mono_family": "Consolas"
-
   },
-
   "layout": {
-
-    "window_width": 1100,
-
-    "window_height": 700,
-
-    "header_h": 56,
-
-    "sidebar_w": 220,
-
-    "pad": 24,
-
+    "window_width": 1400,
+    "window_height": 900,
+    "header_h": 64,
+    "sidebar_w": 240,
+    "chat_history_w": 280,
+    "inspector_w": 320,
+    "composer_h": 96,
+    "pad": 16,
     "gap": 16,
-
-    "card_radius": 16,
-
+    "card_radius": 14,
+    "button_radius": 10,
+    "input_radius": 20,
     "hero_radius": 30,
-
     "card_min_h": 180,
-
     "footer_h": 32
-
   },
-
   "visual_hierarchy": {
-
     "functional_pct": 90,
-
     "branding_pct": 5,
-
     "hero_pct": 5,
-
     "hero_cyan_allowed_components": ["HeroPanel", "ActionRibbon"]
-
   },
-
   "layer_stack": {
-
     "z_index": {
-
       "background": 0,
-
       "depth": 10,
-
       "motion": 20,
-
       "ui": 30,
-
       "modal": 40
-
     }
-
   }
-
 }
-
