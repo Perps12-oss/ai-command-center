@@ -67,10 +67,10 @@ from ai_command_center.services.capability_prompt_catalog_service import (
 from ai_command_center.services.execution_orchestrator_service import (
     ExecutionOrchestratorService,
 )
-from ai_command_center.services.planner_service import PlannerService
-from ai_command_center.services.execution_orchestrator_service import (
-    ExecutionOrchestratorService,
+from ai_command_center.services.external_capability_bridge_service import (
+    ExternalCapabilityBridgeService,
 )
+from ai_command_center.services.planner_service import PlannerService
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -168,6 +168,7 @@ def build_services(
     )
     planner = PlannerService(bus, context_manager=context_manager)
     execution_orchestrator = ExecutionOrchestratorService(bus)
+    external_capability_bridge = ExternalCapabilityBridgeService(bus)
     execution_orchestrator = ExecutionOrchestratorService(
         bus,
         permission_service=permission_service,
@@ -213,6 +214,7 @@ def build_services(
         capability_prompt_catalog,
         planner,
         execution_orchestrator,
+        external_capability_bridge,
         execution_run,
         execution_query,
         workflow_persistence,
