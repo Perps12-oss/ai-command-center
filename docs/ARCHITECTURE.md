@@ -27,7 +27,8 @@ AI Command Center is a **Workspace OS** — an ambient desktop command surface w
 
 | Document | Purpose |
 |----------|---------|
-| [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md) | **Only execution backlog** — Programs 1–4, audit, enforcement, gates |
+| [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md) | **Only execution backlog** — Programs 1–5, audit, enforcement, gates |
+| [architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md](architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md) | **Cognitive architecture** — state-driven reasoning stack (Memory → World Model → Capability → Planner → Executor → Workspace OS) |
 | [architecture/AGENT_RUNTIME_INTERFACE.md](architecture/AGENT_RUNTIME_INTERFACE.md) | **Capability provider contract** — host vs sidecar; integration gate for QwenPaw and future runtimes |
 
 ---

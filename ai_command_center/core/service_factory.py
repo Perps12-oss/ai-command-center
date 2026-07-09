@@ -61,6 +61,16 @@ from ai_command_center.services.execution_event_service import ExecutionEventSer
 from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.services.capability_lifecycle_manager import CapabilityLifecycleManager
+from ai_command_center.services.capability_prompt_catalog_service import (
+    CapabilityPromptCatalogService,
+)
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
+from ai_command_center.services.external_capability_bridge_service import (
+    ExternalCapabilityBridgeService,
+)
+from ai_command_center.services.planner_service import PlannerService
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
@@ -133,6 +143,7 @@ def build_services(
     # ── core services ─────────────────────────────────────────────────────────
     permission_service = PermissionService(bus)
     permission_service.wire_bus_handlers()
+    ai_capability_registry_service = AICapabilityRegistryService(permission_service)
 
     tool_registry = ToolRegistryService(bus, registry=shared_tool_registry)
     tool_executor = ToolExecutorService(
@@ -150,6 +161,14 @@ def build_services(
         otel_endpoint=settings_snapshot.otel_endpoint,
     )
     capability_lifecycle = CapabilityLifecycleManager(bus)
+    capability_prompt_catalog = CapabilityPromptCatalogService(
+        bus,
+        tool_registry=shared_tool_registry,
+        ai_capability_registry=ai_capability_registry_service,
+    )
+    planner = PlannerService(bus, context_manager=context_manager)
+    execution_orchestrator = ExecutionOrchestratorService(bus)
+    external_capability_bridge = ExternalCapabilityBridgeService(bus)
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     execution_event_repo = ExecutionEventRepository(db)
     execution_query = ExecutionQueryService(
@@ -188,6 +207,10 @@ def build_services(
         telemetry,
         tracing,
         capability_lifecycle,
+        capability_prompt_catalog,
+        planner,
+        execution_orchestrator,
+        external_capability_bridge,
         execution_run,
         execution_query,
         workflow_persistence,
@@ -234,7 +257,6 @@ def build_services(
         feature_registry = FeatureRegistry()
         FeatureRegistry.set_instance(feature_registry)
         feature_registry.enable(Feature.FEATURE_DOCKING)
-        ai_capability_registry_service = AICapabilityRegistryService(permission_service)
         command_palette_service = CommandPaletteService(bus)
         search_provider = FTSSearchProvider(entity_service)
 
@@ -270,3 +292,4 @@ def build_services(
         provider_registry=provider_registry,
         workspace_os=workspace_os,
     )
+

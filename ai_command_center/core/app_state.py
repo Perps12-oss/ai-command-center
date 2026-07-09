@@ -56,6 +56,15 @@ from ai_command_center.core.events.topics import (
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
+    CAPABILITY_CATALOG_RESULT,
+    PLAN_GENERATED,
+    EXECUTION_RUN_STARTED,
+    EXECUTION_RUN_COMPLETE,
+    EXECUTION_RUN_FAILED,
+    EXECUTION_STEP_STARTED,
+    EXECUTION_STEP_AWAITING_APPROVAL,
+    EXECUTION_STEP_COMPLETED,
+    EXECUTION_STEP_FAILED,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_EVENT_APPENDED,
@@ -162,6 +171,8 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
+    CAPABILITY_CATALOG_RESULT,
+    PLAN_GENERATED,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -433,6 +444,10 @@ class AppState:
     provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
+    capability_prompt_catalog: tuple[dict[str, object], ...] = ()
+    planner_last_plan: dict[str, object] = field(default_factory=dict)
+    execution_active_plan: dict[str, object] = field(default_factory=dict)
+    execution_current_step: dict[str, object] = field(default_factory=dict)
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
@@ -910,6 +925,131 @@ def _reduce_capability_lifecycle_snapshot(state: AppState, event: Event) -> AppS
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
+
+
+def _reduce_capability_prompt_catalog(state: AppState, event: Event) -> AppState:
+    if event.topic != CAPABILITY_CATALOG_RESULT:
+        return state
+    raw_specs = event.payload.get("specs") or []
+    specs: list[dict[str, object]] = []
+    for item in raw_specs:
+        if isinstance(item, dict):
+            specs.append(dict(item))
+    return replace(
+        state,
+        capability_prompt_catalog=tuple(specs),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_planner_last_plan(state: AppState, event: Event) -> AppState:
+    if event.topic != PLAN_GENERATED:
+        return state
+    raw_plan = event.payload.get("plan")
+    plan_dict: dict[str, object] = {}
+    if isinstance(raw_plan, dict):
+        plan_dict = dict(raw_plan)
+    return replace(
+        state,
+        planner_last_plan=plan_dict,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_execution_orchestrator(state: AppState, event: Event) -> AppState:
+    topic = event.topic
+    payload = event.payload
+    if topic == EXECUTION_RUN_STARTED:
+        plan_dict: dict[str, object] = {
+            "run_id": str(payload.get("run_id", "")),
+            "request_id": str(payload.get("request_id", "")),
+            "goal": str(payload.get("goal", "")),
+            "total_steps": payload.get("total_steps", 0),
+            "steps": list(payload.get("steps") or []),
+            "status": "running",
+        }
+        return replace(
+            state,
+            execution_active_plan=plan_dict,
+            execution_current_step={},
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic in {EXECUTION_STEP_STARTED, EXECUTION_STEP_AWAITING_APPROVAL}:
+        step_dict: dict[str, object] = {
+            "run_id": str(payload.get("run_id", "")),
+            "step_id": str(payload.get("step_id", "")),
+            "index": payload.get("index", 0),
+            "capability": str(payload.get("capability", "")),
+            "risk": str(payload.get("risk", "")),
+            "status": "awaiting_approval"
+            if topic == EXECUTION_STEP_AWAITING_APPROVAL
+            else "started",
+        }
+        active = dict(state.execution_active_plan)
+        if active:
+            active["current_step_id"] = step_dict["step_id"]
+        return replace(
+            state,
+            execution_active_plan=active,
+            execution_current_step=step_dict,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic == EXECUTION_STEP_COMPLETED:
+        active = dict(state.execution_active_plan)
+        if active:
+            raw_steps = active.get("steps")
+            if isinstance(raw_steps, list):
+                step_id = str(payload.get("step_id", ""))
+                updated_steps: list[object] = []
+                for item in raw_steps:
+                    if isinstance(item, dict) and str(item.get("step_id")) == step_id:
+                        merged = dict(item)
+                        merged["status"] = "completed"
+                        updated_steps.append(merged)
+                    else:
+                        updated_steps.append(item)
+                active["steps"] = updated_steps
+        return replace(
+            state,
+            execution_active_plan=active,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic in {EXECUTION_RUN_COMPLETE, EXECUTION_RUN_FAILED}:
+        active = dict(state.execution_active_plan)
+        if active:
+            active["status"] = "complete" if topic == EXECUTION_RUN_COMPLETE else "failed"
+            if topic == EXECUTION_RUN_FAILED:
+                active["error"] = str(payload.get("error", ""))
+        return replace(
+            state,
+            execution_active_plan=active,
+            execution_current_step={}
+            if topic == EXECUTION_RUN_COMPLETE
+            else state.execution_current_step,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic == EXECUTION_STEP_FAILED:
+        step_dict = dict(state.execution_current_step)
+        step_dict["status"] = "failed"
+        step_dict["error"] = str(payload.get("error", ""))
+        active = dict(state.execution_active_plan)
+        if active:
+            active["status"] = "failed"
+            active["error"] = str(payload.get("error", ""))
+        return replace(
+            state,
+            execution_active_plan=active,
+            execution_current_step=step_dict,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    return state
 
 
 def _reduce_execution_run_feed(state: AppState, event: Event) -> AppState:
@@ -1486,6 +1626,9 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
     _reduce_capability_lifecycle_snapshot,
+    _reduce_capability_prompt_catalog,
+    _reduce_planner_last_plan,
+    _reduce_execution_orchestrator,
     _reduce_orchestration_provider_health,
     _reduce_execution_run_feed,
     _reduce_plugin_state_changed,

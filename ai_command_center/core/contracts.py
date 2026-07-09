@@ -10,10 +10,11 @@ Version bump policy:
 
 Gate: python scripts/verify_contracts.py
 
-ContextBundle v1.1 (current):
+ContextBundle v1.2 (current):
     Producer: ContextManager.build_context() only
     Consumer: OllamaService.stream_chat() / .stream() / .chat()
-    v1.0 remains in SUPPORTED_VERSIONS for backward compatibility.
+    v1.2 adds workspace_state section labels from workspace_snippets (vNext M1).
+    v1.0 and v1.1 remain in SUPPORTED_VERSIONS for backward compatibility.
 
 command.routed v1.0:
     contract_version: "1.0"
@@ -28,8 +29,9 @@ OllamaService API v1.0: unchanged.
 from __future__ import annotations
 
 # ContextBundle (ContextManager → OllamaService)
-CONTEXT_BUNDLE_VERSION = "1.1"
+CONTEXT_BUNDLE_VERSION = "1.2"
 CONTEXT_BUNDLE_VERSION_LEGACY = "1.0"
+CONTEXT_BUNDLE_VERSION_V11 = "1.1"
 
 # command.routed envelope (CommandRouter → handlers)
 COMMAND_ROUTED_VERSION = "1.0"
@@ -47,7 +49,11 @@ TOOL_CONTRACT_VERSION = "1.0"
 # Non-user actors (agent, workflow) require workspace_context per ToolExecutorService.
 
 SUPPORTED_VERSIONS: dict[str, tuple[str, ...]] = {
-    "context_bundle": (CONTEXT_BUNDLE_VERSION_LEGACY, CONTEXT_BUNDLE_VERSION),
+    "context_bundle": (
+        CONTEXT_BUNDLE_VERSION_LEGACY,
+        CONTEXT_BUNDLE_VERSION_V11,
+        CONTEXT_BUNDLE_VERSION,
+    ),
     "command_routed": (COMMAND_ROUTED_VERSION,),
     "ollama_service": (OLLAMA_SERVICE_API_VERSION,),
     "tool": (TOOL_CONTRACT_VERSION,),
