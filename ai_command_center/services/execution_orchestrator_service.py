@@ -25,6 +25,7 @@ from ai_command_center.core.events.topics import (
     TOOL_INVOKE,
     TOOL_RESULT,
 )
+from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
 from ai_command_center.domain.runtime_capability import CapabilityKind
 from ai_command_center.services.base import BaseService
@@ -103,6 +104,7 @@ class ExecutionOrchestratorService(BaseService):
             "index": 0,
             "workspace_context": workspace_context,
             "request_id": str(event.payload.get("request_id", "")),
+            "correlation": CorrelationContext.from_payload(event.payload).to_payload(),
             "auto_approve": bool(event.payload.get("auto_approve", False)),
             "paused": False,
         }
@@ -114,6 +116,7 @@ class ExecutionOrchestratorService(BaseService):
                 "request_id": event.payload.get("request_id", ""),
                 "goal": plan.goal,
                 "step_count": len(plan.steps),
+                "correlation": self._runs[run_id]["correlation"],
             },
             source=self.name,
         )
@@ -320,17 +323,24 @@ class ExecutionOrchestratorService(BaseService):
     def _complete_run(self, run_id: str) -> None:
         run = self._runs.pop(run_id, None)
         request_id = str(run.get("request_id", "")) if run else ""
+        correlation = dict(run.get("correlation") or {}) if run else {}
         self._bus.publish(
             EXECUTION_RUN_COMPLETE,
-            {"run_id": run_id, "request_id": request_id},
+            {"run_id": run_id, "request_id": request_id, "correlation": correlation},
             source=self.name,
         )
 
     def _fail_run(self, run_id: str, error: str) -> None:
         run = self._runs.pop(run_id, None)
         request_id = str(run.get("request_id", "")) if run else ""
+        correlation = dict(run.get("correlation") or {}) if run else {}
         self._bus.publish(
             EXECUTION_RUN_FAILED,
-            {"run_id": run_id, "request_id": request_id, "error": error},
+            {
+                "run_id": run_id,
+                "request_id": request_id,
+                "error": error,
+                "correlation": correlation,
+            },
             source=self.name,
         )

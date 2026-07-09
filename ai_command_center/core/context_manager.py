@@ -65,7 +65,7 @@ class ContextManager:
 
     def __init__(
         self,
-        max_context_tokens: int = 4096,
+        max_context_tokens: int = 4000,
         fill_ratio: float = MAX_CONTEXT_FILL_RATIO,
     ) -> None:
         self._max_context_tokens = max_context_tokens
@@ -85,12 +85,14 @@ class ContextManager:
         workspace_snippets: list[str] | None = None,
         conversation_history: list[tuple[str, str]] | None = None,
         clipboard_intent: bool = False,
+        token_budget: int | None = None,
     ) -> ContextBundle:
         query = query.strip()
         if not query:
             return ContextBundle(prompt="", sources=(), token_estimate=0)
 
-        budget = self.context_budget_tokens
+        budget = int(token_budget) if token_budget is not None else self.context_budget_tokens
+        budget = max(1, budget)
         sources: list[str] = []
         sections: list[tuple[int, str, str]] = []
 
