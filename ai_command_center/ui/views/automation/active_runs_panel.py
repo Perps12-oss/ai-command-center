@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import customtkinter as ctk
@@ -14,8 +14,15 @@ from ai_command_center.ui.design_system import theme_v2 as T
 class ActiveRunsPanel(ctk.CTkFrame):
     """Trigger.dev-style live run progress list."""
 
-    def __init__(self, master: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        master: Any,
+        *,
+        on_select_run: Callable[[str, str], None] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(master, fg_color=T.BG_DEEP, corner_radius=0, **kwargs)
+        self._on_select_run = on_select_run or (lambda _run_id, _workflow_id: None)
         ctk.CTkLabel(
             self,
             text="ACTIVE RUNS",
@@ -40,13 +47,22 @@ class ActiveRunsPanel(ctk.CTkFrame):
         for run in runs:
             row = ctk.CTkFrame(self._scroll, fg_color=T.BG_GLASS, corner_radius=T.SMALL_RADIUS)
             row.pack(fill="x", pady=4)
-            ctk.CTkLabel(
+            row.bind(
+                "<Button-1>",
+                lambda _e, rid=run.run_id, wid=run.workflow_id: self._on_select_run(rid, wid),
+            )
+            title = ctk.CTkLabel(
                 row,
                 text=run.title,
                 font=(T.FONT_FAMILY, 11),
                 text_color=T.TEXT_PRIMARY,
                 anchor="w",
-            ).pack(fill="x", padx=10, pady=(8, 2))
+            )
+            title.pack(fill="x", padx=10, pady=(8, 2))
+            title.bind(
+                "<Button-1>",
+                lambda _e, rid=run.run_id, wid=run.workflow_id: self._on_select_run(rid, wid),
+            )
             bar = ctk.CTkProgressBar(
                 row,
                 height=6,
@@ -60,13 +76,18 @@ class ActiveRunsPanel(ctk.CTkFrame):
                 if run.total_steps
                 else run.state
             )
-            ctk.CTkLabel(
+            detail = ctk.CTkLabel(
                 row,
                 text=step_text,
                 font=(T.FONT_FAMILY, 9),
                 text_color=T.TEXT_MUTED,
                 anchor="w",
-            ).pack(fill="x", padx=10, pady=(0, 8))
+            )
+            detail.pack(fill="x", padx=10, pady=(0, 8))
+            detail.bind(
+                "<Button-1>",
+                lambda _e, rid=run.run_id, wid=run.workflow_id: self._on_select_run(rid, wid),
+            )
 
 
 __all__ = ["ActiveRunsPanel"]

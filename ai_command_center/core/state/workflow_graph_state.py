@@ -62,6 +62,29 @@ def _encode_steps(steps: list[dict[str, Any]]) -> str:
     return json.dumps(trimmed, separators=(",", ":"), sort_keys=True)
 
 
+def decode_workflow_steps(payload_json: str) -> list[dict[str, Any]]:
+    """Decode stored workflow step JSON from :class:`WorkflowGraphState`."""
+    return _decode_steps(payload_json)
+
+
+def seed_demo_workflow_graph() -> WorkflowGraphState:
+    """Default workflow graph with the demo-linear catalog flow."""
+    from ai_command_center.core.projectors.automation_workspace_projector import (
+        AutomationWorkspaceProjector,
+    )
+
+    workflow_id = "demo-linear"
+    steps = AutomationWorkspaceProjector.steps_for_workflow(workflow_id)
+    return _project_steps(
+        WorkflowGraphState(),
+        steps,
+        workflow_id=workflow_id,
+        run_id="",
+        workflow_name="Demo Linear Flow",
+        running=False,
+    )
+
+
 def _decode_steps(payload_json: str) -> list[dict[str, Any]]:
     if not payload_json:
         return []
@@ -275,5 +298,7 @@ __all__ = [
     "WorkflowGraphEdgeItem",
     "WorkflowGraphNodeItem",
     "WorkflowGraphState",
+    "decode_workflow_steps",
     "reduce_workflow_graph_state",
+    "seed_demo_workflow_graph",
 ]

@@ -118,8 +118,20 @@ class ProviderLiveMonitor(ctk.CTkFrame):
             if not isinstance(ph, (dict, object)):
                 continue
             pid = str(getattr(ph, "provider_id", "") or (ph.get("provider_id", "") if isinstance(ph, dict) else ""))
-            name = str(getattr(ph, "name", "") or (ph.get("name", pid) if isinstance(ph, dict) else pid))
-            health = str(getattr(ph, "state", "") or (ph.get("state", ph.get("health_state", "unknown")) if isinstance(ph, dict) else "unknown"))
+            name = str(
+                getattr(ph, "display_name", "")
+                or getattr(ph, "name", "")
+                or (ph.get("display_name", ph.get("name", pid)) if isinstance(ph, dict) else pid)
+            )
+            health = str(
+                getattr(ph, "status", "")
+                or getattr(ph, "state", "")
+                or (
+                    ph.get("status", ph.get("state", ph.get("health_state", "unknown")))
+                    if isinstance(ph, dict)
+                    else "unknown"
+                )
+            )
             latency = float(getattr(ph, "latency_ms", 0) or (ph.get("latency_ms", 0) if isinstance(ph, dict) else 0))
             tokens = int(getattr(ph, "tokens_used", 0) or (ph.get("tokens_used", 0) if isinstance(ph, dict) else 0))
             errors = int(getattr(ph, "error_count", 0) or (ph.get("error_count", 0) if isinstance(ph, dict) else 0))

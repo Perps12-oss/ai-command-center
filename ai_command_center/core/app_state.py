@@ -65,6 +65,7 @@ from ai_command_center.core.events.topics import (
     UI_WORKFLOW_NODE_SELECT,
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SELECT,
+    UI_AUTOMATION_SCHEDULE_TOGGLE,
     SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
@@ -118,6 +119,7 @@ from ai_command_center.core.state.inspector_state import (
 from ai_command_center.core.state.workflow_graph_state import (
     WorkflowGraphState,
     reduce_workflow_graph_state,
+    seed_demo_workflow_graph,
 )
 from ai_command_center.core.projectors.automation_workspace_projector import (
     AutomationWorkspaceProjector,
@@ -205,6 +207,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     UI_WORKFLOW_NODE_SELECT,
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SELECT,
+    UI_AUTOMATION_SCHEDULE_TOGGLE,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -437,7 +440,7 @@ class AppState:
     recent_artifacts: tuple[ArtifactCatalogItem, ...] = ()
     recent_execution_events: tuple[ExecutionEventItem, ...] = ()
     execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
-    workflow_graph: WorkflowGraphState = field(default_factory=WorkflowGraphState)
+    workflow_graph: WorkflowGraphState = field(default_factory=seed_demo_workflow_graph)
     automation_workspace: AutomationWorkspaceState = field(
         default_factory=lambda: AutomationWorkspaceProjector.project_state(())
     )

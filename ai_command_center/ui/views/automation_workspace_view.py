@@ -26,12 +26,18 @@ class AutomationWorkspaceView(ctk.CTkFrame):
         *,
         on_run: Callable[[str], None] | None = None,
         on_select_failure: Callable[[str], None] | None = None,
+        on_select_run: Callable[[str, str], None] | None = None,
+        on_schedule_toggle: Callable[[str], None] | None = None,
+        on_template_run: Callable[[str], None] | None = None,
         on_scrub: Callable[[int], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color=T.BG_DEEP, **kwargs)
         self._on_run = on_run or (lambda _workflow_id: None)
         self._on_select_failure = on_select_failure or (lambda _run_id: None)
+        self._on_select_run = on_select_run or (lambda _run_id, _workflow_id: None)
+        self._on_schedule_toggle = on_schedule_toggle or (lambda _schedule_id: None)
+        self._on_template_run = on_template_run or (lambda _workflow_id: None)
         self._on_scrub = on_scrub or (lambda _index: None)
         self._build()
 
@@ -58,13 +64,13 @@ class AutomationWorkspaceView(ctk.CTkFrame):
         self._catalog = AutomationCatalog(top, on_run=self._on_run)
         self._catalog.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 4))
 
-        self._active_runs = ActiveRunsPanel(top)
+        self._active_runs = ActiveRunsPanel(top, on_select_run=self._on_select_run)
         self._active_runs.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 4))
 
-        self._schedules = ScheduleManager(top)
+        self._schedules = ScheduleManager(top, on_toggle=self._on_schedule_toggle)
         self._schedules.grid(row=1, column=0, sticky="nsew", padx=(0, 4), pady=(4, 0))
 
-        self._templates = TemplateGallery(top)
+        self._templates = TemplateGallery(top, on_run=self._on_template_run)
         self._templates.grid(row=1, column=1, sticky="nsew", padx=(4, 0), pady=(4, 0))
 
         self._failures = FailureQueue(

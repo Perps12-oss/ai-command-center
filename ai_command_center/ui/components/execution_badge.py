@@ -14,8 +14,10 @@ from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.design_system import theme_v2 as T
 
 
-def execution_inspect_ref(execution_id: str, execution_index: int = 0) -> InspectableRef:
-    ref_id = execution_id or (f"exec-{execution_index}" if execution_index else "execution-stub")
+def execution_inspect_ref(execution_id: str, execution_index: int = 0) -> InspectableRef | None:
+    if not execution_id and not execution_index:
+        return None
+    ref_id = execution_id or f"exec-{execution_index}"
     label = f"Execution #{execution_index}" if execution_index else "Execution"
     return InspectableRef.from_payload(
         {
@@ -61,6 +63,8 @@ class ExecutionBadge(ctk.CTkButton):
         self._inspect_ref = execution_inspect_ref(execution_id, execution_index)
         self._on_inspect_select = on_inspect_select
         self._on_inspect_navigate = on_inspect_navigate
+        if self._inspect_ref is None:
+            self.configure(state="disabled")
         if on_inspect_navigate is not None:
             self.bind(
                 "<Double-Button-1>",
@@ -69,11 +73,13 @@ class ExecutionBadge(ctk.CTkButton):
             )
 
     def _on_click(self) -> None:
+        if self._inspect_ref is None:
+            return
         if self._on_inspect_select is not None:
             self._on_inspect_select(self._inspect_ref)
 
     @property
-    def inspect_ref(self) -> InspectableRef:
+    def inspect_ref(self) -> InspectableRef | None:
         return self._inspect_ref
 
 

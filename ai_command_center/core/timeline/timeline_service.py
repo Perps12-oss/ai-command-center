@@ -96,21 +96,27 @@ class TimelineService:
         return self._repository.get_reversible(limit)
 
     def undo(self, event_id: UUID) -> bool:
-        """
-        Undo a reversible timeline event.
-        
-        This is a placeholder - actual undo logic depends on the event type
-        and would be implemented by the relevant service.
-        """
+        """Undo a reversible timeline event by publishing undo_data to the bus."""
         event = self._repository.get(event_id)
         if event is None:
             return False
-        
+
         if not event.reversible:
             return False
-        
-        # Placeholder: undo logic would be implemented by event handlers
-        # For now, we just delete the event from timeline
+
+        from ai_command_center.core.events.topics import TIMELINE_UNDO_REQUEST
+
+        self._event_bus.publish(
+            TIMELINE_UNDO_REQUEST,
+            {
+                "timeline_event_id": str(event.id),
+                "event_type": event.event_type,
+                "entity_id": str(event.entity_id) if event.entity_id else None,
+                "entity_type": event.entity_type,
+                "undo_data": dict(event.undo_data or {}),
+            },
+            source="timeline_service",
+        )
         self._repository.delete(event_id)
         return True
 

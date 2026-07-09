@@ -108,12 +108,16 @@ class ViewManagerMixin:
             self._content,
             on_run=self._on_workflow_run,
             on_node_select=self._on_workflow_node_select,
+            on_compare=self._on_workflow_compare,
             on_scrub=self._on_workflow_timeline_scrub,
         )
         self._view_registry["automation"] = lambda: AutomationWorkspaceView(
             self._content,
             on_run=self._on_automation_run,
             on_select_failure=self._on_automation_select_failure,
+            on_select_run=self._on_automation_select_run,
+            on_schedule_toggle=self._on_automation_schedule_toggle,
+            on_template_run=self._on_automation_run,
             on_scrub=self._on_automation_timeline_scrub,
         )
         self._view_registry["providers"] = lambda: ProvidersView(self._content)
@@ -303,8 +307,28 @@ class ViewManagerMixin:
         if request_id:
             self._controller.publish_execution_timeline_scrub(request_id, index)
 
+    def _on_workflow_compare(self) -> None:
+        snap = self._controller.snapshot()
+        run_id = snap.workflow_graph.run_id or getattr(snap, "active_workflow_run_id", "")
+        if not run_id:
+            return
+        self._navigate("executions")
+        self._controller.publish_execution_query(run_id)
+
     def _on_automation_run(self, workflow_id: str) -> None:
         self._controller.publish_automation_run(workflow_id)
+
+    def _on_automation_select_run(self, run_id: str, workflow_id: str) -> None:
+        label = workflow_id.replace("-", " ").title() if workflow_id else run_id[:12]
+        self._controller.publish_inspect_select(
+            "workflow",
+            run_id,
+            label=label,
+            payload={"run_id": run_id, "workflow_id": workflow_id},
+        )
+
+    def _on_automation_schedule_toggle(self, schedule_id: str) -> None:
+        self._controller.publish_automation_schedule_toggle(schedule_id)
 
     def _on_automation_select_failure(self, run_id: str) -> None:
         snap = self._controller.snapshot()
