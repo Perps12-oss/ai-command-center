@@ -544,6 +544,44 @@ def _reduce_phase(state: AppState, event: Event) -> AppState:
     )
 
 
+_METRICS_ONLY_EXTRA_KEYS = frozenset(
+    {
+        "eventbus_topic_counts",
+        "cpu_delta",
+        "ram_delta",
+        "model_load",
+        "network",
+        "health",
+    }
+)
+
+
+def system_snapshot_metrics_only_delta(
+    old: SystemSnapshot,
+    new: SystemSnapshot,
+) -> bool:
+    """Return True when only polling metrics drifted (no UI-structural change)."""
+    if old.phase != new.phase:
+        return False
+    if old.ollama_online != new.ollama_online:
+        return False
+    if old.service_states != new.service_states:
+        return False
+    if old.tool_count != new.tool_count:
+        return False
+    if old.recent_commands != new.recent_commands:
+        return False
+    old_extra = dict(old.extra)
+    new_extra = dict(new.extra)
+    if old_extra.get("openai_online") != new_extra.get("openai_online"):
+        return False
+    structural_keys = (set(old_extra) | set(new_extra)) - _METRICS_ONLY_EXTRA_KEYS
+    for key in structural_keys:
+        if old_extra.get(key) != new_extra.get(key):
+            return False
+    return True
+
+
 def _reduce_system_snapshot(state: AppState, event: Event) -> AppState:
     if event.topic != SYSTEM_SNAPSHOT:
         return state
@@ -1413,11 +1451,22 @@ class AppStateStore:
         listeners: list[Callable[[AppState], None]] = []
         new_state = self._state
         with self._lock:
+            prior_state = self._state
             for reducer in self._reducers:
                 new_state = reducer(new_state, event)
             if new_state != self._state:
                 self._state = new_state
-                listeners = list(self._listeners)
+                notify_listeners = True
+                if (
+                    event.topic == SYSTEM_SNAPSHOT
+                    and system_snapshot_metrics_only_delta(
+                        prior_state.system_snapshot,
+                        new_state.system_snapshot,
+                    )
+                ):
+                    notify_listeners = False
+                if notify_listeners:
+                    listeners = list(self._listeners)
 
         if not listeners:
             return

@@ -10,7 +10,7 @@ from ai_command_center.core.events.topics import ORCHESTRATION_INTENT_CLASSIFIED
 from ai_command_center.db.connection import connect, init_database
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.services.settings_service import SettingsService
-from ai_command_center.telemetry.tracing_service import TracingService
+from ai_command_center.telemetry.tracing_service import TracingService, _otlp_endpoint_reachable
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 
@@ -43,3 +43,21 @@ def test_tracing_disabled_via_settings(span_exporter: InMemorySpanExporter) -> N
     )
     tracing.stop()
     assert len(span_exporter.get_finished_spans()) == 0
+
+
+def test_unreachable_otlp_endpoint_disables_tracing() -> None:
+    assert _otlp_endpoint_reachable("http://127.0.0.1:1") is False
+    bus = EventBus()
+    tracing = TracingService(
+        bus,
+        enabled=True,
+        otel_endpoint="http://127.0.0.1:1",
+    )
+    assert tracing._enabled is False
+    tracing.start()
+    bus.publish(
+        ORCHESTRATION_INTENT_CLASSIFIED,
+        {"request_id": "req-no-collector", "intent": "chat", "query": "hello"},
+        source="test",
+    )
+    tracing.stop()
