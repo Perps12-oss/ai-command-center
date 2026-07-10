@@ -451,9 +451,12 @@ def _apply_markdown_segments(
 ) -> None:
     """Apply parsed markdown segments to a CTkTextbox.
 
-    Segments are (tag, text) tuples where tag is one of:
+    Segments are (text, tag) tuples where tag is one of:
     normal, bold, italic, code, code_block, header, list.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     try:
         tk_text = textbox._textbox
         tk_text.tag_config("bold", font=(T.FONT_FAMILY, 13, "bold"))
@@ -476,17 +479,18 @@ def _apply_markdown_segments(
             font=(T.FONT_FAMILY, 16, "bold"),
             foreground=T.TEXT_HEADING,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to configure textbox tags: %s", exc)
 
-    for tag, text in segments:
+    for text, tag in segments:
         try:
             textbox.configure(state="normal")
             if tag in {"bold", "italic", "code", "code_block", "header", "list"}:
                 textbox._textbox.insert("end", text, tag)
             else:
                 textbox.insert("end", text)
-        except Exception:
+        except Exception as exc:
+            logger.exception("Markdown rendering failed", exc_info=exc)
             try:
                 textbox.configure(state="normal")
                 textbox.insert("end", text)
