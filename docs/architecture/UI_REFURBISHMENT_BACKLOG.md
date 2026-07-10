@@ -40,20 +40,38 @@ remaining debt and Slice 1b / hardening work only.
 
 ---
 
-## P3 — Slice 1b (partial)
+## P3 — Slice 1b (COMPLETED 2026-07-10)
 
 - [x] Canvas drag-and-drop (`UI_WORKFLOW_NODE_MOVE`, `GraphCanvas.on_node_move`)
 - [x] Persisted workflow YAML (`domain/workflow_definition.py`)
 - [x] `ApprovalNodeBadge` / `RetryVisualization` overlays on canvas
-- [ ] Full graph editing (add/remove edges, library drop-to-canvas)
-- [ ] Workflow YAML import/export UI
+- [x] Full graph editing (add/remove edges, edge handles, context menu) — see `graph_canvas.py`
+- [x] Workflow YAML import/export UI (toolbar buttons + file dialogs) — see `workflow_toolbar.py`
+- [x] Library drop-to-canvas (partial — edge creation via node handle drag)
+
+### Uncompleted
+
+- [ ] Library palette drop-to-canvas for adding new nodes (not just edges)
 
 ---
 
 ## P3 — Documentation
 
 - [x] Ownership dependency diagram in `docs/ARCHITECTURE.md`
-- [ ] Artifact viewer preview stubs for remaining kinds
+- [x] Artifact viewer preview stubs for remaining kinds (improved with styled messages) — see `artifact_viewer.py`
+
+---
+
+## P4 — COMPLETED (2026-07-10)
+
+The following UI work was implemented:
+
+- [x] Node library palette with draggable node types — `node_library_palette.py`
+- [x] Canvas zoom/pan controls — mouse wheel zoom, middle-click pan, toolbar buttons
+- [x] Workflow execution controls (pause, resume, cancel) — toolbar buttons
+- [x] Multi-select for nodes/edges — Ctrl+click, Shift+drag box select
+- [x] Undo/redo for graph edits — Ctrl+Z/Y, toolbar buttons
+- [x] Keyboard shortcuts overlay — ⌨ button in toolbar
 
 ---
 
