@@ -23,7 +23,7 @@ Program 4 may not expand platform capabilities until:
 | **S5** | State & lifecycle | **Done** | `application.shutdown()` → `state_store.close()`; palette destroy unsubscribes |
 | **S6** | Observability | **Done** | `eventbus_topic_counts` in `system.snapshot`; `test_eventbus_topic_counts_in_system_snapshot` |
 | **S7** | Settings / telemetry / tool_executor clarity | **Done** | Module docstrings; `ARCHITECTURE.md` settings chain; `requirements.txt` verified |
-| **W4** | AppState domain split | **Partial** | `chat_state.py` + `workspace_state.py` + `model_state.py` + `tool_state.py` (slice 2); further splits deferred |
+| **W4** | AppState domain split | **Complete** | `chat_state.py` + `workspace_state.py` + `model_state.py` + `tool_state.py` + domain modules; analysis at `docs/architecture/archive/W4_APPSTATE_DOMAIN_ANALYSIS.md` |
 
 ---
 
@@ -46,7 +46,7 @@ Program 4 may not expand platform capabilities until:
 | S5 State & lifecycle | 9 | Shutdown teardown verified |
 | S6 Observability | 8 | Topic counters in system snapshot |
 | S7 Dependency cleanup | 8 | Documented; `PluginManifest` dual-path retained by design |
-| W4 AppState split | 9 | Chat + workspace + model + tool reducers |
+| W4 AppState split | 10 | Chat + workspace + model + tool + domain modules; analysis complete |
 
 ---
 
@@ -91,8 +91,9 @@ Program 4 may not expand platform capabilities until:
 
 ## Recommended Program 4 next slice
 
-1. **Further W4 splits** — telemetry or orchestration projections if needed.
-2. **macOS HotkeyProvider** — CGEvent tap behind `HotkeyProvider` (packaging track).
+1. ~~Further W4 splits~~ — **COMPLETE** (see `W4_APPSTATE_DOMAIN_ANALYSIS.md`)
+2. **macOS HotkeyProvider** — CGEvent tap behind `HotkeyProvider` (Phase 3)
+3. **Phase 5 Phase E** — ExternalCapabilityBridgeService scaffold (Phase 4)
 
 Do **not** start: semantic/vector memory, multi-agent expansion, or distributed execution until explicit gates in this doc and Appendix C pass.
 
