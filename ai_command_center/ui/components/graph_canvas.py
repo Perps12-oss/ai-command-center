@@ -507,8 +507,6 @@ class GraphCanvas(ctk.CTkFrame):
             return
         canvas_x = self._canvas.canvasx(event.x)
         canvas_y = self._canvas.canvasy(event.y)
-        dx = canvas_x - self._pan_start[0]
-        dy = canvas_y - self._pan_start[1]
         self._canvas.scan_dragto(event.x, event.y, gain=1)
         self._pan_start = (canvas_x, canvas_y)
 

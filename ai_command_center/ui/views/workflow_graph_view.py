@@ -291,16 +291,6 @@ class WorkflowGraphView(ctk.CTkFrame):
         graph = self._graph_from_state(self._graph_state)
         workflow_name = self._graph_state.workflow_name or "workflow"
 
-        # Convert graph to definition
-        nodes = [
-            {"id": node.node_id, "label": node.label, "kind": node.kind}
-            for node in graph.nodes
-        ]
-        edges = [
-            {"source": edge.source_id, "target": edge.target_id}
-            for edge in graph.edges
-        ]
-
         definition = WorkflowDefinition(
             workflow_id=graph.workflow_id or DEMO_WORKFLOW_ID,
             workflow_name=workflow_name,
@@ -319,7 +309,7 @@ class WorkflowGraphView(ctk.CTkFrame):
             try:
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(yaml_content)
-            except OSError as e:
+            except OSError:
                 # Log error but don't crash - UI should handle gracefully
                 pass
 
@@ -341,7 +331,7 @@ class WorkflowGraphView(ctk.CTkFrame):
 
             # Notify parent about imported workflow
             self._on_import_result(definition)
-        except (OSError, ValueError) as e:
+        except (OSError, ValueError):
             # Log error but don't crash - UI should handle gracefully
             pass
 
