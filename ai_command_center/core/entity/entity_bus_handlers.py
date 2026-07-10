@@ -43,11 +43,16 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CREATE_RESULT,
 )
 from ai_command_center.core.relationship.relationship import RelationshipType
-<<<<<<< HEAD
 from ai_command_center.core.timeline.timeline_undo_handlers import (
     UNDO_DELETE_ENTITY,
     UNDO_DELETE_RELATIONSHIP,
     UNDO_REMOVE_WORKSPACE_ENTITY,
+)
+from ai_command_center.core.world_model.context_compiler import (
+    EntityLine,
+    RelationshipLine,
+    compile_entity_focus,
+    compile_workspace_snapshot,
 )
 
 
@@ -68,14 +73,6 @@ def _record_reversible_timeline(
         reversible=True,
         undo_data=undo_data,
     )
-=======
-from ai_command_center.core.world_model.context_compiler import (
-    EntityLine,
-    RelationshipLine,
-    compile_entity_focus,
-    compile_workspace_snapshot,
-)
->>>>>>> origin/main
 
 
 def _request_id(event: Event) -> str:

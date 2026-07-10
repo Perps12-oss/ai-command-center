@@ -22,32 +22,6 @@ remaining debt and Slice 1b / hardening work only.
 
 ---
 
-<<<<<<< HEAD
-## P2 — Workflow graph DAG
-
-- Non-linear `WorkflowGraph.from_workflow_steps` (true DAG, not linearized steps)
-- Required before Slice 1b canvas editing
-
----
-
-## P2 — Legacy inspector migration
-
-- `ExecutionInspector` → typed payloads instead of dict feed to `inspector_*_tab.py`
-
----
-
-## P2 — Settings off-page projection
-
-- `state_applier` should project settings when view is not visible (minor)
-
----
-
-## P3 — Slice 1b (explicitly deferred in original plan)
-
-- Full drag-and-drop graph editing
-- Branching / persisted workflow YAML
-- `RetryVisualization` / `ApprovalNode` components
-=======
 ## P2 — Complete
 
 ### Workflow graph DAG
@@ -73,17 +47,12 @@ remaining debt and Slice 1b / hardening work only.
 - [x] `ApprovalNodeBadge` / `RetryVisualization` overlays on canvas
 - [ ] Full graph editing (add/remove edges, library drop-to-canvas)
 - [ ] Workflow YAML import/export UI
->>>>>>> origin/main
 
 ---
 
 ## P3 — Documentation
 
-<<<<<<< HEAD
-- [ ] Ownership dependency diagram in `docs/ARCHITECTURE.md` (AGENTS.md deliverable)
-=======
 - [x] Ownership dependency diagram in `docs/ARCHITECTURE.md`
->>>>>>> origin/main
 - [ ] Artifact viewer preview stubs for remaining kinds
 
 ---
