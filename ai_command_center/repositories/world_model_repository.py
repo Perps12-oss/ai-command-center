@@ -84,7 +84,16 @@ class SQLiteWorldModelRepository:
 
     @contextmanager
     def begin_transaction(self) -> Iterator[None]:
-        self._conn.execute("BEGIN")
+        """Atomic transaction context manager.
+
+        Usage:
+            with repo.begin_transaction():
+                # journal first
+                repo.append_mutation(mutation)
+                # then storage
+                repo._save_node_storage(node)
+        """
+        self._conn.execute("BEGIN IMMEDIATE")
         try:
             yield
         except Exception:
@@ -94,17 +103,28 @@ class SQLiteWorldModelRepository:
             self._conn.commit()
 
     def apply_mutation(self, mutation: Mutation) -> None:
-        """Apply durable graph change and append the exact mutation record."""
-        if mutation.type in {MutationType.CREATE_NODE, MutationType.UPDATE_NODE}:
-            self._save_node_storage(_node_from_payload(mutation.payload))
-        elif mutation.type == MutationType.DELETE_NODE:
-            self._delete_node_storage(str(mutation.payload.get("node_id", "")))
-        elif mutation.type == MutationType.CREATE_EDGE:
-            self._save_edge_storage(_edge_from_payload(mutation.payload))
-        elif mutation.type == MutationType.DELETE_EDGE:
-            self._delete_edge_storage(str(mutation.payload.get("edge_id", "")))
-        self.append_mutation(mutation)
-        self._conn.commit()
+        """Apply durable graph change and append the exact mutation record.
+
+        Order of operations (CONSTITUTIONAL REQUIREMENT - Journal First):
+        1. BEGIN transaction
+        2. Journal append_mutation() FIRST
+        3. Storage mutation
+        4. COMMIT
+
+        If storage fails, rollback removes the journal entry.
+        """
+        with self.begin_transaction():
+            # 1. Journal FIRST (auditability requirement)
+            self.append_mutation(mutation)
+            # 2. Then storage mutation
+            if mutation.type in {MutationType.CREATE_NODE, MutationType.UPDATE_NODE}:
+                self._save_node_storage(_node_from_payload(mutation.payload))
+            elif mutation.type == MutationType.DELETE_NODE:
+                self._delete_node_storage(str(mutation.payload.get("node_id", "")))
+            elif mutation.type == MutationType.CREATE_EDGE:
+                self._save_edge_storage(_edge_from_payload(mutation.payload))
+            elif mutation.type == MutationType.DELETE_EDGE:
+                self._delete_edge_storage(str(mutation.payload.get("edge_id", "")))
 
     def save_node(self, node: Node, correlation: CorrelationContext) -> None:
         self.apply_mutation(
