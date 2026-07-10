@@ -1,0 +1,92 @@
+# Tom's Implementation Auditor Configuration
+# ============================================
+# This file configures Tom's automated PR review behavior.
+
+# Trigger Settings
+trigger:
+  # Run on these PR events
+  events:
+    - opened
+    - synchronize
+    - reopened
+    - labeled
+  # Comment command to trigger manual audit
+  comment_command: "/tom-audit"
+  # Label that triggers automatic audit
+  label: "tom-audit"
+
+# Audit Scope
+audit:
+  # Architecture layers to check
+  critical_layers:
+    - repositories
+    - services
+    - domain
+    - core
+  
+  # Phase-specific files to analyze
+  phase_files:
+    phase1:
+      - ai_command_center/domain/world_model.py
+      - ai_command_center/domain/goal.py
+      - ai_command_center/core/event_bus/event.py
+    phase2:
+      - ai_command_center/repositories/world_model_repository.py
+      - ai_command_center/core/world_model/world_model.py
+    phase3:
+      - ai_command_center/services/brain_runtime_service.py
+      - ai_command_center/services/brain_kernel_service.py
+  
+  # Patterns that require manual review
+  suspicious_patterns:
+    - "TODO"
+    - "FIXME"
+    - "HACK"
+    - "raise NotImplementedError"
+    - "pass  #"
+
+# Compliance Checks
+compliance:
+  # Require test coverage for code changes
+  require_tests: true
+  test_patterns:
+    - "test_*.py"
+    - "*_test.py"
+  
+  # Critical checks
+  checks:
+    - name: "Journal-First Ordering"
+      pattern: "apply_mutation.*append_mutation"
+      description: "Ensure journal is written before storage mutation"
+    
+    - name: "Transaction Atomicity"
+      pattern: "begin_transaction"
+      description: "Ensure mutations are wrapped in transactions"
+    
+    - name: "AppState Compliance"
+      pattern: "AppState"
+      description: "UI must use AppState for state management"
+
+# Reporting
+reporting:
+  # Post as PR comment
+  post_comment: true
+  # Set commit status
+  set_status: true
+  # Include these sections
+  sections:
+    - statistics
+    - commits
+    - compliance_checklist
+    - phase_analysis
+    - critical_components
+    - verdict
+
+# Verdict Thresholds
+thresholds:
+  # Minimum test coverage percentage
+  min_test_coverage: 80
+  # Maximum violations before blocking
+  max_violations: 0
+  # Architecture drift tolerance
+  arch_drift_tolerance: 0
