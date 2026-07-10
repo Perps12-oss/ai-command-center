@@ -22,10 +22,12 @@ class RecordingContextManager(ContextManager):
         super().__init__(max_context_tokens=1024)
         self._order = order
         self.graph_snippets: list[str] = []
+        self.workspace_snippets: list[str] = []
 
     def build_context(self, query: str, **kwargs: Any):
         self._order.append("context_manager.build_context")
         self.graph_snippets = list(kwargs.get("graph_snippets") or [])
+        self.workspace_snippets = list(kwargs.get("workspace_snippets") or [])
         return super().build_context(query, **kwargs)
 
 
@@ -75,5 +77,6 @@ def test_workspace_graph_context_resolves_before_context_manager_builds_prompt()
     )
 
     assert order == ["workspace.context.request", "context_manager.build_context"]
-    assert manager.graph_snippets == ["Workspace graph: Alpha card contains Beta resource"]
+    assert manager.workspace_snippets == ["Workspace graph: Alpha card contains Beta resource"]
     assert "Workspace graph: Alpha card contains Beta resource" in assembled.bundle.prompt
+    assert "workspace_state" in assembled.bundle.sources

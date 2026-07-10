@@ -243,8 +243,6 @@ class CapabilityContextAssembler:
             workspace_snippets = [
                 str(n) for n in pending.get("workspace_snippets", []) if str(n).strip()
             ]
-            if workspace_snippets:
-                graph_snippets = workspace_snippets + graph_snippets
             entity_snippets = [
                 str(n) for n in pending.get("entity_snippets", []) if str(n).strip()
             ]
@@ -284,6 +282,7 @@ class CapabilityContextAssembler:
                 query,
                 clipboard=clipboard,
                 notes=notes or None,
+                workspace_snippets=workspace_snippets or None,
                 graph_snippets=graph_snippets or None,
                 conversation_history=history if isinstance(history, list) else None,
                 clipboard_intent=clip_intent,

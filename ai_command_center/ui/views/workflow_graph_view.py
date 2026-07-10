@@ -64,6 +64,7 @@ class WorkflowGraphView(ctk.CTkFrame):
         *,
         on_run: Callable[[str, list[dict[str, Any]]], None] | None = None,
         on_node_select: Callable[[str, str, str], None] | None = None,
+        on_node_move: Callable[[str, float, float], None] | None = None,
         on_compare: Callable[[], None] | None = None,
         on_scrub: Callable[[int], None] | None = None,
         **kwargs: Any,
@@ -71,6 +72,7 @@ class WorkflowGraphView(ctk.CTkFrame):
         super().__init__(master, fg_color=T.BG_DEEP, **kwargs)
         self._on_run = on_run or (lambda _workflow_id, _steps: None)
         self._on_node_select = on_node_select or (lambda _node_id, _label, _workflow_id: None)
+        self._on_node_move = on_node_move or (lambda _node_id, _x, _y: None)
         self._on_compare = on_compare or (lambda: None)
         self._on_scrub = on_scrub or (lambda _index: None)
         self._graph_state: WorkflowGraphState | None = None
@@ -106,7 +108,11 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._library = WorkflowNodeLibrary(left, on_preview=self._handle_node_preview)
         self._library.pack(fill="both", expand=True)
 
-        self._canvas = GraphCanvas(center, on_node_select=self._handle_node_select)
+        self._canvas = GraphCanvas(
+            center,
+            on_node_select=self._handle_node_select,
+            on_node_move=self._handle_node_move,
+        )
         self._canvas.pack(fill="both", expand=True)
 
         bottom = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=0, height=220)
@@ -166,6 +172,9 @@ class WorkflowGraphView(ctk.CTkFrame):
         if self._graph_state is not None:
             graph = self._graph_from_state(self._graph_state)
             self._canvas.render(graph, selected_node_id=node.node_id)
+
+    def _handle_node_move(self, node_id: str, x: float, y: float) -> None:
+        self._on_node_move(node_id, x, y)
 
     def _graph_from_state(self, state: WorkflowGraphState) -> WorkflowGraph:
         return WorkflowGraphProjector.from_state_items(

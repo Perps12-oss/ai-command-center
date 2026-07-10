@@ -12,7 +12,6 @@ from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.entity.entity import (
     ENTITY_TYPE_CARD,
     ENTITY_TYPE_RESOURCE,
-    ENTITY_TYPE_WORKSPACE,
 )
 from ai_command_center.core.entity.entity_bus_handlers import register_entity_bus_handlers
 from ai_command_center.core.entity.entity_repository import EntityRepository
@@ -30,7 +29,6 @@ from ai_command_center.core.events.topics import (
     MEMORY_LOOKUP_RESULT,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
-    UI_COMMAND,
     UI_SELECT_ENTITY,
     WORKSPACE_ACTIVE,
     WORKSPACE_CONTEXT_REQUEST,
@@ -123,9 +121,9 @@ class Phase3WorkspaceContextHandlerTests(unittest.TestCase):
             self.assertEqual(1, len(results))
             snippets = results[0].get("snippets", [])
             joined = "\n".join(str(s) for s in snippets)
-            self.assertIn("Active workspace: Product", joined)
+            self.assertIn("[WORKSPACE] Product", joined)
             self.assertIn("Roadmap", joined)
-            self.assertIn("Relationship graph", joined)
+            self.assertIn("GRAPH:", joined)
             self.assertIn("Spec", joined)
         finally:
             db.close()

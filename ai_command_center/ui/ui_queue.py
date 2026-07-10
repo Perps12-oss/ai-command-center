@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 _VIRTUAL_EVENT = "<<UIQueueItem>>"
 _FALLBACK_INTERVAL_MS = 200
 
+# Streaming interval for UI updates (verified by Phase 2 gate)
+UI_STREAM_INTERVAL_MS = 50
+
 
 class UIQueue:
     """

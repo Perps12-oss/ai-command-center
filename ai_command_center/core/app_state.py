@@ -43,6 +43,15 @@ from ai_command_center.core.events.topics import (
     ENTITY_DELETED,
     ENTITY_RELATIONSHIPS_CHANGED,
     ENTITY_UPDATED,
+    GOAL_ACTIVATED,
+    GOAL_CANCELLED,
+    GOAL_COMPLETED,
+    GOAL_FAILED,
+    GOAL_PAUSED,
+    GOAL_RESUMED,
+    GOAL_SUBMITTED,
+    KERNEL_STATE_CHANGED,
+    OBSERVATION_RECEIVED,
     MEMORY_CLEARED,
     MEMORY_SELECTED,
     MEMORY_STORED,
@@ -56,6 +65,20 @@ from ai_command_center.core.events.topics import (
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
+    CAPABILITY_CATALOG_RESULT,
+    PLAN_GENERATED,
+    RUNTIME_ACTION_COMPLETED,
+    RUNTIME_ACTION_DENIED,
+    RUNTIME_ACTION_FAILED,
+    RUNTIME_ACTION_STARTED,
+    RUNTIME_APPROVAL_REQUESTED,
+    EXECUTION_RUN_STARTED,
+    EXECUTION_RUN_COMPLETE,
+    EXECUTION_RUN_FAILED,
+    EXECUTION_STEP_STARTED,
+    EXECUTION_STEP_AWAITING_APPROVAL,
+    EXECUTION_STEP_COMPLETED,
+    EXECUTION_STEP_FAILED,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_EVENT_APPENDED,
@@ -63,6 +86,7 @@ from ai_command_center.core.events.topics import (
     EXECUTION_QUERY_RESULT,
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
+    UI_WORKFLOW_NODE_MOVE,
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SELECT,
     UI_AUTOMATION_SCHEDULE_TOGGLE,
@@ -161,6 +185,22 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PLUGIN_STATE_CHANGED,
     CAPABILITY_PROVIDERS_READY,
     CAPABILITY_LIFECYCLE_SNAPSHOT,
+    CAPABILITY_CATALOG_RESULT,
+    PLAN_GENERATED,
+    KERNEL_STATE_CHANGED,
+    GOAL_SUBMITTED,
+    GOAL_ACTIVATED,
+    GOAL_PAUSED,
+    GOAL_RESUMED,
+    GOAL_CANCELLED,
+    GOAL_COMPLETED,
+    GOAL_FAILED,
+    OBSERVATION_RECEIVED,
+    RUNTIME_ACTION_STARTED,
+    RUNTIME_APPROVAL_REQUESTED,
+    RUNTIME_ACTION_COMPLETED,
+    RUNTIME_ACTION_FAILED,
+    RUNTIME_ACTION_DENIED,
     # Workspace OS (Track B - Phase 2 + 3.2)
     ENTITY_CREATED,
     EVENT_RELATIONSHIP_CREATED,
@@ -205,6 +245,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     ARTIFACTS_LOADED,
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
+    UI_WORKFLOW_NODE_MOVE,
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SELECT,
     UI_AUTOMATION_SCHEDULE_TOGGLE,
@@ -431,6 +472,10 @@ class AppState:
     provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
+    capability_prompt_catalog: tuple[dict[str, object], ...] = ()
+    planner_last_plan: dict[str, object] = field(default_factory=dict)
+    execution_active_plan: dict[str, object] = field(default_factory=dict)
+    execution_current_step: dict[str, object] = field(default_factory=dict)
     execution_runs: tuple[ExecutionRunItem, ...] = ()
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
@@ -444,6 +489,10 @@ class AppState:
     automation_workspace: AutomationWorkspaceState = field(
         default_factory=lambda: AutomationWorkspaceProjector.project_state(())
     )
+    brain_kernel_state: str = "boot"
+    brain_recent_goals: tuple[dict[str, object], ...] = ()
+    brain_recent_observations: tuple[dict[str, object], ...] = ()
+    brain_recent_runtime_actions: tuple[dict[str, object], ...] = ()
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -908,6 +957,131 @@ def _reduce_capability_lifecycle_snapshot(state: AppState, event: Event) -> AppS
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
+
+
+def _reduce_capability_prompt_catalog(state: AppState, event: Event) -> AppState:
+    if event.topic != CAPABILITY_CATALOG_RESULT:
+        return state
+    raw_specs = event.payload.get("specs") or []
+    specs: list[dict[str, object]] = []
+    for item in raw_specs:
+        if isinstance(item, dict):
+            specs.append(dict(item))
+    return replace(
+        state,
+        capability_prompt_catalog=tuple(specs),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_planner_last_plan(state: AppState, event: Event) -> AppState:
+    if event.topic != PLAN_GENERATED:
+        return state
+    raw_plan = event.payload.get("plan")
+    plan_dict: dict[str, object] = {}
+    if isinstance(raw_plan, dict):
+        plan_dict = dict(raw_plan)
+    return replace(
+        state,
+        planner_last_plan=plan_dict,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_execution_orchestrator(state: AppState, event: Event) -> AppState:
+    topic = event.topic
+    payload = event.payload
+    if topic == EXECUTION_RUN_STARTED:
+        plan_dict: dict[str, object] = {
+            "run_id": str(payload.get("run_id", "")),
+            "request_id": str(payload.get("request_id", "")),
+            "goal": str(payload.get("goal", "")),
+            "total_steps": payload.get("total_steps", 0),
+            "steps": list(payload.get("steps") or []),
+            "status": "running",
+        }
+        return replace(
+            state,
+            execution_active_plan=plan_dict,
+            execution_current_step={},
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic in {EXECUTION_STEP_STARTED, EXECUTION_STEP_AWAITING_APPROVAL}:
+        step_dict: dict[str, object] = {
+            "run_id": str(payload.get("run_id", "")),
+            "step_id": str(payload.get("step_id", "")),
+            "index": payload.get("index", 0),
+            "capability": str(payload.get("capability", "")),
+            "risk": str(payload.get("risk", "")),
+            "status": "awaiting_approval"
+            if topic == EXECUTION_STEP_AWAITING_APPROVAL
+            else "started",
+        }
+        active = dict(state.execution_active_plan)
+        if active:
+            active["current_step_id"] = step_dict["step_id"]
+        return replace(
+            state,
+            execution_active_plan=active,
+            execution_current_step=step_dict,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic == EXECUTION_STEP_COMPLETED:
+        active = dict(state.execution_active_plan)
+        if active:
+            raw_steps = active.get("steps")
+            if isinstance(raw_steps, list):
+                step_id = str(payload.get("step_id", ""))
+                updated_steps: list[object] = []
+                for item in raw_steps:
+                    if isinstance(item, dict) and str(item.get("step_id")) == step_id:
+                        merged = dict(item)
+                        merged["status"] = "completed"
+                        updated_steps.append(merged)
+                    else:
+                        updated_steps.append(item)
+                active["steps"] = updated_steps
+        return replace(
+            state,
+            execution_active_plan=active,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic in {EXECUTION_RUN_COMPLETE, EXECUTION_RUN_FAILED}:
+        active = dict(state.execution_active_plan)
+        if active:
+            active["status"] = "complete" if topic == EXECUTION_RUN_COMPLETE else "failed"
+            if topic == EXECUTION_RUN_FAILED:
+                active["error"] = str(payload.get("error", ""))
+        return replace(
+            state,
+            execution_active_plan=active,
+            execution_current_step={}
+            if topic == EXECUTION_RUN_COMPLETE
+            else state.execution_current_step,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    if topic == EXECUTION_STEP_FAILED:
+        step_dict = dict(state.execution_current_step)
+        step_dict["status"] = "failed"
+        step_dict["error"] = str(payload.get("error", ""))
+        active = dict(state.execution_active_plan)
+        if active:
+            active["status"] = "failed"
+            active["error"] = str(payload.get("error", ""))
+        return replace(
+            state,
+            execution_active_plan=active,
+            execution_current_step=step_dict,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+    return state
 
 
 def _reduce_execution_run_feed(state: AppState, event: Event) -> AppState:
@@ -1451,6 +1625,95 @@ def _reduce_automation_workspace(state: AppState, event: Event) -> AppState:
     )
 
 
+def _trim_dict_feed(
+    feed: tuple[dict[str, object], ...],
+    item: dict[str, object],
+    *,
+    limit: int = 20,
+) -> tuple[dict[str, object], ...]:
+    return (item, *feed)[:limit]
+
+
+def _reduce_brain_state(state: AppState, event: Event) -> AppState:
+    payload = dict(event.payload)
+    if event.topic == KERNEL_STATE_CHANGED:
+        return replace(
+            state,
+            brain_kernel_state=str(payload.get("to") or state.brain_kernel_state),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic in {
+        GOAL_SUBMITTED,
+        GOAL_ACTIVATED,
+        GOAL_PAUSED,
+        GOAL_RESUMED,
+        GOAL_CANCELLED,
+        GOAL_COMPLETED,
+        GOAL_FAILED,
+    }:
+        goal_payload = payload.get("goal")
+        goal_id = str(
+            payload.get("goal_id")
+            or (goal_payload.get("id") if isinstance(goal_payload, dict) else "")
+            or ""
+        )
+        status = event.topic.removeprefix("goal.")
+        item: dict[str, object] = {
+            "topic": event.topic,
+            "goal_id": goal_id,
+            "status": status,
+        }
+        if isinstance(goal_payload, dict):
+            item.update(goal_payload)
+            item["goal_id"] = goal_id
+            item["status"] = status
+        return replace(
+            state,
+            brain_recent_goals=_trim_dict_feed(state.brain_recent_goals, item),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic == OBSERVATION_RECEIVED:
+        item = {
+            "id": str(payload.get("id", "")),
+            "source": str(payload.get("source", "")),
+            "subject": str(payload.get("subject", "")),
+            "change_type": str(payload.get("change_type", "")),
+        }
+        return replace(
+            state,
+            brain_recent_observations=_trim_dict_feed(
+                state.brain_recent_observations,
+                item,
+            ),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic in {
+        RUNTIME_ACTION_STARTED,
+        RUNTIME_APPROVAL_REQUESTED,
+        RUNTIME_ACTION_COMPLETED,
+        RUNTIME_ACTION_FAILED,
+        RUNTIME_ACTION_DENIED,
+    }:
+        item = {
+            "topic": event.topic,
+            "action_id": str(payload.get("action_id", "")),
+            "status": str(payload.get("status") or event.topic.removeprefix("runtime.")),
+        }
+        return replace(
+            state,
+            brain_recent_runtime_actions=_trim_dict_feed(
+                state.brain_recent_runtime_actions,
+                item,
+            ),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    return state
+
+
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
@@ -1484,6 +1747,9 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
     _reduce_capability_lifecycle_snapshot,
+    _reduce_capability_prompt_catalog,
+    _reduce_planner_last_plan,
+    _reduce_execution_orchestrator,
     _reduce_orchestration_provider_health,
     _reduce_execution_run_feed,
     _reduce_plugin_state_changed,
@@ -1498,6 +1764,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_inspector,
     _reduce_workflow_graph,
     _reduce_automation_workspace,
+    _reduce_brain_state,
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,

@@ -27,8 +27,15 @@ AI Command Center is a **Workspace OS** — an ambient desktop command surface w
 
 | Document | Purpose |
 |----------|---------|
-| [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md) | **Only execution backlog** — Programs 1–4, audit, enforcement, gates |
+| [architecture/ARCHITECTURE_TRANSITION_PLAN.md](architecture/ARCHITECTURE_TRANSITION_PLAN.md) | **Only execution backlog** — Programs 1–5, audit, enforcement, gates |
+| [architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md](architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md) | **Cognitive architecture** — state-driven reasoning stack (Memory → World Model → Capability → Planner → Executor → Workspace OS) |
 | [architecture/AGENT_RUNTIME_INTERFACE.md](architecture/AGENT_RUNTIME_INTERFACE.md) | **Capability provider contract** — host vs sidecar; integration gate for QwenPaw and future runtimes |
+| [architecture/PERSISTENCE_ABSTRACTION.md](architecture/PERSISTENCE_ABSTRACTION.md) | **Brain Phase 0** — World Model repository interface, SQLite v1, mutation journal |
+| [architecture/SCHEDULER_ABSTRACTION.md](architecture/SCHEDULER_ABSTRACTION.md) | **Brain Phase 0** — `IScheduler`, single-active-goal queue |
+| [architecture/OBSERVER_FRAMEWORK.md](architecture/OBSERVER_FRAMEWORK.md) | **Brain Phase 0** — observer lifecycle and raw observation flow |
+| [architecture/GOAL_ENGINE.md](architecture/GOAL_ENGINE.md) | **Brain Phase 0** — goal, task, success criteria contracts |
+| [architecture/RUNTIME_SAFETY.md](architecture/RUNTIME_SAFETY.md) | **Brain Phase 0** — action tiers, approval gates, error taxonomy |
+| [architecture/SYSTEM_STATE_AND_RECOVERY.md](architecture/SYSTEM_STATE_AND_RECOVERY.md) | **Brain Phase 0** — kernel state machine and crash recovery |
 
 ---
 
@@ -45,6 +52,76 @@ Constitutional ownership flow is unchanged:
 ```text
 UI → AppState → EventBus → Services → Repositories → Storage
 ```
+
+Brain v1 applies the same ownership rule to the reasoning stack:
+
+```mermaid
+flowchart LR
+    UI[UI projections] --> AppState[AppState snapshots]
+    AppState --> Bus[EventBus topics]
+    Bus --> Services[Services: planner / runtime / scheduler / observers]
+    Services --> Repositories[Repositories only]
+    Repositories --> Storage[(SQLite v1)]
+
+    Runtime[Runtime only] --> WorldModel[World Model apply]
+    WorldModel --> Repositories
+    Observers[Observers] -->|raw observations| Bus
+    Planner[Planner] -->|plans only| Bus
+```
+
+World Model authority is documented in [architecture/adr/ADR-005_WORLD_MODEL_AUTHORITY.md](architecture/adr/ADR-005_WORLD_MODEL_AUTHORITY.md): observers observe, planner reasons, runtime executes, World Model stores, and UI projects.
+
+### Layer ownership boundaries
+
+Each layer may call only the layer directly below it (plus read-only snapshots from AppState).
+Services coordinate exclusively through EventBus topics — never direct service-to-service calls.
+
+```mermaid
+flowchart LR
+    subgraph UI["UI (renderer)"]
+        Views[Views / Components]
+        Ctrl[UIController]
+    end
+    subgraph State["AppState"]
+        Reducers[Pure reducers]
+        Snap[Immutable snapshots]
+    end
+    subgraph Bus["EventBus"]
+        Topics[topics.py contracts]
+    end
+    subgraph Svc["Services"]
+        Lifecycle[BaseService lifecycle]
+        Handlers[Topic handlers]
+    end
+    subgraph Data["Repositories"]
+        Repo[conversation / notes / memory / settings / telemetry]
+    end
+    subgraph Store["Storage"]
+        SQL[(SQLite / files)]
+    end
+
+    Views -->|read snapshots| Snap
+    Views -->|publish UI_*| Ctrl
+    Ctrl -->|publish| Topics
+    Topics -->|dispatch| Handlers
+    Topics -->|reduce| Reducers
+    Reducers --> Snap
+    Snap -->|subscribe| Views
+    Handlers -->|publish| Topics
+    Handlers --> Repo
+    Repo --> SQL
+```
+
+| Layer | Owns | Must not |
+|-------|------|----------|
+| UI | Rendering, input, `UI_*` publishes | SQLite, files, Ollama, direct service calls |
+| AppState | Snapshots, reducer purity | Persistence, side effects |
+| EventBus | Topic routing | Business logic |
+| Services | Domain reactions, lifecycle | Direct peer service calls |
+| Repositories | CRUD, indexing | UI or cross-service orchestration |
+| Storage | Bytes on disk | Application logic |
+
+Follow-on UI backlog: [UI_REFURBISHMENT_BACKLOG.md](architecture/UI_REFURBISHMENT_BACKLOG.md)
 
 ---
 
@@ -89,7 +166,11 @@ flowchart TB
 | Agents (planned) | topics in `core/event_bus.py` | [AGENT_FRAMEWORK.md](architecture/AGENT_FRAMEWORK.md) |
 | Workflows (planned) | `core/workflow/` | [WORKFLOW_ENGINE.md](architecture/WORKFLOW_ENGINE.md) |
 | Chat | `services/chat_handler_service.py`, `ui/views/chat_view.py` | [CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md) |
+<<<<<<< HEAD
 | UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [UI_REFURBISHMENT_BACKLOG.md](architecture/UI_REFURBISHMENT_BACKLOG.md) (active); [archive/ACC_UI_REFURBISHMENT.md](architecture/archive/ACC_UI_REFURBISHMENT.md) |
+=======
+| UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [UI_REFURBISHMENT_BACKLOG.md](architecture/UI_REFURBISHMENT_BACKLOG.md) |
+>>>>>>> origin/main
 | Platform | `platform/`, `utils/hotkey.py` | [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md), [PACKAGING_MSI_DESIGN.md](architecture/PACKAGING_MSI_DESIGN.md) |
 | EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — sync today; async dispatch design complete |
 | Tools | `tools/`, `services/tool_executor_service.py` | Phase 4B flow below |

@@ -10,7 +10,6 @@ from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
-from ai_command_center.core.entity.entity_context import format_entity_context
 from ai_command_center.core.entity.entity import (
     ENTITY_TYPE_CARD,
     ENTITY_TYPE_RESOURCE,
@@ -44,6 +43,7 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CREATE_RESULT,
 )
 from ai_command_center.core.relationship.relationship import RelationshipType
+<<<<<<< HEAD
 from ai_command_center.core.timeline.timeline_undo_handlers import (
     UNDO_DELETE_ENTITY,
     UNDO_DELETE_RELATIONSHIP,
@@ -68,6 +68,14 @@ def _record_reversible_timeline(
         reversible=True,
         undo_data=undo_data,
     )
+=======
+from ai_command_center.core.world_model.context_compiler import (
+    EntityLine,
+    RelationshipLine,
+    compile_entity_focus,
+    compile_workspace_snapshot,
+)
+>>>>>>> origin/main
 
 
 def _request_id(event: Event) -> str:
@@ -262,41 +270,50 @@ def register_entity_bus_handlers(
             )
             return
 
-        related_lines: list[str] = []
+        outgoing_edges: list[RelationshipLine] = []
         for rel in relationship_service.get_by_source(entity_uuid):
             target = entity_service.get(rel.target_id)
             if target is not None:
-                related_lines.append(
-                    f"  - {rel.relationship_type.value}: {target.entity_type} "
-                    f"\"{target.title}\" ({target.id})"
+                outgoing_edges.append(
+                    RelationshipLine(
+                        predicate=rel.relationship_type.value,
+                        target_type=target.entity_type,
+                        target_title=target.title,
+                        target_id=str(target.id),
+                    )
                 )
+        incoming_edges: list[RelationshipLine] = []
         for rel in relationship_service.get_by_target(entity_uuid):
             source_entity = entity_service.get(rel.source_id)
             if source_entity is not None:
-                related_lines.append(
-                    f"  - incoming {rel.relationship_type.value} from "
-                    f"{source_entity.entity_type} \"{source_entity.title}\" "
-                    f"({source_entity.id})"
+                incoming_edges.append(
+                    RelationshipLine(
+                        predicate=rel.relationship_type.value,
+                        target_type=source_entity.entity_type,
+                        target_title=source_entity.title,
+                        target_id=str(source_entity.id),
+                        direction="incoming",
+                    )
                 )
 
-        entity_payload: dict[str, object] = {
-            "entity_id": str(entity.id),
-            "entity_type": entity.entity_type,
-            "entity_title": entity.title,
-            "entity_description": entity.description,
-        }
+        resource_fields: dict[str, str] = {}
         if entity.entity_type == ENTITY_TYPE_RESOURCE:
             meta = dict(entity.metadata)
-            resource_type = str(meta.get("resource_type", ""))
-            entity_payload["resource_type"] = resource_type
-            for key in ("url", "path", "command"):
+            resource_fields["resource_type"] = str(meta.get("resource_type", ""))
+            for key in ("url", "path", "command", "plugin_id"):
                 if meta.get(key):
-                    entity_payload[key] = str(meta[key])
+                    resource_fields[key] = str(meta[key])
 
-        snippet = format_entity_context(entity_payload)
-        snippets: list[str] = [snippet] if snippet else []
-        if related_lines:
-            snippets.append("Related entities:\n" + "\n".join(related_lines))
+        compiled = compile_entity_focus(
+            entity_id=str(entity.id),
+            entity_type=entity.entity_type,
+            entity_title=entity.title,
+            entity_description=entity.description,
+            resource_fields=resource_fields or None,
+            outgoing_edges=outgoing_edges or None,
+            incoming_edges=incoming_edges or None,
+        )
+        snippets: list[str] = [compiled] if compiled else []
 
         _publish_result(
             bus,
@@ -343,11 +360,8 @@ def register_entity_bus_handlers(
             )
             return
 
-        snippets: list[str] = [
-            f"Active workspace: {workspace.title} (workspace_id={workspace.id})"
-        ]
         child_ids_raw = workspace.metadata.get("entities", [])
-        child_lines: list[str] = []
+        child_entities: list[EntityLine] = []
         for child_raw in child_ids_raw:
             try:
                 child_id = UUID(str(child_raw))
@@ -356,11 +370,14 @@ def register_entity_bus_handlers(
             child = entity_service.get(child_id)
             if child is None:
                 continue
-            child_lines.append(
-                f"  - {child.entity_type}: \"{child.title}\" ({child.id})"
+            child_entities.append(
+                EntityLine(
+                    entity_id=str(child.id),
+                    entity_type=child.entity_type,
+                    title=child.title,
+                    description=child.description,
+                )
             )
-        if child_lines:
-            snippets.append("Workspace entities:\n" + "\n".join(child_lines))
 
         focus_uuid: UUID | None = None
         if focus_entity_raw:
@@ -372,24 +389,29 @@ def register_entity_bus_handlers(
             focus_uuid = workspace_uuid
 
         focus_entity = entity_service.get(focus_uuid)
+        focus_line: EntityLine | None = None
         if focus_entity is not None and focus_uuid != workspace_uuid:
-            focus_payload: dict[str, object] = {
-                "entity_id": str(focus_entity.id),
-                "entity_type": focus_entity.entity_type,
-                "entity_title": focus_entity.title,
-                "entity_description": focus_entity.description,
-            }
-            focus_snippet = format_entity_context(focus_payload)
-            if focus_snippet:
-                snippets.append(f"Selected entity:\n{focus_snippet}")
+            focus_line = EntityLine(
+                entity_id=str(focus_entity.id),
+                entity_type=focus_entity.entity_type,
+                title=focus_entity.title,
+                description=focus_entity.description,
+            )
 
         graph_lines = relationship_service.traverse_context_snippets(
             focus_uuid,
             entity_service,
             max_depth=max_depth,
         )
-        if graph_lines:
-            snippets.append("Relationship graph:\n" + "\n".join(graph_lines))
+
+        compiled = compile_workspace_snapshot(
+            workspace_id=str(workspace.id),
+            workspace_title=workspace.title,
+            child_entities=child_entities or None,
+            focus_entity=focus_line,
+            relationship_lines=graph_lines or None,
+        )
+        snippets = [compiled] if compiled else []
 
         _publish_result(
             bus,

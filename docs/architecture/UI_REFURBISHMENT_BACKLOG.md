@@ -22,6 +22,7 @@ remaining debt and Slice 1b / hardening work only.
 
 ---
 
+<<<<<<< HEAD
 ## P2 — Workflow graph DAG
 
 - Non-linear `WorkflowGraph.from_workflow_steps` (true DAG, not linearized steps)
@@ -46,12 +47,43 @@ remaining debt and Slice 1b / hardening work only.
 - Full drag-and-drop graph editing
 - Branching / persisted workflow YAML
 - `RetryVisualization` / `ApprovalNode` components
+=======
+## P2 — Complete
+
+### Workflow graph DAG
+
+- [x] `WorkflowGraph.from_workflow_steps` DAG via `depends_on` / `next`
+- [x] Layered layout (`core/workflow/workflow_graph_layout.py`)
+- [x] `WorkflowDefinition` YAML load/dump
+
+### Legacy inspector migration
+
+- [x] `ExecutionInspector` passes `SpanItem`, `ArtifactItem`, `ProviderHealthSnapshot` to tabs
+
+### Settings off-page projection
+
+- [x] `state_applier._apply_settings_projection` syncs `SettingsView` on `settings_version`
+
+---
+
+## P3 — Slice 1b (partial)
+
+- [x] Canvas drag-and-drop (`UI_WORKFLOW_NODE_MOVE`, `GraphCanvas.on_node_move`)
+- [x] Persisted workflow YAML (`domain/workflow_definition.py`)
+- [x] `ApprovalNodeBadge` / `RetryVisualization` overlays on canvas
+- [ ] Full graph editing (add/remove edges, library drop-to-canvas)
+- [ ] Workflow YAML import/export UI
+>>>>>>> origin/main
 
 ---
 
 ## P3 — Documentation
 
+<<<<<<< HEAD
 - [ ] Ownership dependency diagram in `docs/ARCHITECTURE.md` (AGENTS.md deliverable)
+=======
+- [x] Ownership dependency diagram in `docs/ARCHITECTURE.md`
+>>>>>>> origin/main
 - [ ] Artifact viewer preview stubs for remaining kinds
 
 ---

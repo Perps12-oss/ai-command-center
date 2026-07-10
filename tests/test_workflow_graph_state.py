@@ -5,6 +5,7 @@ from __future__ import annotations
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
+    UI_WORKFLOW_NODE_MOVE,
     UI_WORKFLOW_NODE_SELECT,
     WORKFLOW_COMPLETED,
     WORKFLOW_STARTED,
@@ -82,6 +83,32 @@ def test_workflow_node_select_updates_selection() -> None:
         )
         snap = store.snapshot
         assert snap.workflow_graph.selected_node_id == "node-1"
+    finally:
+        store.close()
+
+
+def test_workflow_node_move_updates_position() -> None:
+    bus = EventBus()
+    store = AppStateStore(bus)
+    try:
+        bus.publish(
+            WORKFLOW_STARTED,
+            {
+                "run_id": "run-move",
+                "workflow_id": "demo",
+                "steps": [{"id": "a", "name": "Plan"}, {"id": "b", "name": "Execute"}],
+            },
+            source="test",
+        )
+        bus.publish(
+            UI_WORKFLOW_NODE_MOVE,
+            {"node_id": "a", "x": 120.0, "y": 64.0, "workflow_id": "demo"},
+            source="ui",
+        )
+        snap = store.snapshot
+        node = next(item for item in snap.workflow_graph.nodes if item.node_id == "a")
+        assert node.x == 120.0
+        assert node.y == 64.0
     finally:
         store.close()
 

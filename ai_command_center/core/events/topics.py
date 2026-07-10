@@ -196,6 +196,69 @@ CAPABILITY_ERROR = "capability.error"
 CAPABILITY_FALLBACK = "capability.fallback"
 CAPABILITY_PROVIDERS_READY = "capability.providers.ready"
 CAPABILITY_LIFECYCLE_SNAPSHOT = "capability.lifecycle.snapshot"
+CAPABILITY_CATALOG_REQUEST = "capability.catalog.request"
+CAPABILITY_CATALOG_RESULT = "capability.catalog.result"
+
+# Planner layer (vNext L4 — goal to plan DAG, no execution)
+PLAN_REQUEST = "plan.request"
+PLAN_GENERATED = "plan.generated"
+PLAN_FAILED = "plan.failed"
+
+# Execution orchestrator (vNext L5 — approved plan execution with gates)
+EXECUTION_RUN_REQUEST = "execution.run.request"
+EXECUTION_RUN_STARTED = "execution.run.started"
+EXECUTION_RUN_COMPLETE = "execution.run.complete"
+EXECUTION_RUN_FAILED = "execution.run.failed"
+EXECUTION_STEP_STARTED = "execution.step.started"
+EXECUTION_STEP_AWAITING_APPROVAL = "execution.step.awaiting_approval"
+EXECUTION_STEP_APPROVED = "execution.step.approved"
+EXECUTION_STEP_COMPLETED = "execution.step.completed"
+EXECUTION_STEP_FAILED = "execution.step.failed"
+
+# Brain v1 goal scheduler (single-active-goal queue)
+GOAL_SUBMIT_REQUEST = "goal.submit.request"
+GOAL_SUBMITTED = "goal.submitted"
+GOAL_ACTIVATED = "goal.activated"
+GOAL_PAUSED = "goal.paused"
+GOAL_RESUMED = "goal.resumed"
+GOAL_CANCELLED = "goal.cancelled"
+GOAL_COMPLETED = "goal.completed"
+GOAL_FAILED = "goal.failed"
+TASK_READY = "task.ready"
+TASK_COMPLETED = "task.completed"
+TASK_FAILED = "task.failed"
+
+# Brain v1 observer framework
+OBSERVATION_RECEIVED = "observation.received"
+OBSERVATION_BATCH_RECEIVED = "observation.batch_received"
+OBSERVATION_FAILED = "observation.failed"
+OBSERVER_STARTED = "observer.started"
+OBSERVER_STOPPED = "observer.stopped"
+OBSERVER_ERROR = "observer.error"
+
+# Brain v1 runtime safety gateway
+RUNTIME_ACTION_REQUEST = "runtime.action.request"
+RUNTIME_ACTION_STARTED = "runtime.action_started"
+RUNTIME_APPROVAL_REQUESTED = "runtime.approval_requested"
+RUNTIME_APPROVAL_DECIDED = "runtime.approval_decided"
+RUNTIME_ACTION_COMPLETED = "runtime.action_completed"
+RUNTIME_ACTION_FAILED = "runtime.action_failed"
+RUNTIME_ACTION_DENIED = "runtime.action_denied"
+RUNTIME_WORLD_MODEL_APPLY_REQUESTED = "runtime.world_model_apply_requested"
+RUNTIME_WORLD_MODEL_APPLY_COMPLETED = "runtime.world_model_apply_completed"
+
+# Brain v1 kernel state machine
+KERNEL_STATE_CHANGED = "kernel.state_changed"
+KERNEL_TRANSITION_REJECTED = "kernel.transition_rejected"
+KERNEL_RECOVERY_STARTED = "kernel.recovery_started"
+KERNEL_RECOVERY_COMPLETED = "kernel.recovery_completed"
+KERNEL_TIMEOUT = "kernel.timeout"
+
+# External integrations (vNext Phase E — MCP/email/calendar via ARI)
+EXTERNAL_CAPABILITY_REGISTER = "external.capability.register"
+EXTERNAL_CAPABILITY_UNREGISTER = "external.capability.unregister"
+EXTERNAL_CAPABILITY_REGISTERED = "external.capability.registered"
+EXTERNAL_CAPABILITY_CATALOG_UPDATED = "external.capability.catalog_updated"
 
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
@@ -262,6 +325,7 @@ UI_EXECUTION_TIMELINE_SCRUB = "ui.execution.timeline.scrub"
 
 # Workflow graph workspace (ACC UI Refurbishment PR 12–13)
 UI_WORKFLOW_NODE_SELECT = "ui.workflow.node.select"
+UI_WORKFLOW_NODE_MOVE = "ui.workflow.node.move"
 UI_WORKFLOW_RUN = "ui.workflow.run"
 
 # Automation workspace (ACC UI Refurbishment PR 14–15)
@@ -417,6 +481,55 @@ __all__ = [
     "CAPABILITY_FALLBACK",
     "CAPABILITY_PROVIDERS_READY",
     "CAPABILITY_LIFECYCLE_SNAPSHOT",
+    "CAPABILITY_CATALOG_REQUEST",
+    "CAPABILITY_CATALOG_RESULT",
+    "PLAN_REQUEST",
+    "PLAN_GENERATED",
+    "PLAN_FAILED",
+    "EXECUTION_RUN_REQUEST",
+    "EXECUTION_RUN_STARTED",
+    "EXECUTION_RUN_COMPLETE",
+    "EXECUTION_RUN_FAILED",
+    "EXECUTION_STEP_STARTED",
+    "EXECUTION_STEP_AWAITING_APPROVAL",
+    "EXECUTION_STEP_APPROVED",
+    "EXECUTION_STEP_COMPLETED",
+    "EXECUTION_STEP_FAILED",
+    "GOAL_SUBMIT_REQUEST",
+    "GOAL_SUBMITTED",
+    "GOAL_ACTIVATED",
+    "GOAL_PAUSED",
+    "GOAL_RESUMED",
+    "GOAL_CANCELLED",
+    "GOAL_COMPLETED",
+    "GOAL_FAILED",
+    "TASK_READY",
+    "TASK_COMPLETED",
+    "TASK_FAILED",
+    "OBSERVATION_RECEIVED",
+    "OBSERVATION_BATCH_RECEIVED",
+    "OBSERVATION_FAILED",
+    "OBSERVER_STARTED",
+    "OBSERVER_STOPPED",
+    "OBSERVER_ERROR",
+    "RUNTIME_ACTION_REQUEST",
+    "RUNTIME_ACTION_STARTED",
+    "RUNTIME_APPROVAL_REQUESTED",
+    "RUNTIME_APPROVAL_DECIDED",
+    "RUNTIME_ACTION_COMPLETED",
+    "RUNTIME_ACTION_FAILED",
+    "RUNTIME_ACTION_DENIED",
+    "RUNTIME_WORLD_MODEL_APPLY_REQUESTED",
+    "RUNTIME_WORLD_MODEL_APPLY_COMPLETED",
+    "KERNEL_STATE_CHANGED",
+    "KERNEL_TRANSITION_REJECTED",
+    "KERNEL_RECOVERY_STARTED",
+    "KERNEL_RECOVERY_COMPLETED",
+    "KERNEL_TIMEOUT",
+    "EXTERNAL_CAPABILITY_REGISTER",
+    "EXTERNAL_CAPABILITY_UNREGISTER",
+    "EXTERNAL_CAPABILITY_REGISTERED",
+    "EXTERNAL_CAPABILITY_CATALOG_UPDATED",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",
@@ -463,6 +576,7 @@ __all__ = [
     "EXECUTION_EVENTS_LOADED",
     "UI_EXECUTION_TIMELINE_SCRUB",
     "UI_WORKFLOW_NODE_SELECT",
+    "UI_WORKFLOW_NODE_MOVE",
     "UI_WORKFLOW_RUN",
     "UI_AUTOMATION_RUN",
     "UI_AUTOMATION_SELECT",

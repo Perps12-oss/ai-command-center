@@ -7,14 +7,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai_command_center.core.contracts import CONTEXT_BUNDLE_VERSION
+from ai_command_center.core.contracts import (
+    COMMAND_ROUTED_VERSION,
+    CONTEXT_BUNDLE_VERSION,
+    OLLAMA_SERVICE_API_VERSION,
+    SUPPORTED_VERSIONS,
+)
+
+# Locked contract surface (UCGS); anchors imports used by assembly boundaries.
+_CONTEXT_MANAGER_CONTRACT = (
+    COMMAND_ROUTED_VERSION,
+    CONTEXT_BUNDLE_VERSION,
+    OLLAMA_SERVICE_API_VERSION,
+    *SUPPORTED_VERSIONS,
+)
 
 MAX_CONTEXT_FILL_RATIO = 0.70
 
 
 @dataclass(frozen=True, slots=True)
 class ContextBundle:
-    """Assembled prompt ready for OllamaService (contract v1.1)."""
+    """Assembled prompt ready for OllamaService (contract v1.2)."""
 
     prompt: str
     sources: tuple[str, ...]
@@ -52,7 +65,7 @@ class ContextManager:
 
     def __init__(
         self,
-        max_context_tokens: int = 4096,
+        max_context_tokens: int = 4000,
         fill_ratio: float = MAX_CONTEXT_FILL_RATIO,
     ) -> None:
         self._max_context_tokens = max_context_tokens
@@ -69,14 +82,17 @@ class ContextManager:
         clipboard: str | None = None,
         notes: list[str] | None = None,
         graph_snippets: list[str] | None = None,
+        workspace_snippets: list[str] | None = None,
         conversation_history: list[tuple[str, str]] | None = None,
         clipboard_intent: bool = False,
+        token_budget: int | None = None,
     ) -> ContextBundle:
         query = query.strip()
         if not query:
             return ContextBundle(prompt="", sources=(), token_estimate=0)
 
-        budget = self.context_budget_tokens
+        budget = int(token_budget) if token_budget is not None else self.context_budget_tokens
+        budget = max(1, budget)
         sources: list[str] = []
         sections: list[tuple[int, str, str]] = []
 
@@ -95,6 +111,13 @@ class ContextManager:
             body = "\n".join(lines)
             if body.strip():
                 sections.append((1, "conversation_history", body))
+
+        if workspace_snippets:
+            for i, snippet in enumerate(workspace_snippets):
+                body = snippet.strip()
+                if body:
+                    label = "workspace_state" if i == 0 else f"workspace_state_{i}"
+                    sections.append((1, label, body))
 
         if graph_snippets:
             for i, snippet in enumerate(graph_snippets):
