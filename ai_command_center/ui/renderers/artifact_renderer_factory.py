@@ -1,14 +1,21 @@
-"""Artifact preview renderers (ACC UI Refurbishment PR 7)."""
+"""Artifact preview renderers (ACC UI Refurbishment PR 7).
+
+Artifact preview kinds:
+- Live preview: text, code, markdown, data
+- Stub (planned): pdf, image, email, calendar
+
+UI Refurbishment P3 Slice 1b: Updated stub messages with clearer status.
+"""
 
 from __future__ import annotations
 
 from ai_command_center.domain.artifact import ArtifactType
 
 _STUB_MESSAGES: dict[str, str] = {
-    ArtifactType.PDF.value: "PDF preview requires a PDF renderer plugin.",
-    ArtifactType.IMAGE.value: "Image preview not available in this build.",
-    ArtifactType.CALENDAR.value: "Calendar viewer coming soon.",
-    ArtifactType.EMAIL.value: "Email preview coming soon.",
+    ArtifactType.PDF.value: "[PDF] Preview requires PDF renderer plugin.\n\nInstall a PDF preview plugin to view documents.",
+    ArtifactType.IMAGE.value: "[IMAGE] Preview not available in this build.\n\nImages can be exported and viewed in external applications.",
+    ArtifactType.CALENDAR.value: "[CALENDAR] Calendar viewer coming soon.\n\nCalendar events will be displayed in a timeline view.",
+    ArtifactType.EMAIL.value: "[EMAIL] Email preview coming soon.\n\nEmail content will be displayed in threaded format.",
 }
 
 

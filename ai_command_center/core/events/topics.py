@@ -307,7 +307,7 @@ TIMELINE_RECORD_REQUEST = "timeline.record.request"
 TIMELINE_RECORD_RESULT = "timeline.record.result"
 SEARCH_RESULTS = "search.results"
 
-# Execution query (TODO 5 — Inspector docked panel)
+# Execution query (UI Refurbishment P3 Slice 1b — Inspector docked panel)
 EXECUTION_QUERY_REQUEST = "execution.query.request"
 EXECUTION_QUERY_RESULT = "execution.query.result"
 
@@ -336,8 +336,15 @@ UI_AUTOMATION_SCHEDULE_TOGGLE = "ui.automation.schedule.toggle"
 # Timeline undo (workspace OS)
 TIMELINE_UNDO_REQUEST = "timeline.undo.request"
 
-# UI artifact actions (TODO 5/6 — artifact viewer bus integration)
+# UI artifact actions (UI Refurbishment P3 Slice 1b — artifact viewer bus integration)
 UI_ARTIFACT_ACTION = "ui.artifact.action"
+ARTIFACT_PREVIEW = "artifact.preview"
+ARTIFACT_EXPORT = "artifact.export"
+ARTIFACT_DELETE = "artifact.delete"
+
+# Workflow graph edge management (UI Refurbishment P3 Slice 1b)
+UI_WORKFLOW_EDGE_CREATE = "ui.workflow.edge.create"
+UI_WORKFLOW_EDGE_DELETE = "ui.workflow.edge.delete"
 
 
 __all__ = [
@@ -582,4 +589,9 @@ __all__ = [
     "UI_AUTOMATION_SCHEDULE_TOGGLE",
     "TIMELINE_UNDO_REQUEST",
     "UI_ARTIFACT_ACTION",
+    "ARTIFACT_PREVIEW",
+    "ARTIFACT_EXPORT",
+    "ARTIFACT_DELETE",
+    "UI_WORKFLOW_EDGE_CREATE",
+    "UI_WORKFLOW_EDGE_DELETE",
 ]
