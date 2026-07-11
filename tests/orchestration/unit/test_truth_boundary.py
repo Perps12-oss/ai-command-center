@@ -155,3 +155,58 @@ def test_llm_narrative_injection_with_empty_receipts_is_rejected(
     validation = boundary.validate(OrchestrationIntent.SEND_EMAIL, result, receipt)
     assert validation.valid is False
     assert validation.response_source == "orchestration_rejected"
+
+
+# --- shell execution truth validation ---
+
+
+def test_accepts_verified_shell_execution(boundary: TruthBoundary) -> None:
+    facts = {"command": "echo hello", "success": True, "output": "hello"}
+    result = ProviderExecutionResult(
+        success=True,
+        response_text="hello",
+        facts=facts,
+    )
+    receipt = _receipt(
+        intent=OrchestrationIntent.EXECUTE_SHELL,
+        facts=tuple(sorted(facts.items())),
+    )
+    validation = boundary.validate(OrchestrationIntent.EXECUTE_SHELL, result, receipt)
+    assert validation.valid is True
+    assert validation.response_source == "orchestration"
+
+
+def test_rejects_shell_execution_without_success_flag(boundary: TruthBoundary) -> None:
+    facts = {"command": "echo hello", "output": "hello"}
+    result = ProviderExecutionResult(
+        success=True,
+        response_text="hello",
+        facts=facts,
+    )
+    receipt = _receipt(
+        intent=OrchestrationIntent.EXECUTE_SHELL,
+        success=True,
+        facts=tuple(sorted(facts.items())),
+    )
+    validation = boundary.validate(OrchestrationIntent.EXECUTE_SHELL, result, receipt)
+    assert validation.valid is False
+    assert validation.response_source == "orchestration_rejected"
+
+
+def test_rejects_failed_shell_execution(boundary: TruthBoundary) -> None:
+    facts = {"command": "false", "success": False, "error": "exit code 1"}
+    result = ProviderExecutionResult(
+        success=False,
+        response_text="",
+        facts=facts,
+        error="exit code 1",
+    )
+    receipt = _receipt(
+        intent=OrchestrationIntent.EXECUTE_SHELL,
+        success=False,
+        error="exit code 1",
+        facts=tuple(sorted(facts.items())),
+    )
+    validation = boundary.validate(OrchestrationIntent.EXECUTE_SHELL, result, receipt)
+    assert validation.valid is False
+    assert validation.response_source == "orchestration_rejected"

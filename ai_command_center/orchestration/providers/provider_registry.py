@@ -6,6 +6,7 @@ from ai_command_center.orchestration.providers.application_provider import Appli
 from ai_command_center.orchestration.providers.calendar_provider import CalendarProvider
 from ai_command_center.orchestration.providers.mcp_adapter import McpAdapterProvider, McpProvider
 from ai_command_center.orchestration.providers.provider_protocol import OrchestrationProvider
+from ai_command_center.orchestration.providers.shell_provider import ShellProvider
 from ai_command_center.orchestration.providers.system_facts_provider import SystemFactsProvider
 
 
@@ -19,6 +20,7 @@ class OrchestrationProviderRegistry:
         application: ApplicationProvider | None = None,
         calendar: CalendarProvider | None = None,
         mcp: McpAdapterProvider | McpProvider | None = None,
+        shell: ShellProvider | None = None,
     ) -> None:
         self._providers: dict[str, OrchestrationProvider] = {}
         for provider in (
@@ -26,6 +28,7 @@ class OrchestrationProviderRegistry:
             application or ApplicationProvider(),
             calendar or CalendarProvider(),
             mcp or McpAdapterProvider(),
+            shell or ShellProvider(),
         ):
             self._providers[provider.provider_id] = provider
 

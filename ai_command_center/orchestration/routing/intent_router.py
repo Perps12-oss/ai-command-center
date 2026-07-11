@@ -10,6 +10,7 @@ _INTENT_PROVIDER: dict[OrchestrationIntent, str] = {
     OrchestrationIntent.CALENDAR_QUERY: "calendar",
     OrchestrationIntent.CALENDAR_EVENT_CREATE: "calendar",
     OrchestrationIntent.SEND_EMAIL: "email",
+    OrchestrationIntent.EXECUTE_SHELL: "shell",
 }
 
 

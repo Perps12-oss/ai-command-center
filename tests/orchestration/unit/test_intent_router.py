@@ -16,6 +16,7 @@ from ai_command_center.orchestration.routing.intent_router import IntentRouter
         (OrchestrationIntent.CALENDAR_QUERY, "calendar"),
         (OrchestrationIntent.CALENDAR_EVENT_CREATE, "calendar"),
         (OrchestrationIntent.SEND_EMAIL, "email"),
+        (OrchestrationIntent.EXECUTE_SHELL, "shell"),
     ],
 )
 def test_resolve_provider_maps_intents(

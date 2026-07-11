@@ -54,6 +54,8 @@ class TruthBoundary:
             return self._validate_email_sent(result, receipt)
         if intent is OrchestrationIntent.CALENDAR_EVENT_CREATE:
             return self._validate_calendar_event_created(result, receipt)
+        if intent is OrchestrationIntent.EXECUTE_SHELL:
+            return self._validate_shell(result)
 
         return TruthValidation(
             valid=False,
@@ -248,6 +250,28 @@ class TruthBoundary:
             valid=True,
             detail="calendar event receipt verified",
             response_text=result.response_text or f"Created calendar event: {title}.",
+            response_source="orchestration",
+        )
+
+    @staticmethod
+    def _validate_shell(result: ProviderExecutionResult) -> TruthValidation:
+        """Validate shell execution — requires success flag and command fact."""
+        success = result.facts.get("success")
+        if success is not True:
+            return TruthValidation(
+                valid=False,
+                detail="shell execution not confirmed",
+                response_text=result.response_text
+                or "Shell command could not be verified.",
+                response_source="orchestration_rejected",
+            )
+        command = str(result.facts.get("command", "")).strip()
+        output = str(result.facts.get("output", "")).strip()
+        response_text = result.response_text.strip() if result.response_text else output
+        return TruthValidation(
+            valid=True,
+            detail="shell execution receipt verified",
+            response_text=response_text or f"Ran: {command}",
             response_source="orchestration",
         )
 

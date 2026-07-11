@@ -11,6 +11,7 @@ _ACTION_INTENTS = frozenset(
         OrchestrationIntent.LAUNCH_APPLICATION,
         OrchestrationIntent.SEND_EMAIL,
         OrchestrationIntent.CALENDAR_EVENT_CREATE,
+        OrchestrationIntent.EXECUTE_SHELL,
     }
 )
 

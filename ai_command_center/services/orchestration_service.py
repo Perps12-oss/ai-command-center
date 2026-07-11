@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Callable
 
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.intents import INTENT_CHAT
+from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_SHELL
 from ai_command_center.core.events.topics import (
     CAPABILITY_PROVIDERS_READY,
     CHAT_COMPLETE,
@@ -26,6 +26,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.orchestration.execution.executor import OrchestrationExecutor
 from ai_command_center.orchestration.execution.response_composer import ResponseComposer
 from ai_command_center.orchestration.intents.classifier import RuleBasedIntentClassifier
+from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
 from ai_command_center.orchestration.orchestration_registry import mark_orchestration_request
 from ai_command_center.orchestration.policies.fallback_policy import OrchestrationFallbackPolicy
 from ai_command_center.orchestration.providers.provider_registry import OrchestrationProviderRegistry
@@ -132,18 +133,30 @@ class OrchestrationService(BaseService):
     def _on_command_routed(self, event: Event) -> None:
         if event.source != "command_router":
             return
-        if event.payload.get("intent") != INTENT_CHAT:
-            return
 
+        routed_intent = str(event.payload.get("intent", "")).strip()
         args = event.payload.get("args") or {}
-        query = str(args.get("prompt", "")).strip()
-        if not query:
-            return
-
         request_id = str(event.payload.get("request_id", "")).strip()
         scope = _routing_scope(dict(event.payload), dict(args))
         for key, value in _observability_scope(event.payload).items():
             scope.setdefault(key, value)
+
+        # Shell commands: route directly to ShellProvider via orchestration
+        if routed_intent == INTENT_SHELL:
+            command = str(args.get("command", "")).strip()
+            if not command:
+                return
+            self._orchestrate_shell(request_id, command, scope)
+            return
+
+        # Chat commands: classify and route
+        if routed_intent != INTENT_CHAT:
+            return
+
+        query = str(args.get("prompt", "")).strip()
+        if not query:
+            return
+
         intent, intent_args = self._classifier.classify(query)
         merged_args = {**intent_args, **scope}
         classified_payload: dict[str, object] = {
@@ -188,6 +201,96 @@ class OrchestrationService(BaseService):
             source=self.name,
         )
 
+        self._execute_and_respond(
+            intent=intent,
+            provider_id=provider_id,
+            request_id=request_id,
+            query=query,
+            args=merged_args,
+        )
+
+    def _orchestrate_shell(
+        self,
+        request_id: str,
+        command: str,
+        scope: dict[str, str],
+    ) -> None:
+        """Execute shell command via ShellProvider with receipts and truth validation.
+
+        Shell commands REQUIRE a workspace_id for execution. Without a workspace,
+        commands are rejected at the truth boundary.
+        """
+        # Workspace enforcement: shell commands must have workspace_id
+        workspace_id = scope.get("workspace_id", "").strip()
+        if not workspace_id:
+            # Shell without workspace: emit rejection at truth boundary
+            self._bus.publish(
+                ORCHESTRATION_TRUTH_VALIDATED,
+                {
+                    "request_id": request_id,
+                    "valid": False,
+                    "detail": "shell command requires active workspace",
+                    "response_source": "orchestration_rejected",
+                },
+                source=self.name,
+            )
+            self._bus.publish(
+                CHAT_COMPLETE,
+                {
+                    "request_id": request_id,
+                    "text": "Shell commands require an active workspace. Please select a workspace first.",
+                    "response_source": "orchestration_rejected",
+                    "truth_validated": False,
+                    "orchestration": {
+                        "intent": "execute_shell",
+                        "provider_id": "shell",
+                        "receipt_id": "",
+                        "truth_detail": "shell command requires active workspace",
+                    },
+                },
+                source=self.name,
+            )
+            return
+
+        intent = OrchestrationIntent.EXECUTE_SHELL
+        provider_id = "shell"
+        args = {"command": command, **scope}
+
+        self._bus.publish(
+            ORCHESTRATION_INTENT_CLASSIFIED,
+            {
+                "request_id": request_id,
+                "query": command,
+                "intent": intent.value,
+                "args": args,
+                **scope,
+            },
+            source=self.name,
+        )
+
+        self._bus.publish(
+            ORCHESTRATION_ROUTING_COMPLETED,
+            {
+                "request_id": request_id,
+                "intent": intent.value,
+                "provider_id": provider_id,
+                "routed": True,
+                **scope,
+            },
+            source=self.name,
+        )
+
+        self._bus.publish(
+            ORCHESTRATION_PROVIDER_SELECTED,
+            {
+                "request_id": request_id,
+                "intent": intent.value,
+                "provider_id": provider_id,
+                **scope,
+            },
+            source=self.name,
+        )
+
         mark_orchestration_request(request_id)
         _logger.info(
             "orchestration.dispatch request_id=%s intent=%s provider=%s",
@@ -200,8 +303,110 @@ class OrchestrationService(BaseService):
             intent,
             provider_id,
             request_id=request_id,
+            query=command,
+            args=args,
+        )
+        self._bus.publish(
+            ORCHESTRATION_RECEIPT,
+            run.receipt.to_dict(),
+            source=self.name,
+        )
+
+        validation = self._truth_boundary.validate(intent, run.result, run.receipt)
+        self._bus.publish(
+            ORCHESTRATION_TRUTH_VALIDATED,
+            {
+                "request_id": request_id,
+                "valid": validation.valid,
+                "detail": validation.detail,
+                "response_source": validation.response_source,
+            },
+            source=self.name,
+        )
+
+        composed = self._response_composer.compose(
+            intent=intent,
+            provider_id=provider_id,
+            validation=validation,
+            receipt=run.receipt,
+        )
+        snapshot = OrchestrationRunSnapshot(
+            request_id=request_id,
+            query=command,
+            intent=intent.value,
+            provider_id=provider_id,
+            execution_success=run.result.success,
+            execution_facts=dict(run.result.facts),
+            execution_error=run.result.error,
+            truth_valid=validation.valid,
+            truth_detail=validation.detail,
+            response_source=validation.response_source,
+            response_text=composed.text,
+            receipt_id=run.receipt.receipt_id,
+            trace_id=uuid.uuid4().hex,
+            span_id=uuid.uuid4().hex[:16],
+        )
+        self._bus.publish(
+            ORCHESTRATION_RUN_SNAPSHOT,
+            snapshot.to_dict(),
+            source=self.name,
+        )
+
+        self._bus.publish(
+            CHAT_STARTED,
+            {"request_id": request_id, "orchestration": True},
+            source=self.name,
+        )
+        self._bus.publish(
+            SESSION_UPDATE_REQUEST,
+            {
+                "request_id": request_id,
+                "role": "user",
+                "content": command,
+            },
+            source=self.name,
+        )
+        complete_payload = self._response_composer.to_chat_complete_payload(
+            composed,
+            request_id=request_id,
+        )
+        self._bus.publish(CHAT_COMPLETE, complete_payload, source=self.name)
+        self._bus.publish(
+            SESSION_UPDATE_REQUEST,
+            {
+                "request_id": request_id,
+                "role": "assistant",
+                "content": composed.text,
+            },
+            source=self.name,
+        )
+        self._bus.publish(
+            TELEMETRY_EVENT,
+            {
+                "name": "orchestration.complete",
+                "request_id": request_id,
+                "intent": intent.value,
+                "provider_id": provider_id,
+                "truth_valid": validation.valid,
+            },
+            source=self.name,
+        )
+
+    def _execute_and_respond(
+        self,
+        intent: OrchestrationIntent,
+        provider_id: str,
+        request_id: str,
+        query: str,
+        args: dict[str, str],
+    ) -> None:
+        """Execute provider and emit all required events."""
+        run = self._executor.run(
+            intent,
+            provider_id,
+            request_id=request_id,
             query=query,
-            args=merged_args,
+            args=args,
         )
         self._bus.publish(
             ORCHESTRATION_RECEIPT,

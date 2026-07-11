@@ -13,4 +13,5 @@ class OrchestrationIntent(str, Enum):
     CALENDAR_QUERY = "calendar_query"
     SEND_EMAIL = "send_email"
     CALENDAR_EVENT_CREATE = "calendar_event_create"
+    EXECUTE_SHELL = "execute_shell"
     UNHANDLED = "unhandled"
