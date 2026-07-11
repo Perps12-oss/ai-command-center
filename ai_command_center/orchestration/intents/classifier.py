@@ -33,6 +33,25 @@ _CREATE_EVENT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Shell verb prefixes that identify shell commands even without ">" prefix.
+_SHELL_VERB_PREFIXES: tuple[str, ...] = (
+    "echo ",
+    "dir",
+    "cd ",
+    "ls ",
+    "pwd",
+    "whoami",
+    "cat ",
+    "type ",
+    "python ",
+    "git ",
+    "node ",
+    "npm ",
+    "pip ",
+    "get-childitem",
+    "get-content ",
+)
+
 
 class RuleBasedIntentClassifier:
     """Classifies user text into orchestration intents using deterministic rules."""
@@ -41,6 +60,14 @@ class RuleBasedIntentClassifier:
     def classify(text: str) -> tuple[OrchestrationIntent, dict[str, str]]:
         normalized = text.strip()
         lower = normalized.lower()
+
+        # Detect shell commands: ">" prefix or shell verb prefix
+        if normalized.startswith(">"):
+            command = normalized[1:].strip()
+            return OrchestrationIntent.EXECUTE_SHELL, {"command": command}
+        for prefix in _SHELL_VERB_PREFIXES:
+            if lower.startswith(prefix.strip()):
+                return OrchestrationIntent.EXECUTE_SHELL, {"command": normalized}
 
         match = _LAUNCH_RE.match(normalized)
         if match:

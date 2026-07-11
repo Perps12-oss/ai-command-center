@@ -45,3 +45,42 @@ def test_unhandled_defers_to_llm_path() -> None:
     intent, args = classifier.classify("Explain quantum computing")
     assert intent is OrchestrationIntent.UNHANDLED
     assert args == {}
+
+
+def test_shell_command_with_prefix() -> None:
+    classifier = RuleBasedIntentClassifier()
+    intent, args = classifier.classify(">echo hello")
+    assert intent is OrchestrationIntent.EXECUTE_SHELL
+    assert args["command"] == "echo hello"
+
+    intent, args = classifier.classify("> ls -la")
+    assert intent is OrchestrationIntent.EXECUTE_SHELL
+    assert args["command"] == "ls -la"
+
+
+def test_shell_command_with_verb_prefix() -> None:
+    classifier = RuleBasedIntentClassifier()
+    intent, args = classifier.classify("echo hello world")
+    assert intent is OrchestrationIntent.EXECUTE_SHELL
+    assert args["command"] == "echo hello world"
+
+    intent, args = classifier.classify("ls -la")
+    assert intent is OrchestrationIntent.EXECUTE_SHELL
+    assert args["command"] == "ls -la"
+
+    intent, args = classifier.classify("pwd")
+    assert intent is OrchestrationIntent.EXECUTE_SHELL
+    assert args["command"] == "pwd"
+
+
+def test_shell_command_priority_over_chat() -> None:
+    """Shell verbs should be classified as EXECUTE_SHELL, not UNHANDLED."""
+    classifier = RuleBasedIntentClassifier()
+    # These are shell commands, not chat
+    intent, args = classifier.classify("git status")
+    assert intent is OrchestrationIntent.EXECUTE_SHELL
+    assert args["command"] == "git status"
+
+    intent, args = classifier.classify("python script.py")
+    assert intent is OrchestrationIntent.EXECUTE_SHELL
+    assert args["command"] == "python script.py"
