@@ -201,6 +201,8 @@ class OrchestrationService(BaseService):
             source=self.name,
         )
 
+        mark_orchestration_request(request_id)
+
         self._execute_and_respond(
             intent=intent,
             provider_id=provider_id,
