@@ -199,119 +199,407 @@ ai_command_center/core/event_bus.py
 
 ---
 
-## Phase 7: Multi-Agent Runtime
+## Phase 7: Operational Intelligence
 
-**Status:** GATED
+**Status:** COMPLETE (foundation)  
+**Priority:** HIGH  
+**Estimated Effort:** Done  
+**Dependencies:** Phase 1-4 complete ✅
 
-**Priority:** MEDIUM  
-**Estimated Effort:** 4-6 weeks  
-**Dependencies:** Phase 5 (Async), Phase 6 (External Bridge)
+### 7.1 Trust & Execution Foundation
 
-### 7.1 Constitutional Gate Checklist
+**Already implemented:**
+- `ExecutionOrchestratorService` — execution gates with approval tiers
+- `TruthBoundary` — validation before response
+- `orchestration/execution/executor.py` — provider execution with receipts
 
-Before any multi-agent code:
+### 7.2 Constitutional Guarantees
 
-- [ ] **A1 — Context Before Conversation**: Which service owns agent context assembly?
-- [ ] **A2 — Execution Before Explanation**: Minimum executable artifact before `chat.complete`?
-- [ ] **A5 — Determinism Before AI**: Deterministic fallback when agent fails?
-- [ ] **System-level**: Multi-agent opt-in; `CommandRouterService` not shadowed
+**Already enforced:**
+- Intent → Provider → Receipt → Composer pipeline
+- No LLM hallucination without provider verification
+- Execution receipts required for all orchestration operations
 
-### 7.2 Required Deliverables
+### 7.3 Exit Criteria
 
-1. [ ] Data-flow diagram: spawn → context → execute → result
-2. [ ] EventBus topics + payloads (new or existing)
-3. [ ] Service decomposition diagram
-4. [ ] Constitutional question → design decision mapping
-5. [ ] Forbidden execution paths list
-6. [ ] Verification plan (tests, scripts, gates)
+✅ Phase 7 foundational work complete (trust before abstraction)
 
-### 7.3 Ownership Rules
+---
 
-```text
-UI → AppState → EventBus → Services → Repositories → Storage
+## Phase 8: Operator Kernel & Model Independence
+
+**Status:** PLANNED  
+**Priority:** HIGH  
+**Estimated Effort:** 6-8 weeks  
+**Dependencies:** Phase 7 complete ✅, Phase 5 (Async) ✅
+
+### 8.1 Mission
+
+Transform ACC from **Operator Runtime** into **Model-Agnostic Operator Platform**.
+
+**Core Principle:**
+```
+Behavior belongs to ACC
+Reasoning belongs to LLM
 ```
 
-- No agent direct access to files, SQLite, settings, Ollama, or tools
-- No direct service-to-service calls
-- No global state — `AppState` + `SettingsSnapshot` only
+### 8.2 Architecture
 
-### 7.4 Agent Lifecycle
+```
+                USER
+                  │
+                  ▼
+        ┌─────────────────┐
+        │ Operator Kernel │
+        └────────┬────────┘
+                 │
+      ┌──────────┼──────────┐
+      ▼          ▼          ▼
+    Intent    Planning   Policies
+      └──────────┼──────────┘
+                 ▼
+      Prompt Assembly Service
+                 ▼
+          Model Adapter
+                 ▼
+        GPT Claude Qwen DeepSeek Gemini
+                 ▼
+        Compliance Engine
+                 ▼
+        Response Contract
+                 ▼
+         UI Renderer
+```
 
-| Event | Topic | Payload |
-|-------|-------|---------|
-| Spawn | `agent.spawned` | `{ agent_id, config, workspace_scope }` |
-| Context request | `agent.context.request` | `{ agent_id, scope }` |
-| Context result | `agent.context.result` | `{ agent_id, context_bundle }` |
-| Task assigned | `agent.task.assigned` | `{ agent_id, task_id, capability }` |
-| Task complete | `agent.task.completed` | `{ agent_id, task_id, result }` |
-| Terminate | `agent.terminated` | `{ agent_id, reason }` |
+### 8.3 Major Subsystems
 
-### 7.5 Exit Criteria
+| Subsystem | Purpose |
+|-----------|---------|
+| **OperatorKernel** | Single source of operational behavior |
+| **IntentResolver** | Classify user intent |
+| **ModeResolver** | Determine operator mode |
+| **PolicyEngine** | Enforce constitutional rules |
+| **PromptAssemblyService** | Dynamic prompt construction |
+| **ModelAdapter** | Provider-neutral interface |
+| **ComplianceEngine** | Validate responses, detect hallucinations |
 
-- [ ] Constitutional gate sign-off (author + reviewer)
-- [ ] All architectural guarantee tests pass
-- [ ] Permission-gated agent spawning
-- [ ] Context assembly through `ContextManager` only
+### 8.4 Model Adapter Layer
+
+**Package:** `ai_command_center/models/`
+
+```
+base.py              — ModelAdapter contract
+openai_adapter.py   — OpenAI / Azure OpenAI
+anthropic_adapter.py — Claude
+gemini_adapter.py    — Gemini
+ollama_adapter.py   — Local models
+registry.py          — Model registry
+```
+
+**Every adapter returns:**
+```python
+ModelResponse  # ACC never consumes raw model output
+```
+
+### 8.5 Structured Response Contracts
+
+| Mode | Contract |
+|------|----------|
+| Chat | `ChatResponse` |
+| Command | `CommandResponse` |
+| Investigation | `InvestigationResponse` |
+| Architect | `ArchitectResponse` |
+
+**No free-form operational responses.**
+
+### 8.6 Compliance Engine
+
+**Validates every response:**
+- Hallucinated capabilities
+- Invalid providers
+- Missing evidence
+- Contract violations
+- Forbidden claims
+
+### 8.7 Success Criteria
+
+- [ ] Swap models without UI changes
+- [ ] Swap models without prompt rewrites
+- [ ] Swap models without capability changes
+- [ ] Same command behavior across providers
+- [ ] Compliance catches hallucinations
+- [ ] Operator identity remains consistent
+
+### 8.8 Deliverables
+
+```
+ai_command_center/operator/
+├── __init__.py
+├── kernel.py
+├── intent_resolver.py
+├── mode_resolver.py
+├── policy_engine.py
+├── prompt_assembly.py
+├── compliance_engine.py
+└── response_contracts.py
+
+ai_command_center/models/
+├── __init__.py
+├── base.py
+├── adapter.py
+├── adapters/
+│   ├── __init__.py
+│   ├── openai_adapter.py
+│   ├── anthropic_adapter.py
+│   ├── gemini_adapter.py
+│   └── ollama_adapter.py
+└── registry.py
+
+tests/operator/
+├── test_kernel.py
+├── test_intent_resolver.py
+├── test_model_adapters.py
+├── test_compliance_engine.py
+└── test_model_independence.py
+```
 
 ---
 
-## Phase 8: Knowledge Federation
+## Phase 9: Goals, Planning & Multi-Agent Coordination
 
-**Status:** FUTURE
+**Status:** PLANNED  
+**Priority:** HIGH  
+**Estimated Effort:** 8-10 weeks  
+**Dependencies:** Phase 8 (Operator Kernel) ✅
 
+### 9.1 Mission
+
+Transform ACC from **Command Execution System** into **Goal Driven Workspace OS**.
+
+**Core Principle:**
+```
+Commands are temporary.
+Goals persist.
+```
+
+### 9.2 Architecture
+
+```
+Goal
+  │
+  ▼
+Planner
+  │
+  ▼
+Task Graph
+  │
+  ▼
+Execution Coordinator
+  │
+  ▼
+Specialist Agents
+  │
+  ▼
+Timeline
+```
+
+### 9.3 Major Subsystems
+
+| Subsystem | Purpose |
+|-----------|---------|
+| **GoalEngine** | Persistent goal entities |
+| **PlanningEngine** | Goal → ExecutionPlan |
+| **TaskGraph** | DAG-based task management |
+| **AgentContracts** | Capability declarations |
+| **AgentCoordinator** | Task assignment, conflict resolution |
+| **PolicyEngine** | Pre-execution approval gates |
+| **OperationalMemory** | Timeline-based memory |
+
+### 9.4 Planning Pipeline
+
+```
+Goal → Explore → Plan → Validate → Execute → Review → Close
+```
+
+### 9.5 Agent Contract Framework
+
+Every agent declares:
+```python
+Capabilities
+Permissions
+Dependencies
+Risk Level
+Evidence Requirements
+```
+
+### 9.6 Success Criteria
+
+- [ ] ACC manages long-running goals
+- [ ] Plans survive restarts
+- [ ] Multiple agents collaborate
+- [ ] Operator remains authority
+- [ ] Every agent action is auditable
+- [ ] Goal progress visible in UI
+
+### 9.7 Deliverables
+
+```
+ai_command_center/orchestration/goals/
+├── __init__.py
+├── goal_engine.py
+├── goal.py
+├── planning_engine.py
+├── task_graph.py
+├── task.py
+└── agent_coordinator.py
+
+ai_command_center/orchestration/agents/
+├── __init__.py
+├── agent_contract.py
+├── agent_registry.py
+└── policy_engine.py
+
+tests/orchestration/goals/
+├── test_goal_engine.py
+├── test_task_graph.py
+├── test_planning_pipeline.py
+└── test_agent_coordination.py
+```
+
+---
+
+## Phase 10: Workspace OS Intelligence & World Model Expansion
+
+**Status:** FUTURE  
 **Priority:** MEDIUM  
-**Estimated Effort:** 6-8 weeks  
-**Dependencies:** Phase 6 (External Bridge), Phase 7 (Multi-Agent)
+**Estimated Effort:** 10-12 weeks  
+**Dependencies:** Phase 9 (Goals & Multi-Agent) ✅
 
-### 8.1 Vector Search Constitutional Amendment
+### 10.1 Mission
 
-**Required:** No vector DB / embeddings without constitutional amendment
+Transform ACC from **Goal Based System** into **Workspace Operating System**.
 
-**Amendment process:**
-1. Submit `governance/amendment_template.md`
-2. UCGS profile update for vector capability
-3. Constitutional pre-flight review
-4. ratification vote
+**Core Principle:**
+```
+The system no longer reasons primarily from conversations.
+It reasons from:
+  - Entities
+  - Relationships
+  - State
+  - Events
+```
 
-### 8.2 Knowledge Graph UI
+### 10.2 Architecture
 
-**Deliverables:**
-- [ ] Graph visualization for memory nodes/edges
-- [ ] Query interface for memory lookup
-- [ ] Cross-source knowledge federation (Obsidian + external)
+```
+World Model
+     │
+     ▼
+Entity Graph
+     │
+     ▼
+Relationship Engine
+     │
+     ▼
+State Projection Layer
+     │
+     ▼
+Reasoning Engine
+     │
+     ▼
+Operator
+```
 
-### 8.3 Cross-Platform Search
+### 10.3 Major Subsystems
 
-**Deliverables:**
-- [ ] Unified search across entities, notes, memory
-- [ ] Filter by entity type, date, workspace
-- [ ] Search result ranking by relevance
+| Subsystem | Purpose |
+|-----------|---------|
+| **WorldModelService** | Core entity storage (Projects, Files, Notes, Tasks, Goals, Agents) |
+| **EntityGraph** | Graph database style architecture |
+| **RelationshipEngine** | Tracks ownership, dependencies, history |
+| **StateProjectionLayer** | CQRS-style read models |
+| **ContextEngine** | Entity-based context assembly |
+| **PredictiveOperations** | Proactive suggestions |
+| **UndoReplayFramework** | Timeline-powered recovery |
+
+### 10.4 World Explorer UI
+
+Similar to:
+- Obsidian Graph
+- Neo4j Browser
+- VS Code Explorer
+
+Displays:
+```
+Entities
+Relationships
+Dependencies
+Goals
+Agents
+```
+
+### 10.5 Success Criteria
+
+- [ ] ACC reasons from world state instead of conversation history
+- [ ] Every object is an entity
+- [ ] Relationships are queryable
+- [ ] Goals, tasks, agents, files, projects are connected
+- [ ] Context is generated from the World Model
+- [ ] Undo and replay are operational
+- [ ] ACC proactively identifies blockers and opportunities
+- [ ] Workspace OS behavior driven by entities, events, and state
+
+### 10.6 Deliverables
+
+```
+ai_command_center/world/
+├── __init__.py
+├── world_model_service.py
+├── entity_graph.py
+├── relationship_engine.py
+├── state_projections.py
+├── context_engine.py
+├── predictive_engine.py
+└── undo_replay.py
+
+ai_command_center/ui/views/
+├── world_explorer_view.py
+├── relationship_visualizer.py
+└── dependency_inspector.py
+
+tests/world/
+├── test_world_model.py
+├── test_entity_graph.py
+├── test_relationships.py
+├── test_state_projections.py
+└── test_context_engine.py
+```
 
 ---
 
-## Phase 9: Cross-Platform Expansion
+## Phase 11: Cross-Platform Expansion
 
 **Status:** FUTURE
 
 **Priority:** MEDIUM  
 **Estimated Effort:** 8-12 weeks  
-**Dependencies:** Phase 5 (Async), Phase 6 (External Bridge)
+**Dependencies:** Phase 5 (Async), Phase 10 (World Model)
 
-### 9.1 macOS Support
+### 11.1 macOS Support
 
 **Deliverables:**
 - [ ] `platform/hotkey_provider_macos.py` (CGEvent tap)
 - [ ] Accessibility permissions check and user prompt
 - [ ] System tray parity with Windows
 
-### 9.2 Linux Support
+### 11.2 Linux Support
 
 **Deliverables:**
 - [ ] X11/Wayland hotkey detection
 - [ ] System tray integration (libappindicator)
 - [ ] Path handling for Linux filesystem
 
-### 9.3 Platform Abstraction
+### 11.3 Platform Abstraction
 
 **Deliverables:**
 - [ ] Unified `PlatformService` abstraction
@@ -323,19 +611,21 @@ UI → AppState → EventBus → Services → Repositories → Storage
 ## Implementation Order
 
 ```
-Phase 5 → Phase 6 → Phase 7 → Phase 8 → Phase 9
-   ↑         ↑         ↑         ↑         ↑
+Phase 7 → Phase 8 → Phase 9 → Phase 10 → Phase 11
    │         │         │         │         │
-   Priority: Async   External   Multi-   Knowledge  Linux/
-             perf    bridge     agent    graph    macOS
+   ▼         ▼         ▼         ▼         ▼
+Complete  Operator   Goals &   World     Cross-
+(Founda-   Kernel    Multi-   Model    Platform
+tion)      (Model    Agent    (Entity
+           Indep)    Coord)    Graph)
 ```
 
 **Rationale:**
-1. **Phase 5** (Async) — Infrastructure for all subsequent phases
-2. **Phase 6** (External Bridge) — Unblocks MCP and external providers
-3. **Phase 7** (Multi-Agent) — Requires Phase 5 infrastructure
-4. **Phase 8** (Knowledge) — Requires Phase 6 external bridge
-5. **Phase 9** (Platform) — Independent but benefits from Phase 5
+1. **Phase 7** (Complete) — Trust before abstraction
+2. **Phase 8** (Operator Kernel) — Abstraction before agents
+3. **Phase 9** (Goals & Multi-Agent) — Agents before world-model
+4. **Phase 10** (World Model) — World-model for true Workspace OS
+5. **Phase 11** (Platform) — Independent, benefits from all prior phases
 
 ---
 
@@ -355,13 +645,13 @@ All phases require:
 
 | Phase | Dev Weeks | Risk Level | Priority |
 |-------|-----------|------------|----------|
-| 5 — Async EventBus | 2-3 | HIGH | HIGH |
-| 6 — External Bridge | 2-3 | MEDIUM | HIGH |
-| 7 — Multi-Agent | 4-6 | HIGH | MEDIUM |
-| 8 — Knowledge | 6-8 | MEDIUM | MEDIUM |
-| 9 — Cross-Platform | 8-12 | MEDIUM | LOW |
+| 7 — Operational Intelligence | Done | — | HIGH |
+| 8 — Operator Kernel | 6-8 | HIGH | HIGH |
+| 9 — Goals & Multi-Agent | 8-10 | HIGH | HIGH |
+| 10 — World Model | 10-12 | MEDIUM | MEDIUM |
+| 11 — Cross-Platform | 8-12 | MEDIUM | LOW |
 
-**Total remaining:** 22-32 weeks (one developer)
+**Total remaining:** 32-42 weeks (one developer)
 
 ---
 
@@ -369,11 +659,10 @@ All phases require:
 
 | Criterion | Measurement |
 |-----------|-------------|
-| Async EventBus | 95th percentile dispatch latency < 50ms |
-| External Bridge | MCP manifests load, capability catalog aggregates |
-| Multi-Agent | Constitutional gate sign-off, permission-gated |
-| Knowledge | Graph visualization, cross-source search |
-| Cross-Platform | macOS + Linux hotkey + tray parity |
+| Phase 8 — Model Independence | Swap models without prompt rewrites |
+| Phase 9 — Goals | Plans survive restarts, multiple agents collaborate |
+| Phase 10 — World Model | ACC reasons from entities, not conversation |
+| Phase 11 — Cross-Platform | macOS + Linux hotkey + tray parity |
 | Test Suite | 100% pass rate maintained |
 | UCGS | All rules pass at strict level |
 
@@ -406,12 +695,14 @@ If any phase introduces regressions:
 | `PROJECT_CONSTITUTION_V4.md` | Supreme authority |
 | `AGENTS.md` | Layer ownership rules |
 | `docs/ARCHITECTURE.md` | Runtime architecture |
-| `docs/architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md` | Cognitive stack (Program 5) |
 | `docs/architecture/WORKSPACE_VISION.md` | Product north star |
-| `docs/architecture/ASYNC_EVENTBUS_POLICY.md` | Phase 5 design |
-| `docs/architecture/AGENT_RUNTIME_INTERFACE.md` | Phase 7 design |
-| `docs/architecture/PROGRAM_3_WORKSPACE_ADOPTION.md` | Phase 2 reference |
-| `docs/architecture/PLATFORM_STRATEGY.md` | Phase 9 design |
+| `docs/plans/PHASE_5_ASYNC_EVENTBUS_PLAN.md` | Phase 5 implementation |
+| `docs/plans/PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | Phase 6 implementation |
+| `docs/plans/PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md` | Phase 7 (superseded) |
+| `docs/plans/PHASE_8_OPERATOR_KERNEL_PLAN.md` | Phase 8 implementation |
+| `docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | Phase 9 implementation |
+| `docs/plans/PHASE_10_WORLD_MODEL_PLAN.md` | Phase 10 implementation |
+| `docs/plans/PHASE_11_CROSS_PLATFORM_PLAN.md` | Phase 11 implementation |
 
 ### Active Governance
 
@@ -429,3 +720,4 @@ If any phase introduces regressions:
 | Date | Change |
 |------|--------|
 | 2026-07-11 | Initial consolidated roadmap — Phases 1-4 complete, Phases 5-9 planned |
+| 2026-07-11 | Updated Phases 7-11 with Operator Kernel, Goals & Multi-Agent, World Model designs |
