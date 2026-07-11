@@ -8,7 +8,15 @@ This directory contains detailed implementation plans for each phase of the AI C
 
 | Document | Description |
 |----------|-------------|
-| `../MASTER_ROADMAP_2026.md` | Consolidated 4-phase roadmap with all phases |
+| `../MASTER_ROADMAP_2026.md` | Consolidated roadmap with all phases 1-11 |
+
+---
+
+## Key Reference
+
+| Document | Description |
+|----------|-------------|
+| `PHASE_7_8_9_10_QA.md` | **CRITICAL** — 5 key questions and detailed answers about Phases 7-10 |
 
 ---
 
@@ -18,25 +26,24 @@ This directory contains detailed implementation plans for each phase of the AI C
 |-------|----------|--------|----------|
 | 5 | `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | IN PROGRESS | HIGH |
 | 6 | `PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | IN PROGRESS | HIGH |
-| 7 | `PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md` | GATED | MEDIUM |
-| 8 | `PHASE_8_KNOWLEDGE_FEDERATION_PLAN.md` | FUTURE | MEDIUM |
-| 9 | `PHASE_9_CROSS_PLATFORM_PLAN.md` | FUTURE | LOW |
+| 7 | `PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md` | Superseded | — |
+| **8** | `PHASE_8_OPERATOR_KERNEL_PLAN.md` | **PLANNED** | **HIGH** |
+| **9** | `PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | **PLANNED** | **HIGH** |
+| **10** | `PHASE_10_WORLD_MODEL_PLAN.md` | **FUTURE** | **MEDIUM** |
+| 11 | `PHASE_9_CROSS_PLATFORM_PLAN.md` | FUTURE | LOW |
 
 ---
 
 ## Phase Dependencies
 
 ```
-Phase 5 ──┬── Phase 6 ──┬── Phase 7 ──┬── Phase 8
-          │             │             │
-Async     External      Multi-       Knowledge
-EventBus  Bridge        Agent        Federation
-                          │
-                          │
-                          └── Phase 9
-                              │
-                          Cross-
-                          Platform
+Phase 7 ──► Phase 8 ──► Phase 9 ──► Phase 10
+   │           │           │           │
+   ▼           ▼           ▼           ▼
+Operational  Operator   Goals &    World Model
+Intelligence Kernel    Multi-Agent
+
+Phase 5 ──► All phases (Async EventBus required)
 ```
 
 ---
@@ -55,24 +62,28 @@ EventBus  Bridge        Agent        Federation
 - Integrate with planner capability catalog
 - Design: `AGENT_RUNTIME_INTERFACE.md`
 
-### Gated
+### Planned (Phases 8-10)
 
-**Phase 7 — Multi-Agent Runtime**
-- Requires constitutional gate sign-off
-- All 3 constitutional questions must be answered
-- See `PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md`
+**Phase 8 — Operator Kernel & Model Independence**
+- Model-agnostic operator platform
+- Core: "Behavior belongs to ACC, Reasoning belongs to LLM"
+- Key: `PHASE_8_OPERATOR_KERNEL_PLAN.md`
+
+**Phase 9 — Goals & Multi-Agent Coordination**
+- Goal-driven workspace OS
+- Core: "Commands are temporary, Goals persist"
+- Key: `PHASE_9_GOALS_MULTI_AGENT_PLAN.md`
+
+**Phase 10 — World Model & Reasoning**
+- Entity-driven reasoning
+- Core: "ACC reasons from entities, not conversation"
+- Key: `PHASE_10_WORLD_MODEL_PLAN.md`
 
 ### Future
 
-**Phase 8 — Knowledge Federation**
-- Requires constitutional amendment for vector search
-- Cross-source unified search
-- Graph visualization
-
-**Phase 9 — Cross-Platform**
+**Phase 11 — Cross-Platform**
 - macOS and Linux support
 - Platform abstraction layer
-- Platform-specific implementations
 
 ---
 
