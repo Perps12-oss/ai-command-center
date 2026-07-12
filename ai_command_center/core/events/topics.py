@@ -259,6 +259,7 @@ EXTERNAL_CAPABILITY_REGISTER = "external.capability.register"
 EXTERNAL_CAPABILITY_UNREGISTER = "external.capability.unregister"
 EXTERNAL_CAPABILITY_REGISTERED = "external.capability.registered"
 EXTERNAL_CAPABILITY_CATALOG_UPDATED = "external.capability.catalog_updated"
+EXTERNAL_PROVIDER_DISCOVERED = "external.provider.discovered"
 
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
@@ -536,6 +537,7 @@ __all__ = [
     "EXTERNAL_CAPABILITY_UNREGISTER",
     "EXTERNAL_CAPABILITY_REGISTERED",
     "EXTERNAL_CAPABILITY_CATALOG_UPDATED",
+    "EXTERNAL_PROVIDER_DISCOVERED",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",
