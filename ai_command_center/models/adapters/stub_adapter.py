@@ -6,7 +6,7 @@ requiring external API access.
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import Iterator
 
 from ai_command_center.models.base import ModelAdapter, ModelConfig, ModelResponse
 from ai_command_center.operator.mode_resolver import OperatorMode

@@ -6,11 +6,10 @@ Reference: docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md Section 9.1
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ai_command_center.orchestration.goals.goal import Goal
 from ai_command_center.orchestration.goals.goal_status import GoalStatus
-from ai_command_center.orchestration.goals.task_graph import TaskGraph
 
 if TYPE_CHECKING:
     from ai_command_center.core.event_bus import EventBus

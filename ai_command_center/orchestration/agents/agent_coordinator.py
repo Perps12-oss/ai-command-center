@@ -11,9 +11,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from ai_command_center.orchestration.agents.agent_contract import Agent, AgentStatus
+from ai_command_center.orchestration.agents.agent_contract import Agent
 from ai_command_center.orchestration.agents.agent_registry import AgentRegistry
-from ai_command_center.orchestration.goals.task import Task, TaskStatus
+from ai_command_center.orchestration.goals.task import Task
 
 logger = logging.getLogger(__name__)
 
