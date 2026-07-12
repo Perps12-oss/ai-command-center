@@ -1,3 +1,28 @@
 {
-  "violations": []
+  "violations": [
+    {
+      "rule": "R2",
+      "file": "ai_command_center/operator/kernel.py",
+      "line": 134,
+      "message": "service class 'PromptAssemblyService' instantiated outside services/ or composition root"
+    },
+    {
+      "rule": "R2",
+      "file": "ai_command_center/platform/platform_service.py",
+      "line": 432,
+      "message": "service class 'WindowsPlatformService' instantiated outside services/ or composition root"
+    },
+    {
+      "rule": "R2",
+      "file": "ai_command_center/platform/platform_service.py",
+      "line": 434,
+      "message": "service class 'MacOSPlatformService' instantiated outside services/ or composition root"
+    },
+    {
+      "rule": "R2",
+      "file": "ai_command_center/platform/platform_service.py",
+      "line": 436,
+      "message": "service class 'LinuxPlatformService' instantiated outside services/ or composition root"
+    }
+  ]
 }
