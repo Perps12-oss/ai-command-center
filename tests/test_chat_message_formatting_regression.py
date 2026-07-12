@@ -22,8 +22,11 @@ from ai_command_center.ui.views.chat.message_block import AssistantMessageBlock
 
 def test_assistant_message_block_renders_markdown_correctly() -> None:
     """Verify that markdown formatting does not leak tag names into rendered text."""
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         block = AssistantMessageBlock(root)
         block.pack(fill="both", expand=True)
@@ -36,10 +39,10 @@ def test_assistant_message_block_renders_markdown_correctly() -> None:
         # Retrieve the displayed text from the textbox
         rendered_text = block._textbox.get("1.0", "end").strip()
 
-        # Assertions to ensure formatting markers do not leak
+        # Assertions to ensure markdown syntax markers do not leak
         assert "code_block" not in rendered_text
-        assert "bold" not in rendered_text
-        assert "italic" not in rendered_text
+        assert "**" not in rendered_text
+        assert "*" not in rendered_text
         assert "Intro text" in rendered_text
         assert "print('hello world')" in rendered_text
         assert "Outro text" in rendered_text
@@ -61,8 +64,8 @@ def test_assistant_message_block_renders_bold_text() -> None:
 
         rendered_text = block._textbox.get("1.0", "end").strip()
 
-        # Bold tag should not appear in output
-        assert "bold" not in rendered_text
+        # Markdown bold markers should not appear in output
+        assert "**bold text**" not in rendered_text
         # The actual content should be present
         assert "bold text" in rendered_text
     finally:
@@ -83,8 +86,8 @@ def test_assistant_message_block_renders_italic_text() -> None:
 
         rendered_text = block._textbox.get("1.0", "end").strip()
 
-        # Italic tag should not appear in output
-        assert "italic" not in rendered_text
+        # Markdown italic markers should not appear in output
+        assert "*italic text*" not in rendered_text
         # The actual content should be present
         assert "italic text" in rendered_text
     finally:
@@ -186,10 +189,10 @@ Use `code` inline.
 
         rendered_text = block._textbox.get("1.0", "end").strip()
 
-        # No formatting tags should leak into the output
+        # No markdown syntax markers should leak into the output
         assert "code_block" not in rendered_text
-        assert "bold" not in rendered_text
-        assert "italic" not in rendered_text
+        assert "**bold**" not in rendered_text
+        assert "*italic*" not in rendered_text
         assert "header" not in rendered_text
         assert "list" not in rendered_text
 

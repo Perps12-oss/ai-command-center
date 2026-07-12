@@ -173,15 +173,6 @@ def create_response(
     **kwargs: Any,
 ) -> ResponseContract:
     """Factory function to create a response of the appropriate type."""
-    mode_to_contract = {
-        OperatorMode.CHAT: ChatResponse,
-        OperatorMode.COMMAND: CommandResponse,
-        OperatorMode.INVESTIGATION: InvestigationResponse,
-        OperatorMode.ARCHITECT: ArchitectResponse,
-    }
-
-    contract_class = mode_to_contract.get(mode, ChatResponse)
-
     # Build appropriate kwargs based on mode
     if mode == OperatorMode.CHAT:
         return ChatResponse(message=content, **kwargs)

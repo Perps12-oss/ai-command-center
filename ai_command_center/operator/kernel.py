@@ -26,7 +26,7 @@ from ai_command_center.domain.correlation import CorrelationContext
 if TYPE_CHECKING:
     from ai_command_center.core.event_bus import EventBus
     from ai_command_center.models.base import ModelAdapter
-    from ai_command_center.operator.intent_resolver import Intent, IntentType
+    from ai_command_center.operator.intent_resolver import IntentType
     from ai_command_center.operator.mode_resolver import OperatorMode
     from ai_command_center.operator.compliance_engine import ComplianceViolation
     from ai_command_center.operator.prompt_assembly import PromptAssemblyService
