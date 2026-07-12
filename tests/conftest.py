@@ -112,6 +112,34 @@ def event_bus():
 
 
 @pytest.fixture
+def mock_event_bus():
+    """A minimal mock EventBus for operator tests.
+
+    Returns a simple object that implements publish() for testing
+    components that don't need full EventBus functionality.
+    """
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class MockEvent:
+        topic: str
+        payload: dict = field(default_factory=dict)
+        source: str = "test"
+
+    class MockEventBus:
+        def __init__(self):
+            self.published: list[MockEvent] = []
+
+        def publish(self, topic: str, payload: dict | None = None, *, source: str = "test"):
+            self.published.append(MockEvent(topic=topic, payload=payload or {}, source=source))
+
+        def subscribe(self, topic: str, handler):
+            return lambda: None  # No-op unsubscribe
+
+    return MockEventBus()
+
+
+@pytest.fixture
 def temp_db_path(tmp_path: Path) -> Path:
     """Path to a fresh, bootstrapped SQLite DB file (schema applied)."""
     from ai_command_center.db.connection import connect, init_database
