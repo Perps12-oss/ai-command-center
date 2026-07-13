@@ -31,7 +31,7 @@ from ai_command_center.orchestration.orchestration_registry import mark_orchestr
 from ai_command_center.orchestration.policies.fallback_policy import OrchestrationFallbackPolicy
 from ai_command_center.orchestration.providers.provider_registry import OrchestrationProviderRegistry
 from ai_command_center.orchestration.routing.intent_router import IntentRouter
-from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
+from ai_command_center.domain.orchestration_run_snapshot import OrchestrationRunSnapshot, _dict_to_immutable
 from ai_command_center.orchestration.verification.truth_boundary import TruthBoundary
 from ai_command_center.services.base import BaseService
 
@@ -338,7 +338,7 @@ class OrchestrationService(BaseService):
             intent=intent.value,
             provider_id=provider_id,
             execution_success=run.result.success,
-            execution_facts=dict(run.result.facts),
+            execution_facts=_dict_to_immutable(run.result.facts),  # IMMUTABLE
             execution_error=run.result.error,
             truth_valid=validation.valid,
             truth_detail=validation.detail,
@@ -440,7 +440,7 @@ class OrchestrationService(BaseService):
             intent=intent.value,
             provider_id=provider_id,
             execution_success=run.result.success,
-            execution_facts=dict(run.result.facts),
+            execution_facts=_dict_to_immutable(run.result.facts),  # IMMUTABLE
             execution_error=run.result.error,
             truth_valid=validation.valid,
             truth_detail=validation.detail,
