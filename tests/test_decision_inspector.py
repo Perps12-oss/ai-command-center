@@ -45,8 +45,11 @@ def test_decision_domain_to_inspect_payload() -> None:
 
 
 def test_decision_inspector_smoke_and_host_registration() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         decision = Decision(reason="Approve deployment")
         ref = InspectableRef.from_payload(
@@ -71,8 +74,11 @@ def test_decision_inspector_smoke_and_host_registration() -> None:
 def test_response_action_strip_calls_on_inspect_select_with_kind(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     selected: list[InspectableRef] = []
 
     def capture(ref: InspectableRef) -> None:

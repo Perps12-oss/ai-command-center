@@ -19,8 +19,11 @@ from ai_command_center.ui.components.inspector import InspectorHost, MessageInsp
 
 
 def test_inspector_host_smoke() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         host = InspectorHost(root)
         host.pack(fill="both", expand=True)

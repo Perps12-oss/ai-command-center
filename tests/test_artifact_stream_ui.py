@@ -23,8 +23,11 @@ from ai_command_center.ui.views.chat.message_block import AssistantMessageBlock
 
 
 def test_artifact_list_view_renders_cards() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     actions: list[tuple[str, str]] = []
     try:
         view = ArtifactListView(
@@ -53,8 +56,11 @@ def test_artifact_list_view_renders_cards() -> None:
 
 
 def test_assistant_message_block_set_artifacts_updates_strip() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         block = AssistantMessageBlock(
             root,
@@ -82,8 +88,11 @@ def test_assistant_message_block_set_artifacts_updates_strip() -> None:
 
 
 def test_execution_badge_invokes_inspect_select() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     selected = []
     try:
         badge = ExecutionBadge(

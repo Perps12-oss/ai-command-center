@@ -21,8 +21,11 @@ from ai_command_center.ui.views.workflow_graph_view import WorkflowGraphView
 
 
 def test_workflow_graph_view_smoke() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         view = WorkflowGraphView(root)
         view.pack(fill="both", expand=True)

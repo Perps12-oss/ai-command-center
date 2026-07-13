@@ -24,8 +24,11 @@ from ai_command_center.ui.views.chat import message_block as chat_message_block
 
 
 def test_artifact_and_provider_inspectors_smoke() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         artifact_ref = InspectableRef.from_payload(
             {
@@ -94,8 +97,11 @@ def test_artifact_and_provider_inspectors_smoke() -> None:
 def test_assistant_message_text_widget_is_not_bound(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     captured: list[tuple[object, ...]] = []
 
     def record_bind(widgets, *, get_ref, on_select, on_navigate):

@@ -6,7 +6,7 @@ Reference: docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md Section 9.2
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -75,8 +75,8 @@ class Task:
     description: str = ""
     status: TaskStatus = TaskStatus.PENDING
     priority: TaskPriority = TaskPriority.NORMAL
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     depends_on: list[str] = field(default_factory=list)
     assigned_to: str | None = None
     result: dict[str, Any] | None = None
@@ -116,7 +116,7 @@ class Task:
             status=self.status,
             priority=self.priority,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             depends_on=self.depends_on,
             assigned_to=agent_id,
             result=self.result,
@@ -138,7 +138,7 @@ class Task:
             status=TaskStatus.COMPLETED,
             priority=self.priority,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             depends_on=self.depends_on,
             assigned_to=self.assigned_to,
             result=result or {},
@@ -163,7 +163,7 @@ class Task:
             status=new_status,
             priority=self.priority,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             depends_on=self.depends_on,
             assigned_to=self.assigned_to,
             result=self.result,
@@ -185,7 +185,7 @@ class Task:
             status=TaskStatus.RUNNING,
             priority=self.priority,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             depends_on=self.depends_on,
             assigned_to=self.assigned_to,
             result=self.result,
