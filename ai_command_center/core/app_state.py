@@ -173,6 +173,12 @@ from ai_command_center.domain.provider_registry_snapshot import (
     ProviderEntry as ProviderRegistryEntry,
     ProviderRegistrySnapshot,
 )
+from ai_command_center.domain.permission_check_snapshot import (
+    PendingCheck,
+    PermissionCheckSnapshot,
+    ResolvedCheck,
+    _MAX_RESOLVED_HISTORY,
+)
 from ai_command_center.domain.workflow_library_snapshot import (
     WorkflowLibrarySnapshot,
     WorkflowRunSnapshot,
@@ -535,6 +541,10 @@ class AppState:
     )
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
+    # Blueprint Phase 8 — Permission Check AppState projection
+    permission_snapshot: PermissionCheckSnapshot = field(
+        default_factory=PermissionCheckSnapshot
+    )
     orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
     provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
@@ -2007,6 +2017,81 @@ def _wm_mutation_summary(mutation: dict) -> str:
     return mtype
 
 
+# ── Blueprint Phase 8 — Permission Check AppState reducer ─────────────────────
+
+_PERMISSION_TOPICS = frozenset({
+    PERMISSION_CHECK_REQUEST,
+    PERMISSION_CHECK_RESULT,
+})
+
+
+def _reduce_permission_snapshot(state: AppState, event: Event) -> AppState:
+    """Project permission check events into immutable AppState.permission_snapshot."""
+    topic = event.topic
+    if topic not in _PERMISSION_TOPICS:
+        return state
+    p = event.payload
+    snap = state.permission_snapshot
+
+    if topic == PERMISSION_CHECK_REQUEST:
+        if not p.get("interactive"):
+            return state
+        check_id = str(p.get("check_id") or "")
+        if not check_id:
+            return state
+        pending = PendingCheck(
+            check_id=check_id,
+            permissions=tuple(str(x) for x in (p.get("permissions") or []) if x),
+            actor_type=str(p.get("actor_type") or "agent"),
+            actor_id=str(p.get("actor_id") or ""),
+            summary=str(p.get("summary") or "An agent requested supervised permissions."),
+        )
+        new_snap = replace(
+            snap,
+            pending=pending,
+            revision=snap.revision + 1,
+            total_requested=snap.total_requested + 1,
+        )
+        return replace(
+            state,
+            permission_snapshot=new_snap,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == PERMISSION_CHECK_RESULT:
+        check_id = str(p.get("check_id") or "")
+        pending = snap.pending
+        if pending is None or pending.check_id != check_id:
+            return state
+        granted = bool(p.get("granted", False))
+        resolved = ResolvedCheck(
+            check_id=check_id,
+            actor_id=pending.actor_id,
+            granted=granted,
+            summary=pending.summary,
+        )
+        history = (resolved,) + snap.resolved
+        if len(history) > _MAX_RESOLVED_HISTORY:
+            history = history[:_MAX_RESOLVED_HISTORY]
+        new_snap = replace(
+            snap,
+            pending=None,
+            revision=snap.revision + 1,
+            resolved=history,
+            total_granted=snap.total_granted + (1 if granted else 0),
+            total_denied=snap.total_denied + (0 if granted else 1),
+        )
+        return replace(
+            state,
+            permission_snapshot=new_snap,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    return state
+
+
 # ── Blueprint Phase 7 — Workflow Library AppState reducer ─────────────────────
 
 _WORKFLOW_LIB_TOPICS = frozenset({
@@ -2845,6 +2930,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_agent_pipeline_snapshot,
     _reduce_provider_registry,
     _reduce_workflow_library,
+    _reduce_permission_snapshot,
 )
 
 
