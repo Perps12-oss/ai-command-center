@@ -94,6 +94,9 @@ from ai_command_center.core.events.topics import (
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
     SYSTEM_SNAPSHOT,
+    JOURNAL_ENTRY_APPENDED,
+    OPERATION_LOADED,
+    OPERATION_SAVED,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -152,6 +155,8 @@ from ai_command_center.core.state.automation_workspace_state import (
     reduce_automation_workspace_state,
 )
 from ai_command_center.domain.automation_workspace import AutomationWorkspaceState
+from ai_command_center.domain.journal_entry import JournalEntry
+from ai_command_center.domain.operation_snapshot import OperationSnapshot
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -249,6 +254,9 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SELECT,
     UI_AUTOMATION_SCHEDULE_TOGGLE,
+    JOURNAL_ENTRY_APPENDED,
+    OPERATION_LOADED,
+    OPERATION_SAVED,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -493,6 +501,12 @@ class AppState:
     brain_recent_goals: tuple[dict[str, object], ...] = ()
     brain_recent_observations: tuple[dict[str, object], ...] = ()
     brain_recent_runtime_actions: tuple[dict[str, object], ...] = ()
+
+    # Blueprint Phase 1 — Operations Library & Journal
+    operation_library_index: tuple[OperationSnapshot, ...] = ()
+    operation_journal: tuple[JournalEntry, ...] = ()
+    active_operation: OperationSnapshot | None = None
+    journal_entry_counter: int = 0
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1714,6 +1728,85 @@ def _reduce_brain_state(state: AppState, event: Event) -> AppState:
     return state
 
 
+# ── Blueprint Phase 1 — Operations Library & Journal reducers ─────────────────
+
+JOURNAL_MAX_ENTRIES = 500
+
+
+def _reduce_operation_saved(state: AppState, event: Event) -> AppState:
+    """Update operation_library_index from OPERATION_SAVED events."""
+    if event.topic != OPERATION_SAVED:
+        return state
+    payload = event.payload
+    correlation_id = str(payload.get("correlation_id", ""))
+    if not correlation_id:
+        return state
+    existing_map = {s.correlation_id: s for s in state.operation_library_index}
+    prev = existing_map.get(correlation_id)
+    updated = OperationSnapshot(
+        correlation_id=correlation_id,
+        goal_id=str(payload.get("goal_id", prev.goal_id if prev else "")),
+        goal_title=str(payload.get("goal_title", prev.goal_title if prev else "")),
+        goal_status=str(payload.get("goal_status", prev.goal_status if prev else "unknown")),
+        goal_priority=prev.goal_priority if prev else "normal",
+        started_at=prev.started_at if prev else 0.0,
+        completed_at=prev.completed_at if prev else 0.0,
+        agent_ids=prev.agent_ids if prev else (),
+        execution_ids=prev.execution_ids if prev else (),
+        tags=prev.tags if prev else (),
+    )
+    existing_map[correlation_id] = updated
+    index = tuple(
+        sorted(existing_map.values(), key=lambda s: s.started_at or 0.0, reverse=True)
+    )
+    return replace(
+        state,
+        operation_library_index=index,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_operation_loaded(state: AppState, event: Event) -> AppState:
+    """Set active_operation from OPERATION_LOADED payload snapshot."""
+    if event.topic != OPERATION_LOADED:
+        return state
+    payload = event.payload
+    raw_snapshot = payload.get("snapshot")
+    if not isinstance(raw_snapshot, dict):
+        return state
+    try:
+        snapshot = OperationSnapshot.from_dict(raw_snapshot)
+    except Exception:
+        return state
+    return replace(
+        state,
+        active_operation=snapshot,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+def _reduce_journal_entry_appended(state: AppState, event: Event) -> AppState:
+    """Append a JournalEntry to operation_journal, capped at JOURNAL_MAX_ENTRIES."""
+    if event.topic != JOURNAL_ENTRY_APPENDED:
+        return state
+    counter = state.journal_entry_counter + 1
+    try:
+        entry = JournalEntry.from_payload(event.payload, entry_id=counter)
+    except Exception:
+        return state
+    journal = state.operation_journal + (entry,)
+    if len(journal) > JOURNAL_MAX_ENTRIES:
+        journal = journal[-JOURNAL_MAX_ENTRIES:]
+    return replace(
+        state,
+        operation_journal=journal,
+        journal_entry_counter=counter,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
 
 _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
@@ -1769,6 +1862,9 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,
     *EXECUTION_EVENT_REDUCERS,
+    _reduce_operation_saved,
+    _reduce_operation_loaded,
+    _reduce_journal_entry_appended,
 )
 
 
