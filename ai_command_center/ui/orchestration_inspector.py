@@ -80,7 +80,7 @@ class OrchestrationInspector(ctk.CTkToplevel):
             "",
             "Execution Result:",
             f"  success: {run.execution_success}",
-            f"  facts: {run.execution_facts}",
+            f"  facts: {run.execution_facts_dict}",
             f"  error: {run.execution_error or '-'}",
             "",
             "Truth Validation:",
