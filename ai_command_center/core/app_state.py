@@ -169,6 +169,10 @@ from ai_command_center.domain.agent_pipeline_snapshot import (
     AgentPipelineSnapshot,
     AgentRunSnapshot,
 )
+from ai_command_center.domain.provider_registry_snapshot import (
+    ProviderEntry as ProviderRegistryEntry,
+    ProviderRegistrySnapshot,
+)
 from ai_command_center.domain.execution_library_snapshot import (
     ExecutionLibrarySnapshot,
     ExecutionPlanSnapshot,
@@ -524,6 +528,10 @@ class AppState:
     orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
     provider_health_map: tuple[ProviderHealthSnapshot, ...] = ()
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
+    # Blueprint Phase 6 — Provider Registry AppState projection
+    provider_registry: ProviderRegistrySnapshot = field(
+        default_factory=ProviderRegistrySnapshot
+    )
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     capability_prompt_catalog: tuple[dict[str, object], ...] = ()
     capability_library: CapabilityLibrarySnapshot = field(
@@ -1989,6 +1997,88 @@ def _wm_mutation_summary(mutation: dict) -> str:
     return mtype
 
 
+# ── Blueprint Phase 6 — Provider Registry AppState reducer ────────────────────
+
+_PROVIDER_REGISTRY_TOPICS = frozenset({
+    CAPABILITY_PROVIDERS_READY,
+    ORCHESTRATION_PROVIDER_HEALTH,
+})
+
+
+def _reduce_provider_registry(state: AppState, event: Event) -> AppState:
+    """Project provider health/runtime events into immutable AppState.provider_registry."""
+    topic = event.topic
+    if topic not in _PROVIDER_REGISTRY_TOPICS:
+        return state
+    p = event.payload
+    reg = state.provider_registry
+    entry_map: dict[str, ProviderRegistryEntry] = {e.provider_id: e for e in reg.providers}
+
+    if topic == CAPABILITY_PROVIDERS_READY:
+        for item in (p.get("providers") or []):
+            if not isinstance(item, dict):
+                continue
+            pid = str(item.get("id") or "")
+            if not pid:
+                continue
+            prev = entry_map.get(pid)
+            health_raw = str(item.get("health_state") or "").lower()
+            if health_raw in {"ready", "healthy"}:
+                health_status = "healthy"
+            elif health_raw == "degraded":
+                health_status = "degraded"
+            else:
+                health_status = prev.health_status if prev else "offline"
+            entry_map[pid] = ProviderRegistryEntry(
+                provider_id=pid,
+                name=str(item.get("name") or pid),
+                version=str(item.get("version") or (prev.version if prev else "")),
+                source="runtime",
+                kind=str(item.get("kind") or (prev.kind if prev else "")),
+                health_status=health_status,
+                health_detail=str(item.get("health_detail") or ""),
+                enabled=bool(item.get("enabled", True)),
+                capabilities=tuple(str(c) for c in (item.get("capabilities") or [])),
+                permissions=tuple(str(q) for q in (item.get("permissions") or [])),
+            )
+
+    elif topic == ORCHESTRATION_PROVIDER_HEALTH:
+        pid = str(p.get("provider_id") or "")
+        if not pid:
+            return state
+        prev = entry_map.get(pid)
+        healthy = bool(p.get("healthy", False))
+        health_status = "healthy" if healthy else "offline"
+        entry_map[pid] = ProviderRegistryEntry(
+            provider_id=pid,
+            name=str(p.get("display_name") or (prev.name if prev else pid)),
+            version=prev.version if prev else "",
+            source="orchestration",
+            kind=prev.kind if prev else "",
+            health_status=health_status,
+            health_detail=str(p.get("detail") or ""),
+            enabled=prev.enabled if prev else True,
+            capabilities=prev.capabilities if prev else (),
+            permissions=prev.permissions if prev else (),
+        )
+
+    providers = tuple(entry_map.values())
+    healthy_count = sum(1 for e in providers if e.healthy)
+    degraded_count = sum(1 for e in providers if e.degraded)
+    new_reg = ProviderRegistrySnapshot(
+        providers=providers,
+        total_count=len(providers),
+        healthy_count=healthy_count,
+        degraded_count=degraded_count,
+    )
+    return replace(
+        state,
+        provider_registry=new_reg,
+        last_event_topic=topic,
+        last_event_source=event.source,
+    )
+
+
 # ── Blueprint Phase 5 — Agent Pipeline AppState reducer ───────────────────────
 
 _AGENT_TOPICS = frozenset({
@@ -2577,6 +2667,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_capability_library,
     _reduce_execution_library,
     _reduce_agent_pipeline_snapshot,
+    _reduce_provider_registry,
 )
 
 
