@@ -54,6 +54,7 @@ from ai_command_center.repositories.runtime_provider_manifest_repository import 
 )
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from ai_command_center.repositories.operation_index_repository import OperationIndexRepository
 from ai_command_center.repositories.world_model_repository import SQLiteWorldModelRepository
 from ai_command_center.repositories.artifact_repository import ArtifactRepository
 from ai_command_center.repositories.execution_event_repository import ExecutionEventRepository
@@ -108,6 +109,7 @@ from ai_command_center.telemetry.tracing_service import TracingService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
 from ai_command_center.services.workflow_engine_service import WorkflowEngineService
+from ai_command_center.services.operation_indexer_service import OperationIndexerService
 from ai_command_center.services.workflow_persistence_service import WorkflowPersistenceService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
@@ -153,6 +155,7 @@ def build_services(
     )
     goal_repo = GoalRepository(db)
     goal_engine_repo = SQLiteGoalEngineRepository(db)
+    op_index_repo = OperationIndexRepository(db)
 
     # ── shared singletons ─────────────────────────────────────────────────────
     context_manager = ContextManager()
@@ -206,6 +209,11 @@ def build_services(
         run_repo=ExecutionRunRepository(db),
         event_repo=execution_event_repo,
     )
+    operation_indexer = OperationIndexerService(
+        bus,
+        op_repo=op_index_repo,
+        goal_repo=goal_repo,
+    )
     workflow_persistence = WorkflowPersistenceService(bus, repo=WorkflowRunRepository(db))
     artifact = ArtifactService(bus, repo=ArtifactRepository(db))
     execution_event = ExecutionEventService(bus, repo=execution_event_repo)
@@ -247,6 +255,7 @@ def build_services(
         external_capability_bridge,
         execution_run,
         execution_query,
+        operation_indexer,
         workflow_persistence,
         artifact,
         execution_event,

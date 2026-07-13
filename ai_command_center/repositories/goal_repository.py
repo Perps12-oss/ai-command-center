@@ -33,6 +33,7 @@ class GoalRepository:
             );
             CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
             CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
+            CREATE INDEX IF NOT EXISTS idx_goals_correlation ON goals(correlation_id);
             """
         )
         self._conn.commit()
@@ -80,6 +81,15 @@ class GoalRepository:
                 "SELECT * FROM goals ORDER BY created_at ASC"
             ).fetchall()
         return [_row_to_goal(row) for row in rows]
+
+    def get_by_correlation(self, correlation_id: str) -> Goal | None:
+        row = self._conn.execute(
+            "SELECT * FROM goals WHERE correlation_id = ? LIMIT 1",
+            (correlation_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return _row_to_goal(row)
 
     def update_goal_status(
         self, goal_id: str, status: GoalStatus, correlation: CorrelationContext

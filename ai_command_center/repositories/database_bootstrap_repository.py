@@ -179,6 +179,50 @@ def _migrate_v8(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v9(conn: sqlite3.Connection) -> None:
+    """Blueprint Phase 0: operation_index, operation_archive tables;
+    execution_runs.correlation_id column for cross-artifact linking."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS operation_index (
+            correlation_id TEXT PRIMARY KEY,
+            goal_id        TEXT NOT NULL DEFAULT '',
+            goal_title     TEXT NOT NULL DEFAULT '',
+            goal_status    TEXT NOT NULL DEFAULT 'unknown',
+            goal_priority  TEXT NOT NULL DEFAULT 'normal',
+            started_at     REAL,
+            completed_at   REAL,
+            agent_ids      TEXT NOT NULL DEFAULT '[]',
+            execution_ids  TEXT NOT NULL DEFAULT '[]',
+            tags           TEXT NOT NULL DEFAULT '[]'
+        );
+        CREATE INDEX IF NOT EXISTS idx_op_index_status
+            ON operation_index(goal_status);
+        CREATE INDEX IF NOT EXISTS idx_op_index_started
+            ON operation_index(started_at DESC);
+
+        CREATE TABLE IF NOT EXISTS operation_archive (
+            correlation_id TEXT PRIMARY KEY,
+            frozen_at      REAL NOT NULL,
+            snapshot_json  TEXT NOT NULL
+        );
+        """
+    )
+    cols = {
+        str(row[1] if isinstance(row, tuple) else row["name"])
+        for row in conn.execute("PRAGMA table_info(execution_runs)").fetchall()
+    }
+    if "correlation_id" not in cols:
+        conn.execute(
+            "ALTER TABLE execution_runs"
+            " ADD COLUMN correlation_id TEXT NOT NULL DEFAULT ''"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_execution_runs_correlation"
+            " ON execution_runs(correlation_id)"
+        )
+
+
 _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (1, _migrate_v1),
     (2, _migrate_v2),
@@ -188,6 +232,7 @@ _MIGRATIONS: list[tuple[int, MigrationFn]] = [
     (6, _migrate_v6),
     (7, _migrate_v7),
     (8, _migrate_v8),
+    (9, _migrate_v9),
 ]
 
 
