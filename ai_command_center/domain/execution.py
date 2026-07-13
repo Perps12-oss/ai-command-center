@@ -9,6 +9,8 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 
+from ai_command_center.domain.correlation import CorrelationContext
+
 
 class ExecutionStatus(str, Enum):
     """Lifecycle status of an execution run."""
@@ -47,6 +49,7 @@ class Execution:
     span_id: str = ""
     receipt_id: str = ""
     metadata: dict = field(default_factory=dict)
+    correlation: CorrelationContext = field(default_factory=CorrelationContext.new)
 
     @property
     def duration_s(self) -> float:
@@ -80,4 +83,5 @@ class Execution:
             trace_id=str(payload.get("trace_id", "")),
             span_id=str(payload.get("span_id", "")),
             receipt_id=str(payload.get("receipt_id", "")),
+            correlation=CorrelationContext.from_payload(payload),
         )

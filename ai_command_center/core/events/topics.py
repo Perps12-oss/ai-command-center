@@ -347,6 +347,43 @@ ARTIFACT_DELETE = "artifact.delete"
 UI_WORKFLOW_EDGE_CREATE = "ui.workflow.edge.create"
 UI_WORKFLOW_EDGE_DELETE = "ui.workflow.edge.delete"
 
+# Operations Library and Focus Navigation (Blueprint Phase 0)
+# FOCUS_SELECTED payload: {focus_id: str, focus_type: str, correlation_id: str}
+FOCUS_SELECTED = "focus.selected"
+# FOCUS_RESOLUTION_FAILED payload: {focus_id: str, reason: str}
+FOCUS_RESOLUTION_FAILED = "focus.resolution_failed"
+# OPERATION_LOAD_REQUEST payload: {correlation_id: str}
+OPERATION_LOAD_REQUEST = "operation.load_request"
+# OPERATION_LOADED payload: {correlation_id: str, snapshot: dict}
+OPERATION_LOADED = "operation.loaded"
+# OPERATION_SAVED payload: {correlation_id: str, goal_id: str, goal_title: str, goal_status: str}
+OPERATION_SAVED = "operation.saved"
+# OPERATION_ARCHIVED payload: {correlation_id: str, frozen_at: float}
+OPERATION_ARCHIVED = "operation.archived"
+# LAYOUT_PREFERENCE_CHANGED payload: {layout_key: str, value: dict}
+LAYOUT_PREFERENCE_CHANGED = "layout.preference_changed"
+# JOURNAL_ENTRY_APPENDED payload: {correlation_id: str, kind: str, summary: str, object_id: str, object_type: str, timestamp: float}
+JOURNAL_ENTRY_APPENDED = "journal.entry_appended"
+# COMPOSITION_RECIPE_RESOLVED payload: {focus_id: str, recipe: dict, panels: list}
+COMPOSITION_RECIPE_RESOLVED = "composition.recipe_resolved"
+
+# World Model UI (Phase 10 — P3)
+WORLD_MODEL_NODE_SELECTED = "world_model.node.selected"
+WORLD_MODEL_NODE_DESELECTED = "world_model.node.deselected"
+WORLD_MODEL_GRAPH_REFRESHED = "world_model.graph.refreshed"
+WORLD_MODEL_MUTATION_APPLIED = "world_model.mutation.applied"
+WORLD_MODEL_EXPLORER_OPEN = "world_model.explorer.open"
+WORLD_MODEL_DEPENDENCY_INSPECT = "world_model.dependency.inspect"
+
+# Cross-Workspace Federation (Phase 10 — P4)
+FEDERATION_WORKSPACE_REGISTERED = "federation.workspace.registered"
+FEDERATION_WORKSPACE_UNREGISTERED = "federation.workspace.unregistered"
+FEDERATION_QUERY_REQUEST = "federation.query.request"
+FEDERATION_QUERY_RESULT = "federation.query.result"
+FEDERATION_SYNC_STARTED = "federation.sync.started"
+FEDERATION_SYNC_COMPLETED = "federation.sync.completed"
+FEDERATION_CONFLICT_DETECTED = "federation.conflict.detected"
+
 
 __all__ = [
     "TOPIC_VERSION",
@@ -596,4 +633,26 @@ __all__ = [
     "ARTIFACT_DELETE",
     "UI_WORKFLOW_EDGE_CREATE",
     "UI_WORKFLOW_EDGE_DELETE",
+    "FOCUS_SELECTED",
+    "FOCUS_RESOLUTION_FAILED",
+    "OPERATION_LOAD_REQUEST",
+    "OPERATION_LOADED",
+    "OPERATION_SAVED",
+    "OPERATION_ARCHIVED",
+    "LAYOUT_PREFERENCE_CHANGED",
+    "JOURNAL_ENTRY_APPENDED",
+    "COMPOSITION_RECIPE_RESOLVED",
+    "WORLD_MODEL_NODE_SELECTED",
+    "WORLD_MODEL_NODE_DESELECTED",
+    "WORLD_MODEL_GRAPH_REFRESHED",
+    "WORLD_MODEL_MUTATION_APPLIED",
+    "WORLD_MODEL_EXPLORER_OPEN",
+    "WORLD_MODEL_DEPENDENCY_INSPECT",
+    "FEDERATION_WORKSPACE_REGISTERED",
+    "FEDERATION_WORKSPACE_UNREGISTERED",
+    "FEDERATION_QUERY_REQUEST",
+    "FEDERATION_QUERY_RESULT",
+    "FEDERATION_SYNC_STARTED",
+    "FEDERATION_SYNC_COMPLETED",
+    "FEDERATION_CONFLICT_DETECTED",
 ]

@@ -24,6 +24,14 @@ tool.invoke / tool.result v1.0 (Phase 4B):
     Consumer: ToolExecutorService — one invocation per event, no loops
 
 OllamaService API v1.0: unchanged.
+
+operation contract v1.0 (Blueprint Phase 0):
+    Producer: OperationIndexerService
+    Consumer: AppState reducer (_reduce_operation_loaded)
+    OPERATION_LOAD_REQUEST payload: {correlation_id: str}
+    OPERATION_LOADED payload: {correlation_id: str, snapshot: dict[str, Any]}
+    OPERATION_SAVED payload: {correlation_id: str, goal_id: str, goal_title: str, goal_status: str}
+    OPERATION_ARCHIVED payload: {correlation_id: str, frozen_at: float}
 """
 
 from __future__ import annotations
@@ -42,6 +50,9 @@ OLLAMA_SERVICE_API_VERSION = "1.0"
 # tool.invoke / tool.result envelope (Phase 4B)
 TOOL_CONTRACT_VERSION = "1.0"
 
+# operation.load_request / operation.loaded envelope (Blueprint Phase 0)
+OPERATION_CONTRACT_VERSION = "1.0"
+
 # TOOL_INVOKE without workspace_context — documented opt-out paths (Program 3 exit):
 #   1. actor_type "user" with empty workspace_context (no active workspace at invoke time)
 #   2. Non-production tests and verification scripts
@@ -57,6 +68,7 @@ SUPPORTED_VERSIONS: dict[str, tuple[str, ...]] = {
     "command_routed": (COMMAND_ROUTED_VERSION,),
     "ollama_service": (OLLAMA_SERVICE_API_VERSION,),
     "tool": (TOOL_CONTRACT_VERSION,),
+    "operation": (OPERATION_CONTRACT_VERSION,),
 }
 
 
