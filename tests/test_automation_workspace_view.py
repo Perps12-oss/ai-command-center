@@ -23,8 +23,11 @@ from ai_command_center.ui.views.automation_workspace_view import AutomationWorks
 
 
 def test_automation_workspace_view_smoke() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         view = AutomationWorkspaceView(root)
         view.pack(fill="both", expand=True)

@@ -43,6 +43,7 @@ from ai_command_center.core.workspace.workspace_service import WorkspaceService
 from ai_command_center.core.workspace_os_service import WorkspaceOsService
 from ai_command_center.repositories.conversation_repository import ConversationRepository
 from ai_command_center.repositories.goal_repository import GoalRepository
+from ai_command_center.repositories.goal_engine_repository import SQLiteGoalEngineRepository
 from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.repositories.plugin_manifest_repository import (
@@ -77,6 +78,7 @@ from ai_command_center.services.execution_orchestrator_service import (
 from ai_command_center.services.external_capability_bridge_service import (
     ExternalCapabilityBridgeService,
 )
+from ai_command_center.orchestration.goals.goal_engine import GoalEngine
 from ai_command_center.services.planner_service import PlannerService
 from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.chat_export_service import ChatExportService
@@ -118,6 +120,7 @@ class WiredServices:
     ollama: OllamaHttpService
     provider_registry: ProviderRegistry = field(default_factory=build_default_registry)
     workspace_os: WorkspaceOsService | None = field(default=None)
+    goal_engine: GoalEngine | None = field(default=None)
 
 
 def build_services(
@@ -149,6 +152,7 @@ def build_services(
         relationship_repo=relationship_repo,
     )
     goal_repo = GoalRepository(db)
+    goal_engine_repo = SQLiteGoalEngineRepository(db)
 
     # ── shared singletons ─────────────────────────────────────────────────────
     context_manager = ContextManager()
@@ -186,6 +190,7 @@ def build_services(
     )
     brain_runtime = BrainRuntimeService(bus, world_model)
     brain_kernel = BrainKernelService(bus, world_model)
+    goal_engine = GoalEngine(bus, goal_engine_repo)
     goal_scheduler = SingleGoalScheduler(bus, goal_repo)
     observer = ObserverService(
         bus,
@@ -318,6 +323,7 @@ def build_services(
         ollama=ollama,
         provider_registry=provider_registry,
         workspace_os=workspace_os,
+        goal_engine=goal_engine,
     )
 
 

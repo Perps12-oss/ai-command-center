@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -45,7 +45,7 @@ class TimelineEntry:
     entity_id: str
     before_state: dict[str, Any] | None = None  # State before action
     after_state: dict[str, Any] | None = None  # State after action
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     user_id: str = "system"
     correlation_id: str | None = None
     description: str = ""
@@ -93,7 +93,7 @@ class Snapshot:
     """A point-in-time snapshot of system state."""
 
     id: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     goals: list[dict[str, Any]] = field(default_factory=list)
     tasks: list[dict[str, Any]] = field(default_factory=list)
     entities: list[dict[str, Any]] = field(default_factory=list)
@@ -362,7 +362,7 @@ class Timeline:
         try:
             snapshot = Snapshot(
                 id=str(uuid.uuid4()),
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 metadata=metadata or {},
             )
 

@@ -22,8 +22,11 @@ from ai_command_center.ui.components.inspector import MessageInspector
 
 
 def test_inspector_dock_hosts_inspector() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         dock = InspectorDock(root)
         dock.pack(fill="both", expand=True)
@@ -45,8 +48,11 @@ def test_inspector_dock_hosts_inspector() -> None:
 
 
 def test_execution_timeline_dock_renders_and_scrubs() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     scrubbed: list[int] = []
     try:
         dock = ExecutionTimelineDock(root, on_scrub=scrubbed.append)

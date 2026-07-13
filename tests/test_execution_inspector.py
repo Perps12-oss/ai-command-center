@@ -19,8 +19,11 @@ from ai_command_center.ui.components.inspector import CollapsibleSection, Execut
 
 
 def test_execution_inspector_smoke() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         ctx = ExecutionContext(
             request_id="req-1",

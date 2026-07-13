@@ -6,7 +6,7 @@ Reference: docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md Section 9.1
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from ai_command_center.orchestration.goals.goal_status import GoalStatus
@@ -38,8 +38,8 @@ class Goal:
     title: str
     description: str
     status: GoalStatus = GoalStatus.DRAFT
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str = "user"
     parent_goal_id: str | None = None
     tags: list[str] = field(default_factory=list)
@@ -67,7 +67,7 @@ class Goal:
             description=self.description,
             status=target_status,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             created_by=self.created_by,
             parent_goal_id=self.parent_goal_id,
             tags=self.tags,
@@ -121,7 +121,7 @@ class Goal:
             description=self.description,
             status=self.status,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             created_by=self.created_by,
             parent_goal_id=self.parent_goal_id,
             tags=self.tags,
@@ -138,7 +138,7 @@ class Goal:
             description=self.description,
             status=self.status,
             created_at=self.created_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
             created_by=self.created_by,
             parent_goal_id=self.parent_goal_id,
             tags=tags,

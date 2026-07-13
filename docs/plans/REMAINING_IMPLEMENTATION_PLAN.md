@@ -72,10 +72,10 @@ ai_command_center/orchestration/providers/mcp_adapter.py
 ```
 
 ### Exit Criteria
-- [ ] `ExternalCapabilityBridgeService` starts successfully
-- [ ] MCP manifests load and validate
-- [ ] Capability aggregation to planner-facing catalog
-- [ ] Architecture lint clean
+- [x] `ExternalCapabilityBridgeService` starts successfully
+- [x] MCP manifests load and validate
+- [x] Capability aggregation to planner-facing catalog
+- [x] Architecture lint clean
 
 ---
 

@@ -35,8 +35,11 @@ def _event(index: int, request_id: str) -> ExecutionEvent:
 
 
 def test_execution_timeline_view_and_inspector_smoke() -> None:
-    root = tk.Tk()
-    root.withdraw()
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as exc:
+        pytest.skip(f"tkinter display unavailable: {exc}")
     try:
         events = (_event(0, "req-a"), _event(1, "req-b"), _event(2, "req-a"))
 
