@@ -173,6 +173,12 @@ from ai_command_center.domain.provider_registry_snapshot import (
     ProviderEntry as ProviderRegistryEntry,
     ProviderRegistrySnapshot,
 )
+from ai_command_center.domain.workflow_library_snapshot import (
+    WorkflowLibrarySnapshot,
+    WorkflowRunSnapshot,
+    WorkflowStepSnapshot,
+    _MAX_WORKFLOW_HISTORY,
+)
 from ai_command_center.domain.execution_library_snapshot import (
     ExecutionLibrarySnapshot,
     ExecutionPlanSnapshot,
@@ -523,6 +529,10 @@ class AppState:
         default_factory=AgentPipelineSnapshot
     )
     active_workflow_run_id: str = ""
+    # Blueprint Phase 7 — Workflow Library AppState projection
+    workflow_library: WorkflowLibrarySnapshot = field(
+        default_factory=WorkflowLibrarySnapshot
+    )
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
     orchestration_run: OrchestrationRunSnapshot = field(default_factory=OrchestrationRunSnapshot)
@@ -1997,6 +2007,172 @@ def _wm_mutation_summary(mutation: dict) -> str:
     return mtype
 
 
+# ── Blueprint Phase 7 — Workflow Library AppState reducer ─────────────────────
+
+_WORKFLOW_LIB_TOPICS = frozenset({
+    WORKFLOW_STARTED,
+    WORKFLOW_STEP_STARTED,
+    WORKFLOW_STEP_COMPLETED,
+    WORKFLOW_COMPLETED,
+    WORKFLOW_FAILED,
+    WORKFLOW_RUNS_LOADED,
+})
+
+
+def _reduce_workflow_library(state: AppState, event: Event) -> AppState:
+    """Project workflow lifecycle events into immutable AppState.workflow_library."""
+    topic = event.topic
+    if topic not in _WORKFLOW_LIB_TOPICS:
+        return state
+    p = event.payload
+    lib = state.workflow_library
+
+    # ── WORKFLOW_RUNS_LOADED (bulk hydration on startup) ───────────────────────
+    if topic == WORKFLOW_RUNS_LOADED:
+        raw_runs = p.get("runs")
+        if not isinstance(raw_runs, list) or not raw_runs:
+            return state
+        run_map: dict[str, WorkflowRunSnapshot] = {r.run_id: r for r in lib.runs}
+        for raw in raw_runs:
+            if not isinstance(raw, dict):
+                continue
+            run_id = str(raw.get("run_id") or "")
+            if not run_id or run_id in run_map:
+                continue
+            run_map[run_id] = WorkflowRunSnapshot(
+                run_id=run_id,
+                workflow_id=str(raw.get("workflow_id") or ""),
+                state=str(raw.get("state") or "completed"),
+                current_step_index=int(raw.get("current_step_index") or 0),
+                total_steps=int(raw.get("total_steps") or 0),
+                error=str(raw.get("error") or ""),
+            )
+        runs = tuple(run_map.values())
+        if len(runs) > _MAX_WORKFLOW_HISTORY:
+            runs = runs[:_MAX_WORKFLOW_HISTORY]
+        new_lib = replace(lib, runs=runs, total_started=lib.total_started + len(run_map) - len(lib.runs))
+        return replace(
+            state,
+            workflow_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    run_id = str(p.get("run_id") or "")
+    if not run_id:
+        return state
+
+    prev = lib.run_by_id(run_id)
+
+    # ── WORKFLOW_STARTED ───────────────────────────────────────────────────────
+    if topic == WORKFLOW_STARTED:
+        workflow_id = str(p.get("workflow_id") or "")
+        total_steps = int(p.get("total_steps") or 0)
+        run = WorkflowRunSnapshot(
+            run_id=run_id,
+            workflow_id=workflow_id,
+            state="running",
+            total_steps=total_steps,
+        )
+        runs = lib.runs
+        if not any(r.run_id == run_id for r in runs):
+            runs = runs + (run,)
+            if len(runs) > _MAX_WORKFLOW_HISTORY:
+                runs = runs[:_MAX_WORKFLOW_HISTORY]
+        else:
+            runs = tuple(r if r.run_id != run_id else run for r in runs)
+        new_lib = replace(
+            lib,
+            runs=runs,
+            active_run_id=run_id,
+            total_started=lib.total_started + 1,
+        )
+        return replace(
+            state,
+            workflow_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if prev is None:
+        prev = WorkflowRunSnapshot(run_id=run_id, state="running")
+
+    # ── WORKFLOW_STEP_STARTED ──────────────────────────────────────────────────
+    if topic == WORKFLOW_STEP_STARTED:
+        step_id = str(p.get("step_id") or "")
+        step_index = int(p.get("index") or prev.current_step_index)
+        step = WorkflowStepSnapshot(
+            step_id=step_id,
+            run_id=run_id,
+            index=step_index,
+            status="running",
+        )
+        steps = prev.steps
+        if not any(s.step_id == step_id for s in steps):
+            steps = steps + (step,)
+        else:
+            steps = tuple(s if s.step_id != step_id else step for s in steps)
+        run = replace(
+            prev,
+            state="running",
+            current_step_id=step_id,
+            current_step_index=step_index,
+            steps=steps,
+        )
+
+    # ── WORKFLOW_STEP_COMPLETED ────────────────────────────────────────────────
+    elif topic == WORKFLOW_STEP_COMPLETED:
+        step_id = str(p.get("step_id") or prev.current_step_id)
+        steps = tuple(
+            replace(s, status="completed") if s.step_id == step_id else s
+            for s in prev.steps
+        )
+        run = replace(
+            prev,
+            steps=steps,
+            current_step_index=prev.current_step_index + 1,
+        )
+
+    # ── WORKFLOW_COMPLETED / WORKFLOW_FAILED ───────────────────────────────────
+    elif topic in {WORKFLOW_COMPLETED, WORKFLOW_FAILED}:
+        final_state = "completed" if topic == WORKFLOW_COMPLETED else "failed"
+        error = str(p.get("error") or "") if topic == WORKFLOW_FAILED else ""
+        run = replace(prev, state=final_state, error=error)
+
+    else:
+        return state
+
+    runs = tuple(r if r.run_id != run_id else run for r in lib.runs)
+    if not any(r.run_id == run_id for r in lib.runs):
+        runs = lib.runs + (run,)
+
+    active_id = lib.active_run_id
+    total_completed = lib.total_completed
+    total_failed = lib.total_failed
+    if topic == WORKFLOW_COMPLETED:
+        total_completed += 1
+        if active_id == run_id:
+            active_id = ""
+    elif topic == WORKFLOW_FAILED:
+        total_failed += 1
+        if active_id == run_id:
+            active_id = ""
+
+    new_lib = replace(
+        lib,
+        runs=runs,
+        active_run_id=active_id,
+        total_completed=total_completed,
+        total_failed=total_failed,
+    )
+    return replace(
+        state,
+        workflow_library=new_lib,
+        last_event_topic=topic,
+        last_event_source=event.source,
+    )
+
+
 # ── Blueprint Phase 6 — Provider Registry AppState reducer ────────────────────
 
 _PROVIDER_REGISTRY_TOPICS = frozenset({
@@ -2668,6 +2844,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_execution_library,
     _reduce_agent_pipeline_snapshot,
     _reduce_provider_registry,
+    _reduce_workflow_library,
 )
 
 
