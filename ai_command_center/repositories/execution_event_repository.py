@@ -15,6 +15,31 @@ class ExecutionEventRepository:
 
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
+        self._ensure_table()
+
+    def _ensure_table(self) -> None:
+        self._conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS execution_events (
+                event_id TEXT PRIMARY KEY,
+                trace_id TEXT NOT NULL DEFAULT '',
+                parent_event_id TEXT,
+                timestamp REAL NOT NULL,
+                event_type TEXT NOT NULL,
+                actor TEXT NOT NULL DEFAULT '',
+                scope TEXT NOT NULL DEFAULT '',
+                request_id TEXT NOT NULL DEFAULT '',
+                payload TEXT NOT NULL DEFAULT '{}',
+                state_diff TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_execution_events_request
+                ON execution_events(request_id);
+            CREATE INDEX IF NOT EXISTS idx_execution_events_trace
+                ON execution_events(trace_id);
+            CREATE INDEX IF NOT EXISTS idx_execution_events_timestamp
+                ON execution_events(timestamp);
+            """
+        )
 
     def append(self, event: ExecutionEvent) -> ExecutionEvent:
         event_id = event.event_id or uuid.uuid4().hex

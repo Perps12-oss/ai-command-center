@@ -149,30 +149,30 @@ class GraphCanvas(ctk.CTkFrame):
         self._selection_start: tuple[float, float] | None = None
         self._selection_box: int | None = None
 
-        self._canvas = tk.Canvas(self, bg=T.BG_DEEP, highlightthickness=0)
-        h_scroll = tk.Scrollbar(self, orient="horizontal", command=self._canvas.xview)
-        v_scroll = tk.Scrollbar(self, orient="vertical", command=self._canvas.yview)
-        self._canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
+        self._tk_canvas = tk.Canvas(self, bg=T.BG_DEEP, highlightthickness=0)
+        h_scroll = tk.Scrollbar(self, orient="horizontal", command=self._tk_canvas.xview)
+        v_scroll = tk.Scrollbar(self, orient="vertical", command=self._tk_canvas.yview)
+        self._tk_canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
         h_scroll.pack(side="bottom", fill="x")
         v_scroll.pack(side="right", fill="y")
-        self._canvas.pack(side="left", fill="both", expand=True)
+        self._tk_canvas.pack(side="left", fill="both", expand=True)
 
         # Mouse bindings
-        self._canvas.bind("<Button-1>", self._on_canvas_press)
-        self._canvas.bind("<B1-Motion>", self._on_canvas_drag)
-        self._canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
-        self._canvas.bind("<Button-3>", self._on_canvas_context)
-        self._canvas.bind("<Double-Button-1>", self._on_canvas_double_click)
-        self._canvas.bind("<MouseWheel>", self._on_mouse_wheel)
-        self._canvas.bind("<Button-2>", self._on_pan_start)
-        self._canvas.bind("<B2-Motion>", self._on_pan_drag)
-        self._canvas.bind("<ButtonRelease-2>", self._on_pan_end)
-        self._canvas.bind("<Shift-Button-1>", self._on_selection_start)
+        self._tk_canvas.bind("<Button-1>", self._on_canvas_press)
+        self._tk_canvas.bind("<B1-Motion>", self._on_canvas_drag)
+        self._tk_canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
+        self._tk_canvas.bind("<Button-3>", self._on_canvas_context)
+        self._tk_canvas.bind("<Double-Button-1>", self._on_canvas_double_click)
+        self._tk_canvas.bind("<MouseWheel>", self._on_mouse_wheel)
+        self._tk_canvas.bind("<Button-2>", self._on_pan_start)
+        self._tk_canvas.bind("<B2-Motion>", self._on_pan_drag)
+        self._tk_canvas.bind("<ButtonRelease-2>", self._on_pan_end)
+        self._tk_canvas.bind("<Shift-Button-1>", self._on_selection_start)
 
         # Keyboard bindings on canvas (canvas must have focus)
-        self._canvas.bind("<Key>", self._on_key_press)
-        self._canvas.bind("<FocusIn>", self._on_focus_in)
-        self._canvas.focus_set()  # Allow canvas to receive keyboard events
+        self._tk_canvas.bind("<Key>", self._on_key_press)
+        self._tk_canvas.bind("<FocusIn>", self._on_focus_in)
+        self._tk_canvas.focus_set()  # Allow canvas to receive keyboard events
 
         self._context_menu: tk.Menu | None = None
 
@@ -190,13 +190,13 @@ class GraphCanvas(ctk.CTkFrame):
             self._selected_edge_ids = selected_edge_ids
         self._node_bounds.clear()
         self._edge_bounds.clear()
-        self._canvas.delete("all")
+        self._tk_canvas.delete("all")
 
         # Apply zoom transform
-        self._canvas.scale("all", 0, 0, self._zoom_level, self._zoom_level)
+        self._tk_canvas.scale("all", 0, 0, self._zoom_level, self._zoom_level)
 
         if not graph.nodes:
-            self._canvas.create_text(
+            self._tk_canvas.create_text(
                 100,
                 60,
                 text="No nodes",
@@ -215,7 +215,7 @@ class GraphCanvas(ctk.CTkFrame):
 
         max_x = max((n.x + _NODE_W + 40) for n in graph.nodes)
         max_y = max((n.y + _NODE_H + 40) for n in graph.nodes)
-        self._canvas.configure(scrollregion=(0, 0, max_x * self._zoom_level, max_y * self._zoom_level))
+        self._tk_canvas.configure(scrollregion=(0, 0, max_x * self._zoom_level, max_y * self._zoom_level))
 
     def _draw_node(self, node: GraphNode) -> None:
         x, y = node.x, node.y
@@ -226,7 +226,7 @@ class GraphCanvas(ctk.CTkFrame):
         width = 2 if is_selected else 1
 
         self._node_bounds[node.node_id] = (x, y, x + _NODE_W, y + _NODE_H)
-        self._canvas.create_rectangle(
+        self._tk_canvas.create_rectangle(
             x,
             y,
             x + _NODE_W,
@@ -236,7 +236,7 @@ class GraphCanvas(ctk.CTkFrame):
             width=width,
             tags=("node", node.node_id),
         )
-        self._canvas.create_oval(
+        self._tk_canvas.create_oval(
             x + 8,
             y + _NODE_H / 2 - 5,
             x + 18,
@@ -245,7 +245,7 @@ class GraphCanvas(ctk.CTkFrame):
             outline="",
             tags=("node", node.node_id),
         )
-        self._canvas.create_text(
+        self._tk_canvas.create_text(
             x + _NODE_W / 2 + 5,
             y + _NODE_H / 2,
             text=node.label[:16],
@@ -256,7 +256,7 @@ class GraphCanvas(ctk.CTkFrame):
         )
         overlay = node_overlay_kind(node)
         if overlay == "approval":
-            self._canvas.create_text(
+            self._tk_canvas.create_text(
                 x + _NODE_W - 10,
                 y + 8,
                 text="✓",
@@ -265,7 +265,7 @@ class GraphCanvas(ctk.CTkFrame):
                 tags=("node", node.node_id),
             )
         elif overlay == "retry":
-            self._canvas.create_text(
+            self._tk_canvas.create_text(
                 x + _NODE_W - 12,
                 y + 8,
                 text="↻",
@@ -277,7 +277,7 @@ class GraphCanvas(ctk.CTkFrame):
         # Edge handle (right side of node) for creating edges
         handle_x = x + _NODE_W
         handle_y = y + _NODE_H / 2
-        self._canvas.create_oval(
+        self._tk_canvas.create_oval(
             handle_x - _EDGE_HANDLE_SIZE / 2,
             handle_y - _EDGE_HANDLE_SIZE / 2,
             handle_x + _EDGE_HANDLE_SIZE / 2,
@@ -310,7 +310,7 @@ class GraphCanvas(ctk.CTkFrame):
         line_color = T.ACCENT_DEFAULT if is_selected else T.BG_GLASS_BORDER
         line_width = 3 if is_selected else 2
 
-        self._canvas.create_line(
+        self._tk_canvas.create_line(
             sx, sy, tx, ty,
             fill=line_color,
             width=line_width,
@@ -351,8 +351,8 @@ class GraphCanvas(ctk.CTkFrame):
         """Handle left mouse button press."""
         if self._graph is None:
             return
-        canvas_x = self._canvas.canvasx(event.x)
-        canvas_y = self._canvas.canvasy(event.y)
+        canvas_x = self._tk_canvas.canvasx(event.x)
+        canvas_y = self._tk_canvas.canvasy(event.y)
 
         # Check if clicking on edge handle to start drawing an edge
         handle_node_id = self._hit_test_edge_handle(canvas_x, canvas_y)
@@ -418,10 +418,10 @@ class GraphCanvas(ctk.CTkFrame):
         """Start selection box on Shift+click."""
         if self._graph is None:
             return
-        canvas_x = self._canvas.canvasx(event.x)
-        canvas_y = self._canvas.canvasy(event.y)
+        canvas_x = self._tk_canvas.canvasx(event.x)
+        canvas_y = self._tk_canvas.canvasy(event.y)
         self._selection_start = (canvas_x, canvas_y)
-        self._selection_box = self._canvas.create_rectangle(
+        self._selection_box = self._tk_canvas.create_rectangle(
             canvas_x, canvas_y, canvas_x, canvas_y,
             outline=T.ACCENT_DEFAULT,
             dash=(4, 4),
@@ -432,10 +432,10 @@ class GraphCanvas(ctk.CTkFrame):
         """Update selection box as mouse moves."""
         if self._selection_start is None or self._selection_box is None:
             return
-        canvas_x = self._canvas.canvasx(event.x)
-        canvas_y = self._canvas.canvasy(event.y)
+        canvas_x = self._tk_canvas.canvasx(event.x)
+        canvas_y = self._tk_canvas.canvasy(event.y)
         x0, y0 = self._selection_start
-        self._canvas.coords(self._selection_box, x0, y0, canvas_x, canvas_y)
+        self._tk_canvas.coords(self._selection_box, x0, y0, canvas_x, canvas_y)
 
     def _on_canvas_drag(self, event: tk.Event) -> None:
         """Handle mouse drag for node movement."""
@@ -447,8 +447,8 @@ class GraphCanvas(ctk.CTkFrame):
         node = self._graph.node_by_id(self._drag_node_id)
         if node is None:
             return
-        canvas_x = self._canvas.canvasx(event.x)
-        canvas_y = self._canvas.canvasy(event.y)
+        canvas_x = self._tk_canvas.canvasx(event.x)
+        canvas_y = self._tk_canvas.canvasy(event.y)
         node.x = max(0.0, canvas_x - self._drag_offset[0])
         node.y = max(0.0, canvas_y - self._drag_offset[1])
         self.render(self._graph, selected_node_ids=self._selected_node_ids)
@@ -457,8 +457,8 @@ class GraphCanvas(ctk.CTkFrame):
         """Handle mouse button release."""
         # Handle selection box completion
         if self._selection_start is not None and self._selection_box is not None:
-            canvas_x = self._canvas.canvasx(event.x)
-            canvas_y = self._canvas.canvasy(event.y)
+            canvas_x = self._tk_canvas.canvasx(event.x)
+            canvas_y = self._tk_canvas.canvasy(event.y)
             x0, y0 = self._selection_start
             # Select all nodes within the box
             self._selected_node_ids.clear()
@@ -467,7 +467,7 @@ class GraphCanvas(ctk.CTkFrame):
                 if (min(x0, canvas_x) <= node.x <= max(x0, canvas_x) and
                     min(y0, canvas_y) <= node.y <= max(y0, canvas_y)):
                     self._selected_node_ids.add(node.node_id)
-            self._canvas.delete(self._selection_box)
+            self._tk_canvas.delete(self._selection_box)
             self._selection_box = None
             self._selection_start = None
             if self._graph:
@@ -499,15 +499,15 @@ class GraphCanvas(ctk.CTkFrame):
     def _on_pan_start(self, event: tk.Event) -> None:
         """Start panning with middle mouse button."""
         self._pan_mode = True
-        self._pan_start = (self._canvas.canvasx(event.x), self._canvas.canvasy(event.y))
+        self._pan_start = (self._tk_canvas.canvasx(event.x), self._tk_canvas.canvasy(event.y))
 
     def _on_pan_drag(self, event: tk.Event) -> None:
         """Pan the canvas."""
         if not self._pan_mode or self._pan_start is None:
             return
-        canvas_x = self._canvas.canvasx(event.x)
-        canvas_y = self._canvas.canvasy(event.y)
-        self._canvas.scan_dragto(event.x, event.y, gain=1)
+        canvas_x = self._tk_canvas.canvasx(event.x)
+        canvas_y = self._tk_canvas.canvasy(event.y)
+        self._tk_canvas.scan_dragto(event.x, event.y, gain=1)
         self._pan_start = (canvas_x, canvas_y)
 
     def _on_pan_end(self, event: tk.Event) -> None:
@@ -593,8 +593,8 @@ class GraphCanvas(ctk.CTkFrame):
         if self._context_menu:
             self._context_menu.destroy()
 
-        canvas_x = self._canvas.canvasx(event.x)
-        canvas_y = self._canvas.canvasy(event.y)
+        canvas_x = self._tk_canvas.canvasx(event.x)
+        canvas_y = self._tk_canvas.canvasy(event.y)
 
         # Check what's under the cursor
         node = self._hit_test(canvas_x, canvas_y)
@@ -603,7 +603,7 @@ class GraphCanvas(ctk.CTkFrame):
         if node is None and edge_hit is None:
             return  # No action for empty space
 
-        self._context_menu = tk.Menu(self._canvas, tearoff=0)
+        self._context_menu = tk.Menu(self._tk_canvas, tearoff=0)
         if node is not None:
             self._context_menu.add_command(
                 label=f"Edit '{node.label[:12]}'...",
@@ -628,8 +628,8 @@ class GraphCanvas(ctk.CTkFrame):
         """Handle double-click on edge to select it for deletion."""
         if self._graph is None:
             return
-        canvas_x = self._canvas.canvasx(event.x)
-        canvas_y = self._canvas.canvasy(event.y)
+        canvas_x = self._tk_canvas.canvasx(event.x)
+        canvas_y = self._tk_canvas.canvasy(event.y)
         edge_hit = self._hit_test_edge(canvas_x, canvas_y)
         if edge_hit is not None:
             src_id, tgt_id = edge_hit
