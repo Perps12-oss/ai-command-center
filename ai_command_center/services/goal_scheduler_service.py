@@ -65,6 +65,22 @@ class SingleGoalScheduler(BaseService):
                 self._bus.subscribe(TASK_FAILED, self._on_task_failed),
             ]
         )
+        self._recover_queue()
+
+    def _recover_queue(self) -> None:
+        """Reload persisted QUEUED and ACTIVE goals from the repository on startup.
+
+        Any goal that was ACTIVE at crash time is downgraded back to QUEUED so
+        it will be re-planned cleanly by _activate_next_if_idle.
+        """
+        recovered = self._repo.list_goals(GoalStatus.QUEUED.value)
+        previously_active = self._repo.list_goals(GoalStatus.ACTIVE.value)
+        for goal in previously_active:
+            downgraded = replace(goal, status=GoalStatus.QUEUED)
+            self._repo.save_goal(downgraded)
+            recovered.append(downgraded)
+        self._queue = sorted(recovered, key=lambda item: _PRIORITY_ORDER[item.priority])
+        self._activate_next_if_idle()
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:

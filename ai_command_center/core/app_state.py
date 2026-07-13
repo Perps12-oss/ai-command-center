@@ -215,6 +215,20 @@ from ai_command_center.domain.world_model_snapshot import (
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
+from ai_command_center.domain.brain_state_snapshot import (
+    BrainStateSnapshot,
+    GoalSnapshot as BrainGoalSnapshot,
+    ObservationSnapshot as BrainObservationSnapshot,
+    RuntimeActionSnapshot as BrainRuntimeActionSnapshot,
+    PlanSnapshot as BrainPlanSnapshot,
+    PlanStepSnapshot as BrainPlanStepSnapshot,
+)
+from ai_command_center.domain.chat_session_snapshot import (
+    ChatSessionSnapshot,
+    ChatMessageSnapshot,
+    ChatWorkspaceEntityRef,
+    ChatContextInfo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -532,6 +546,8 @@ class AppState:
     selected_entity_type: str = ""
     selected_entity_title: str = ""
     chat_active_session_key: str = "default"
+    # Blueprint Phase 12 — Chat Session consolidated snapshot
+    chat_session: ChatSessionSnapshot = field(default_factory=ChatSessionSnapshot)
     errors: tuple[str, ...] = ()
 
     # Track 3.2 â€” full projection of feature catalogs
@@ -601,6 +617,8 @@ class AppState:
     brain_recent_goals: tuple[dict[str, object], ...] = ()
     brain_recent_observations: tuple[dict[str, object], ...] = ()
     brain_recent_runtime_actions: tuple[dict[str, object], ...] = ()
+    # Blueprint Phase 11 — Brain State consolidated snapshot
+    brain_state: BrainStateSnapshot = field(default_factory=BrainStateSnapshot)
 
     # Blueprint Phase 1 — Operations Library & Journal
     operation_library_index: tuple[OperationSnapshot, ...] = ()
@@ -1677,6 +1695,67 @@ from ai_command_center.core.state.chat_state import (  # noqa: E402
     _reduce_context_snapshot,
     _reduce_ui_chat_new_session,
 )
+
+# ── Blueprint Phase 12 — Chat Session consolidated snapshot reducer ──
+
+_CHAT_SNAPSHOT_TOPICS: frozenset[str] = frozenset({
+    CHAT_STARTED,
+    CHAT_CHUNK,
+    CHAT_COMPLETE,
+    CHAT_CANCELLED,
+    CHAT_ERROR,
+    CHAT_HISTORY_LOADED,
+    UI_CHAT_NEW_SESSION,
+})
+
+
+def _reduce_chat_session_snapshot(state: AppState, event: Event) -> AppState:
+    """Phase 12 projection: builds ChatSessionSnapshot from raw chat fields.
+
+    Pure projection — runs AFTER all raw chat reducers. Increments revision.
+    """
+    if event.topic not in _CHAT_SNAPSHOT_TOPICS:
+        return state
+    messages: tuple[ChatMessageSnapshot, ...] = tuple(
+        ChatMessageSnapshot(role=m.role, content=m.content)
+        for m in state.chat_history_messages
+    )
+    ctx = ChatContextInfo(
+        sources=state.chat_context_sources,
+        token_estimate=state.chat_token_estimate,
+        snippet_count=state.workspace_context_snippet_count,
+        workspace_id=state.last_workspace_context_workspace_id,
+    )
+    entity = ChatWorkspaceEntityRef(
+        entity_id=state.chat_workspace_entity_id,
+        entity_type=state.chat_workspace_entity_type,
+        title=state.chat_workspace_entity_title,
+        description=state.chat_workspace_entity_description,
+        url=state.chat_workspace_entity_url,
+        path=state.chat_workspace_entity_path,
+    )
+    snap = ChatSessionSnapshot(
+        active_request_id=state.active_chat_request_id,
+        last_request_id=state.last_chat_request_id,
+        status=state.chat_status,
+        streaming=state.chat_streaming,
+        session_key=state.chat_active_session_key,
+        last_error=state.last_chat_error,
+        stream_buffer=state.chat_stream_buffer,
+        stream_revision=state.chat_stream_revision,
+        pending_user_text=state.chat_pending_user_text,
+        started_user_text=state.chat_started_user_text,
+        last_assistant_message=state.last_assistant_message,
+        context=ctx,
+        workspace_entity=entity,
+        history_messages=messages,
+        history_count=state.chat_history_count,
+        history_revision=state.chat_history_revision,
+        revision=state.chat_session.revision + 1,
+    )
+    return replace(state, chat_session=snap)
+
+
 from ai_command_center.core.state.workspace_state import (  # noqa: E402
     _reduce_notes_indexed,
     _reduce_workspace_active,
@@ -1944,6 +2023,72 @@ def _reduce_brain_state(state: AppState, event: Event) -> AppState:
             ),
             last_event_topic=event.topic,
             last_event_source=event.source,
+        )
+    return state
+
+
+
+# ── Blueprint Phase 11 — Brain State consolidated snapshot reducer ──
+
+_BRAIN_GOAL_TOPICS: frozenset[str] = frozenset({
+    GOAL_SUBMITTED,
+    GOAL_ACTIVATED,
+    GOAL_PAUSED,
+    GOAL_RESUMED,
+    GOAL_CANCELLED,
+    GOAL_COMPLETED,
+    GOAL_FAILED,
+})
+_BRAIN_ACTION_TOPICS: frozenset[str] = frozenset({
+    RUNTIME_ACTION_STARTED,
+    RUNTIME_ACTION_COMPLETED,
+    RUNTIME_ACTION_FAILED,
+    RUNTIME_ACTION_DENIED,
+})
+_BRAIN_SNAPSHOT_TOPICS: frozenset[str] = (
+    frozenset({KERNEL_STATE_CHANGED, OBSERVATION_RECEIVED, PLAN_GENERATED})
+    | _BRAIN_GOAL_TOPICS
+    | _BRAIN_ACTION_TOPICS
+)
+
+
+def _reduce_brain_state_snapshot(state: AppState, event: Event) -> AppState:
+    """Phase 11 projection: builds BrainStateSnapshot from raw brain fields.
+
+    Runs AFTER _reduce_brain_state so raw fields already reflect the event.
+    """
+    if event.topic not in _BRAIN_SNAPSHOT_TOPICS:
+        return state
+    bs = state.brain_state
+    topic = event.topic
+    if topic == KERNEL_STATE_CHANGED:
+        return replace(state, brain_state=bs.with_kernel_state(state.brain_kernel_state))
+    if topic in _BRAIN_GOAL_TOPICS:
+        raw = state.brain_recent_goals[0] if state.brain_recent_goals else {}
+        return replace(
+            state,
+            brain_state=bs.with_goal(BrainGoalSnapshot.from_dict(dict(raw))),
+        )
+    if topic == OBSERVATION_RECEIVED:
+        raw = state.brain_recent_observations[0] if state.brain_recent_observations else {}
+        return replace(
+            state,
+            brain_state=bs.with_observation(
+                BrainObservationSnapshot.from_dict(dict(raw))
+            ),
+        )
+    if topic in _BRAIN_ACTION_TOPICS:
+        raw = state.brain_recent_runtime_actions[0] if state.brain_recent_runtime_actions else {}
+        return replace(
+            state,
+            brain_state=bs.with_action(BrainRuntimeActionSnapshot.from_dict(dict(raw))),
+        )
+    if topic == PLAN_GENERATED:
+        return replace(
+            state,
+            brain_state=bs.with_plan(
+                BrainPlanSnapshot.from_dict(dict(state.planner_last_plan))
+            ),
         )
     return state
 
@@ -3061,6 +3206,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_system_snapshot,
     _reduce_chat_workspace_entity,
     _reduce_ui_chat_new_session,
+    _reduce_chat_session_snapshot,  # Phase 12 projection
     _reduce_workspace_os_event,
     _reduce_workspace_active,
     _reduce_workspace_selection,
@@ -3094,6 +3240,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_workflow_graph,
     _reduce_automation_workspace,
     _reduce_brain_state,
+    _reduce_brain_state_snapshot,  # Phase 11 projection
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,

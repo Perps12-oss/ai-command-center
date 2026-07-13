@@ -20,9 +20,13 @@ from ai_command_center.ui.views.execution_timeline_view import ExecutionTimeline
 from ai_command_center.ui.views.settings_view import SettingsView
 from ai_command_center.ui.views.system_view import SystemView
 from ai_command_center.ui.views.automation_workspace_view import AutomationWorkspaceView
+from ai_command_center.ui.views.dependency_inspector_view import DependencyInspectorView
+from ai_command_center.ui.views.relationship_view import RelationshipView
 from ai_command_center.ui.views.workflow_graph_view import WorkflowGraphView
+from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
+from ai_command_center.core.state.world_model_state import WorldModelState
 
 ViewFactory = Callable[[], object]
 
@@ -34,6 +38,9 @@ VIEW_IDS: tuple[str, ...] = (
     "timeline",
     "workflow",
     "automation",
+    "world_explorer",
+    "relationships",
+    "dependencies",
     "providers",
     "capabilities",
     "artifacts",
@@ -52,6 +59,7 @@ class ViewManagerMixin:
     def _register_views(self) -> None:
         """Register all view factories. Add new views here only."""
         ws_controller = WorkspaceOsUIController(self._bus)
+        self._world_model_state = WorldModelState(self._bus)
         self._view_registry["workspace"] = lambda: WorkspaceView(
             self._content,
             on_launch=self._controller.publish_launch_resource,
@@ -126,6 +134,21 @@ class ViewManagerMixin:
         self._view_registry["artifacts"] = lambda: ArtifactsView(
             self._content,
             on_artifact_action=self._controller.publish_artifact_action,
+        )
+        self._view_registry["world_explorer"] = lambda: WorldExplorerView(
+            self._content,
+            bus=self._bus,
+            state=self._world_model_state,
+        )
+        self._view_registry["relationships"] = lambda: RelationshipView(
+            self._content,
+            bus=self._bus,
+            state=self._world_model_state,
+        )
+        self._view_registry["dependencies"] = lambda: DependencyInspectorView(
+            self._content,
+            bus=self._bus,
+            state=self._world_model_state,
         )
         self._view_registry["gallery"] = lambda: ComponentGalleryView(self._content)
 
