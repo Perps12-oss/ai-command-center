@@ -160,6 +160,11 @@ from ai_command_center.core.state.automation_workspace_state import (
     reduce_automation_workspace_state,
 )
 from ai_command_center.domain.automation_workspace import AutomationWorkspaceState
+from ai_command_center.domain.capability_library_snapshot import (
+    CapabilityEntry,
+    CapabilityLibrarySnapshot,
+    ProviderEntry,
+)
 from ai_command_center.domain.journal_entry import JournalEntry
 from ai_command_center.domain.operation_snapshot import OperationSnapshot
 from ai_command_center.domain.world_model_snapshot import (
@@ -499,6 +504,9 @@ class AppState:
     runtime_capability_providers: tuple[RuntimeProviderItem, ...] = ()
     capability_lifecycle: tuple[CapabilityRecord, ...] = ()
     capability_prompt_catalog: tuple[dict[str, object], ...] = ()
+    capability_library: CapabilityLibrarySnapshot = field(
+        default_factory=CapabilityLibrarySnapshot
+    )
     planner_last_plan: dict[str, object] = field(default_factory=dict)
     execution_active_plan: dict[str, object] = field(default_factory=dict)
     execution_current_step: dict[str, object] = field(default_factory=dict)
@@ -1955,6 +1963,167 @@ def _wm_mutation_summary(mutation: dict) -> str:
     return mtype
 
 
+# ── Blueprint Phase 3 — Capability Library AppState reducer ───────────────────
+
+_CAP_LIB_TOPICS = frozenset({
+    CAPABILITY_PROVIDERS_READY,
+    CAPABILITY_LIFECYCLE_SNAPSHOT,
+    CAPABILITY_CATALOG_RESULT,
+})
+
+
+def _reduce_capability_library(state: AppState, event: Event) -> AppState:
+    """Project capability events into immutable AppState.capability_library snapshot."""
+    topic = event.topic
+    if topic not in _CAP_LIB_TOPICS:
+        return state
+    p = event.payload
+    lib = state.capability_library
+
+    if topic == CAPABILITY_LIFECYCLE_SNAPSHOT:
+        raw_records = p.get("capability_lifecycle") or []
+        entry_map: dict[str, CapabilityEntry] = {e.capability_id: e for e in lib.entries}
+        for item in raw_records:
+            if not isinstance(item, dict):
+                continue
+            cid = str(item.get("capability_id") or "")
+            if not cid:
+                continue
+            prev = entry_map.get(cid)
+            raw_params = item.get("parameters") or {}
+            params: tuple[tuple[str, str], ...] = ()
+            if isinstance(raw_params, dict):
+                params = tuple((str(k), str(v)) for k, v in raw_params.items())
+            entry_map[cid] = CapabilityEntry(
+                capability_id=cid,
+                provider_id=str(item.get("provider_id") or (prev.provider_id if prev else "")),
+                capability_kind=str(item.get("capability_kind") or (prev.capability_kind if prev else "")),
+                lifecycle_state=str(item.get("lifecycle_state") or (prev.lifecycle_state if prev else "discovered")),
+                health_status=str(item.get("health_status") or (prev.health_status if prev else "offline")),
+                certified=bool(item.get("certified", prev.certified if prev else False)),
+                observable=bool(item.get("observable", prev.observable if prev else False)),
+                source=str(item.get("source") or (prev.source if prev else "")),
+                description=prev.description if prev else "",
+                parameters=params or (prev.parameters if prev else ()),
+                last_error=str(item.get("last_error") or ""),
+                discovered_at=float(item.get("discovered_at") or (prev.discovered_at if prev else 0.0)),
+                updated_at=float(item.get("updated_at") or (prev.updated_at if prev else 0.0)),
+            )
+        entries = tuple(entry_map.values())
+        healthy = sum(1 for e in entries if e.health_status == "healthy")
+        new_lib = replace(
+            lib,
+            entries=entries,
+            total_count=len(entries),
+            healthy_count=healthy,
+        )
+        return replace(
+            state,
+            capability_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == CAPABILITY_CATALOG_RESULT:
+        raw_specs = p.get("specs") or []
+        entry_map = {e.capability_id: e for e in lib.entries}
+        for spec in raw_specs:
+            if not isinstance(spec, dict):
+                continue
+            cid = str(spec.get("capability_id") or spec.get("id") or "")
+            if not cid:
+                continue
+            prev = entry_map.get(cid)
+            raw_params = spec.get("parameters") or {}
+            params = ()
+            if isinstance(raw_params, dict):
+                params = tuple((str(k), str(v)) for k, v in raw_params.items())
+            entry_map[cid] = CapabilityEntry(
+                capability_id=cid,
+                provider_id=str(spec.get("provider_id") or (prev.provider_id if prev else "")),
+                capability_kind=str(spec.get("kind") or spec.get("capability_kind") or (prev.capability_kind if prev else "")),
+                lifecycle_state=prev.lifecycle_state if prev else "discovered",
+                health_status=prev.health_status if prev else "offline",
+                certified=prev.certified if prev else False,
+                observable=prev.observable if prev else False,
+                source=str(spec.get("source") or (prev.source if prev else "")),
+                description=str(spec.get("description") or (prev.description if prev else "")),
+                parameters=params or (prev.parameters if prev else ()),
+                last_error=prev.last_error if prev else "",
+                discovered_at=prev.discovered_at if prev else 0.0,
+                updated_at=prev.updated_at if prev else 0.0,
+            )
+        entries = tuple(entry_map.values())
+        healthy = sum(1 for e in entries if e.health_status == "healthy")
+        new_lib = replace(
+            lib,
+            entries=entries,
+            total_count=len(entries),
+            healthy_count=healthy,
+            catalog_version=lib.catalog_version + 1,
+        )
+        return replace(
+            state,
+            capability_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == CAPABILITY_PROVIDERS_READY:
+        raw_providers = p.get("providers") or []
+        provider_map: dict[str, ProviderEntry] = {pr.provider_id: pr for pr in lib.providers}
+        entry_map = {e.capability_id: e for e in lib.entries}
+        for item in raw_providers:
+            if not isinstance(item, dict):
+                continue
+            pid = str(item.get("id") or "")
+            if not pid:
+                continue
+            caps = [str(c) for c in (item.get("capabilities") or [])]
+            provider_map[pid] = ProviderEntry(
+                provider_id=pid,
+                name=str(item.get("name") or pid),
+                version=str(item.get("version") or ""),
+                health_state=str(item.get("health_state") or ""),
+                enabled=bool(item.get("enabled", True)),
+                capability_count=len(caps),
+            )
+            for cid in caps:
+                prev = entry_map.get(cid)
+                entry_map[cid] = CapabilityEntry(
+                    capability_id=cid,
+                    provider_id=pid,
+                    capability_kind=prev.capability_kind if prev else "",
+                    lifecycle_state=prev.lifecycle_state if prev else "discovered",
+                    health_status=str(item.get("health_state") or (prev.health_status if prev else "offline")),
+                    certified=prev.certified if prev else False,
+                    observable=prev.observable if prev else False,
+                    source=prev.source if prev else "runtime",
+                    description=prev.description if prev else "",
+                    parameters=prev.parameters if prev else (),
+                    last_error=prev.last_error if prev else "",
+                    discovered_at=prev.discovered_at if prev else 0.0,
+                    updated_at=prev.updated_at if prev else 0.0,
+                )
+        entries = tuple(entry_map.values())
+        healthy = sum(1 for e in entries if e.health_status == "healthy")
+        new_lib = replace(
+            lib,
+            entries=entries,
+            providers=tuple(provider_map.values()),
+            total_count=len(entries),
+            healthy_count=healthy,
+        )
+        return replace(
+            state,
+            capability_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    return state
+
+
 # ── Blueprint Phase 1 — Operations Library & Journal reducers ─────────────────
 
 JOURNAL_MAX_ENTRIES = 500
@@ -2093,6 +2262,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_operation_loaded,
     _reduce_journal_entry_appended,
     _reduce_world_model,
+    _reduce_capability_library,
 )
 
 
