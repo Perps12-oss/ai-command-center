@@ -1,0 +1,18 @@
+{
+  "tom_audit_v2": true,
+  "verdict": "COMPLIANT",
+  "repo_commit": "a73af7934cab4ee54fc902831cc76aacfdec7313",
+  "files_checked": [
+    "ai_command_center/operator/",
+    "ai_command_center/orchestration/goals/",
+    "ai_command_center/orchestration/agents/",
+    "ai_command_center/core/world_model/",
+    "ai_command_center/platform/",
+    "ai_command_center/runtime_manifests/",
+    "ai_command_center/services/external_capability_bridge_service.py",
+    "ai_command_center/core/app_state.py",
+    "ai_command_center/core/service_factory.py"
+  ],
+  "evidence_hash": "sha256:f3973e8422a3e4d0",
+  "timestamp": "2026-07-13T00:00:00Z"
+}
