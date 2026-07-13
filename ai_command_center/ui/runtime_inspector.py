@@ -191,7 +191,7 @@ class RuntimeInspector(ctk.CTkToplevel):
                 {
                     "receipt_id": run.receipt_id,
                     "execution_success": run.execution_success,
-                    "execution_facts": run.execution_facts,
+                    "execution_facts": run.execution_facts_dict,  # Convert tuple back to dict for display
                     "execution_error": run.execution_error,
                 },
                 indent=2,
