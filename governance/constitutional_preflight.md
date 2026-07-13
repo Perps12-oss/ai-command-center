@@ -1,21 +1,27 @@
 # CONSTITUTIONAL PRE-FLIGHT
 
 Task Description:
-ACC Blueprint Resolutions — Phase 8: PermissionCheckSnapshot AppState projection.
-Adds an immutable AppState.permission_snapshot: PermissionCheckSnapshot field
-consolidating pending_permission_check (PermissionCheckItem | None) and
-permission_check_revision (int) into a single typed snapshot that also tracks
-a resolved-check history. Reducer consumes PERMISSION_CHECK_REQUEST and
-PERMISSION_CHECK_RESULT. Both topics already in APP_STATE_TOPICS. Existing fields
-preserved for backward compatibility. No new topics, services, or DB changes.
+ACC Blueprint Resolutions — Phase 9: ServiceRegistrySnapshot AppState projection.
+Adds an immutable AppState.service_registry: ServiceRegistrySnapshot field that
+consolidates the flat services tuple with per-service lifecycle history and a
+health trend. Wires the four canonical service lifecycle topics that BaseService
+publishes (SERVICE_STARTED, SERVICE_READY, SERVICE_STOPPED, SERVICE_ERROR) but
+that AppStateStore was silently dropping because only SERVICE_STATE_CHANGED was
+in APP_STATE_TOPICS. The existing services tuple is preserved for backward
+compatibility. No new topics, services, or DB changes.
 
 Files Reviewed:
 - PROJECT_CONSTITUTION_V4.md
 - AGENTS.md
 - docs/ARCHITECTURE.md
+- docs/ARCHITECTURE_ENFORCEMENT.md
 - docs/architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md
-- ai_command_center/core/app_state.py (lines 441-449, 536-537, 1534-1573)
+- ai_command_center/services/base.py
+- ai_command_center/core/contracts.py
 - ai_command_center/core/events/topics.py
+- ai_command_center/core/app_state.py (AppState, APP_STATE_TOPICS, _reduce_service_state, _DEFAULT_REDUCERS)
+- ai_command_center/domain/service_state.py
+- ai_command_center/domain/permission_check_snapshot.py (pattern reference)
 - governance/constitutional_preflight.md
 
 Authorities Reviewed:
@@ -25,25 +31,29 @@ Authorities Reviewed:
 
 Protected Assets Impacted:
 - AppState Projection System (Tier A) — 1 new field added; populated by pure reducer only
-- Existing pending_permission_check, permission_check_revision — preserved unchanged
+- EventBus Topic Registry (Tier A) — four canonical service topics already registered; only AppState subscription wiring changes
+- Service Lifecycle Framework (Tier B) — consumer side only; no BaseService changes
 
 Sources of Truth Impacted:
-- AppState source of truth: ai_command_center/core/app_state.py (new field and reducer)
-- New domain module: ai_command_center/domain/permission_check_snapshot.py
+- AppState source of truth: ai_command_center/core/app_state.py (new field, topic wiring, reducer)
+- New domain module: ai_command_center/domain/service_registry_snapshot.py
+- Service operational state remains authoritative in BaseService._state
 
 Architectural Invariants Impacted:
 - Invariant 1: Ownership Flow preserved
 - Invariant 2: UI Isolation — no UI changes
 - Invariant 4: AppState Governance — new field populated by reducer only
-- Invariant 8: Topic Governance — only already-registered topics consumed
+- Invariant 8: Topic Governance — only canonical, already-registered topics consumed
 
 Contracts Impacted:
-- None — both consumed topics already registered; no new contracts required
+- APP_STATE_TOPICS subscription list in ai_command_center/core/app_state.py (adds four existing topics)
+- New ServiceRegistrySnapshot dataclass contract in ai_command_center/domain/
 
 Gate Impact Assessment:
-- No APP_STATE_TOPICS changes (both topics already present)
-- No new topics, no contract versions, no schema changes
-- No existing reducer signatures changed
+- Adds SERVICE_STARTED, SERVICE_READY, SERVICE_STOPPED, SERVICE_ERROR to APP_STATE_TOPICS
+  (all four already registered in topics.py)
+- No new topic definitions, no contract versions, no schema changes
+- Existing services tuple preserved unchanged
 - No gate removals or bypasses permitted
 
 Historical Gates Impacted:
@@ -53,9 +63,9 @@ Historical Gates Impacted:
 - python3 -m ruff check ai_command_center
 
 Regression Risk:
-Low. Additive only: new domain module, new AppState field defaulting to empty snapshot,
-new reducer returning state unchanged for non-matching topics. Existing
-pending_permission_check and permission_check_revision unchanged.
+Low. Additive wiring and new snapshot. The four lifecycle topics were previously
+published but not consumed by AppStateStore; wiring them cannot break existing
+consumers. Existing services field behavior is preserved.
 
 Constitutional Status:
 

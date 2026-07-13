@@ -12,7 +12,7 @@ Constitutional fixes:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
