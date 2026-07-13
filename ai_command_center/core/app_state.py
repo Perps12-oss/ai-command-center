@@ -83,6 +83,7 @@ from ai_command_center.core.events.topics import (
     ORCHESTRATION_RUN_SNAPSHOT,
     EXECUTION_EVENT_APPENDED,
     EXECUTION_EVENTS_LOADED,
+    EXECUTION_RUNS_LOADED,
     EXECUTION_QUERY_RESULT,
     UI_EXECUTION_TIMELINE_SCRUB,
     UI_WORKFLOW_NODE_SELECT,
@@ -269,6 +270,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     UI_SELECT_ENTITY,
     EXECUTION_EVENT_APPENDED,
     EXECUTION_EVENTS_LOADED,
+    EXECUTION_RUNS_LOADED,
     # Agent / workflow runs (Track R7)
     AGENT_SPAWNED,
     AGENT_TASK_REQUEST,
@@ -2160,7 +2162,8 @@ def _reduce_workflow_library(state: AppState, event: Event) -> AppState:
             total_steps=total_steps,
         )
         runs = lib.runs
-        if not any(r.run_id == run_id for r in runs):
+        is_new_run = not any(r.run_id == run_id for r in runs)
+        if is_new_run:
             runs = runs + (run,)
             if len(runs) > _MAX_WORKFLOW_HISTORY:
                 runs = runs[:_MAX_WORKFLOW_HISTORY]
@@ -2492,6 +2495,7 @@ _EXEC_LIB_TOPICS = frozenset({
     EXECUTION_STEP_COMPLETED,
     EXECUTION_STEP_FAILED,
     EXECUTION_STEP_AWAITING_APPROVAL,
+    EXECUTION_RUNS_LOADED,
 })
 
 
@@ -2503,6 +2507,43 @@ def _reduce_execution_library(state: AppState, event: Event) -> AppState:
     p = event.payload
     lib = state.execution_library
     plan = lib.active_plan
+
+    # ── EXECUTION_RUNS_LOADED (bulk hydration on startup) ────────────────────────
+    if topic == EXECUTION_RUNS_LOADED:
+        raw_runs = p.get("runs")
+        if not isinstance(raw_runs, list) or not raw_runs:
+            return state
+        entries = tuple(
+            ExecutionRunEntry(
+                run_id=str(r.get("run_id") or ""),
+                request_id=str(r.get("request_id") or ""),
+                source=str(r.get("source") or ""),
+                created_at=float(r.get("created_at") or 0),
+                summary=str(r.get("summary") or ""),
+                status="complete",
+            )
+            for r in raw_runs
+            if isinstance(r, dict) and r.get("run_id")
+        )
+        # Update run_history and total_runs - dedup against existing
+        existing_ids = {e.run_id for e in lib.run_history}
+        new_entries = tuple(e for e in entries if e.run_id not in existing_ids)
+        if new_entries:
+            new_history = lib.run_history + new_entries
+            if len(new_history) > _MAX_RUN_HISTORY:
+                new_history = new_history[:_MAX_RUN_HISTORY]
+            new_lib = replace(
+                lib,
+                run_history=new_history,
+                total_runs=lib.total_runs + len(new_entries),
+            )
+            return replace(
+                state,
+                execution_library=new_lib,
+                last_event_topic=topic,
+                last_event_source=event.source,
+            )
+        return state
 
     if topic == EXECUTION_RUN_STARTED:
         raw_steps = p.get("steps") or []

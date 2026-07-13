@@ -19,6 +19,7 @@ from ai_command_center.core.events.topics import (
     RUNTIME_APPROVAL_REQUESTED,
     RUNTIME_WORLD_MODEL_APPLY_COMPLETED,
     RUNTIME_WORLD_MODEL_APPLY_REQUESTED,
+    WORLD_MODEL_GRAPH_REFRESHED,
 )
 from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.domain.correlation import CorrelationContext
@@ -57,6 +58,43 @@ class BrainRuntimeService(BaseService):
                 self._bus.subscribe(RUNTIME_APPROVAL_DECIDED, self._on_approval_decided),
                 self._bus.subscribe(OBSERVATION_RECEIVED, self._on_observation_received),
             ]
+        )
+        # Publish WorldModel graph state for AppState rehydration
+        self._publish_graph_refresh()
+
+    def _publish_graph_refresh(self) -> None:
+        """Rebuild WorldModel cache and publish graph state for AppState snapshot."""
+        # Recover the WorldModel cache from the mutation journal
+        self._world_model.recover(replay_limit=1000)
+        
+        # Build the full graph payload from the repository
+        nodes = []
+        edges = []
+        
+        # Get all nodes from the WorldModel cache
+        for node_id, node in self._world_model._nodes.items():
+            nodes.append({
+                "id": node.id,
+                "type": node.type,
+                "label": node.attributes.get("name") or node.attributes.get("title") or node.id,
+                "attributes": node.attributes,
+            })
+        
+        # Get all edges from the repository
+        for node_id in self._world_model._nodes:
+            for edge in self._world_model.get_edges(node_id, "out"):
+                edges.append({
+                    "id": edge.id,
+                    "from_node_id": edge.from_node_id,
+                    "to_node_id": edge.to_node_id,
+                    "type": edge.type,
+                })
+        
+        # Publish the graph refresh event for AppState rehydration
+        self._bus.publish(
+            WORLD_MODEL_GRAPH_REFRESHED,
+            {"nodes": nodes, "edges": edges},
+            source=self.name,
         )
 
     def _on_unload(self) -> None:

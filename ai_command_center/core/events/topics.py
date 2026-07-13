@@ -320,6 +320,7 @@ ARTIFACTS_LOADED = "artifacts.loaded"
 # Execution timeline stream (ACC UI Refurbishment PR 8)
 EXECUTION_EVENT_APPENDED = "execution.event.appended"
 EXECUTION_EVENTS_LOADED = "execution.events.loaded"
+EXECUTION_RUNS_LOADED = "execution.runs.loaded"
 
 # Execution timeline UI (ACC UI Refurbishment PR 9)
 UI_EXECUTION_TIMELINE_SCRUB = "ui.execution.timeline.scrub"
@@ -619,6 +620,7 @@ __all__ = [
     "ARTIFACTS_LOADED",
     "EXECUTION_EVENT_APPENDED",
     "EXECUTION_EVENTS_LOADED",
+    "EXECUTION_RUNS_LOADED",
     "UI_EXECUTION_TIMELINE_SCRUB",
     "UI_WORKFLOW_NODE_SELECT",
     "UI_WORKFLOW_NODE_MOVE",
