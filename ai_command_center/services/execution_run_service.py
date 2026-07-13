@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.topics import CHAT_COMPLETE, ORCHESTRATION_RUN_SNAPSHOT
+from ai_command_center.core.events.topics import (
+    CHAT_COMPLETE,
+    EXECUTION_RUNS_LOADED,
+    ORCHESTRATION_RUN_SNAPSHOT,
+)
 from ai_command_center.repositories.execution_run_repository import ExecutionRunRepository
 from ai_command_center.services.base import BaseService
 
@@ -27,11 +31,35 @@ class ExecutionRunService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(CHAT_COMPLETE, self._on_chat_complete)
         )
+        # Publish recent runs for AppState rehydration
+        self._publish_recent_runs()
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
+
+    def _publish_recent_runs(self) -> None:
+        """Publish recent execution runs for AppState snapshot rehydration."""
+        runs = self._repo.list_recent(limit=50)
+        if not runs:
+            return
+        self._bus.publish(
+            EXECUTION_RUNS_LOADED,
+            {
+                "runs": [
+                    {
+                        "run_id": run.run_id,
+                        "request_id": run.request_id,
+                        "source": run.source,
+                        "created_at": run.created_at,
+                        "summary": run.snapshot.get("goal", "") if run.snapshot else "",
+                    }
+                    for run in runs
+                ]
+            },
+            source=self.name,
+        )
 
     def _on_orchestration_snapshot(self, event: Event) -> None:
         payload = event.payload
