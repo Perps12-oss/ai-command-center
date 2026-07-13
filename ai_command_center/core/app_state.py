@@ -127,7 +127,11 @@ from ai_command_center.domain.capability_provider_settings import (
 )
 from ai_command_center.platform.model_registry import normalize_tier_map
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
-from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
+from ai_command_center.domain.orchestration_run_snapshot import (
+    OrchestrationRunSnapshot,
+    OrchestrationRunEntry,
+    _dict_to_immutable,
+)
 from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, ArtifactCatalogItem
 from ai_command_center.core.state.execution_event_state import (
     EXECUTION_EVENT_REDUCERS,
@@ -1033,9 +1037,33 @@ def _reduce_orchestration_provider_health(state: AppState, event: Event) -> AppS
         h.provider_id: h for h in state.provider_health_map
     }
     health_items[snap.provider_id] = snap
+    new_health_map = tuple(health_items.values())
+    
+    # Also update orchestration_run.provider_health (unified snapshot)
+    new_orchestration_run = OrchestrationRunSnapshot(
+        request_id=state.orchestration_run.request_id,
+        query=state.orchestration_run.query,
+        intent=state.orchestration_run.intent,
+        provider_id=state.orchestration_run.provider_id,
+        execution_success=state.orchestration_run.execution_success,
+        execution_facts=state.orchestration_run.execution_facts,
+        execution_error=state.orchestration_run.execution_error,
+        truth_valid=state.orchestration_run.truth_valid,
+        truth_detail=state.orchestration_run.truth_detail,
+        response_source=state.orchestration_run.response_source,
+        response_text=state.orchestration_run.response_text,
+        receipt_id=state.orchestration_run.receipt_id,
+        trace_id=state.orchestration_run.trace_id,
+        span_id=state.orchestration_run.span_id,
+        run_history=state.orchestration_run.run_history,
+        total_runs=state.orchestration_run.total_runs,
+        provider_health=new_health_map,  # Unified into snapshot
+    )
+    
     return replace(
         state,
-        provider_health_map=tuple(health_items.values()),
+        provider_health_map=new_health_map,
+        orchestration_run=new_orchestration_run,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1621,13 +1649,17 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
         return state
     payload = event.payload
     facts = payload.get("execution_facts") or {}
+    
+    # FIX: Convert dict to immutable tuple[tuple[str, str], ...]
+    immutable_facts = _dict_to_immutable(facts) if isinstance(facts, dict) else ()
+    
     run = OrchestrationRunSnapshot(
         request_id=str(payload.get("request_id", "")),
         query=str(payload.get("query", "")),
         intent=str(payload.get("intent", "")),
         provider_id=str(payload.get("provider_id", "")),
         execution_success=bool(payload.get("execution_success")),
-        execution_facts=dict(facts) if isinstance(facts, dict) else {},
+        execution_facts=immutable_facts,  # IMMUTABLE tuple
         execution_error=str(payload.get("execution_error") or "") or None,
         truth_valid=bool(payload.get("truth_valid")),
         truth_detail=str(payload.get("truth_detail", "")),
@@ -1637,6 +1669,58 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
         trace_id=str(payload.get("trace_id", "")),
         span_id=str(payload.get("span_id", "")),
     )
+    
+    # Build run history - add new run, cap at max
+    existing_history = state.orchestration_run.run_history
+    existing_ids = {r.request_id for r in existing_history}
+    
+    if run.request_id and run.request_id not in existing_ids:
+        new_entry = OrchestrationRunEntry(
+            request_id=run.request_id,
+            query=run.query,
+            intent=run.intent,
+            provider_id=run.provider_id,
+            execution_success=run.execution_success,
+            execution_facts=run.execution_facts,
+            execution_error=run.execution_error,
+            truth_valid=run.truth_valid,
+            truth_detail=run.truth_detail,
+            response_source=run.response_source,
+            response_text=run.response_text,
+            receipt_id=run.receipt_id,
+            trace_id=run.trace_id,
+            span_id=run.span_id,
+            timestamp=payload.get("timestamp", 0.0) or 0.0,
+        )
+        new_history = (new_entry,) + existing_history
+        if len(new_history) > 50:
+            new_history = new_history[:50]
+        total_runs = state.orchestration_run.total_runs + 1
+    else:
+        new_history = existing_history
+        total_runs = state.orchestration_run.total_runs
+    
+    # Include provider_health in snapshot
+    new_run = OrchestrationRunSnapshot(
+        request_id=run.request_id,
+        query=run.query,
+        intent=run.intent,
+        provider_id=run.provider_id,
+        execution_success=run.execution_success,
+        execution_facts=run.execution_facts,
+        execution_error=run.execution_error,
+        truth_valid=run.truth_valid,
+        truth_detail=run.truth_detail,
+        response_source=run.response_source,
+        response_text=run.response_text,
+        receipt_id=run.receipt_id,
+        trace_id=run.trace_id,
+        span_id=run.span_id,
+        run_history=new_history,
+        total_runs=total_runs,
+        provider_health=state.orchestration_run.provider_health,
+    )
+    
     exec_ctx = ExecutionContext(
         request_id=run.request_id,
         provider_id=run.provider_id,
@@ -1658,7 +1742,7 @@ def _reduce_orchestration_run(state: AppState, event: Event) -> AppState:
     )
     return replace(
         state,
-        orchestration_run=run,
+        orchestration_run=new_run,
         execution_context=exec_ctx,
         last_event_topic=event.topic,
         last_event_source=event.source,
