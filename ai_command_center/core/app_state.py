@@ -2166,11 +2166,12 @@ def _reduce_workflow_library(state: AppState, event: Event) -> AppState:
                 runs = runs[:_MAX_WORKFLOW_HISTORY]
         else:
             runs = tuple(r if r.run_id != run_id else run for r in runs)
+        is_new_run = not any(r.run_id == run_id for r in lib.runs)
         new_lib = replace(
             lib,
             runs=runs,
             active_run_id=run_id,
-            total_started=lib.total_started + 1,
+            total_started=lib.total_started + (1 if is_new_run else 0),
         )
         return replace(
             state,
