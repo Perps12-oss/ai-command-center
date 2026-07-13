@@ -15,7 +15,7 @@ from ai_command_center.core.events.topics import (
     ORCHESTRATION_RUN_SNAPSHOT,
 )
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
-from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
+from ai_command_center.domain.orchestration_run_snapshot import OrchestrationRunSnapshot
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.ui_queue import UIQueue
 
