@@ -97,6 +97,11 @@ from ai_command_center.core.events.topics import (
     JOURNAL_ENTRY_APPENDED,
     OPERATION_LOADED,
     OPERATION_SAVED,
+    RUNTIME_WORLD_MODEL_APPLY_COMPLETED,
+    WORLD_MODEL_GRAPH_REFRESHED,
+    WORLD_MODEL_MUTATION_APPLIED,
+    WORLD_MODEL_NODE_DESELECTED,
+    WORLD_MODEL_NODE_SELECTED,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -157,6 +162,14 @@ from ai_command_center.core.state.automation_workspace_state import (
 from ai_command_center.domain.automation_workspace import AutomationWorkspaceState
 from ai_command_center.domain.journal_entry import JournalEntry
 from ai_command_center.domain.operation_snapshot import OperationSnapshot
+from ai_command_center.domain.world_model_snapshot import (
+    EdgeSnapshot,
+    GoalSnapshot,
+    MutationSnapshot,
+    NodeSnapshot,
+    WorldModelSnapshot,
+    _attrs_to_pairs,
+)
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.domain.system_snapshot import SystemSnapshot
 
@@ -257,6 +270,11 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     JOURNAL_ENTRY_APPENDED,
     OPERATION_LOADED,
     OPERATION_SAVED,
+    RUNTIME_WORLD_MODEL_APPLY_COMPLETED,
+    WORLD_MODEL_GRAPH_REFRESHED,
+    WORLD_MODEL_MUTATION_APPLIED,
+    WORLD_MODEL_NODE_DESELECTED,
+    WORLD_MODEL_NODE_SELECTED,
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_STARTED,
@@ -507,6 +525,9 @@ class AppState:
     operation_journal: tuple[JournalEntry, ...] = ()
     active_operation: OperationSnapshot | None = None
     journal_entry_counter: int = 0
+
+    # Blueprint Phase 2 — World Model AppState projection
+    world_model: WorldModelSnapshot = field(default_factory=WorldModelSnapshot)
 Reducer = Callable[[AppState, Event], AppState]
 
 
@@ -1728,6 +1749,212 @@ def _reduce_brain_state(state: AppState, event: Event) -> AppState:
     return state
 
 
+# ── Blueprint Phase 2 — World Model AppState reducer ────────────────────────────
+
+_WM_MUTATION_TOPICS = frozenset({
+    WORLD_MODEL_MUTATION_APPLIED,
+    RUNTIME_WORLD_MODEL_APPLY_COMPLETED,
+})
+_WM_TOPICS = _WM_MUTATION_TOPICS | frozenset({
+    WORLD_MODEL_GRAPH_REFRESHED,
+    WORLD_MODEL_NODE_SELECTED,
+    WORLD_MODEL_NODE_DESELECTED,
+    ENTITY_CREATED,
+    ENTITY_UPDATED,
+    ENTITY_DELETED,
+    GOAL_SUBMITTED,
+    GOAL_ACTIVATED,
+    GOAL_COMPLETED,
+    GOAL_FAILED,
+    GOAL_CANCELLED,
+})
+
+
+def _reduce_world_model(state: AppState, event: Event) -> AppState:
+    """Project world model events into immutable AppState.world_model snapshot."""
+    topic = event.topic
+    if topic not in _WM_TOPICS:
+        return state
+    wm = state.world_model
+    p = event.payload
+
+    if topic == WORLD_MODEL_GRAPH_REFRESHED:
+        raw_nodes = p.get("nodes") or []
+        raw_edges = p.get("edges") or []
+        nodes = tuple(
+            NodeSnapshot(
+                node_id=str(n.get("id") or ""),
+                node_type=str(n.get("type") or "resource"),
+                label=str(n.get("label") or n.get("name") or ""),
+                attributes=_attrs_to_pairs(n.get("attributes")),
+            )
+            for n in raw_nodes if n.get("id")
+        )
+        edges = tuple(
+            EdgeSnapshot(
+                edge_id=str(e.get("id") or ""),
+                from_node_id=str(e.get("from_node_id") or ""),
+                to_node_id=str(e.get("to_node_id") or ""),
+                edge_type=str(e.get("type") or "related"),
+                from_label=str(e.get("from_label") or ""),
+                to_label=str(e.get("to_label") or ""),
+            )
+            for e in raw_edges
+        )
+        new_wm = replace(
+            wm,
+            nodes=nodes,
+            edges=edges,
+            node_count=len(nodes),
+        )
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == ENTITY_CREATED:
+        node_id = str(p.get("id") or p.get("entity_id") or "")
+        if not node_id:
+            return state
+        new_node = NodeSnapshot(
+            node_id=node_id,
+            node_type=str(p.get("entity_type") or p.get("type") or "resource"),
+            label=str(p.get("name") or p.get("title") or node_id),
+            attributes=_attrs_to_pairs(p.get("attributes")),
+        )
+        nodes = tuple(n for n in wm.nodes if n.node_id != node_id) + (new_node,)
+        new_wm = replace(wm, nodes=nodes, node_count=len(nodes))
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == ENTITY_UPDATED:
+        node_id = str(p.get("id") or p.get("entity_id") or "")
+        if not node_id:
+            return state
+        prev = next((n for n in wm.nodes if n.node_id == node_id), None)
+        updated = NodeSnapshot(
+            node_id=node_id,
+            node_type=str(p.get("entity_type") or p.get("type") or (prev.node_type if prev else "resource")),
+            label=str(p.get("name") or p.get("title") or (prev.label if prev else node_id)),
+            attributes=_attrs_to_pairs(p.get("attributes")) or (prev.attributes if prev else ()),
+        )
+        nodes = tuple(n if n.node_id != node_id else updated for n in wm.nodes)
+        if prev is None:
+            nodes = nodes + (updated,)
+        new_wm = replace(wm, nodes=nodes, node_count=len(nodes))
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == ENTITY_DELETED:
+        node_id = str(p.get("id") or p.get("entity_id") or "")
+        nodes = tuple(n for n in wm.nodes if n.node_id != node_id)
+        edges = tuple(
+            e for e in wm.edges
+            if e.from_node_id != node_id and e.to_node_id != node_id
+        )
+        selected = "" if wm.selected_node_id == node_id else wm.selected_node_id
+        new_wm = replace(wm, nodes=nodes, edges=edges, node_count=len(nodes), selected_node_id=selected)
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic in _WM_MUTATION_TOPICS:
+        mutation = p.get("mutation") or p
+        entry = MutationSnapshot(
+            mutation_id=str(mutation.get("id") or mutation.get("mutation_id") or ""),
+            mutation_type=str(mutation.get("type") or "unknown"),
+            correlation_id=str(mutation.get("correlation_id") or ""),
+            goal_id=str(mutation.get("goal_id") or ""),
+            timestamp=str(mutation.get("created_at") or mutation.get("timestamp") or ""),
+            summary=_wm_mutation_summary(mutation),
+        )
+        log = wm.mutation_log + (entry,)
+        if len(log) > 200:
+            log = log[-200:]
+        new_wm = replace(wm, mutation_log=log, mutation_count=len(log))
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == WORLD_MODEL_NODE_SELECTED:
+        node_id = str(p.get("node_id") or "")
+        new_wm = replace(wm, selected_node_id=node_id)
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == WORLD_MODEL_NODE_DESELECTED:
+        new_wm = replace(wm, selected_node_id="")
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic in {GOAL_SUBMITTED, GOAL_ACTIVATED, GOAL_COMPLETED, GOAL_FAILED, GOAL_CANCELLED}:
+        goal = p.get("goal") or p
+        goal_id = str(goal.get("id") or goal.get("goal_id") or p.get("goal_id") or "")
+        if not goal_id:
+            return state
+        status_map = {
+            GOAL_SUBMITTED: "submitted",
+            GOAL_ACTIVATED: "active",
+            GOAL_COMPLETED: "complete",
+            GOAL_FAILED: "failed",
+            GOAL_CANCELLED: "cancelled",
+        }
+        snap = GoalSnapshot(
+            goal_id=goal_id,
+            title=str(goal.get("title") or goal_id),
+            status=str(goal.get("status") or status_map.get(topic, "submitted")),
+        )
+        goals = tuple(g if g.goal_id != goal_id else snap for g in wm.goals)
+        if not any(g.goal_id == goal_id for g in wm.goals):
+            goals = goals + (snap,)
+        new_wm = replace(wm, goals=goals)
+        return replace(
+            state,
+            world_model=new_wm,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    return state
+
+
+def _wm_mutation_summary(mutation: dict) -> str:
+    mtype = str(mutation.get("type") or "")
+    payload = mutation.get("payload") or {}
+    node = payload.get("node") or {}
+    node_id = str(node.get("id") or payload.get("node_id") or "")
+    edge_id = str(payload.get("edge_id") or "")
+    if node_id:
+        return f"{mtype} → node:{node_id}"
+    if edge_id:
+        return f"{mtype} → edge:{edge_id}"
+    return mtype
+
+
 # ── Blueprint Phase 1 — Operations Library & Journal reducers ─────────────────
 
 JOURNAL_MAX_ENTRIES = 500
@@ -1865,6 +2092,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_operation_saved,
     _reduce_operation_loaded,
     _reduce_journal_entry_appended,
+    _reduce_world_model,
 )
 
 
