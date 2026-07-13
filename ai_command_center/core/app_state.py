@@ -165,6 +165,13 @@ from ai_command_center.domain.capability_library_snapshot import (
     CapabilityLibrarySnapshot,
     ProviderEntry,
 )
+from ai_command_center.domain.execution_library_snapshot import (
+    ExecutionLibrarySnapshot,
+    ExecutionPlanSnapshot,
+    ExecutionRunEntry,
+    ExecutionStepSnapshot,
+    _MAX_RUN_HISTORY,
+)
 from ai_command_center.domain.journal_entry import JournalEntry
 from ai_command_center.domain.operation_snapshot import OperationSnapshot
 from ai_command_center.domain.world_model_snapshot import (
@@ -272,6 +279,13 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SELECT,
     UI_AUTOMATION_SCHEDULE_TOGGLE,
+    EXECUTION_RUN_STARTED,
+    EXECUTION_RUN_COMPLETE,
+    EXECUTION_RUN_FAILED,
+    EXECUTION_STEP_STARTED,
+    EXECUTION_STEP_AWAITING_APPROVAL,
+    EXECUTION_STEP_COMPLETED,
+    EXECUTION_STEP_FAILED,
     JOURNAL_ENTRY_APPENDED,
     OPERATION_LOADED,
     OPERATION_SAVED,
@@ -511,6 +525,10 @@ class AppState:
     execution_active_plan: dict[str, object] = field(default_factory=dict)
     execution_current_step: dict[str, object] = field(default_factory=dict)
     execution_runs: tuple[ExecutionRunItem, ...] = ()
+    # Blueprint Phase 4 — Execution Library AppState projection
+    execution_library: ExecutionLibrarySnapshot = field(
+        default_factory=ExecutionLibrarySnapshot
+    )
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
     inspector: InspectorState = field(default_factory=InspectorState)
@@ -1963,6 +1981,151 @@ def _wm_mutation_summary(mutation: dict) -> str:
     return mtype
 
 
+# ── Blueprint Phase 4 — Execution Library AppState reducer ────────────────────
+
+_EXEC_LIB_TOPICS = frozenset({
+    EXECUTION_RUN_STARTED,
+    EXECUTION_RUN_COMPLETE,
+    EXECUTION_RUN_FAILED,
+    EXECUTION_STEP_STARTED,
+    EXECUTION_STEP_COMPLETED,
+    EXECUTION_STEP_FAILED,
+    EXECUTION_STEP_AWAITING_APPROVAL,
+})
+
+
+def _reduce_execution_library(state: AppState, event: Event) -> AppState:
+    """Project execution events into immutable AppState.execution_library snapshot."""
+    topic = event.topic
+    if topic not in _EXEC_LIB_TOPICS:
+        return state
+    p = event.payload
+    lib = state.execution_library
+    plan = lib.active_plan
+
+    if topic == EXECUTION_RUN_STARTED:
+        raw_steps = p.get("steps") or []
+        steps = tuple(
+            ExecutionStepSnapshot(
+                step_id=str(s.get("step_id") or ""),
+                run_id=str(p.get("run_id") or ""),
+                index=int(s.get("index") or i),
+                capability=str(s.get("capability") or ""),
+                risk=str(s.get("risk") or ""),
+                status="pending",
+            )
+            for i, s in enumerate(raw_steps)
+            if isinstance(s, dict)
+        )
+        new_plan = ExecutionPlanSnapshot(
+            run_id=str(p.get("run_id") or ""),
+            request_id=str(p.get("request_id") or ""),
+            goal=str(p.get("goal") or ""),
+            total_steps=int(p.get("total_steps") or len(steps)),
+            status="running",
+            steps=steps,
+        )
+        new_lib = replace(lib, active_plan=new_plan)
+        return replace(
+            state,
+            execution_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic in {EXECUTION_STEP_STARTED, EXECUTION_STEP_AWAITING_APPROVAL}:
+        step_id = str(p.get("step_id") or "")
+        step_status = "awaiting_approval" if topic == EXECUTION_STEP_AWAITING_APPROVAL else "started"
+        updated_steps = tuple(
+            replace(s, status=step_status) if s.step_id == step_id else s
+            for s in plan.steps
+        )
+        if not any(s.step_id == step_id for s in plan.steps):
+            new_step = ExecutionStepSnapshot(
+                step_id=step_id,
+                run_id=str(p.get("run_id") or plan.run_id),
+                index=int(p.get("index") or 0),
+                capability=str(p.get("capability") or ""),
+                risk=str(p.get("risk") or ""),
+                status=step_status,
+            )
+            updated_steps = plan.steps + (new_step,)
+        new_plan = replace(plan, steps=updated_steps, current_step_id=step_id)
+        new_lib = replace(lib, active_plan=new_plan)
+        return replace(
+            state,
+            execution_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == EXECUTION_STEP_COMPLETED:
+        step_id = str(p.get("step_id") or "")
+        updated_steps = tuple(
+            replace(s, status="completed") if s.step_id == step_id else s
+            for s in plan.steps
+        )
+        new_plan = replace(plan, steps=updated_steps)
+        new_lib = replace(lib, active_plan=new_plan)
+        return replace(
+            state,
+            execution_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == EXECUTION_STEP_FAILED:
+        step_id = str(p.get("step_id") or "")
+        error = str(p.get("error") or "")
+        updated_steps = tuple(
+            replace(s, status="failed", error=error) if s.step_id == step_id else s
+            for s in plan.steps
+        )
+        new_plan = replace(plan, steps=updated_steps, status="failed", error=error)
+        new_lib = replace(lib, active_plan=new_plan)
+        return replace(
+            state,
+            execution_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic in {EXECUTION_RUN_COMPLETE, EXECUTION_RUN_FAILED}:
+        final_status = "complete" if topic == EXECUTION_RUN_COMPLETE else "failed"
+        error = str(p.get("error") or "") if topic == EXECUTION_RUN_FAILED else ""
+        entry = ExecutionRunEntry(
+            run_id=plan.run_id or str(p.get("run_id") or ""),
+            request_id=plan.request_id or str(p.get("request_id") or ""),
+            source="orchestration",
+            created_at=float(p.get("created_at") or 0.0),
+            summary=plan.goal[:120] if plan.goal else "",
+            status=final_status,
+        )
+        history = (entry,) + lib.run_history
+        if len(history) > _MAX_RUN_HISTORY:
+            history = history[:_MAX_RUN_HISTORY]
+        closed_plan = replace(
+            plan,
+            status=final_status,
+            error=error,
+            current_step_id="" if topic == EXECUTION_RUN_COMPLETE else plan.current_step_id,
+        )
+        new_lib = replace(
+            lib,
+            active_plan=closed_plan,
+            run_history=history,
+            total_runs=lib.total_runs + 1,
+        )
+        return replace(
+            state,
+            execution_library=new_lib,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    return state
+
+
 # ── Blueprint Phase 3 — Capability Library AppState reducer ───────────────────
 
 _CAP_LIB_TOPICS = frozenset({
@@ -2263,6 +2426,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_journal_entry_appended,
     _reduce_world_model,
     _reduce_capability_library,
+    _reduce_execution_library,
 )
 
 
