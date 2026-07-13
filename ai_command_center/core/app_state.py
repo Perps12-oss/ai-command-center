@@ -165,6 +165,10 @@ from ai_command_center.domain.capability_library_snapshot import (
     CapabilityLibrarySnapshot,
     ProviderEntry,
 )
+from ai_command_center.domain.agent_pipeline_snapshot import (
+    AgentPipelineSnapshot,
+    AgentRunSnapshot,
+)
 from ai_command_center.domain.execution_library_snapshot import (
     ExecutionLibrarySnapshot,
     ExecutionPlanSnapshot,
@@ -510,6 +514,10 @@ class AppState:
     active_agent_pipeline_id: str = ""
     agent_pipeline_stage: str = ""
     agent_pipeline_planned_tools: tuple[str, ...] = ()
+    # Blueprint Phase 5 — Agent Pipeline AppState projection
+    agent_pipeline: AgentPipelineSnapshot = field(
+        default_factory=AgentPipelineSnapshot
+    )
     active_workflow_run_id: str = ""
     pending_permission_check: PermissionCheckItem | None = None
     permission_check_revision: int = 0
@@ -1981,6 +1989,147 @@ def _wm_mutation_summary(mutation: dict) -> str:
     return mtype
 
 
+# ── Blueprint Phase 5 — Agent Pipeline AppState reducer ───────────────────────
+
+_AGENT_TOPICS = frozenset({
+    AGENT_SPAWNED,
+    AGENT_TASK_REQUEST,
+    AGENT_TASK_COMPLETE,
+    AGENT_TERMINATED,
+    AGENT_PIPELINE_STARTED,
+    AGENT_PIPELINE_STAGE,
+    AGENT_PIPELINE_PLANNED,
+    AGENT_PIPELINE_COMPLETE,
+})
+
+
+def _reduce_agent_pipeline_snapshot(state: AppState, event: Event) -> AppState:
+    """Project agent/pipeline events into immutable AppState.agent_pipeline snapshot."""
+    topic = event.topic
+    if topic not in _AGENT_TOPICS:
+        return state
+    p = event.payload
+    ap = state.agent_pipeline
+
+    if topic in {AGENT_SPAWNED, AGENT_TASK_REQUEST, AGENT_TASK_COMPLETE, AGENT_TERMINATED}:
+        agent_id = str(p.get("agent_id") or "")
+        if not agent_id:
+            return state
+
+        prev = ap.run_by_id(agent_id)
+        request_id = str(p.get("request_id") or (prev.request_id if prev else ""))
+        task = str(p.get("task") or (prev.task if prev else ""))
+        workspace_id = str(p.get("workspace_id") or (prev.workspace_id if prev else ""))
+        workspace_entity_id = str(
+            p.get("workspace_entity_id") or (prev.workspace_entity_id if prev else "")
+        )
+        spawn_role = str(p.get("spawn_role") or (prev.spawn_role if prev else ""))
+
+        if topic == AGENT_SPAWNED:
+            run_state = str(p.get("state") or "spawning")
+            steps = prev.steps if prev else 0
+            error = ""
+        elif topic == AGENT_TASK_REQUEST:
+            run_state = "running"
+            steps = (prev.steps if prev else 0) + 1
+            error = str(p.get("error") or (prev.error if prev else ""))
+        elif topic == AGENT_TASK_COMPLETE:
+            run_state = "waiting"
+            steps = prev.steps if prev else 0
+            error = str(p.get("error") or (prev.error if prev else ""))
+        else:  # AGENT_TERMINATED
+            error = str(p.get("error") or "")
+            run_state = "failed" if error else "terminated"
+            steps = prev.steps if prev else 0
+
+        run = AgentRunSnapshot(
+            agent_id=agent_id,
+            request_id=request_id,
+            state=run_state,
+            task=task or (prev.task if prev else ""),
+            error=error,
+            steps=steps,
+            workspace_id=workspace_id or (prev.workspace_id if prev else ""),
+            workspace_entity_id=workspace_entity_id or (prev.workspace_entity_id if prev else ""),
+            spawn_role=spawn_role or (prev.spawn_role if prev else ""),
+        )
+
+        runs = tuple(r if r.agent_id != agent_id else run for r in ap.runs)
+        if not any(r.agent_id == agent_id for r in ap.runs):
+            runs = ap.runs + (run,)
+
+        if topic == AGENT_TERMINATED:
+            active_ids = tuple(i for i in ap.active_run_ids if i != agent_id)
+            active_id = active_ids[0] if active_ids and ap.active_run_id == agent_id else (
+                ap.active_run_id if ap.active_run_id != agent_id else ""
+            )
+        else:
+            existing_ids = ap.active_run_ids
+            active_ids = existing_ids if agent_id in existing_ids else existing_ids + (agent_id,)
+            active_id = agent_id
+
+        total = ap.total_spawned + (1 if topic == AGENT_SPAWNED else 0)
+        new_ap = replace(
+            ap,
+            runs=runs,
+            active_run_id=active_id,
+            active_run_ids=active_ids,
+            total_spawned=total,
+        )
+        return replace(
+            state,
+            agent_pipeline=new_ap,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == AGENT_PIPELINE_STARTED:
+        pipeline_id = str(p.get("pipeline_id") or "")
+        stage = str(p.get("stage") or "starting")
+        planned_raw = p.get("planned_tools") or ()
+        planned = tuple(str(t) for t in planned_raw)
+        new_ap = replace(ap, pipeline_id=pipeline_id, pipeline_stage=stage, planned_tools=planned)
+        return replace(
+            state,
+            agent_pipeline=new_ap,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == AGENT_PIPELINE_STAGE:
+        pipeline_id = str(p.get("pipeline_id") or ap.pipeline_id)
+        stage = str(p.get("stage") or "")
+        new_ap = replace(ap, pipeline_id=pipeline_id, pipeline_stage=stage)
+        return replace(
+            state,
+            agent_pipeline=new_ap,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == AGENT_PIPELINE_PLANNED:
+        planned_raw = p.get("planned_tools") or ()
+        planned = tuple(str(t) for t in planned_raw) or ap.planned_tools
+        new_ap = replace(ap, planned_tools=planned)
+        return replace(
+            state,
+            agent_pipeline=new_ap,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    if topic == AGENT_PIPELINE_COMPLETE:
+        new_ap = replace(ap, pipeline_id="", pipeline_stage="complete", planned_tools=())
+        return replace(
+            state,
+            agent_pipeline=new_ap,
+            last_event_topic=topic,
+            last_event_source=event.source,
+        )
+
+    return state
+
+
 # ── Blueprint Phase 4 — Execution Library AppState reducer ────────────────────
 
 _EXEC_LIB_TOPICS = frozenset({
@@ -2427,6 +2576,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_world_model,
     _reduce_capability_library,
     _reduce_execution_library,
+    _reduce_agent_pipeline_snapshot,
 )
 
 
