@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -31,6 +32,11 @@ from ai_command_center.core.events.topics import (
     ARTIFACTS_LOADED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
+    SERVICE_ERROR,
+    SERVICE_READY,
+    SERVICE_STARTED,
+    SERVICE_STATE_CHANGED,
+    SERVICE_STOPPED,
     CHAT_CANCELLED,
     CHAT_CHUNK,
     CHAT_COMPLETE,
@@ -91,7 +97,6 @@ from ai_command_center.core.events.topics import (
     UI_AUTOMATION_RUN,
     UI_AUTOMATION_SELECT,
     UI_AUTOMATION_SCHEDULE_TOGGLE,
-    SERVICE_STATE_CHANGED,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
     SYSTEM_SNAPSHOT,
@@ -184,6 +189,7 @@ from ai_command_center.domain.permission_check_snapshot import (
     ResolvedCheck,
     _MAX_RESOLVED_HISTORY,
 )
+from ai_command_center.domain.service_registry_snapshot import ServiceRegistrySnapshot
 from ai_command_center.domain.workflow_library_snapshot import (
     WorkflowLibrarySnapshot,
     WorkflowRunSnapshot,
@@ -214,6 +220,10 @@ logger = logging.getLogger(__name__)
 
 APP_STATE_TOPICS: tuple[str, ...] = (
     SERVICE_STATE_CHANGED,
+    SERVICE_STARTED,
+    SERVICE_READY,
+    SERVICE_STOPPED,
+    SERVICE_ERROR,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
     COMMAND_ROUTED,
@@ -481,6 +491,10 @@ class AppState:
 
     phase: str = "idle"
     services: tuple[ServiceSnapshot, ...] = ()
+    # Blueprint Phase 9 — Service Registry AppState projection
+    service_registry: ServiceRegistrySnapshot = field(
+        default_factory=ServiceRegistrySnapshot
+    )
     settings: SettingsSnapshot = field(default_factory=SettingsSnapshot)
     system_snapshot: SystemSnapshot = field(default_factory=SystemSnapshot)
     workspace_os: WorkspaceOsSnapshot = field(default_factory=WorkspaceOsSnapshot)
@@ -681,17 +695,54 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
 
 
 def _reduce_service_state(state: AppState, event: Event) -> AppState:
-    if event.topic != SERVICE_STATE_CHANGED:
+    topic = event.topic
+    if topic not in {
+        SERVICE_STATE_CHANGED,
+        SERVICE_STARTED,
+        SERVICE_READY,
+        SERVICE_STOPPED,
+        SERVICE_ERROR,
+    }:
         return state
-    name = str(event.payload.get("name", ""))
-    new_state = str(event.payload.get("state", "off"))
-    detail = str(event.payload.get("detail", ""))
+    p = event.payload
+    if topic == SERVICE_STATE_CHANGED:
+        name = str(p.get("name", ""))
+        new_state = str(p.get("state", "off"))
+        detail = str(p.get("detail", ""))
+    else:
+        name = str(p.get("service", ""))
+        detail = str(p.get("detail", ""))
+        if topic == SERVICE_STARTED:
+            new_state = "started"
+        elif topic == SERVICE_READY:
+            new_state = "ready"
+        elif topic == SERVICE_STOPPED:
+            new_state = "stopped"
+        elif topic == SERVICE_ERROR:
+            new_state = "error"
+        else:
+            new_state = "unknown"
+    if not name:
+        return state
     updated = {s.name: s for s in state.services}
     updated[name] = ServiceSnapshot(name=name, state=new_state, detail=detail)
     services = tuple(sorted(updated.values(), key=lambda s: s.name))
+    registry = state.service_registry
+    timestamp = time.time()
+    if topic == SERVICE_STATE_CHANGED:
+        registry = registry.record_state_changed(name, new_state, detail, timestamp)
+    elif topic == SERVICE_STARTED:
+        registry = registry.record_started(name, timestamp)
+    elif topic == SERVICE_READY:
+        registry = registry.record_ready(name, timestamp)
+    elif topic == SERVICE_STOPPED:
+        registry = registry.record_stopped(name, timestamp)
+    elif topic == SERVICE_ERROR:
+        registry = registry.record_error(name, detail, timestamp)
     return replace(
         state,
         services=services,
+        service_registry=registry,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
