@@ -246,6 +246,9 @@ class ViewManagerMixin:
             if chat:
                 chat.focus_input()
 
+        if hasattr(self, "_queue_state_refresh"):
+            self._queue_state_refresh()
+
     def _on_sidebar_navigate(self, view_id: str) -> None:
         self._navigate(view_id)
 

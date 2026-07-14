@@ -80,7 +80,7 @@ class CommandPaletteApp(
         self._setup_keybindings()
         self.update_idletasks()
         self.attributes("-alpha", 0.0)
-        self._apply_state()
+        self._queue_state_refresh()
         snap = self._controller.snapshot()
         theme_manager.apply(
             self,

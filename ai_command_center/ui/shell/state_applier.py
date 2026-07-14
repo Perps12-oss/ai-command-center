@@ -14,6 +14,12 @@ class StateApplierMixin:
     """Applies AppState snapshots to shell widgets and catalog views."""
 
     def _queue_state_refresh(self) -> None:
+        """Enqueue a single state application; coalesce overlapping requests."""
+        if getattr(self, "_state_refresh_enqueued", False):
+            self._state_refresh_pending = True
+            return
+        self._state_refresh_enqueued = True
+        self._state_refresh_pending = False
         self._ui_queue.enqueue(self._apply_state)
 
     def _maybe_show_permission_dialog(self, snap) -> None:
@@ -48,6 +54,11 @@ class StateApplierMixin:
         )
 
     def _apply_state(self) -> None:
+        """Project the latest AppState into the shell. Re-enqueues if state changed while applying."""
+        self._state_refresh_enqueued = False
+        self._state_refresh_pending = False
+
+        current_view = getattr(self, "_current_view", "")
         snap = self._controller.snapshot()
         diag = getattr(snap, "execution_inspector", None)
         self._maybe_show_permission_dialog(snap)
@@ -65,7 +76,7 @@ class StateApplierMixin:
         self._top.update_top_bar(snap)
 
         command_center = self._command_center_view()
-        if command_center and hasattr(command_center, "apply_state"):
+        if command_center and hasattr(command_center, "apply_state") and current_view == "command_center":
             command_center.apply_state(snap)
 
         if snap.chat_status == "streaming":
@@ -88,7 +99,7 @@ class StateApplierMixin:
             pass
 
         home = self._home_view()
-        if home:
+        if home and current_view == "home":
             home.update_stats(
                 messages=self._msg_count,
                 memories=self._memory_count,
@@ -100,7 +111,7 @@ class StateApplierMixin:
                 home.update_ollama(False)
 
         chat = self._chat_view()
-        if chat:
+        if chat and current_view == "chat":
             chat.set_model(snap.settings.default_model)
             chat.update_entity_context(
                 snap.chat_workspace_entity_id,
@@ -253,6 +264,9 @@ class StateApplierMixin:
         self._apply_execution_timeline(snap)
         self._apply_workflow_graph(snap)
         self._apply_automation_workspace(snap)
+
+        if self._state_refresh_pending:
+            self._queue_state_refresh()
 
     def _apply_settings_projection(self, snap) -> None:
         """Keep SettingsView in sync when settings change off-page."""
