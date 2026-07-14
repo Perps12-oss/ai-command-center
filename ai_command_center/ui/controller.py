@@ -98,26 +98,40 @@ class UIController:
     def current_workspace_scope(self) -> dict[str, str]:
         """Workspace scope derived from AppState for UI-originated intents."""
         snap = self._state_store.snapshot
+        workspace_entity = getattr(snap, "workspace_entity", None)
         scope: dict[str, str] = {}
-        active_ws = str(snap.active_workspace_id).strip()
+        active_ws = str(
+            getattr(workspace_entity, "active_workspace_id", snap.active_workspace_id)
+        ).strip()
         if active_ws:
             scope["workspace_id"] = active_ws
-            if snap.active_workspace_title:
-                scope["active_workspace_title"] = snap.active_workspace_title
+            title = str(
+                getattr(workspace_entity, "active_workspace_title", snap.active_workspace_title)
+            ).strip()
+            if title:
+                scope["active_workspace_title"] = title
         entity = self.active_chat_workspace_entity()
         if entity is None:
-            selected_id = str(snap.selected_entity_id).strip()
+            selected_id = str(
+                getattr(workspace_entity, "selected_entity_id", snap.selected_entity_id)
+            ).strip()
             if selected_id:
                 scope["workspace_entity_id"] = selected_id
-                if snap.selected_entity_type:
-                    scope["workspace_entity_type"] = snap.selected_entity_type
-                if snap.selected_entity_title:
-                    scope["workspace_entity_title"] = snap.selected_entity_title
+                selected_type = str(
+                    getattr(workspace_entity, "selected_entity_type", snap.selected_entity_type)
+                ).strip()
+                selected_title = str(
+                    getattr(workspace_entity, "selected_entity_title", snap.selected_entity_title)
+                ).strip()
+                if selected_type:
+                    scope["workspace_entity_type"] = selected_type
+                if selected_title:
+                    scope["workspace_entity_title"] = selected_title
                 scope["selected_entity_id"] = selected_id
-                if snap.selected_entity_type:
-                    scope["selected_entity_type"] = snap.selected_entity_type
-                if snap.selected_entity_title:
-                    scope["selected_entity_title"] = snap.selected_entity_title
+                if selected_type:
+                    scope["selected_entity_type"] = selected_type
+                if selected_title:
+                    scope["selected_entity_title"] = selected_title
             return scope
         scope["workspace_entity_id"] = entity["entity_id"]
         scope["workspace_entity_type"] = entity.get("entity_type", "")

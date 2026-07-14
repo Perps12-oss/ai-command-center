@@ -140,6 +140,10 @@ from ai_command_center.domain.orchestration_run_snapshot import (
 from ai_command_center.domain.execution_inspector_snapshot import (
     ExecutionInspectorSnapshot,
 )
+from ai_command_center.domain.workspace_entity_snapshot import (
+    WorkspaceEntityItem as WorkspaceEntitySnapshotItem,
+    WorkspaceEntitySnapshot,
+)
 from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, ArtifactCatalogItem
 from ai_command_center.core.state.execution_event_state import (
     EXECUTION_EVENT_REDUCERS,
@@ -514,6 +518,8 @@ class AppState:
     settings: SettingsSnapshot = field(default_factory=SettingsSnapshot)
     system_snapshot: SystemSnapshot = field(default_factory=SystemSnapshot)
     workspace_os: WorkspaceOsSnapshot = field(default_factory=WorkspaceOsSnapshot)
+    # Blueprint Phase 14 — Workspace Entity consolidated snapshot
+    workspace_entity: WorkspaceEntitySnapshot = field(default_factory=WorkspaceEntitySnapshot)
     last_event_topic: str = ""
     last_event_source: str = ""
     settings_version: int = 0
@@ -1942,6 +1948,56 @@ def _reduce_execution_inspector_snapshot(state: AppState, event: Event) -> AppSt
     )
 
 
+_WORKSPACE_ENTITY_TOPICS = frozenset({
+    ENTITY_CREATED,
+    ENTITY_UPDATED,
+    ENTITY_DELETED,
+    EVENT_RELATIONSHIP_CREATED,
+    EVENT_ACTION_REGISTERED,
+    EVENT_TIMELINE_EVENT,
+    NOTES_INDEXED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
+    UI_SELECT_ENTITY,
+    UI_INSPECT_SELECT,
+    UI_INSPECT_CLEAR,
+    UI_INSPECT_NAVIGATE,
+})
+
+
+def _reduce_workspace_entity_snapshot(state: AppState, event: Event) -> AppState:
+    """Project workspace/entity selection into a single immutable snapshot."""
+    if event.topic not in _WORKSPACE_ENTITY_TOPICS:
+        return state
+    workspace_entities = tuple(
+        WorkspaceEntitySnapshotItem(
+            entity_id=item.entity_id,
+            entity_type=item.entity_type,
+            title=item.title,
+            metadata=tuple(item.metadata),
+        )
+        for item in state.workspace_os.entities
+    )
+    new_snap = WorkspaceEntitySnapshot.from_components(
+        active_workspace_id=state.active_workspace_id,
+        active_workspace_title=state.active_workspace_title,
+        selected_entity_id=state.selected_entity_id,
+        selected_entity_type=state.selected_entity_type,
+        selected_entity_title=state.selected_entity_title,
+        workspace_entities=workspace_entities,
+        inspector=state.inspector,
+        revision=state.workspace_entity.revision + 1,
+    )
+    if new_snap == state.workspace_entity:
+        return state
+    return replace(
+        state,
+        workspace_entity=new_snap,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_inspector(state: AppState, event: Event) -> AppState:
     new_inspector = reduce_inspector_state(state.inspector, event)
     if new_inspector == state.inspector:
@@ -3277,6 +3333,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_execution_context,
     _reduce_execution_timeline,
     _reduce_inspector,
+    _reduce_workspace_entity_snapshot,
     _reduce_workflow_graph,
     _reduce_automation_workspace,
     _reduce_brain_state,
