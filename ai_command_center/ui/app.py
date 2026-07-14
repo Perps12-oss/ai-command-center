@@ -38,7 +38,8 @@ class CommandPaletteApp(
         workspace_os_enabled: bool = True,
     ) -> None:
         super().__init__()
-        self._default_view = "workspace" if workspace_os_enabled else "home"
+        self._workspace_os_enabled = workspace_os_enabled
+        self._default_view = "command_center" if workspace_os_enabled else "home"
         self._bus = bus
         self._controller = UIController(bus, state_store, self._queue_state_refresh)
         self._ui_queue = UIQueue(self)
@@ -98,7 +99,7 @@ class CommandPaletteApp(
         _ = str(event.payload.get("reason", "no_active_workspace"))
 
         def update() -> None:
-            if self._default_view == "workspace":
+            if getattr(self, "_workspace_os_enabled", self._default_view == "workspace"):
                 self._navigate("workspace")
             self._toast.show(
                 "Activate a workspace before running commands",

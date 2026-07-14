@@ -32,6 +32,7 @@ class ApplicationShellMixin:
             self,
             on_settings=lambda: self._navigate("settings"),
             on_close=self.hide,
+            on_navigate=self._navigate,
         )
         self._top.pack(fill="x", side="top")
 

@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.views.chat_view import ChatView
+from ai_command_center.ui.views.command_center_view import CommandCenterView
 from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
 from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.home_view import HomeView
@@ -32,6 +33,7 @@ ViewFactory = Callable[[], object]
 
 VIEW_IDS: tuple[str, ...] = (
     "workspace",
+    "command_center",
     "home",
     "chat",
     "executions",
@@ -50,6 +52,9 @@ VIEW_IDS: tuple[str, ...] = (
     "plugins",
     "settings",
     "gallery",
+    "goals",
+    "agents",
+    "approvals",
 )
 
 
@@ -71,6 +76,14 @@ class ViewManagerMixin:
             self._content,
             on_command=self._on_command,
         )
+        self._view_registry["command_center"] = lambda: CommandCenterView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
+        self._view_registry["goals"] = lambda: PlaceholderView(self._content, "goals")
+        self._view_registry["agents"] = lambda: PlaceholderView(self._content, "agents")
+        self._view_registry["approvals"] = lambda: PlaceholderView(self._content, "approvals")
         self._view_registry["chat"] = lambda: ChatView(
             self._content,
             on_cancel=self._controller.publish_chat_cancel,
@@ -192,8 +205,12 @@ class ViewManagerMixin:
         v = self._views.get("workspace")
         return v if isinstance(v, WorkspaceView) else None
 
+    def _command_center_view(self) -> CommandCenterView | None:
+        v = self._views.get("command_center")
+        return v if isinstance(v, CommandCenterView) else None
+
     def _workspace_os_routing_enabled(self) -> bool:
-        return self._default_view == "workspace"
+        return getattr(self, "_workspace_os_enabled", self._default_view == "workspace")
 
     def _policy_resolve_view(self, view_id: str) -> str:
         """Workspace-centric routing: chat consumes active workspace scope."""

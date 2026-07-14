@@ -9,22 +9,30 @@ from ai_command_center.ui.design_system import theme_v2 as T
 
 VIEW_LABELS: dict[str, str] = {
     "home": "Home Dashboard",
+    "command_center": "Command Center",
     "chat": "Chat Workspace",
     "notes": "Obsidian Notes",
     "memory": "Memory",
     "system": "System Monitor",
     "plugins": "Plugins",
     "settings": "Settings",
+    "goals": "Goal Dashboard",
+    "agents": "Agent Monitor",
+    "approvals": "Approval Center",
 }
 
 VIEW_HINTS: dict[str, str] = {
     "home": "Quick actions and system overview.",
+    "command_center": "Operational overview and mission control.",
     "chat": "Ollama streaming chat.",
     "notes": "Vault search and quick notes.",
     "memory": "Browse and manage stored memories.",
     "system": "CPU, RAM, and shared memory monitor.",
     "plugins": "Plugin manager.",
     "settings": "Accent, hotkey, low memory mode.",
+    "goals": "Goal lifecycle dashboard — under construction (Phase 11F).",
+    "agents": "Active agent runs and pipeline monitor — under construction (Phase 11D).",
+    "approvals": "Pending permission checks and decision history — under construction (Phase 11E).",
 }
 
 

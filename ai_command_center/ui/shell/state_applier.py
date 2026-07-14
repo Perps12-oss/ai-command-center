@@ -62,6 +62,12 @@ class StateApplierMixin:
             openai_online=openai_online,
             openai_configured=openai_configured,
         )
+        self._top.update_top_bar(snap)
+
+        command_center = self._command_center_view()
+        if command_center and hasattr(command_center, "apply_state"):
+            command_center.apply_state(snap)
+
         if snap.chat_status == "streaming":
             self._last_terminal_chat_key = None
         self._overlay_mode = snap.settings.overlay_mode

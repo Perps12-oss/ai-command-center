@@ -8,6 +8,7 @@ from ai_command_center.ui.design_system import theme_v2 as T
 
 NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("workspace", "Workspace"),
+    ("command_center", "Command Center"),
     ("home", "Home"),
     ("chat", "Chat"),
     ("executions", "Executions"),
@@ -25,6 +26,9 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("system", "System"),
     ("plugins", "Plugins"),
     ("settings", "Settings"),
+    ("goals", "Goals"),
+    ("agents", "Agents"),
+    ("approvals", "Approvals"),
 )
 
 # Feature-flagged nav items — registered dynamically if feature is enabled
