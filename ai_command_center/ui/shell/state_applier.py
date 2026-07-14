@@ -49,6 +49,7 @@ class StateApplierMixin:
 
     def _apply_state(self) -> None:
         snap = self._controller.snapshot()
+        diag = getattr(snap, "execution_inspector", None)
         self._maybe_show_permission_dialog(snap)
         extra = dict(snap.system_snapshot.extra)
         openai_online = bool(extra.get("openai_online", False))
@@ -102,13 +103,18 @@ class StateApplierMixin:
             )
             chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
             if hasattr(chat, "update_inspector"):
-                chat.update_inspector(snap.execution_context)
+                chat.update_inspector(
+                    diag.execution_context if diag is not None else snap.execution_context
+                )
             if hasattr(chat, "update_timeline"):
-                if snap.execution_timeline.revision != getattr(
+                execution_timeline = (
+                    diag.execution_timeline if diag is not None else snap.execution_timeline
+                )
+                if execution_timeline.revision != getattr(
                     self, "_last_execution_timeline_revision", 0
                 ):
-                    chat.update_timeline(list(snap.execution_timeline.events))
-                    self._last_execution_timeline_revision = snap.execution_timeline.revision
+                    chat.update_timeline(list(execution_timeline.events))
+                    self._last_execution_timeline_revision = execution_timeline.revision
             if hasattr(chat, "show_inspector") and hasattr(chat, "clear_inspector"):
                 if snap.inspector.revision != getattr(self, "_last_inspector_revision", 0):
                     if snap.inspector.selected is not None:
@@ -282,7 +288,8 @@ class StateApplierMixin:
         executions = self._executions_view()
         if executions is None or not hasattr(executions, "apply_timeline"):
             return
-        timeline = snap.execution_scrubber
+        diag = getattr(snap, "execution_inspector", None)
+        timeline = diag.execution_scrubber if diag is not None else snap.execution_scrubber
         if not timeline.request_id:
             return
         key = (
@@ -309,7 +316,10 @@ class StateApplierMixin:
             )
 
         spans: list[dict] = []
-        if snap.execution_context.request_id == timeline.request_id:
+        execution_context = (
+            diag.execution_context if diag is not None else snap.execution_context
+        )
+        if execution_context.request_id == timeline.request_id:
             spans = [
                 {
                     "span_id": span.span_id,
@@ -321,10 +331,10 @@ class StateApplierMixin:
                     "started_at": span.started_at,
                     "attributes": dict(span.attributes),
                 }
-                for span in snap.execution_context.trace_spans
+                for span in execution_context.trace_spans
             ]
             if not steps:
-                for span in snap.execution_context.trace_spans:
+                for span in execution_context.trace_spans:
                     labels.append(span.name)
                     steps.append(
                         {
