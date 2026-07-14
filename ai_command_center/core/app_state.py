@@ -140,9 +140,15 @@ from ai_command_center.domain.orchestration_run_snapshot import (
 from ai_command_center.domain.execution_inspector_snapshot import (
     ExecutionInspectorSnapshot,
 )
+from ai_command_center.domain.model_artifact_snapshot import ModelArtifactSnapshot
 from ai_command_center.domain.workspace_entity_snapshot import (
     WorkspaceEntityItem as WorkspaceEntitySnapshotItem,
     WorkspaceEntitySnapshot,
+)
+from ai_command_center.domain.notes_memory_snapshot import (
+    MemoryCatalogItem as NotesMemoryCatalogItem,
+    NoteCatalogItem as NotesMemoryNoteItem,
+    NotesMemorySnapshot,
 )
 from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, ArtifactCatalogItem
 from ai_command_center.core.state.execution_event_state import (
@@ -564,6 +570,8 @@ class AppState:
     note_index_status: tuple[int, int] = ()  # (files, ms)
     memory_catalog: tuple[MemoryItem, ...] = ()
     memory_selected: tuple[str, ...] = ()
+    # Blueprint Phase 15 — Notes/Memory consolidated snapshot
+    notes_memory: NotesMemorySnapshot = field(default_factory=NotesMemorySnapshot)
     plugin_catalog: tuple[PluginItem, ...] = ()
 
     # Track R7 â€” agent / workflow run projections
@@ -615,6 +623,8 @@ class AppState:
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
     recent_artifacts: tuple[ArtifactCatalogItem, ...] = ()
+    # Blueprint Phase 16 — Model/Artifact consolidated snapshot
+    model_artifact: ModelArtifactSnapshot = field(default_factory=ModelArtifactSnapshot)
     recent_execution_events: tuple[ExecutionEventItem, ...] = ()
     execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
     # Blueprint Phase 13 — Execution Inspector consolidated snapshot
@@ -1041,6 +1051,107 @@ def _reduce_memory_cleared(state: AppState, event: Event) -> AppState:
     return replace(
         state,
         memory_selected=(),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+_NOTES_MEMORY_TOPICS = frozenset({
+    NOTE_SEARCH_RESULTS,
+    NOTE_SELECTED,
+    NOTE_CREATED,
+    NOTE_INDEX_COMPLETE,
+    NOTES_INDEXED,
+    MEMORY_STORED,
+    MEMORY_SELECTED,
+    MEMORY_CLEARED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
+})
+
+
+def _reduce_notes_memory_snapshot(state: AppState, event: Event) -> AppState:
+    """Project notes + memory catalogs into a single immutable snapshot."""
+    if event.topic not in _NOTES_MEMORY_TOPICS:
+        return state
+    current = state.notes_memory
+    notes_catalog = tuple(
+        NotesMemoryNoteItem(path=item.path, title=item.title, snippet=item.snippet)
+        for item in state.notes_catalog
+    )
+    note_selected = (
+        NotesMemoryNoteItem(
+            path=state.note_selected.path,
+            title=state.note_selected.title,
+            snippet=state.note_selected.snippet,
+        )
+        if state.note_selected is not None
+        else None
+    )
+    memory_catalog = tuple(
+        NotesMemoryCatalogItem(
+            node_id=item.node_id,
+            label=item.label,
+            workspace_id=item.workspace_id,
+            entity_id=item.entity_id,
+        )
+        for item in state.memory_catalog
+    )
+    if (
+        current.notes_catalog == notes_catalog
+        and current.note_selected == note_selected
+        and current.note_index_status == state.note_index_status
+        and current.memory_catalog == memory_catalog
+        and current.memory_selected == state.memory_selected
+    ):
+        return state
+    new_snap = NotesMemorySnapshot.from_components(
+        notes_catalog=notes_catalog,
+        note_selected=note_selected,
+        note_index_status=state.note_index_status,
+        memory_catalog=memory_catalog,
+        memory_selected=state.memory_selected,
+        revision=current.revision + 1,
+    )
+    return replace(
+        state,
+        notes_memory=new_snap,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+_MODEL_ARTIFACT_TOPICS = frozenset({
+    MODEL_SELECTED,
+    TOOL_STARTED,
+    TOOL_COMPLETED,
+    TOOL_FAILED,
+    ARTIFACT_CREATED,
+    ARTIFACT_UPDATED,
+    ARTIFACTS_LOADED,
+})
+
+
+def _reduce_model_artifact_snapshot(state: AppState, event: Event) -> AppState:
+    """Project model selection, tool runs, and artifacts into one snapshot."""
+    if event.topic not in _MODEL_ARTIFACT_TOPICS:
+        return state
+    current = state.model_artifact
+    if (
+        current.model_selection == state.model_selection
+        and current.recent_tool_runs == state.recent_tool_runs
+        and current.recent_artifacts == state.recent_artifacts
+    ):
+        return state
+    new_snap = ModelArtifactSnapshot.from_components(
+        model_selection=state.model_selection,
+        recent_tool_runs=state.recent_tool_runs,
+        recent_artifacts=state.recent_artifacts,
+        revision=current.revision + 1,
+    )
+    return replace(
+        state,
+        model_artifact=new_snap,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -3315,6 +3426,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_selected,
     _reduce_memory_cleared,
     _reduce_workspace_memory_catalog,
+    _reduce_notes_memory_snapshot,
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
     _reduce_capability_lifecycle_snapshot,
@@ -3341,6 +3453,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,
+    _reduce_model_artifact_snapshot,
     *EXECUTION_EVENT_REDUCERS,
     _reduce_execution_inspector_snapshot,
     _reduce_operation_saved,

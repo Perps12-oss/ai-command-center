@@ -197,7 +197,13 @@ class StateApplierMixin:
             if chat and hasattr(chat, "update_artifact_stream"):
                 req_id = snap.active_chat_request_id or snap.last_chat_request_id
                 if req_id:
-                    scoped = artifacts_for_request(snap.recent_artifacts, str(req_id))
+                    artifacts_snap = getattr(snap, "model_artifact", None)
+                    artifact_catalog = (
+                        artifacts_snap.recent_artifacts
+                        if artifacts_snap is not None
+                        else snap.recent_artifacts
+                    )
+                    scoped = artifacts_for_request(artifact_catalog, str(req_id))
                     chat.update_artifact_stream(str(req_id), scoped)
 
         if snap.inspector.navigate_revision != getattr(
@@ -370,7 +376,7 @@ class StateApplierMixin:
             snap.provider_health_map,
             snap.runtime_capability_providers,
             snap.capability_lifecycle,
-            snap.recent_artifacts,
+            getattr(snap, "model_artifact", None),
             getattr(snap.execution_context, "artifacts", ()),
         )
 
@@ -421,9 +427,21 @@ class StateApplierMixin:
 
         artifacts = self._artifacts_view()
         if artifacts and hasattr(artifacts, "set_artifacts"):
-            artifacts.set_artifacts(snap.recent_artifacts)
+            artifacts_snap = getattr(snap, "model_artifact", None)
+            artifact_catalog = (
+                artifacts_snap.recent_artifacts
+                if artifacts_snap is not None
+                else snap.recent_artifacts
+            )
+            artifacts.set_artifacts(artifact_catalog)
         elif artifacts and hasattr(artifacts, "apply_state"):
-            artifacts.apply_state(snap.recent_artifacts)
+            artifacts_snap = getattr(snap, "model_artifact", None)
+            artifact_catalog = (
+                artifacts_snap.recent_artifacts
+                if artifacts_snap is not None
+                else snap.recent_artifacts
+            )
+            artifacts.apply_state(artifact_catalog)
 
         home = self._home_view()
         if home:
@@ -438,7 +456,12 @@ class StateApplierMixin:
                 if str(getattr(r, "source", "")) == "orchestration"
             )
             provider_health = "healthy" if snap.provider_health_map else ""
-            artifact_count = len(snap.recent_artifacts) or len(
+            artifact_catalog = (
+                snap.model_artifact.recent_artifacts
+                if getattr(snap, "model_artifact", None) is not None
+                else snap.recent_artifacts
+            )
+            artifact_count = len(artifact_catalog) or len(
                 getattr(snap.execution_context, "artifacts", ())
             )
             pending = 1 if snap.pending_permission_check else 0
