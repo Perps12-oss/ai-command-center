@@ -1,5 +1,5 @@
-"""Orchestration runtime state for inspector projection."""
+"""Orchestration runtime state package.
 
-from ai_command_center.orchestration.state.orchestration_snapshot import OrchestrationRunSnapshot
-
-__all__ = ["OrchestrationRunSnapshot"]
+Legacy orchestration snapshot exports were removed in favor of the
+domain contract at ai_command_center.domain.orchestration_run_snapshot.
+"""

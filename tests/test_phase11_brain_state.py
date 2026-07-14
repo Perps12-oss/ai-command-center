@@ -1,11 +1,14 @@
 """Phase 11 - BrainStateSnapshot projection tests."""
 from __future__ import annotations
-import os, unittest
+
+import os
+import unittest
+from dataclasses import FrozenInstanceError
 os.environ.setdefault("APPDATA", "/tmp/aicc_test_appdata")
 
 from ai_command_center.domain.brain_state_snapshot import (
     BrainStateSnapshot, GoalSnapshot, ObservationSnapshot,
-    RuntimeActionSnapshot, PlanSnapshot, PlanStepSnapshot,
+    RuntimeActionSnapshot, PlanSnapshot,
     _MAX_GOAL_HISTORY, _MAX_OBSERVATION_HISTORY, _MAX_ACTION_HISTORY,
 )
 
@@ -34,8 +37,8 @@ class TestGoalSnapshot(unittest.TestCase):
 
     def test_frozen(self):
         g = GoalSnapshot()
-        with self.assertRaises((AttributeError, TypeError)):
-            object.__setattr__(g, "goal_id", "x")
+        with self.assertRaises(FrozenInstanceError):
+            g.goal_id = "x"  # type: ignore[misc]
 
 
 class TestObservationSnapshot(unittest.TestCase):
