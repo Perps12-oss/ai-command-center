@@ -137,6 +137,9 @@ from ai_command_center.domain.orchestration_run_snapshot import (
     OrchestrationRunEntry,
     _dict_to_immutable,
 )
+from ai_command_center.domain.execution_inspector_snapshot import (
+    ExecutionInspectorSnapshot,
+)
 from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, ArtifactCatalogItem
 from ai_command_center.core.state.execution_event_state import (
     EXECUTION_EVENT_REDUCERS,
@@ -221,7 +224,6 @@ from ai_command_center.domain.brain_state_snapshot import (
     ObservationSnapshot as BrainObservationSnapshot,
     RuntimeActionSnapshot as BrainRuntimeActionSnapshot,
     PlanSnapshot as BrainPlanSnapshot,
-    PlanStepSnapshot as BrainPlanStepSnapshot,
 )
 from ai_command_center.domain.chat_session_snapshot import (
     ChatSessionSnapshot,
@@ -609,6 +611,10 @@ class AppState:
     recent_artifacts: tuple[ArtifactCatalogItem, ...] = ()
     recent_execution_events: tuple[ExecutionEventItem, ...] = ()
     execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
+    # Blueprint Phase 13 — Execution Inspector consolidated snapshot
+    execution_inspector: ExecutionInspectorSnapshot = field(
+        default_factory=ExecutionInspectorSnapshot
+    )
     workflow_graph: WorkflowGraphState = field(default_factory=seed_demo_workflow_graph)
     automation_workspace: AutomationWorkspaceState = field(
         default_factory=lambda: AutomationWorkspaceProjector.project_state(())
@@ -1705,6 +1711,7 @@ _CHAT_SNAPSHOT_TOPICS: frozenset[str] = frozenset({
     CHAT_CANCELLED,
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
+    UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
 })
 
@@ -1903,6 +1910,38 @@ def _reduce_execution_timeline(state: AppState, event: Event) -> AppState:
     )
 
 
+_EXECUTION_INSPECTOR_TOPICS = frozenset({
+    EXECUTION_QUERY_RESULT,
+    EXECUTION_EVENT_APPENDED,
+    EXECUTION_EVENTS_LOADED,
+    UI_EXECUTION_TIMELINE_SCRUB,
+    PLAN_GENERATED,
+})
+
+
+def _reduce_execution_inspector_snapshot(state: AppState, event: Event) -> AppState:
+    """Project execution inspector slices into a single immutable snapshot."""
+    if event.topic not in _EXECUTION_INSPECTOR_TOPICS:
+        return state
+    planner_last_plan = BrainPlanSnapshot.from_dict(dict(state.planner_last_plan))
+    new_snap = ExecutionInspectorSnapshot.from_components(
+        execution_context=state.execution_context,
+        execution_scrubber=state.execution_scrubber,
+        execution_timeline=state.execution_timeline,
+        recent_execution_events=state.recent_execution_events,
+        planner_last_plan=planner_last_plan,
+        revision=state.execution_inspector.revision + 1,
+    )
+    if new_snap == state.execution_inspector:
+        return state
+    return replace(
+        state,
+        execution_inspector=new_snap,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
 def _reduce_inspector(state: AppState, event: Event) -> AppState:
     new_inspector = reduce_inspector_state(state.inspector, event)
     if new_inspector == state.inspector:
@@ -1989,7 +2028,8 @@ def _reduce_brain_state(state: AppState, event: Event) -> AppState:
         )
     if event.topic == OBSERVATION_RECEIVED:
         item = {
-            "id": str(payload.get("id", "")),
+            "id": str(payload.get("observation_id") or payload.get("id", "")),
+            "observation_id": str(payload.get("observation_id", "")),
             "source": str(payload.get("source", "")),
             "subject": str(payload.get("subject", "")),
             "change_type": str(payload.get("change_type", "")),
@@ -3245,6 +3285,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,
     *EXECUTION_EVENT_REDUCERS,
+    _reduce_execution_inspector_snapshot,
     _reduce_operation_saved,
     _reduce_operation_loaded,
     _reduce_journal_entry_appended,

@@ -1,6 +1,9 @@
 """Phase 12 - ChatSessionSnapshot projection tests."""
 from __future__ import annotations
-import os, unittest
+
+import os
+import unittest
+from dataclasses import FrozenInstanceError
 os.environ.setdefault("APPDATA", "/tmp/aicc_test_appdata")
 
 from ai_command_center.domain.chat_session_snapshot import (
@@ -16,8 +19,8 @@ class TestChatMessageSnapshot(unittest.TestCase):
 
     def test_frozen(self):
         m = ChatMessageSnapshot(role="user", content="hi")
-        with self.assertRaises((AttributeError, TypeError)):
-            object.__setattr__(m, "role", "x")
+        with self.assertRaises(FrozenInstanceError):
+            m.role = "x"  # type: ignore[misc]
 
 
 class TestChatWorkspaceEntityRef(unittest.TestCase):
@@ -48,8 +51,8 @@ class TestChatSessionSnapshot(unittest.TestCase):
 
     def test_frozen(self):
         s = ChatSessionSnapshot()
-        with self.assertRaises((AttributeError, TypeError)):
-            object.__setattr__(s, "status", "streaming")
+        with self.assertRaises(FrozenInstanceError):
+            s.status = "streaming"  # type: ignore[misc]
 
 
 class TestChatSessionSnapshotReducer(unittest.TestCase):
