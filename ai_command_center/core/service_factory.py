@@ -38,6 +38,7 @@ from ai_command_center.core.service_manager import ServiceManager
 from ai_command_center.core.snapshot.snapshot_service import SnapshotService
 from ai_command_center.core.timeline.timeline_repository import TimelineRepository
 from ai_command_center.core.timeline.timeline_service import TimelineService
+from ai_command_center.core.timeline.timeline_undo_handlers import register_timeline_undo_handlers
 from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.core.workspace.workspace_service import WorkspaceService
 from ai_command_center.core.workspace_os_service import WorkspaceOsService
@@ -308,6 +309,14 @@ def build_services(
             workspace_service=workspace_service,
             timeline_service=timeline_service,
             action_registry=action_registry,
+        )
+
+        # Wire timeline undo handlers for workspace OS operations
+        register_timeline_undo_handlers(
+            entity_service=entity_service,
+            relationship_service=relationship_service,
+            workspace_service=workspace_service,
+            bus=bus,
         )
 
         workspace_os = WorkspaceOsService(
