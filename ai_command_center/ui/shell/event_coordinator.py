@@ -28,6 +28,7 @@ from ai_command_center.core.events.topics import (
     SERVICE_STATE_CHANGED,
     SYSTEM_EVENTS,
     SYSTEM_SNAPSHOT,
+    TIMELINE_UNDO_RESULT,
     TOOL_ERROR,
     TOOL_RESULT,
 )
@@ -47,6 +48,7 @@ class EventCoordinatorMixin:
         self._wire_plugin_events()
         self._wire_navigation_events()
         self._wire_live_events()
+        self._wire_timeline_events()
 
     def _wire_navigation_events(self) -> None:
         self._bus_unsubs.append(
@@ -394,5 +396,24 @@ class EventCoordinatorMixin:
             chat = self._chat_view()
             if chat:
                 chat.set_model(indicator)
+
+        self._ui_queue.enqueue(update)
+
+    def _wire_timeline_events(self) -> None:
+        self._bus_unsubs.append(
+            self._bus.subscribe(TIMELINE_UNDO_RESULT, self._on_timeline_undo_result)
+        )
+
+    def _on_timeline_undo_result(self, event: Event) -> None:
+        payload = event.payload or {}
+        success = bool(payload.get("success", False))
+        error = str(payload.get("error", ""))
+
+        def update() -> None:
+            if success:
+                self._toast.show("Undo successful", kind="success")
+                self._apply_state()
+            else:
+                self._toast.show(f"Undo failed: {error}", kind="error")
 
         self._ui_queue.enqueue(update)
