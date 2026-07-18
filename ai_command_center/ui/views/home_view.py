@@ -186,16 +186,16 @@ class _ActivityFeed(ctk.CTkFrame):
         self._row_frames.clear()
 
         if not self._entries:
-            placeholder = ctk.CTkFrame(self, fg_color="transparent")
-            placeholder.pack(fill="x", padx=T.PAD, pady=10)
+            empty_row = ctk.CTkFrame(self, fg_color="transparent")
+            empty_row.pack(fill="x", padx=T.PAD, pady=10)
             ctk.CTkLabel(
-                placeholder,
+                empty_row,
                 text="No activity yet \u2014 start typing above.",
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
                 anchor="w",
             ).pack(fill="x")
-            self._row_frames.append(placeholder)
+            self._row_frames.append(empty_row)
             return
 
         for icon, text, ts in self._entries:

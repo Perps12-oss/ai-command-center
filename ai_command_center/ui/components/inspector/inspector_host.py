@@ -14,7 +14,7 @@ from ai_command_center.ui.components.inspector.provider_inspector import Provide
 from ai_command_center.ui.components.inspector.message_inspector import MessageInspector
 from ai_command_center.ui.design_system import theme_v2 as T
 
-_DEFAULT_PLACEHOLDER = "Select an object to inspect."
+_EMPTY_SELECTION_HINT = "Select an object to inspect."
 
 
 class InspectorHost(ctk.CTkFrame):
@@ -58,14 +58,14 @@ class InspectorHost(ctk.CTkFrame):
         self._body = ctk.CTkFrame(self, fg_color="transparent")
         self._body.pack(fill="both", expand=True)
 
-        self._placeholder = ctk.CTkLabel(
+        self._empty_hint = ctk.CTkLabel(
             self._body,
-            text=_DEFAULT_PLACEHOLDER,
+            text=_EMPTY_SELECTION_HINT,
             font=T.FONT_BODY,
             text_color=T.TEXT_MUTED,
             anchor="w",
         )
-        self._placeholder.pack(fill="both", expand=True, padx=12, pady=12)
+        self._empty_hint.pack(fill="both", expand=True, padx=12, pady=12)
 
         self.register("message", MessageInspector(self._body))
         self.register("artifact", ArtifactInspector(self._body))
@@ -74,7 +74,7 @@ class InspectorHost(ctk.CTkFrame):
 
     def set_default(self, widget: ctk.CTkBaseClass) -> None:
         self._default_widget = widget
-        self._placeholder.pack_forget()
+        self._empty_hint.pack_forget()
         widget.pack(in_=self._body, fill="both", expand=True)
         self._set_visible(widget)
 
@@ -84,7 +84,7 @@ class InspectorHost(ctk.CTkFrame):
     def show(self, ref: InspectableRef) -> None:
         inspector = self._registry.get(ref.kind)
         if inspector is None:
-            self._show_placeholder(f"No inspector registered for {ref.kind!r}.")
+            self._show_empty_hint(f"No inspector registered for {ref.kind!r}.")
             self._current_ref = ref
             self._title.configure(text=ref.label or ref.kind.title() or "Inspector")
             return
@@ -127,13 +127,13 @@ class InspectorHost(ctk.CTkFrame):
             self._default_widget.pack(in_=self._body, fill="both", expand=True)
             self._set_visible(self._default_widget)
             return
-        self._show_placeholder(_DEFAULT_PLACEHOLDER)
+        self._show_empty_hint(_EMPTY_SELECTION_HINT)
 
-    def _show_placeholder(self, message: str) -> None:
+    def _show_empty_hint(self, message: str) -> None:
         self._hide_current()
-        self._placeholder.configure(text=message)
-        self._placeholder.pack(fill="both", expand=True, padx=12, pady=12)
-        self._set_visible(self._placeholder)
+        self._empty_hint.configure(text=message)
+        self._empty_hint.pack(fill="both", expand=True, padx=12, pady=12)
+        self._set_visible(self._empty_hint)
 
 
 __all__ = ["InspectorHost"]

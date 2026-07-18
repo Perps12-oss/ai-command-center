@@ -26,9 +26,9 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("system", "System"),
     ("plugins", "Plugins"),
     ("settings", "Settings"),
-    ("goals", "Goals"),
+    ("goals", "Goal Dashboard"),
     ("agents", "Agent Monitor"),
-    ("approvals", "Approvals"),
+    ("approvals", "Approval Center"),
 )
 
 # Feature-flagged nav items — registered dynamically if feature is enabled

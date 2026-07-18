@@ -61,7 +61,11 @@ class RelationshipExplorerPanel(ctk.CTkFrame):
 
         self._section("Incoming")
         if not incoming:
-            self._muted("No incoming relationships.")
+            self._muted(
+                "No incoming relationships for this entity. "
+                "Links appear when edges are created between entities. "
+                "Next: relate this node to another entity from workspace activity."
+            )
         for edge in incoming:
             self._edge_row(
                 peer_id=edge.from_node_id,
@@ -72,7 +76,11 @@ class RelationshipExplorerPanel(ctk.CTkFrame):
 
         self._section("Outgoing")
         if not outgoing:
-            self._muted("No outgoing relationships.")
+            self._muted(
+                "No outgoing relationships for this entity. "
+                "Links appear when edges are created between entities. "
+                "Next: relate this node to another entity from workspace activity."
+            )
         for edge in outgoing:
             self._edge_row(
                 peer_id=edge.to_node_id,
@@ -83,7 +91,11 @@ class RelationshipExplorerPanel(ctk.CTkFrame):
 
     def _render_empty(self) -> None:
         clear_children(self._body)
-        self._muted("Select a node to view relationships.")
+        self._muted(
+            "No node selected for relationships.\n"
+            "Incoming and outgoing edges appear after you select an entity.\n"
+            "Next: select a node in Knowledge Graph or Entity Explorer."
+        )
 
     def _section(self, title: str) -> None:
         ctk.CTkLabel(
@@ -101,6 +113,7 @@ class RelationshipExplorerPanel(ctk.CTkFrame):
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
             anchor="w",
+            justify="left",
         ).pack(fill="x", padx=4, pady=2)
 
     def _edge_row(

@@ -11,7 +11,6 @@ from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.agents_view import AgentsView
 from ai_command_center.ui.views.approvals_view import ApprovalsView
 from ai_command_center.ui.views.command_center_view import CommandCenterView
-from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
 from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.home_view import HomeView
@@ -55,7 +54,6 @@ VIEW_IDS: tuple[str, ...] = (
     "system",
     "plugins",
     "settings",
-    "gallery",
     "goals",
     "agents",
     "approvals",
@@ -87,6 +85,8 @@ class ViewManagerMixin:
         )
         self._view_registry["goals"] = lambda: GoalView(
             self._content,
+            on_new_goal=self._on_goal_new,
+            on_select=self._on_goal_select,
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
@@ -99,6 +99,8 @@ class ViewManagerMixin:
         )
         self._view_registry["approvals"] = lambda: ApprovalsView(
             self._content,
+            on_decide=self._on_approval_decide,
+            on_select=self._on_approval_select,
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
@@ -183,7 +185,6 @@ class ViewManagerMixin:
             bus=self._bus,
             state=self._world_model_state,
         )
-        self._view_registry["gallery"] = lambda: ComponentGalleryView(self._content)
 
     def _ensure_view(self, view_id: str) -> object:
         if view_id not in self._views:
@@ -364,6 +365,51 @@ class ViewManagerMixin:
             aid,
             label=aid,
             payload={"agent_id": aid},
+        )
+
+    def _on_approval_select(self, check_id: str) -> None:
+        """Focus a pending approval check via existing inspect selection flow."""
+        cid = str(check_id).strip()
+        if not cid:
+            return
+        self._controller.publish_inspect_select(
+            "approval",
+            cid,
+            label=cid,
+            payload={"check_id": cid},
+        )
+
+    def _on_goal_select(self, goal_id: str) -> None:
+        """Focus a goal via existing inspect selection flow."""
+        gid = str(goal_id).strip()
+        if not gid:
+            return
+        self._controller.publish_inspect_select(
+            "goal",
+            gid,
+            label=gid,
+            payload={"goal_id": gid},
+        )
+
+    def _on_goal_new(self, title: str, priority: int = 0) -> None:
+        """Publish GOAL_SUBMIT_REQUEST for Hero New Goal (never lifecycle facts)."""
+        self._controller.publish_goal_submit_request(title, priority=priority)
+
+    def _on_approval_decide(
+        self,
+        check_id: str,
+        granted: bool,
+        permissions: tuple[str, ...],
+        actor_type: str,
+        actor_id: str,
+    ) -> None:
+        """Publish PERMISSION_CHECK_RESULT for Approve / Deny."""
+        self._controller.publish_permission_result(
+            check_id=check_id,
+            granted=granted,
+            permissions=permissions,
+            actor_type=actor_type,
+            actor_id=actor_id,
         )
 
     def _on_agent_cancel(self, agent_id: str, reason: str = "cancelled") -> None:

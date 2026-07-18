@@ -11,15 +11,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_STATUS_COLORS: dict[str, str] = {
-    "running":   T.STATUS_BUSY,
-    "success":   T.STATUS_READY,
-    "failed":    T.STATUS_ERROR,
-    "error":     T.STATUS_ERROR,
-    "cancelled": T.TEXT_MUTED,
-    "pending":   T.TEXT_MUTED,
-}
+from ai_command_center.ui.design_system.status_tokens import execution_state_color
 
 _STATUS_ICONS: dict[str, str] = {
     "running":   "⟳",
@@ -51,7 +43,7 @@ class ToolExecutionCard(ctk.CTkFrame):
         duration_ms: int = 0,
         **kwargs: Any,
     ) -> None:
-        color = _STATUS_COLORS.get(status, T.TEXT_MUTED)
+        color = execution_state_color(status)[0]
         super().__init__(
             master,
             fg_color=T.BG_GLASS,
@@ -163,7 +155,7 @@ class ToolExecutionCard(ctk.CTkFrame):
 
     def update_status(self, status: str, output_text: str = "") -> None:
         """Update running → success/failed after completion."""
-        color = _STATUS_COLORS.get(status, T.TEXT_MUTED)
+        color = execution_state_color(status)[0]
         self.configure(border_color=color)
         if output_text:
             self._output_text = output_text

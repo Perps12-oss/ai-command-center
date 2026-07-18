@@ -61,10 +61,15 @@ class ExecutionHistoryPanel(ctk.CTkFrame):
         if not runs:
             ctk.CTkLabel(
                 self._body,
-                text="No agent runs projected yet.",
+                text=(
+                    "No agent runs projected yet.\n"
+                    "History appears after agent pipelines produce run snapshots.\n"
+                    "Next: start an agent pipeline from Chat or Goals."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
                 anchor="w",
+                justify="left",
             ).pack(fill="x", padx=4, pady=12)
             return
 

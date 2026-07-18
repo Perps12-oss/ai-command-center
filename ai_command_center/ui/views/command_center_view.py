@@ -14,6 +14,12 @@ from ai_command_center.ui.design_system.status_tokens import (
     goal_state_color,
     status_color,
 )
+from ai_command_center.ui.views.surface_state import (
+    article18_empty,
+    article18_loading,
+    domain_error_from_snap,
+    set_surface_state,
+)
 
 
 class CommandCenterView(ctk.CTkFrame):
@@ -41,7 +47,7 @@ class CommandCenterView(ctk.CTkFrame):
 
         ctk.CTkLabel(
             hero_top,
-            text="AI Command Center",
+            text="Command Center",
             font=T.FONT_TITLE,
             text_color=T.TEXT_PRIMARY,
         ).pack(side="left")
@@ -87,6 +93,17 @@ class CommandCenterView(ctk.CTkFrame):
             command=self._on_action,
         )
         self._action_button.pack(side="right")
+
+        self._surface_state = ctk.CTkLabel(
+            self._hero,
+            text="Loading…",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            justify="left",
+            wraplength=720,
+        )
+        self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
         # Operations Grid
         ops = ctk.CTkFrame(self, fg_color="transparent")
@@ -180,6 +197,18 @@ class CommandCenterView(ctk.CTkFrame):
 
     def apply_state(self, snap: Any) -> None:
         """Project AppState into the dashboard."""
+        if snap is None:
+            set_surface_state(
+                self._surface_state,
+                kind="loading",
+                message=article18_loading(
+                    status="Status: loading Command Center",
+                    what="brain_state, executions, agents, approvals, providers, world_model",
+                    next_action="Wait for AppState refresh; then use the Hero action.",
+                ),
+            )
+            return
+
         now = time.time()
         brain_state = getattr(snap, "brain_state", None)
         goals = list(getattr(brain_state, "recent_goals", ()) if brain_state else ())
@@ -220,6 +249,33 @@ class CommandCenterView(ctk.CTkFrame):
         mutation_count = getattr(world_model, "mutation_count", 0) if world_model else 0
 
         active_goal_count = sum(1 for g in goals if getattr(g, "status", "") == "active")
+
+        err = domain_error_from_snap(
+            snap,
+            topic_prefixes=("service.", "app.", "tool."),
+        )
+        quiet = (
+            active_goal_count == 0
+            and running_count == 0
+            and pending_count == 0
+            and agent_count == 0
+            and mutation_count == 0
+        )
+        if err:
+            set_surface_state(self._surface_state, kind="error", message=err)
+        elif quiet:
+            set_surface_state(
+                self._surface_state,
+                kind="empty",
+                message=article18_empty(
+                    why="Command Center has no active goals, executions, agents, or approvals yet.",
+                    creates="Activity appears when goals run, executions start, "
+                    "agents spawn, or approvals are requested.",
+                    next_action="Click New Goal or Open Chat from the Hero to begin.",
+                ),
+            )
+        else:
+            set_surface_state(self._surface_state, kind="data")
 
         # Update hero
         self._status_label.configure(
@@ -348,7 +404,7 @@ class _OpsCard(ctk.CTkFrame):
 
         self._status = ctk.CTkLabel(
             top,
-            text="●",
+            text="ready",
             font=T.FONT_SMALL,
             text_color=T.STATUS_READY,
         )
@@ -404,7 +460,8 @@ class _OpsCard(ctk.CTkFrame):
     def update(self, metric: str, status: str, sub: str, timestamp: float) -> None:
         self._metric.configure(text=metric)
         self._sub.configure(text=sub)
-        self._status.configure(text_color=status_color(status))
+        status_text = (status or "ready").strip().lower()
+        self._status.configure(text=status_text, text_color=status_color(status_text))
         self._updated.configure(text=f"Updated {_format_relative(timestamp)}")
 
 
@@ -479,6 +536,18 @@ class _RecentChangesFeed(ctk.CTkFrame):
                 events.append((ts, f"Goal {status}: {text}" if status else f"Goal: {text}", "goal"))
 
         events.sort(key=lambda x: x[0], reverse=True)
+        if not events:
+            empty = article18_empty(
+                why="No recent mutations, executions, approvals, or goal transitions yet.",
+                creates="Activity appears when goals run, executions complete, "
+                "approvals resolve, or the World Model mutates.",
+                next_action="Open Goals or Chat to start work that produces changes.",
+            )
+            self._items[0].configure(text=empty, text_color=T.TEXT_MUTED)
+            for lbl in self._items[1:]:
+                lbl.configure(text="", text_color=T.TEXT_SECONDARY)
+            return
+
         for i, lbl in enumerate(self._items):
             if i < len(events):
                 ts, text, source = events[i]

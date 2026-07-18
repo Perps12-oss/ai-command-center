@@ -13,6 +13,19 @@ Implementation may not begin before pre-flight completion.
 
 ---
 
+## Phase completion — main is the only truth
+
+**NO phase may be declared complete unless:**
+
+1. All phase features exist on `main`.
+2. All phase audits exist on `main`.
+3. All constitution updates for the phase exist on `main`.
+4. No active branch contains phase functionality absent from `main`.
+
+See `docs/governance/PHASE_COMPLETION_RULE.md` and `.cursor/rules/phase-complete-on-main.mdc`.
+
+---
+
 ## Default PR workflow — babysit (local + Cloud)
 
 **Babysit PR is the default end-to-end workflow**, not opt-in. Applies to **local Cursor agents** and **Cursor Cloud agents**.
