@@ -23,14 +23,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_STATUS_COLORS: dict[str, str] = {
-    "idle":      T.TEXT_MUTED,
-    "streaming": T.STATUS_BUSY,
-    "ready":     T.STATUS_READY,
-    "error":     T.STATUS_ERROR,
-    "cancelled": T.TEXT_MUTED,
-}
+from ai_command_center.ui.design_system.status_tokens import status_color
 
 _PROVIDER_COLORS: dict[str, str] = {
     "ollama":  "#22C55E",
@@ -188,7 +181,7 @@ class ChatHeader(ctk.CTkFrame):
     def update_status(self, status: str) -> None:
         """Update execution status: idle | streaming | ready | error."""
         self._status = status
-        color = _STATUS_COLORS.get(status, T.TEXT_MUTED)
+        color = status_color(status)
         icons = {
             "streaming": "● streaming",
             "error":     "✕ error",

@@ -64,7 +64,11 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
             enable_node_drag=False,
             enable_selection_box=False,
             show_scrollbars=False,
-            empty_message="No entities in World Model",
+            empty_message=(
+                "No entities in the World Model yet.\n"
+                "Entities appear when notes, goals, or workspace activity is indexed.\n"
+                "Next: click New Entity or open Goals/Chat to create linked work."
+            ),
             canvas_bg=T.BG_DEEP,
         )
         self._surface.pack(fill="both", expand=True, padx=8, pady=(0, 8))

@@ -132,8 +132,29 @@ def test_hero_opens_latest_when_idle() -> None:
     view = ExecutionsView(None, on_select=selected.append)
     view.apply_state(_sample_snap(active=False))
     assert view._hero_action.cget("text") == "Open Latest Execution"
+    assert str(view._hero_action.cget("state")) == "normal"
     view._hero_action.invoke()
     assert selected  # latest from library
+
+
+def test_hero_disabled_when_no_executions() -> None:
+    selected: list[str] = []
+    view = ExecutionsView(None, on_select=selected.append)
+    view.apply_state(AppState())
+    assert view._hero_action.cget("text") == "No Executions"
+    assert str(view._hero_action.cget("state")) == "disabled"
+    view._on_hero_action()
+    assert selected == []
+    banner = view._surface_state.cget("text")
+    assert "Next" in banner
+    assert "execution" in banner.lower()
+
+
+def test_surface_state_loading_none_snapshot() -> None:
+    view = ExecutionsView(None)
+    view.apply_state(None)
+    assert "Loading" in view._surface_state.cget("text")
+    assert str(view._hero_action.cget("state")) == "disabled"
 
 
 def test_list_sort_failures_first() -> None:

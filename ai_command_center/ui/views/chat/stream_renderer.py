@@ -16,7 +16,8 @@ BUBBLE_TBX_W = 540
 SIDE_PAD = 16
 _STREAM_DEBOUNCE_MS = 16
 _CURSOR_CHAR = "▌"
-_PLACEHOLDER = "●  ●  ●"
+# Intentional UX affordance shown while waiting for the first stream chunk.
+_STREAMING_INDICATOR = "●  ●  ●"
 
 # Fader palette — for non-intrusive action elements
 CLR_META = "#404060"   # timestamps, copy icon at rest
@@ -153,7 +154,7 @@ class AssistantBubble(ctk.CTkFrame):
         self._append_job = None
         self._resize_job = None
         self._cursor_mark = "stream_cursor"
-        self._showing_placeholder = True
+        self._showing_streaming_indicator = True
 
         self._textbox = ctk.CTkTextbox(
             self,
@@ -168,25 +169,26 @@ class AssistantBubble(ctk.CTkFrame):
         self._textbox.pack(padx=16, pady=13)
         _configure_markdown_tags(self._textbox)
         self._textbox.configure(state="disabled")
-        self._write_placeholder()
+        self._write_streaming_indicator()
         self._live = True
         self._blink()
 
-    def _write_placeholder(self) -> None:
+    def _write_streaming_indicator(self) -> None:
+        """Show the intentional streaming wait indicator (not a content stub)."""
         self._textbox.configure(state="normal")
         self._textbox.delete("1.0", "end")
-        self._textbox.insert("1.0", _PLACEHOLDER)
+        self._textbox.insert("1.0", _STREAMING_INDICATOR)
         self._textbox.configure(state="disabled")
-        self._showing_placeholder = True
+        self._showing_streaming_indicator = True
         self._buffer.reset("")
 
-    def _clear_placeholder(self) -> None:
-        if not self._showing_placeholder:
+    def _clear_streaming_indicator(self) -> None:
+        if not self._showing_streaming_indicator:
             return
         self._textbox.configure(state="normal")
         self._textbox.delete("1.0", "end")
         self._textbox.configure(state="disabled")
-        self._showing_placeholder = False
+        self._showing_streaming_indicator = False
         self._buffer.reset("")
 
     def _write_segments(self, segments: list[tuple[str, str | None]]) -> None:
@@ -228,8 +230,8 @@ class AssistantBubble(ctk.CTkFrame):
     def _append_incremental(self, delta: str) -> None:
         if not delta:
             return
-        if self._showing_placeholder:
-            self._clear_placeholder()
+        if self._showing_streaming_indicator:
+            self._clear_streaming_indicator()
         self._textbox.configure(state="normal")
         self._remove_cursor()
         self._textbox.insert("end", delta)
@@ -247,7 +249,7 @@ class AssistantBubble(ctk.CTkFrame):
         if not self._live:
             return
         self._cur_vis = not self._cur_vis
-        if not self._showing_placeholder:
+        if not self._showing_streaming_indicator:
             self._textbox.configure(state="normal")
             self._remove_cursor()
             if self._cur_vis:

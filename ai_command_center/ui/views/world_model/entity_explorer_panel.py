@@ -154,9 +154,14 @@ class EntityExplorerPanel(ctk.CTkFrame):
         if not nodes:
             ctk.CTkLabel(
                 self._list,
-                text="No entities match filters.",
+                text=(
+                    "No entities match the current filters.\n"
+                    "Entities appear when the World Model is indexed or New Entity is used.\n"
+                    "Next: clear filters or create an entity from the hero action."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
+                justify="left",
             ).pack(pady=24)
             return
         for node in nodes:

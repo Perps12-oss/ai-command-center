@@ -89,7 +89,7 @@ def test_artifact_and_provider_inspectors_smoke() -> None:
         )
         host.show(unknown_ref)
         root.update_idletasks()
-        assert host._visible_widget is host._placeholder
+        assert host._visible_widget is host._empty_hint
     finally:
         root.destroy()
 

@@ -38,6 +38,8 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 ## Phase 11A — Command Center Dashboard + Top Bar
 
+**Status:** Complete.
+
 **Objective:** Create the default operational homepage and global status bar.
 
 **UI Constitution Articles:** 8, 9, 17.
@@ -46,7 +48,7 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 | Component | Article | Content |
 |---|---|---|
-| Hero Section | 7, 8 | Workspace name "Command Center", current state, active goal, critical summary, immediate action |
+| Hero Section | 7, 8 | Workspace name **Command Center** (canonical), current state, active goal, critical summary, immediate action |
 | Operations Grid | 8, 10 | Cards for Executions, Agents, Approvals, Providers — each with header, metric, status, timestamp, action |
 | System Awareness | 8 | World Model summary, knowledge stats, recent changes |
 
@@ -78,19 +80,22 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 ### Acceptance Criteria
 
-- [ ] Command Center is the default view on launch.
-- [ ] Hero Section displays active goal, status, and one immediate action.
-- [ ] Operations Grid cards show header, metric, status, timestamp, action.
-- [ ] Top Bar displays all six required elements from Article 17.
-- [ ] Clicking a Top Bar badge navigates to the correct workspace.
+- [x] Command Center is the default view on launch.
+- [x] Hero Section displays active goal, status, and one immediate action.
+- [x] Operations Grid cards show header, metric, status text + color, timestamp, action.
+- [x] Top Bar displays all six required elements from Article 17.
+- [x] Clicking a Top Bar badge navigates to the correct workspace.
+- [x] Surface states: Loading / Empty / Error / Data (Article 18 empty copy).
 
 ---
 
 ## Phase 11B — World Model Workspace
 
+**Status:** Complete.
+
 **Objective:** Make the knowledge graph a first-class operating surface.
 
-**UI Constitution Articles:** 5 (Teal), 12.
+**UI Constitution Articles:** 5 (`WORLD_TEAL`), 12.
 
 ### Required Panels (Article 12)
 
@@ -130,6 +135,8 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 ## Phase 11C — Execution Center
 
+**Status:** Complete.
+
 **Objective:** Give operators complete runtime visibility and evidence.
 
 **UI Constitution Articles:** 5 (Blue / `EXECUTION_BLUE`), 13.
@@ -165,6 +172,8 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 - [x] Truth Validation shows valid/partial/failed via centralized status tokens.
 - [x] Uses existing execution projections only; no new AppState/services/repos.
 - [x] `EXECUTION_BLUE` token + `verify_ui_constitution.py` Phase 11C checks.
+- [x] Hero action disabled with updated label when no execution target exists.
+- [x] Surface states: Loading / Empty / Error / Data (Article 18 empty copy).
 
 ---
 
@@ -211,70 +220,83 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 **Objective:** Make approvals a permanent, visible workspace.
 
-**UI Constitution Articles:** 5 (Orange), 15.
+**UI Constitution Articles:** 5 (Orange / `APPROVAL_ORANGE`), 15.
+
+**Status:** Complete (Pending Queue primary; explicit risk rationale).
 
 ### Required Panels (Article 15)
 
-1. **Pending Queue** — `permission_snapshot.pending`.
-2. **Decision History** — `permission_snapshot.resolved`.
-3. **Risk Classification** — risk level from `ExecutionStepSnapshot.risk` or `permission_snapshot` payload.
-4. **Approval Statistics** — `total_requested`, `total_granted`, `total_denied`.
+1. **Pending Queue** (primary) — `permission_snapshot.pending` + Approve/Deny.
+2. **Risk Classification** — composed (execution step → capability map → unknown) with reason/source.
+3. **Decision History** — `permission_snapshot.resolved` only (no invented timestamps).
+4. **Approval Statistics** — `total_requested` / `granted` / `denied` + pending count.
 
 ### Hero Section
 
 - Workspace Name: "Approval Center"
-- Current State: "`<pending>` pending"
-- Primary Metric: last decision outcome
-- Immediate Action: "Review Next"
+- Metrics: Pending · Granted · Denied · Last Decision (`resolved[0]` or "No decisions recorded")
+- Immediate Action: **Review Next** (focus only; never approve/deny)
 
 ### Files
 
-- `ai_command_center/ui/views/approval_center_view.py` (new)
-- `ai_command_center/ui/components/approval_item.py` (new)
-- `ai_command_center/ui/controller.py` (publish `PERMISSION_CHECK_RESULT`)
+- `ai_command_center/ui/views/approvals_view.py` (shell, route `approvals`)
+- `ai_command_center/ui/views/approval_center/` panels
+- `tests/ui/test_approval_center_projection.py`
+- `scripts/verify_ui_constitution.py` Phase 11E checks
 
 ### Acceptance Criteria
 
-- [ ] Pending Queue shows description, risk, timestamp, actor.
-- [ ] Approve/Deny buttons publish `PERMISSION_CHECK_RESULT`.
-- [ ] Decision History shows outcome, timestamp, summary, correlation ID.
-- [ ] Empty state explains why no approvals are pending and suggests next action.
+- [x] Pending Queue dominates layout; empty state explains next step.
+- [x] Approve/Deny publish `PERMISSION_CHECK_RESULT`.
+- [x] Risk Classification shows tier + reason + source (unknown explicit).
+- [x] Last Decision from resolved ordering only; `APPROVAL_ORANGE` documented.
 
 ---
 
 ## Phase 11F — Goal Dashboard
 
+**Status:** Complete.
+
 **Objective:** Make goals, plans, and lifecycle visible and actionable.
 
-**UI Constitution Articles:** 5 (Amber), 16.
+**UI Constitution Articles:** 5 (`GOAL_AMBER`), 16.
 
 ### Required Panels (Article 16)
 
 1. **Goal List** — `brain_state.recent_goals` filtered by status.
 2. **Goal Detail** — description, metadata, errors, priority.
-3. **Plan Preview** — `planner_last_plan` or `brain_state.last_plan`.
-4. **Goal Progress** — status and completion percentage.
-5. **Goal History** — status changes from `brain_state.recent_goals`.
+3. **Plan Preview** — `brain_state.last_plan` with `planner_last_plan` fallback.
+4. **Goal Progress** — derived from projected plan step statuses.
+5. **Goal History** — projected goals from `brain_state.recent_goals`.
 
 ### Hero Section
 
 - Workspace Name: "Goal Dashboard"
-- Current State: "`<active>` active goals"
+- Metrics: Active · Queued · Paused · Failed
 - Primary Metric: highest-priority active goal title
-- Immediate Action: "New Goal"
+- Immediate Action: **New Goal** → `publish_goal_submit_request` → `GOAL_SUBMIT_REQUEST`
+- Does **not** publish lifecycle facts (`GOAL_ACTIVATED` / `GOAL_PAUSED` / `GOAL_CANCELLED`)
 
 ### Files
 
-- `ai_command_center/ui/views/goals_view.py` (new)
-- `ai_command_center/ui/components/goal_item.py` (new)
-- `ai_command_center/ui/components/plan_preview.py` (new)
+- `ai_command_center/ui/views/goal_view.py` (orchestration shell, route `goals`)
+- `ai_command_center/ui/views/goal_dashboard/goal_list_panel.py`
+- `ai_command_center/ui/views/goal_dashboard/goal_detail_panel.py`
+- `ai_command_center/ui/views/goal_dashboard/plan_preview_panel.py`
+- `ai_command_center/ui/views/goal_dashboard/goal_progress_panel.py`
+- `ai_command_center/ui/views/goal_dashboard/goal_history_panel.py`
+- `tests/ui/test_goal_dashboard_projection.py`
+- `scripts/verify_ui_constitution.py` Phase 11F checks
 
 ### Acceptance Criteria
 
-- [ ] Goal list filters by status (Active, Queued, Paused, Completed, Failed, Cancelled).
-- [ ] Each row shows title, priority badge, status badge, date.
-- [ ] Plan Preview displays `planner_last_plan` steps.
-- [ ] Actions publish `GOAL_SUBMIT_REQUEST`, `GOAL_ACTIVATED`, `GOAL_PAUSED`, `GOAL_CANCELLED`.
+- [x] Goal list filters by status (Active, Queued, Paused, Completed, Failed, Cancelled).
+- [x] Each row shows title, priority badge, status badge (color + text).
+- [x] Plan Preview displays `brain_state.last_plan` / `planner_last_plan` steps.
+- [x] New Goal publishes `GOAL_SUBMIT_REQUEST` only (no lifecycle fact publishes from UI).
+- [x] Reads `AppState.brain_state` (+ optional `planner_last_plan`); no GoalRepository/GoalEngine/services.
+- [x] `GOAL_AMBER` documented in `docs/UI_CONSTITUTION.md` and used by shell + panels.
+- [x] Sidebar label is "Goal Dashboard"; surface states Loading / Empty / Error / Data.
 
 ---
 
@@ -286,63 +308,58 @@ After each phase, run:
 python3 -m pytest -m "not slow"
 python3 -m ruff check ai_command_center
 python3 scripts/verify_constitution.py
+python3 scripts/verify_ui_constitution.py
 ```
 
-A new `scripts/verify_ui_constitution.py` should be created during Phase 11A to check:
+`scripts/verify_ui_constitution.py` checks:
 
-- Hero Sections exist on all primary workspaces.
+- Hero Sections exist on all primary workspaces (11A–11F).
 - Cards have header, metric, status, timestamp, action.
 - Status badges include both color and text.
 - No UI component mutates repositories.
-- All mandatory workspaces are in navigation.
-- Empty states are informative.
+- All mandatory workspaces are in navigation (no orphan routes).
+- Empty states are informative (Article 18).
+- Phase 11F Goal Dashboard contracts (`GOAL_AMBER`, five panels, submit wiring).
 
 ---
 
 ## Definition of Done
 
-Phase 11 is complete when:
+Phase 11 is **COMPLETE** when:
 
 1. ✅ All mandatory workspaces exist and are accessible from navigation.
 2. ✅ Each workspace has a compliant Hero Section.
 3. ✅ All cards follow Card Standards.
-4. ✅ Status badges use both color and text.
+4. ✅ Status badges use both color and text (canonical `status_tokens.py`).
 5. ✅ Top Bar displays all required elements.
 6. ✅ UI reads only from `AppState` and publishes `EventBus` events.
 7. ✅ `scripts/verify_constitution.py` passes.
-8. ✅ `python3 -m ruff check ai_command_center` passes.
-9. ✅ Operators can observe every major backend subsystem without reading logs.
+8. ✅ `scripts/verify_ui_constitution.py` passes (including Phase 11F).
+9. ✅ `python3 -m ruff check ai_command_center` passes.
+10. ✅ Operators can observe every major backend subsystem without reading logs.
+11. ✅ Goal Dashboard tested via `tests/ui/test_goal_dashboard_projection.py`.
 
 ---
 
-## Implementation Order & Estimated Effort
+## Implementation Order
 
-| Phase | Title | Effort |
+| Phase | Title | Status |
 |---|---|---|
-| 11A | Command Center Dashboard + Top Bar | 2 days |
-| 11B | World Model Workspace | 3 days |
-| 11C | Execution Center | 2 days |
-| 11D | Agent Monitor | 2 days |
-| 11E | Approval Center | 1.5 days |
-| 11F | Goal Dashboard | 2 days |
-
-**Total:** ~12.5 working days.
+| 11A | Command Center Dashboard + Top Bar | Complete |
+| 11B | World Model Workspace | Complete |
+| 11C | Execution Center | Complete |
+| 11D | Agent Monitor | Complete |
+| 11E | Approval Center | Complete |
+| 11F | Goal Dashboard | Complete |
 
 ---
 
-## Risk Mitigation
+## Risk Mitigation (closed)
 
-| Risk | Mitigation |
+| Risk | Resolution |
 |---|---|
-| AppState field names differ from plan | Verify exact names from `core/app_state.py` before each phase. |
-| Graph performance with many nodes | Use level-of-detail or limit initial visible nodes. |
-| Goal lifecycle controls | Phase 11F is read-only if `GoalEngine` persistence projection is not added. |
-| Execution truth/receipt split | Composite from `execution_library`, `execution_context`, and `orchestration_run` in `StateApplierMixin`. |
-| Sidebar overflow | Group workspaces into collapsible sections (Ops, Monitor, Library). |
-
----
-
-## Open Questions
-
-1. Should the Command Center Dashboard replace `HomeView` as the default view, or coexist?
-2. For Phase 11F, do you want read-only goal visibility first, or should we add a `GoalEngine` → `AppState` projection before UI work?
+| AppState field names differ from plan | Verified against `core/app_state.py` / domain snapshots. |
+| Graph performance with many nodes | LOD / initial visible-node limits in World Model panels. |
+| Goal lifecycle controls | UI submits intent only (`GOAL_SUBMIT_REQUEST`); lifecycle facts remain service-owned. |
+| Execution truth/receipt split | Composed from `execution_library`, `execution_context`, and `orchestration_run`. |
+| Sidebar overflow | Grouped workspaces; orphan gallery route removed from registry. |
