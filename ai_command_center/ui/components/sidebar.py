@@ -15,7 +15,7 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("timeline", "Timeline"),
     ("workflow", "Workflow"),
     ("automation", "Automation"),
-    ("world_explorer", "World Explorer"),
+    ("world_explorer", "World Model"),
     ("relationships", "Relationships"),
     ("dependencies", "Dependencies"),
     ("providers", "Providers"),

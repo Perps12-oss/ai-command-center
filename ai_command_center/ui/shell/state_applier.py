@@ -91,6 +91,14 @@ class StateApplierMixin:
         if approvals and hasattr(approvals, "apply_state") and current_view == "approvals":
             approvals.apply_state(snap)
 
+        world_explorer = self._world_explorer_view()
+        if (
+            world_explorer
+            and hasattr(world_explorer, "apply_state")
+            and current_view == "world_explorer"
+        ):
+            world_explorer.apply_state(snap)
+
         if snap.chat_status == "streaming":
             self._last_terminal_chat_key = None
         self._overlay_mode = snap.settings.overlay_mode

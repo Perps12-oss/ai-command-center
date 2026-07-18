@@ -1,7 +1,8 @@
-"""UI Constitution hardening gate for Phase 11A.
+"""UI Constitution hardening gate for Phase 11A + 11B.
 
 Checks that the frontend is fully wired, uses the canonical status-token system,
-has no placeholder screens, and exposes the required hero/ops/top-bar contracts.
+has no placeholder screens, exposes the required hero/ops/top-bar contracts,
+and that the World Model workspace satisfies Article 12.
 
 Exit codes:
   0 = PASS
@@ -35,6 +36,15 @@ PHASE_11A_FILES: tuple[Path, ...] = (
     UI_ROOT / "shell" / "event_coordinator.py",
     UI_ROOT / "app.py",
     UI_ROOT / "controller.py",
+)
+
+PHASE_11B_FILES: tuple[Path, ...] = (
+    UI_ROOT / "views" / "world_explorer_view.py",
+    UI_ROOT / "views" / "world_model" / "knowledge_graph_panel.py",
+    UI_ROOT / "views" / "world_model" / "entity_explorer_panel.py",
+    UI_ROOT / "views" / "world_model" / "selection_inspector_panel.py",
+    UI_ROOT / "views" / "world_model" / "relationship_explorer_panel.py",
+    UI_ROOT / "views" / "world_model" / "mutation_journal_panel.py",
 )
 
 
@@ -212,6 +222,92 @@ def _check_theme_tokens(v: Violation) -> None:
                 v.add(f"{path.relative_to(REPO)} uses unapproved color {hex_color}")
 
 
+def _check_world_model_workspace(v: Violation) -> None:
+    """Verify Phase 11B / Article 12 World Model workspace contracts."""
+    for path in PHASE_11B_FILES:
+        if not path.exists():
+            v.add(f"Missing World Model file: {path.relative_to(REPO)}")
+
+    shell = UI_ROOT / "views" / "world_explorer_view.py"
+    if not shell.exists():
+        return
+    text = _read(shell)
+
+    required_symbols = (
+        ("Hero", "_hero"),
+        ("Knowledge Graph", "KnowledgeGraphPanel"),
+        ("Entity Explorer", "EntityExplorerPanel"),
+        ("Selection Inspector", "SelectionInspectorPanel"),
+        ("Relationship Explorer", "RelationshipExplorerPanel"),
+        ("Mutation Journal", "MutationJournalPanel"),
+        ("WORLD_TEAL accent", "WORLD_TEAL"),
+        ("New Entity action", "_new_entity_btn"),
+        ("apply_state projection", "def apply_state"),
+    )
+    for label, symbol in required_symbols:
+        if symbol not in text:
+            v.add(f"World Model workspace missing {label} ({symbol})")
+
+    if "from ai_command_center.core.state.world_model_state" in text:
+        v.add("world_explorer_view.py must not import WorldModelState")
+    if "add_listener" in text:
+        v.add("world_explorer_view.py must not subscribe to mutable state listeners")
+    if "WORLD_MODEL_MUTATION_APPLIED" in text:
+        v.add("world_explorer_view.py must not publish WORLD_MODEL_MUTATION_APPLIED")
+
+    # Forbidden layer access across 11B panels
+    forbidden_patterns = (
+        "ai_command_center.repositories",
+        "ai_command_center.services",
+        "from ai_command_center.core.state.world_model_state",
+        "WORLD_MODEL_MUTATION_APPLIED",
+    )
+    for path in PHASE_11B_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        for forbidden in forbidden_patterns:
+            if forbidden in panel_text:
+                v.add(f"{path.relative_to(REPO)} contains forbidden symbol {forbidden}")
+
+    # Wiring: route preserved, AppState-driven apply, create/select publishes
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["world_explorer"]' not in view_manager:
+        v.add("view_manager missing world_explorer factory")
+    if "WorldModelState(self._bus)" in view_manager and "WorldExplorerView" in view_manager:
+        # Factory must not inject WorldModelState into WorldExplorerView
+        factory_block = re.search(
+            r'self\._view_registry\["world_explorer"\]\s*=\s*lambda:.*?WorldExplorerView\((.*?)\)',
+            view_manager,
+            re.S,
+        )
+        if factory_block and "state=" in factory_block.group(1):
+            v.add("WorldExplorerView factory still injects WorldModelState")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "world_explorer"' not in state_applier:
+        v.add("state_applier does not drive world_explorer via apply_state")
+
+    controller = _read(UI_ROOT / "controller.py")
+    if "publish_world_model_node_selected" not in controller:
+        v.add("UIController missing publish_world_model_node_selected")
+    if "publish_entity_create_request" not in controller:
+        v.add("UIController missing publish_entity_create_request")
+    if "ENTITY_CREATE_REQUEST" not in controller:
+        v.add("UIController does not publish ENTITY_CREATE_REQUEST")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("world_explorer", "World Model")' not in sidebar:
+        v.add("Sidebar label for world_explorer is not 'World Model'")
+
+    for path in PHASE_11B_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        if "WORLD_TEAL" not in panel_text and path.name != "__init__.py":
+            v.add(f"{path.relative_to(REPO)} does not use WORLD_TEAL token")
+
+
 def main() -> int:
     v = Violation()
     _check_no_local_status_maps(v)
@@ -223,6 +319,7 @@ def main() -> int:
     _check_no_placeholders(v)
     _check_route_reachability(v)
     _check_theme_tokens(v)
+    _check_world_model_workspace(v)
 
     if v.errors:
         v.report()

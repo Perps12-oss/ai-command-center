@@ -105,20 +105,26 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 - Workspace Name: "World Model"
 - Current State: "`<node_count>` entities, `<edge_count>` relationships"
 - Primary Metric: active goals count
-- Immediate Action: "New Entity" (publishes `WORLD_MODEL_MUTATION_APPLIED`)
+- Immediate Action: "New Entity" (publishes `ENTITY_CREATE_REQUEST`; never `WORLD_MODEL_MUTATION_APPLIED`)
 
 ### Files
 
-- `ai_command_center/ui/views/world_explorer_view.py` (enhance)
-- `ai_command_center/ui/components/graph_canvas.py` (reuse)
-- `ai_command_center/ui/views/world_model/` panels (new if needed)
+- `ai_command_center/ui/views/world_explorer_view.py` (orchestration shell)
+- `ai_command_center/ui/views/world_model/knowledge_graph_panel.py`
+- `ai_command_center/ui/views/world_model/entity_explorer_panel.py`
+- `ai_command_center/ui/views/world_model/selection_inspector_panel.py`
+- `ai_command_center/ui/views/world_model/relationship_explorer_panel.py`
+- `ai_command_center/ui/views/world_model/mutation_journal_panel.py`
 
 ### Acceptance Criteria
 
-- [ ] All nodes and edges are visible in the graph.
-- [ ] Clicking a node selects it and updates Relationship Explorer + Selection Inspector.
-- [ ] Mutation Journal shows the last 200 mutations with expandable details.
-- [ ] Graph uses Teal color identity for World Model nodes.
+- [x] All nodes and edges are visible in the graph.
+- [x] Clicking a node selects it and updates Relationship Explorer + Selection Inspector.
+- [x] Mutation Journal shows the last 200 mutations with expandable details.
+- [x] Graph uses Teal color identity for World Model nodes.
+- [x] Reads `AppState.world_model` only (no `WorldModelState` listeners).
+- [x] Hero publishes `ENTITY_CREATE_REQUEST`.
+- [x] `scripts/verify_ui_constitution.py` includes Phase 11B checks.
 
 ---
 

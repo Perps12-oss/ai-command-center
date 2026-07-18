@@ -15,6 +15,7 @@ from ai_command_center.core.events.topics import (
     CHAT_EXPORT_REQUEST,
     CLIPBOARD_CONTENT,
     CLIPBOARD_REQUEST,
+    ENTITY_CREATE_REQUEST,
     MEMORY_DELETE_REQUEST,
     MEMORY_REMEMBER,
     NOTE_SELECT,
@@ -47,6 +48,7 @@ from ai_command_center.core.events.topics import (
     UI_AUTOMATION_SELECT,
     UI_WORKFLOW_RUN,
     WORKFLOW_START,
+    WORLD_MODEL_NODE_SELECTED,
 )
 
 
@@ -504,3 +506,31 @@ class UIController:
             text = None
         if text:
             self._bus.publish(CLIPBOARD_CONTENT, {"text": text}, source="ui")
+
+    def publish_world_model_node_selected(self, node_id: str) -> None:
+        """Publish world-model node selection intent."""
+        self._bus.publish(
+            WORLD_MODEL_NODE_SELECTED,
+            {"node_id": str(node_id)},
+            source="ui",
+        )
+
+    def publish_entity_create_request(
+        self,
+        *,
+        entity_type: str = "note",
+        title: str = "New Entity",
+        description: str = "",
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        """Publish entity creation intent (never WORLD_MODEL_MUTATION_APPLIED)."""
+        self._bus.publish(
+            ENTITY_CREATE_REQUEST,
+            {
+                "entity_type": str(entity_type),
+                "title": str(title),
+                "description": str(description),
+                "metadata": dict(metadata or {}),
+            },
+            source="ui",
+        )

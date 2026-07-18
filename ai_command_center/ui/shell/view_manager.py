@@ -166,8 +166,9 @@ class ViewManagerMixin:
         )
         self._view_registry["world_explorer"] = lambda: WorldExplorerView(
             self._content,
-            bus=self._bus,
-            state=self._world_model_state,
+            on_select=self._controller.publish_world_model_node_selected,
+            on_create_entity=self._on_world_model_create_entity,
+            on_navigate=self._navigate,
         )
         self._view_registry["relationships"] = lambda: RelationshipView(
             self._content,
@@ -229,6 +230,17 @@ class ViewManagerMixin:
     def _command_center_view(self) -> CommandCenterView | None:
         v = self._views.get("command_center")
         return v if isinstance(v, CommandCenterView) else None
+
+    def _world_explorer_view(self) -> WorldExplorerView | None:
+        v = self._views.get("world_explorer")
+        return v if isinstance(v, WorldExplorerView) else None
+
+    def _on_world_model_create_entity(self) -> None:
+        """Hero New Entity → ENTITY_CREATE_REQUEST via UIController."""
+        self._controller.publish_entity_create_request(
+            entity_type="note",
+            title="New Entity",
+        )
 
     def _workspace_os_routing_enabled(self) -> bool:
         return getattr(self, "_workspace_os_enabled", self._default_view == "workspace")
