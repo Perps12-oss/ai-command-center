@@ -143,7 +143,7 @@ Commands (local, 2026-07-18):
 python scripts/verify_constitution.py          # PASS
 python scripts/verify_ui_constitution.py       # PASS
 python tools/ucgs_runner.py | ucgs_ci_gate     # PASS
-python -m pytest                               # 1012+ passed after arrow fix
+python -m pytest                               # 1017 passed, 5 skipped
 ```
 
 Structural proof tests in `tests/test_graph_primitives.py`:
