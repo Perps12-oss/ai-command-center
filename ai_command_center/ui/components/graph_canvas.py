@@ -1,10 +1,8 @@
-"""GraphCanvas — tkinter canvas renderer for workflow graphs.
+"""GraphCanvas — workflow-domain adapter over the shared BaseGraphCanvas.
 
-P4 Features (2026-07-10):
-- P4.2: Canvas zoom/pan with mouse wheel and drag
-- P4.4: Multi-select with Ctrl+click and selection box
-- P4.5: Undo/redo for graph edits
-- P4.6: Keyboard shortcuts
+Workflow-specific behavior (undo/redo, edge handles, context menus, node
+overlays) lives here. Shared zoom/pan/selection/draw lives in
+``ui.components.graph``.
 """
 
 from __future__ import annotations
@@ -15,9 +13,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-import customtkinter as ctk
-
 from ai_command_center.domain.workflow_graph import GraphEdge, GraphNode, NodeState, WorkflowGraph
+from ai_command_center.ui.components.graph import (
+    BaseGraphCanvas,
+    GraphEdgeVisual,
+    GraphNodeVisual,
+)
 from ai_command_center.ui.components.workflow_node_overlays import node_overlay_kind
 from ai_command_center.ui.design_system import theme_v2 as T
 
@@ -48,6 +49,7 @@ _STATE_FILL: dict[NodeState, str] = {
 
 class EditActionType(Enum):
     """Types of graph edit actions for undo/redo."""
+
     NODE_MOVE = "node_move"
     NODE_ADD = "node_add"
     NODE_DELETE = "node_delete"
@@ -58,9 +60,10 @@ class EditActionType(Enum):
 @dataclass
 class EditAction:
     """Represents a single graph edit action for undo/redo."""
+
     action_type: EditActionType
     node_id: str = ""
-    target_id: str = ""  # For edge operations
+    target_id: str = ""
     old_x: float = 0.0
     old_y: float = 0.0
     new_x: float = 0.0
@@ -70,6 +73,7 @@ class EditAction:
 @dataclass
 class GraphHistory:
     """Tracks undo/redo history for graph edits."""
+
     undo_stack: list[EditAction] = field(default_factory=list)
     redo_stack: list[EditAction] = field(default_factory=list)
     max_size: int = 50
@@ -101,8 +105,50 @@ class GraphHistory:
         return action
 
 
-class GraphCanvas(ctk.CTkFrame):
-    """Canvas-based workflow graph renderer with node hit-testing, edge management, zoom/pan, multi-select, and undo/redo."""
+def _workflow_node_visual(node: GraphNode) -> GraphNodeVisual:
+    color = _STATE_COLORS.get(node.state, T.TEXT_MUTED)
+    fill = _STATE_FILL.get(node.state, T.BG_GLASS)
+    badge = ""
+    badge_color = ""
+    overlay = node_overlay_kind(node)
+    if overlay == "approval":
+        badge = "✓"
+        badge_color = T.ACCENT_DEFAULT
+    elif overlay == "retry":
+        badge = "↻"
+        badge_color = T.STATUS_BUSY
+    return GraphNodeVisual(
+        node_id=node.node_id,
+        x=node.x,
+        y=node.y,
+        label=node.label[:16],
+        width=_NODE_W,
+        height=_NODE_H,
+        shape="rect",
+        fill=fill,
+        outline=color,
+        outline_width=1,
+        text_color=T.TEXT_PRIMARY,
+        font_size=10,
+        status_dot_color=color,
+        badge=badge,
+        badge_color=badge_color,
+    )
+
+
+def _workflow_edge_visual(edge: GraphEdge) -> GraphEdgeVisual:
+    return GraphEdgeVisual(
+        edge_id=GraphEdgeVisual.make_id(edge.source_id, edge.target_id),
+        source_id=edge.source_id,
+        target_id=edge.target_id,
+        color=T.BG_GLASS_BORDER,
+        width=2,
+        arrow="forward",
+    )
+
+
+class GraphCanvas(BaseGraphCanvas):
+    """Workflow graph adapter: projects WorkflowGraph onto BaseGraphCanvas."""
 
     def __init__(
         self,
@@ -117,9 +163,8 @@ class GraphCanvas(ctk.CTkFrame):
         on_redo: Callable[[], None] | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(master, fg_color=T.BG_DEEP, corner_radius=0, **kwargs)
-        self._on_node_select = on_node_select or (lambda _node: None)
-        self._on_node_move = on_node_move or (lambda _node_id, _x, _y: None)
+        self._on_workflow_node_select = on_node_select or (lambda _node: None)
+        self._on_workflow_node_move = on_node_move or (lambda _nid, _x, _y: None)
         self._on_edge_create = on_edge_create or (lambda _src, _tgt: None)
         self._on_edge_delete = on_edge_delete or (lambda _edge: None)
         self._on_node_add = on_node_add or (lambda _node_type, _x, _y: None)
@@ -127,54 +172,40 @@ class GraphCanvas(ctk.CTkFrame):
         self._on_redo = on_redo or (lambda: None)
 
         self._graph: WorkflowGraph | None = None
-        self._selected_node_ids: set[str] = set()
-        self._selected_edge_ids: set[str] = set()
-        self._node_bounds: dict[str, tuple[float, float, float, float]] = {}
-        self._edge_bounds: dict[tuple[str, str], tuple[float, float, float, float]] = {}
-        self._drag_node_id = ""
-        self._drag_offset: tuple[float, float] = (0.0, 0.0)
+        self._history = GraphHistory()
         self._edge_draw_start: tuple[float, float] | None = None
         self._edge_draw_source_id = ""
-        self._history = GraphHistory()
-
-        # Zoom/Pan state
-        self._zoom_level = 1.0
-        self._zoom_min = 0.25
-        self._zoom_max = 3.0
-        self._zoom_step = 0.1
-        self._pan_start: tuple[float, float] | None = None
-        self._pan_mode = False  # Middle mouse button
-
-        # Selection box for multi-select
-        self._selection_start: tuple[float, float] | None = None
-        self._selection_box: int | None = None
-
-        self._tk_canvas = tk.Canvas(self, bg=T.BG_DEEP, highlightthickness=0)
-        h_scroll = tk.Scrollbar(self, orient="horizontal", command=self._tk_canvas.xview)
-        v_scroll = tk.Scrollbar(self, orient="vertical", command=self._tk_canvas.yview)
-        self._tk_canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
-        h_scroll.pack(side="bottom", fill="x")
-        v_scroll.pack(side="right", fill="y")
-        self._tk_canvas.pack(side="left", fill="both", expand=True)
-
-        # Mouse bindings
-        self._tk_canvas.bind("<Button-1>", self._on_canvas_press)
-        self._tk_canvas.bind("<B1-Motion>", self._on_canvas_drag)
-        self._tk_canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
-        self._tk_canvas.bind("<Button-3>", self._on_canvas_context)
-        self._tk_canvas.bind("<Double-Button-1>", self._on_canvas_double_click)
-        self._tk_canvas.bind("<MouseWheel>", self._on_mouse_wheel)
-        self._tk_canvas.bind("<Button-2>", self._on_pan_start)
-        self._tk_canvas.bind("<B2-Motion>", self._on_pan_drag)
-        self._tk_canvas.bind("<ButtonRelease-2>", self._on_pan_end)
-        self._tk_canvas.bind("<Shift-Button-1>", self._on_selection_start)
-
-        # Keyboard bindings on canvas (canvas must have focus)
-        self._tk_canvas.bind("<Key>", self._on_key_press)
-        self._tk_canvas.bind("<FocusIn>", self._on_focus_in)
-        self._tk_canvas.focus_set()  # Allow canvas to receive keyboard events
-
         self._context_menu: tk.Menu | None = None
+        self._move_origins: dict[str, tuple[float, float]] = {}
+
+        super().__init__(
+            master,
+            on_node_select=self._forward_node_select,
+            on_node_move=self._forward_node_move,
+            enable_zoom=True,
+            enable_pan=True,
+            enable_multi_select=True,
+            enable_node_drag=True,
+            enable_selection_box=True,
+            show_scrollbars=True,
+            empty_message="No nodes",
+            **kwargs,
+        )
+
+        self.tk_canvas.bind("<Button-3>", self._on_canvas_context)
+        self.tk_canvas.bind("<Double-Button-1>", self._on_canvas_double_click)
+        self.tk_canvas.bind("<Key>", self._on_key_press)
+        self.tk_canvas.focus_set()
+
+    def _on_canvas_drag(self, event: tk.Event) -> None:
+        super()._on_canvas_drag(event)
+        # Keep WorkflowGraph domain coordinates in sync while dragging.
+        if self._drag_node_id and self._graph is not None:
+            visual = self._node_index.get(self._drag_node_id)
+            domain = self._graph.node_by_id(self._drag_node_id)
+            if visual is not None and domain is not None:
+                domain.x = visual.x
+                domain.y = visual.y
 
     def render(
         self,
@@ -184,100 +215,47 @@ class GraphCanvas(ctk.CTkFrame):
         selected_edge_ids: set[str] | None = None,
     ) -> None:
         self._graph = graph
-        if selected_node_ids is not None:
-            self._selected_node_ids = selected_node_ids
-        if selected_edge_ids is not None:
-            self._selected_edge_ids = selected_edge_ids
-        self._node_bounds.clear()
-        self._edge_bounds.clear()
-        self._tk_canvas.delete("all")
+        nodes = [_workflow_node_visual(n) for n in graph.nodes]
+        edges = [_workflow_edge_visual(e) for e in graph.edges]
+        self.set_scene(
+            nodes,
+            edges,
+            selected_node_ids=selected_node_ids,
+            selected_edge_ids=selected_edge_ids,
+        )
 
-        # Apply zoom transform
-        self._tk_canvas.scale("all", 0, 0, self._zoom_level, self._zoom_level)
-
-        if not graph.nodes:
-            self._tk_canvas.create_text(
-                100,
-                60,
-                text="No nodes",
-                fill=T.TEXT_MUTED,
-                font=(T.FONT_FAMILY, 12),
-            )
+    def _forward_node_select(self, node_id: str) -> None:
+        if self._graph is None:
             return
+        node = self._graph.node_by_id(node_id)
+        if node is not None:
+            self._on_workflow_node_select(node)
 
-        # Draw edges first (below nodes)
-        for edge in graph.edges:
-            self._draw_edge(edge)
-
-        # Draw nodes on top
-        for node in graph.nodes:
-            self._draw_node(node)
-
-        max_x = max((n.x + _NODE_W + 40) for n in graph.nodes)
-        max_y = max((n.y + _NODE_H + 40) for n in graph.nodes)
-        self._tk_canvas.configure(scrollregion=(0, 0, max_x * self._zoom_level, max_y * self._zoom_level))
-
-    def _draw_node(self, node: GraphNode) -> None:
-        x, y = node.x, node.y
-        color = _STATE_COLORS.get(node.state, T.TEXT_MUTED)
-        fill = _STATE_FILL.get(node.state, T.BG_GLASS)
-        is_selected = node.node_id in self._selected_node_ids
-        outline = T.ACCENT_DEFAULT if is_selected else color
-        width = 2 if is_selected else 1
-
-        self._node_bounds[node.node_id] = (x, y, x + _NODE_W, y + _NODE_H)
-        self._tk_canvas.create_rectangle(
-            x,
-            y,
-            x + _NODE_W,
-            y + _NODE_H,
-            fill=fill,
-            outline=outline,
-            width=width,
-            tags=("node", node.node_id),
-        )
-        self._tk_canvas.create_oval(
-            x + 8,
-            y + _NODE_H / 2 - 5,
-            x + 18,
-            y + _NODE_H / 2 + 5,
-            fill=color,
-            outline="",
-            tags=("node", node.node_id),
-        )
-        self._tk_canvas.create_text(
-            x + _NODE_W / 2 + 5,
-            y + _NODE_H / 2,
-            text=node.label[:16],
-            fill=T.TEXT_PRIMARY,
-            font=(T.FONT_FAMILY, 10),
-            anchor="center",
-            tags=("node", node.node_id),
-        )
-        overlay = node_overlay_kind(node)
-        if overlay == "approval":
-            self._tk_canvas.create_text(
-                x + _NODE_W - 10,
-                y + 8,
-                text="✓",
-                fill=T.ACCENT_DEFAULT,
-                font=(T.FONT_FAMILY, 10, "bold"),
-                tags=("node", node.node_id),
+    def _forward_node_move(self, node_id: str, x: float, y: float) -> None:
+        if self._graph is None:
+            return
+        node = self._graph.node_by_id(node_id)
+        if node is None:
+            return
+        old = self._move_origins.pop(node_id, (node.x, node.y))
+        node.x = x
+        node.y = y
+        self._history.push(
+            EditAction(
+                action_type=EditActionType.NODE_MOVE,
+                node_id=node_id,
+                old_x=old[0],
+                old_y=old[1],
+                new_x=x,
+                new_y=y,
             )
-        elif overlay == "retry":
-            self._tk_canvas.create_text(
-                x + _NODE_W - 12,
-                y + 8,
-                text="↻",
-                fill=T.STATUS_BUSY,
-                font=(T.FONT_FAMILY, 10, "bold"),
-                tags=("node", node.node_id),
-            )
+        )
+        self._on_workflow_node_move(node_id, x, y)
 
-        # Edge handle (right side of node) for creating edges
-        handle_x = x + _NODE_W
-        handle_y = y + _NODE_H / 2
-        self._tk_canvas.create_oval(
+    def _decorate_node(self, node: GraphNodeVisual, tags: tuple[str, ...]) -> None:
+        handle_x = node.x + node.width
+        handle_y = node.y + node.height / 2
+        self.tk_canvas.create_oval(
             handle_x - _EDGE_HANDLE_SIZE / 2,
             handle_y - _EDGE_HANDLE_SIZE / 2,
             handle_x + _EDGE_HANDLE_SIZE / 2,
@@ -287,49 +265,7 @@ class GraphCanvas(ctk.CTkFrame):
             tags=("edge_handle", "edge_handle_" + node.node_id),
         )
 
-    def _draw_edge(self, edge: GraphEdge) -> None:
-        if self._graph is None:
-            return
-        src = self._graph.node_by_id(edge.source_id)
-        tgt = self._graph.node_by_id(edge.target_id)
-        if src is None or tgt is None:
-            return
-
-        sx = src.x + _NODE_W
-        sy = src.y + _NODE_H / 2
-        tx = tgt.x
-        ty = tgt.y + _NODE_H / 2
-
-        edge_key = (edge.source_id, edge.target_id)
-        edge_id = f"{edge.source_id}->{edge.target_id}"
-        mid_x = (sx + tx) / 2
-        mid_y = (sy + ty) / 2
-        self._edge_bounds[edge_key] = (mid_x - 15, mid_y - 8, mid_x + 15, mid_y + 8)
-
-        is_selected = edge_id in self._selected_edge_ids
-        line_color = T.ACCENT_DEFAULT if is_selected else T.BG_GLASS_BORDER
-        line_width = 3 if is_selected else 2
-
-        self._tk_canvas.create_line(
-            sx, sy, tx, ty,
-            fill=line_color,
-            width=line_width,
-            arrow=tk.LAST,
-            arrowshape=(8, 10, 4),
-            tags=("edge", f"edge_{edge.source_id}_{edge.target_id}"),
-        )
-
-    def _hit_test(self, canvas_x: float, canvas_y: float) -> GraphNode | None:
-        if self._graph is None:
-            return None
-        for node in self._graph.nodes:
-            x0, y0, x1, y1 = self._node_bounds.get(node.node_id, (0, 0, 0, 0))
-            if x0 <= canvas_x <= x1 and y0 <= canvas_y <= y1:
-                return node
-        return None
-
     def _hit_test_edge_handle(self, canvas_x: float, canvas_y: float) -> str | None:
-        """Check if click is on an edge handle. Returns node_id or None."""
         if self._graph is None:
             return None
         for node in self._graph.nodes:
@@ -340,353 +276,137 @@ class GraphCanvas(ctk.CTkFrame):
                 return node.node_id
         return None
 
-    def _hit_test_edge(self, canvas_x: float, canvas_y: float) -> tuple[str, str] | None:
-        """Check if click is on an edge. Returns (source_id, target_id) or None."""
-        for (src_id, tgt_id), (x0, y0, x1, y1) in self._edge_bounds.items():
-            if x0 <= canvas_x <= x1 and y0 <= canvas_y <= y1:
-                return (src_id, tgt_id)
-        return None
-
-    def _on_canvas_press(self, event: tk.Event) -> None:
-        """Handle left mouse button press."""
-        if self._graph is None:
-            return
-        canvas_x = self._tk_canvas.canvasx(event.x)
-        canvas_y = self._tk_canvas.canvasy(event.y)
-
-        # Check if clicking on edge handle to start drawing an edge
+    def _intercept_press(self, canvas_x: float, canvas_y: float, event: tk.Event) -> bool:
         handle_node_id = self._hit_test_edge_handle(canvas_x, canvas_y)
         if handle_node_id:
             self._edge_draw_start = (canvas_x, canvas_y)
             self._edge_draw_source_id = handle_node_id
-            self._selected_node_ids.clear()
-            self._selected_edge_ids.clear()
-            return
+            self.selection.clear()
+            return True
 
-        # Check if clicking on a node
-        node = self._hit_test(canvas_x, canvas_y)
-        if node is not None:
-            # If we were drawing an edge, complete it
-            if self._edge_draw_source_id and self._edge_draw_source_id != node.node_id:
-                self._on_edge_create(self._edge_draw_source_id, node.node_id)
+        # Complete pending edge when clicking a target node
+        if self._edge_draw_source_id:
+            visual = self.hit_test_node(canvas_x, canvas_y)
+            if visual is not None and visual.node_id != self._edge_draw_source_id:
+                self._on_edge_create(self._edge_draw_source_id, visual.node_id)
                 self._edge_draw_start = None
                 self._edge_draw_source_id = ""
-                return
+                return True
 
-            # Toggle selection with Ctrl, otherwise select single
-            if event.state & 0x4:  # Ctrl modifier
-                if node.node_id in self._selected_node_ids:
-                    self._selected_node_ids.discard(node.node_id)
-                else:
-                    self._selected_node_ids.add(node.node_id)
-            else:
-                self._selected_node_ids = {node.node_id}
-                self._selected_edge_ids.clear()
+        # Sync domain node positions when drag starts
+        visual = self.hit_test_node(canvas_x, canvas_y)
+        if visual is not None and self._graph is not None:
+            domain = self._graph.node_by_id(visual.node_id)
+            if domain is not None:
+                self._move_origins[visual.node_id] = (domain.x, domain.y)
+        return False
 
-            self._drag_node_id = node.node_id
-            self._drag_offset = (canvas_x - node.x, canvas_y - node.y)
-            if len(self._selected_node_ids) == 1:
-                self._on_node_select(node)
-            self.render(self._graph, selected_node_ids=self._selected_node_ids)
-            return
-
-        # Check if clicking on an edge
-        edge_hit = self._hit_test_edge(canvas_x, canvas_y)
-        if edge_hit:
-            src_id, tgt_id = edge_hit
-            edge_id = f"{src_id}->{tgt_id}"
-            if event.state & 0x4:  # Ctrl modifier
-                if edge_id in self._selected_edge_ids:
-                    self._selected_edge_ids.discard(edge_id)
-                else:
-                    self._selected_edge_ids.add(edge_id)
-            else:
-                self._selected_edge_ids = {edge_id}
-                self._selected_node_ids.clear()
-            if self._graph:
-                self.render(self._graph, selected_edge_ids=self._selected_edge_ids)
-            return
-
-        # Clear selection on empty canvas click (unless Shift for selection box)
-        if not (event.state & 0x1):  # Not Shift
-            self._selected_node_ids.clear()
-            self._selected_edge_ids.clear()
-            if self._graph:
-                self.render(self._graph)
-
-    def _on_selection_start(self, event: tk.Event) -> None:
-        """Start selection box on Shift+click."""
-        if self._graph is None:
-            return
-        canvas_x = self._tk_canvas.canvasx(event.x)
-        canvas_y = self._tk_canvas.canvasy(event.y)
-        self._selection_start = (canvas_x, canvas_y)
-        self._selection_box = self._tk_canvas.create_rectangle(
-            canvas_x, canvas_y, canvas_x, canvas_y,
-            outline=T.ACCENT_DEFAULT,
-            dash=(4, 4),
-            width=1,
-        )
-
-    def _on_selection_drag(self, event: tk.Event) -> None:
-        """Update selection box as mouse moves."""
-        if self._selection_start is None or self._selection_box is None:
-            return
-        canvas_x = self._tk_canvas.canvasx(event.x)
-        canvas_y = self._tk_canvas.canvasy(event.y)
-        x0, y0 = self._selection_start
-        self._tk_canvas.coords(self._selection_box, x0, y0, canvas_x, canvas_y)
-
-    def _on_canvas_drag(self, event: tk.Event) -> None:
-        """Handle mouse drag for node movement."""
-        # Don't drag if we have a selection box
-        if self._selection_start is not None:
-            return
-        if not self._drag_node_id or self._graph is None:
-            return
-        node = self._graph.node_by_id(self._drag_node_id)
-        if node is None:
-            return
-        canvas_x = self._tk_canvas.canvasx(event.x)
-        canvas_y = self._tk_canvas.canvasy(event.y)
-        node.x = max(0.0, canvas_x - self._drag_offset[0])
-        node.y = max(0.0, canvas_y - self._drag_offset[1])
-        self.render(self._graph, selected_node_ids=self._selected_node_ids)
-
-    def _on_canvas_release(self, event: tk.Event) -> None:
-        """Handle mouse button release."""
-        # Handle selection box completion
-        if self._selection_start is not None and self._selection_box is not None:
-            canvas_x = self._tk_canvas.canvasx(event.x)
-            canvas_y = self._tk_canvas.canvasy(event.y)
-            x0, y0 = self._selection_start
-            # Select all nodes within the box
-            self._selected_node_ids.clear()
-            self._selected_edge_ids.clear()
-            for node in (self._graph.nodes if self._graph else []):
-                if (min(x0, canvas_x) <= node.x <= max(x0, canvas_x) and
-                    min(y0, canvas_y) <= node.y <= max(y0, canvas_y)):
-                    self._selected_node_ids.add(node.node_id)
-            self._tk_canvas.delete(self._selection_box)
-            self._selection_box = None
-            self._selection_start = None
-            if self._graph:
-                self.render(self._graph, selected_node_ids=self._selected_node_ids)
-            return
-
-        # Handle edge drawing
+    def _intercept_release(self, canvas_x: float, canvas_y: float, event: tk.Event) -> bool:
         if self._edge_draw_start is not None:
             self._edge_draw_start = None
             self._edge_draw_source_id = ""
-            return
-
-        # Handle node movement
-        if not self._drag_node_id or self._graph is None:
-            return
-        node = self._graph.node_by_id(self._drag_node_id)
-        if node is not None:
-            # Record the move for undo
-            action = EditAction(
-                action_type=EditActionType.NODE_MOVE,
-                node_id=node.node_id,
-                old_x=node.x,
-                old_y=node.y,
-            )
-            self._history.push(action)
-            self._on_node_move(node.node_id, node.x, node.y)
-        self._drag_node_id = ""
-
-    def _on_pan_start(self, event: tk.Event) -> None:
-        """Start panning with middle mouse button."""
-        self._pan_mode = True
-        self._pan_start = (self._tk_canvas.canvasx(event.x), self._tk_canvas.canvasy(event.y))
-
-    def _on_pan_drag(self, event: tk.Event) -> None:
-        """Pan the canvas."""
-        if not self._pan_mode or self._pan_start is None:
-            return
-        canvas_x = self._tk_canvas.canvasx(event.x)
-        canvas_y = self._tk_canvas.canvasy(event.y)
-        self._tk_canvas.scan_dragto(event.x, event.y, gain=1)
-        self._pan_start = (canvas_x, canvas_y)
-
-    def _on_pan_end(self, event: tk.Event) -> None:
-        """End panning."""
-        self._pan_mode = False
-        self._pan_start = None
-
-    def _on_mouse_wheel(self, event: tk.Event) -> None:
-        """Handle mouse wheel for zooming."""
-        if self._graph is None:
-            return
-        delta = event.delta
-        if delta > 0:
-            self._zoom_level = min(self._zoom_max, self._zoom_level + self._zoom_step)
-        elif delta < 0:
-            self._zoom_level = max(self._zoom_min, self._zoom_level - self._zoom_step)
-        self.render(self._graph, selected_node_ids=self._selected_node_ids)
-
-    def _on_focus_in(self, event: tk.Event) -> None:
-        """Handle focus change - ensure canvas maintains keyboard focus."""
-        pass  # Canvas focus is set in __init__
-
-    def _on_key_press(self, event: tk.Event) -> None:
-        """Handle keyboard shortcuts."""
-        if self._graph is None:
-            return
-
-        # Ctrl+Z - Undo
-        if event.state & 0x4 and event.keysym == "z":  # Ctrl+Z
-            self._handle_undo()
-        # Ctrl+Y or Ctrl+Shift+Z - Redo
-        elif event.state & 0x4 and (event.keysym == "y" or
-              (event.keysym == "Z" and event.state & 0x1)):  # Ctrl+Shift+Z
-            self._handle_redo()
-        # Ctrl+A - Select all
-        elif event.state & 0x4 and event.keysym == "a":
-            self._selected_node_ids = {n.node_id for n in self._graph.nodes}
-            self._selected_edge_ids.clear()
-            self.render(self._graph, selected_node_ids=self._selected_node_ids)
-        # Delete - Delete selected
-        elif event.keysym == "Delete" or event.keysym == "BackSpace":
-            self._delete_selected()
-        # Escape - Clear selection
-        elif event.keysym == "Escape":
-            self._selected_node_ids.clear()
-            self._selected_edge_ids.clear()
-            self.render(self._graph)
-
-    def _handle_undo(self) -> None:
-        """Handle undo operation."""
-        action = self._history.pop_undo()
-        if action is None:
-            return
-        self._on_undo()
-        # Note: actual undo logic is handled by parent
-
-    def _handle_redo(self) -> None:
-        """Handle redo operation."""
-        action = self._history.pop_redo()
-        if action is None:
-            return
-        self._on_redo()
-        # Note: actual redo logic is handled by parent
-
-    def _delete_selected(self) -> None:
-        """Delete all selected nodes and edges."""
-        if self._graph is None:
-            return
-        # Delete selected edges first
-        for edge_id in list(self._selected_edge_ids):
-            parts = edge_id.split("->")
-            if len(parts) == 2:
-                self._delete_edge(parts[0], parts[1])
-        # Delete selected nodes
-        for node_id in list(self._selected_node_ids):
-            pass
-        self._selected_node_ids.clear()
-        self._selected_edge_ids.clear()
+            return True
+        return False
 
     def _on_canvas_context(self, event: tk.Event) -> None:
-        """Show context menu on right-click."""
         if self._context_menu:
             self._context_menu.destroy()
+        canvas_x, canvas_y = self._event_xy(event)
+        visual = self.hit_test_node(canvas_x, canvas_y)
+        edge_visual = self.hit_test_edge(canvas_x, canvas_y)
+        if visual is None and edge_visual is None:
+            return
 
-        canvas_x = self._tk_canvas.canvasx(event.x)
-        canvas_y = self._tk_canvas.canvasy(event.y)
-
-        # Check what's under the cursor
-        node = self._hit_test(canvas_x, canvas_y)
-        edge_hit = self._hit_test_edge(canvas_x, canvas_y)
-
-        if node is None and edge_hit is None:
-            return  # No action for empty space
-
-        self._context_menu = tk.Menu(self._tk_canvas, tearoff=0)
-        if node is not None:
-            self._context_menu.add_command(
-                label=f"Edit '{node.label[:12]}'...",
-                command=lambda: self._on_node_select(node),
-            )
-            self._context_menu.add_separator()
-        if edge_hit is not None:
-            src_id, tgt_id = edge_hit
+        self._context_menu = tk.Menu(self.tk_canvas, tearoff=0)
+        if visual is not None and self._graph is not None:
+            node = self._graph.node_by_id(visual.node_id)
+            if node is not None:
+                self._context_menu.add_command(
+                    label=f"Edit '{node.label[:12]}'...",
+                    command=lambda n=node: self._on_workflow_node_select(n),
+                )
+                self._context_menu.add_separator()
+        if edge_visual is not None:
             self._context_menu.add_command(
                 label="Delete Edge",
-                command=lambda: self._delete_edge(src_id, tgt_id),
+                command=lambda e=edge_visual: self._delete_edge(e.source_id, e.target_id),
             )
-            if node is None:
-                self._context_menu.add_separator()
-
         try:
             self._context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self._context_menu.grab_release()
 
     def _on_canvas_double_click(self, event: tk.Event) -> None:
-        """Handle double-click on edge to select it for deletion."""
-        if self._graph is None:
-            return
-        canvas_x = self._tk_canvas.canvasx(event.x)
-        canvas_y = self._tk_canvas.canvasy(event.y)
-        edge_hit = self._hit_test_edge(canvas_x, canvas_y)
-        if edge_hit is not None:
-            src_id, tgt_id = edge_hit
-            self._delete_edge(src_id, tgt_id)
+        canvas_x, canvas_y = self._event_xy(event)
+        edge_visual = self.hit_test_edge(canvas_x, canvas_y)
+        if edge_visual is not None:
+            self._delete_edge(edge_visual.source_id, edge_visual.target_id)
 
     def _delete_edge(self, source_id: str, target_id: str) -> None:
-        """Delete the edge between source_id and target_id."""
         if self._graph is None:
             return
         for edge in self._graph.edges:
             if edge.source_id == source_id and edge.target_id == target_id:
-                edge_id = f"{source_id}->{target_id}"
-                self._selected_edge_ids.discard(edge_id)
+                self.selection.selected_edge_ids.discard(
+                    GraphEdgeVisual.make_id(source_id, target_id)
+                )
                 self._on_edge_delete(edge)
                 break
 
-    # Public API for zoom controls
-    def zoom_in(self) -> None:
-        """Zoom in by one step."""
+    def _on_key_press(self, event: tk.Event) -> None:
         if self._graph is None:
             return
-        self._zoom_level = min(self._zoom_max, self._zoom_level + self._zoom_step)
-        self.render(self._graph, selected_node_ids=self._selected_node_ids)
+        if event.state & 0x4 and event.keysym == "z":
+            self._handle_undo()
+        elif event.state & 0x4 and (
+            event.keysym == "y" or (event.keysym == "Z" and event.state & 0x1)
+        ):
+            self._handle_redo()
+        elif event.state & 0x4 and event.keysym == "a":
+            self.selection.select_nodes({n.node_id for n in self._graph.nodes})
+            self.render(self._graph, selected_node_ids=self.selection.copy_node_ids())
+        elif event.keysym in ("Delete", "BackSpace"):
+            self._delete_selected()
+        elif event.keysym == "Escape":
+            self.selection.clear()
+            self.render(self._graph)
 
-    def zoom_out(self) -> None:
-        """Zoom out by one step."""
+    def _handle_undo(self) -> None:
+        action = self._history.pop_undo()
+        if action is None:
+            return
+        self._on_undo()
+
+    def _handle_redo(self) -> None:
+        action = self._history.pop_redo()
+        if action is None:
+            return
+        self._on_redo()
+
+    def _delete_selected(self) -> None:
         if self._graph is None:
             return
-        self._zoom_level = max(self._zoom_min, self._zoom_level - self._zoom_step)
-        self.render(self._graph, selected_node_ids=self._selected_node_ids)
-
-    def zoom_reset(self) -> None:
-        """Reset zoom to 100%."""
-        if self._graph is None:
-            return
-        self._zoom_level = 1.0
-        self.render(self._graph, selected_node_ids=self._selected_node_ids)
-
-    def get_zoom_level(self) -> float:
-        """Get current zoom level."""
-        return self._zoom_level
+        for edge_id in list(self.selection.selected_edge_ids):
+            parts = edge_id.split("->")
+            if len(parts) == 2:
+                self._delete_edge(parts[0], parts[1])
+        self.selection.clear()
 
     def can_undo(self) -> bool:
-        """Check if undo is available."""
         return self._history.can_undo()
 
     def can_redo(self) -> bool:
-        """Check if redo is available."""
         return self._history.can_redo()
 
     def record_node_move(self, node_id: str, old_x: float, old_y: float) -> None:
-        """Record a node move for undo."""
-        self._history.push(EditAction(
-            action_type=EditActionType.NODE_MOVE,
-            node_id=node_id,
-            old_x=old_x,
-            old_y=old_y,
-        ))
+        self._history.push(
+            EditAction(
+                action_type=EditActionType.NODE_MOVE,
+                node_id=node_id,
+                old_x=old_x,
+                old_y=old_y,
+            )
+        )
 
 
-__all__ = ["GraphCanvas"]
+__all__ = ["GraphCanvas", "EditAction", "EditActionType", "GraphHistory"]
