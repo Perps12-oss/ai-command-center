@@ -11,6 +11,11 @@ import customtkinter as ctk
 from ai_command_center.providers.defaults import provider_display_name
 from ai_command_center.ui.components.status_pill import StatusPill
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.design_system.status_tokens import (
+    goal_state_color,
+    kernel_state_color,
+    status_badge,
+)
 
 
 class TopBar(ctk.CTkFrame):
@@ -50,7 +55,7 @@ class TopBar(ctk.CTkFrame):
             font=T.FONT_SMALL,
             fg_color="transparent",
             hover_color=T.LIGHT_GLASS,
-            text_color=T.GOAL_AMBER,
+            text_color=goal_state_color("ready")[0],
             height=28,
             command=self._on_active_goal,
         )
@@ -181,25 +186,25 @@ class TopBar(ctk.CTkFrame):
         self._provider_pill.set_state(provider_name, "ready")
 
         if phase in {"starting", "busy"}:
-            self._provider_pill.set_state(provider_name, "busy")
+            self._provider_pill.set_state(provider_name, status_badge("busy"))
             return
         if phase in {"error", "stopped"}:
-            self._provider_pill.set_state(provider_name, "error")
+            self._provider_pill.set_state(provider_name, status_badge("error"))
             return
 
         if provider == "openai":
             if not openai_configured:
-                self._provider_pill.set_state("No API key", "offline")
+                self._provider_pill.set_state("No API key", status_badge("offline"))
             elif openai_online:
-                self._provider_pill.set_state(provider_name, "ready")
+                self._provider_pill.set_state(provider_name, status_badge("ready"))
             else:
-                self._provider_pill.set_state("Offline", "offline")
+                self._provider_pill.set_state("Offline", status_badge("offline"))
             return
 
         if ollama_online:
-            self._provider_pill.set_state(provider_name, "ready")
+            self._provider_pill.set_state(provider_name, status_badge("ready"))
         else:
-            self._provider_pill.set_state("Offline", "offline")
+            self._provider_pill.set_state("Offline", status_badge("offline"))
 
     def update_top_bar(self, snap: Any) -> None:
         """Project AppState operational summary into the top bar."""
@@ -208,17 +213,23 @@ class TopBar(ctk.CTkFrame):
         # Active goal
         goals = list(getattr(brain_state, "recent_goals", ()) if brain_state else ())
         active_goal = ""
+        goal_state = "ready"
         for g in goals:
-            if getattr(g, "status", "") in {"active", "queued", "running"}:
+            status = getattr(g, "status", "")
+            if status in {"active", "queued", "running"}:
                 active_goal = getattr(g, "text", "")
+                goal_state = status
                 break
-        self._active_goal_btn.configure(text=active_goal or "No active goal")
+        self._active_goal_btn.configure(
+            text=active_goal or "No active goal",
+            text_color=goal_state_color(goal_state)[0],
+        )
 
         # Kernel state
         kernel_state = getattr(brain_state, "kernel_state", "") if brain_state else ""
         self._kernel_pill.set_state(
             kernel_state.title() or "Ready",
-            _kernel_state_to_pill(kernel_state),
+            kernel_state_color(kernel_state),
         )
 
         # Active agents
@@ -247,14 +258,3 @@ class TopBar(ctk.CTkFrame):
             self._provider_pill.set_state("Ollama offline", "offline")
 
 
-def _kernel_state_to_pill(state: str) -> str:
-    state = str(state).lower()
-    if state in {"ready", "complete"}:
-        return "ready"
-    if state in {"error", "failed", "stopped"}:
-        return "error"
-    if state in {"boot", "starting", "busy"}:
-        return "busy"
-    if state in {"offline"}:
-        return "offline"
-    return "ready"

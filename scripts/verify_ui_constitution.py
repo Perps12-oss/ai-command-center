@@ -1,0 +1,237 @@
+"""UI Constitution hardening gate for Phase 11A.
+
+Checks that the frontend is fully wired, uses the canonical status-token system,
+has no placeholder screens, and exposes the required hero/ops/top-bar contracts.
+
+Exit codes:
+  0 = PASS
+  1 = FAIL
+"""
+
+from __future__ import annotations
+
+import ast
+import re
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+UI_ROOT = REPO / "ai_command_center" / "ui"
+
+PHASE_11A_FILES: tuple[Path, ...] = (
+    UI_ROOT / "design_system" / "status_tokens.py",
+    UI_ROOT / "components" / "status_pill.py",
+    UI_ROOT / "components" / "top_bar.py",
+    UI_ROOT / "components" / "sidebar.py",
+    UI_ROOT / "views" / "command_center_view.py",
+    UI_ROOT / "views" / "goal_view.py",
+    UI_ROOT / "views" / "approvals_view.py",
+    UI_ROOT / "views" / "agents_view.py",
+    UI_ROOT / "views" / "workflow_graph_view.py",
+    UI_ROOT / "components" / "graph_canvas.py",
+    UI_ROOT / "shell" / "view_manager.py",
+    UI_ROOT / "shell" / "state_applier.py",
+    UI_ROOT / "shell" / "application_shell.py",
+    UI_ROOT / "shell" / "event_coordinator.py",
+    UI_ROOT / "app.py",
+    UI_ROOT / "controller.py",
+)
+
+
+class Violation:
+    """Collects a single constitutional violation."""
+
+    def __init__(self) -> None:
+        self.errors: list[str] = []
+
+    def add(self, message: str) -> None:
+        self.errors.append(message)
+
+    def report(self) -> None:
+        for err in self.errors:
+            print(f"FAIL: {err}")
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _find_local_function(text: str, name: str) -> bool:
+    """Return True if a top-level function with the given name exists."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return False
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return True
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == name:
+            return True
+    return False
+
+
+def _check_no_local_status_maps(v: Violation) -> None:
+    """Ensure status color logic is not duplicated in view code."""
+    command_center = UI_ROOT / "views" / "command_center_view.py"
+    top_bar = UI_ROOT / "components" / "top_bar.py"
+
+    for path, names in (
+        (command_center, ("_status_color", "status_color")),
+        (top_bar, ("_kernel_state_to_pill", "kernel_state_to_pill")),
+    ):
+        text = _read(path)
+        for name in names:
+            if _find_local_function(text, name):
+                v.add(f"{path.name} contains local status-color function {name}()")
+
+
+def _check_status_tokens_usage(v: Violation) -> None:
+    """Verify Phase 11A UI components import and consume status_tokens."""
+    expected = UI_ROOT / "design_system" / "status_tokens.py"
+    if not expected.exists():
+        v.add(f"Missing {expected.relative_to(REPO)}")
+        return
+
+    for path in PHASE_11A_FILES:
+        text = _read(path)
+        if path.name in ("status_tokens.py", "theme_v2.py"):
+            continue
+        if "status_tokens" not in text and "status_badge" not in text and "status_color" not in text:
+            continue
+        if "status_tokens" not in text:
+            v.add(f"{path.name} uses status-token helpers but does not import status_tokens")
+
+
+def _check_top_bar_pills(v: Violation) -> None:
+    """Verify Article 17 required pills are present in TopBar."""
+    text = _read(UI_ROOT / "components" / "top_bar.py")
+    required = (
+        "_active_goal_btn",
+        "_kernel_pill",
+        "_agents_pill",
+        "_approvals_pill",
+        "_model_pill",
+        "_provider_pill",
+        "_time_label",
+    )
+    for name in required:
+        if name not in text:
+            v.add(f"TopBar missing required pill/widget: {name}")
+
+
+def _check_hero_action(v: Violation) -> None:
+    """Verify the Command Center hero exposes a primary action button."""
+    text = _read(UI_ROOT / "views" / "command_center_view.py")
+    if "_action_button" not in text:
+        v.add("CommandCenterView missing hero action button (_action_button)")
+    if "_resolve_hero_action" not in text:
+        v.add("CommandCenterView does not dynamically resolve hero action")
+
+
+def _check_ops_cards_timestamp(v: Violation) -> None:
+    """Verify every operational card displays a timestamp."""
+    text = _read(UI_ROOT / "views" / "command_center_view.py")
+    if "_updated" not in text:
+        v.add("CommandCenterView ops cards missing timestamp label")
+    if "_format_relative" not in text:
+        v.add("CommandCenterView ops cards missing relative-time formatter")
+
+
+def _check_view_registry(v: Violation) -> None:
+    """Verify every VIEW_ID is registered and no critical view is a placeholder."""
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+
+    view_ids_match = re.search(r"VIEW_IDS\s*\:\s*tuple\[str,\s*\.\.\.\]\s*=\s*\((.*?)\)", view_manager, re.S)
+    if not view_ids_match:
+        v.add("Could not locate VIEW_IDS in view_manager.py")
+        return
+
+    raw = view_ids_match.group(1)
+    view_ids = [m.strip('"\'') for m in re.findall(r'"([^"]+)"', raw)]
+
+    for vid in view_ids:
+        if f'self._view_registry["{vid}"]' not in view_manager:
+            v.add(f"View '{vid}' is in VIEW_IDS but has no registered factory")
+
+    for vid in ("command_center", "goals", "agents", "approvals"):
+        if f'self._view_registry["{vid}"] = lambda: PlaceholderView' in view_manager:
+            v.add(f"View '{vid}' is still registered as PlaceholderView")
+
+
+def _check_no_placeholders(v: Violation) -> None:
+    """Fail if known placeholder markers remain in Phase 11A UI source or if PlaceholderView persists."""
+    markers = ("TODO", "FIXME", "COMING_SOON", "PLACEHOLDER", "TEMP", "MOCK", "DUMMY", "STUB")
+    for path in PHASE_11A_FILES:
+        text = _read(path)
+        for marker in markers:
+            if re.search(rf"\b{re.escape(marker)}\b", text):
+                v.add(f"{path.relative_to(REPO)} contains placeholder marker '{marker}'")
+
+    placeholder_file = UI_ROOT / "views" / "placeholder.py"
+    if placeholder_file.exists() and "class PlaceholderView" in _read(placeholder_file):
+        v.add(f"PlaceholderView still defined in {placeholder_file.relative_to(REPO)}")
+
+    view_manager = UI_ROOT / "shell" / "view_manager.py"
+    if "PlaceholderView" in _read(view_manager):
+        v.add("view_manager.py still references PlaceholderView")
+
+
+def _check_route_reachability(v: Violation) -> None:
+    """Ensure sidebar routes and command aliases cover the registered views."""
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    router = _read(REPO / "ai_command_center" / "services" / "command_router_service.py")
+
+    view_ids_match = re.search(r"VIEW_IDS\s*\:\s*tuple\[str,\s*\.\.\.\]\s*=\s*\((.*?)\)", view_manager, re.S)
+    if not view_ids_match:
+        v.add("Could not locate VIEW_IDS for route reachability")
+        return
+    view_ids = [m.strip('"\'') for m in re.findall(r'"([^"]+)"', view_ids_match.group(1))]
+
+    for vid in view_ids:
+        if vid in ("timeline", "workflow", "relationships", "dependencies", "gallery", "world_explorer"):
+            continue
+        if vid not in sidebar:
+            v.add(f"Sidebar does not expose route for '{vid}'")
+        if f'"{vid}"' not in router:
+            v.add(f"CommandRouter _VIEW_ALIASES does not cover '{vid}'")
+
+
+def _check_theme_tokens(v: Violation) -> None:
+    """Ensure Phase 11A UI views use theme tokens rather than ad-hoc hex literals."""
+    theme_path = UI_ROOT / "design_system" / "theme_v2.py"
+    theme_text = _read(theme_path)
+    allowed_hex = set(re.findall(r"#[0-9A-Fa-f]{6}", theme_text))
+
+    for path in PHASE_11A_FILES:
+        if path.name in ("theme_v2.py", "verify_ui_constitution.py"):
+            continue
+        text = _read(path)
+        for hex_color in re.findall(r"#[0-9A-Fa-f]{6}", text):
+            if hex_color not in allowed_hex:
+                v.add(f"{path.relative_to(REPO)} uses unapproved color {hex_color}")
+
+
+def main() -> int:
+    v = Violation()
+    _check_no_local_status_maps(v)
+    _check_status_tokens_usage(v)
+    _check_top_bar_pills(v)
+    _check_hero_action(v)
+    _check_ops_cards_timestamp(v)
+    _check_view_registry(v)
+    _check_no_placeholders(v)
+    _check_route_reachability(v)
+    _check_theme_tokens(v)
+
+    if v.errors:
+        v.report()
+        print(f"\nUI Constitution gate failed with {len(v.errors)} violation(s).")
+        return 1
+
+    print("UI Constitution gate passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

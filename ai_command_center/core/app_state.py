@@ -528,6 +528,7 @@ class AppState:
     workspace_entity: WorkspaceEntitySnapshot = field(default_factory=WorkspaceEntitySnapshot)
     last_event_topic: str = ""
     last_event_source: str = ""
+    last_event_timestamp: float = 0.0
     settings_version: int = 0
     last_command: str = ""
     last_command_intent: str = ""
@@ -2080,31 +2081,122 @@ def _reduce_workspace_entity_snapshot(state: AppState, event: Event) -> AppState
     """Project workspace/entity selection into a single immutable snapshot."""
     if event.topic not in _WORKSPACE_ENTITY_TOPICS:
         return state
-    workspace_entities = tuple(
-        WorkspaceEntitySnapshotItem(
-            entity_id=item.entity_id,
-            entity_type=item.entity_type,
-            title=item.title,
-            metadata=tuple(item.metadata),
+
+    current = state.workspace_entity
+    topic = event.topic
+    payload = event.payload
+    workspace_entities = current.workspace_entities
+    active_workspace_id = current.active_workspace_id
+    active_workspace_title = current.active_workspace_title
+    selected_entity_id = current.selected_entity_id
+    selected_entity_type = current.selected_entity_type
+    selected_entity_title = current.selected_entity_title
+    inspector = current.inspector
+    changed = False
+
+    if topic == ENTITY_CREATED:
+        raw = state.workspace_os.entities[-1] if state.workspace_os.entities else None
+        if raw is not None:
+            new_item = WorkspaceEntitySnapshotItem(
+                entity_id=raw.entity_id,
+                entity_type=raw.entity_type,
+                title=raw.title,
+                metadata=tuple(raw.metadata),
+            )
+            workspace_entities = workspace_entities + (new_item,)
+            changed = True
+
+    elif topic == ENTITY_UPDATED:
+        updated_id = str(payload.get("entity_id", ""))
+        if updated_id:
+            new_entities: list[WorkspaceEntitySnapshotItem] = []
+            for item in workspace_entities:
+                if item.entity_id == updated_id:
+                    raw = next(
+                        (e for e in state.workspace_os.entities if e.entity_id == updated_id),
+                        None,
+                    )
+                    if raw is not None:
+                        new_entities.append(
+                            WorkspaceEntitySnapshotItem(
+                                entity_id=raw.entity_id,
+                                entity_type=raw.entity_type,
+                                title=raw.title,
+                                metadata=tuple(raw.metadata),
+                            )
+                        )
+                    else:
+                        new_entities.append(item)
+                    changed = True
+                else:
+                    new_entities.append(item)
+            workspace_entities = tuple(new_entities)
+
+    elif topic == ENTITY_DELETED:
+        deleted_id = str(payload.get("entity_id", ""))
+        if deleted_id:
+            workspace_entities = tuple(e for e in workspace_entities if e.entity_id != deleted_id)
+            changed = len(workspace_entities) != len(current.workspace_entities)
+
+    elif topic == NOTES_INDEXED:
+        workspace_entities = tuple(
+            WorkspaceEntitySnapshotItem(
+                entity_id=item.entity_id,
+                entity_type=item.entity_type,
+                title=item.title,
+                metadata=tuple(item.metadata),
+            )
+            for item in state.workspace_os.entities
         )
-        for item in state.workspace_os.entities
-    )
-    new_snap = WorkspaceEntitySnapshot.from_components(
-        active_workspace_id=state.active_workspace_id,
-        active_workspace_title=state.active_workspace_title,
-        selected_entity_id=state.selected_entity_id,
-        selected_entity_type=state.selected_entity_type,
-        selected_entity_title=state.selected_entity_title,
-        workspace_entities=workspace_entities,
-        inspector=state.inspector,
-        revision=state.workspace_entity.revision + 1,
-    )
-    if new_snap == state.workspace_entity:
+        changed = workspace_entities != current.workspace_entities
+
+    elif topic == WORKSPACE_ACTIVE:
+        active_workspace_id = str(payload.get("workspace_id", ""))
+        active_workspace_title = str(payload.get("title", ""))
+        changed = (
+            active_workspace_id != current.active_workspace_id
+            or active_workspace_title != current.active_workspace_title
+        )
+
+    elif topic == WORKSPACE_DEACTIVATED:
+        active_workspace_id = ""
+        active_workspace_title = ""
+        changed = (
+            active_workspace_id != current.active_workspace_id
+            or active_workspace_title != current.active_workspace_title
+        )
+
+    elif topic == UI_SELECT_ENTITY:
+        selected_entity_id = str(payload.get("entity_id", ""))
+        selected_entity_type = str(payload.get("entity_type", ""))
+        selected_entity_title = str(payload.get("title", ""))
+        changed = (
+            selected_entity_id != current.selected_entity_id
+            or selected_entity_type != current.selected_entity_type
+            or selected_entity_title != current.selected_entity_title
+        )
+
+    elif topic in {UI_INSPECT_SELECT, UI_INSPECT_CLEAR, UI_INSPECT_NAVIGATE}:
+        inspector = state.inspector
+        changed = inspector != current.inspector
+
+    if not changed:
         return state
+
+    new_snap = WorkspaceEntitySnapshot.from_components(
+        active_workspace_id=active_workspace_id,
+        active_workspace_title=active_workspace_title,
+        selected_entity_id=selected_entity_id,
+        selected_entity_type=selected_entity_type,
+        selected_entity_title=selected_entity_title,
+        workspace_entities=workspace_entities,
+        inspector=inspector,
+        revision=current.revision + 1,
+    )
     return replace(
         state,
         workspace_entity=new_snap,
-        last_event_topic=event.topic,
+        last_event_topic=topic,
         last_event_source=event.source,
     )
 
@@ -3509,6 +3601,7 @@ class AppStateStore:
             for reducer in self._reducers:
                 new_state = reducer(new_state, event)
             if new_state != self._state:
+                object.__setattr__(new_state, "last_event_timestamp", event.timestamp)
                 self._state = new_state
                 notify_listeners = True
                 if (

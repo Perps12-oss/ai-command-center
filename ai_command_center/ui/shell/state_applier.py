@@ -79,6 +79,18 @@ class StateApplierMixin:
         if command_center and hasattr(command_center, "apply_state") and current_view == "command_center":
             command_center.apply_state(snap)
 
+        goal = self._goal_view()
+        if goal and hasattr(goal, "apply_state") and current_view == "goals":
+            goal.apply_state(snap)
+
+        agents = self._agents_view()
+        if agents and hasattr(agents, "apply_state") and current_view == "agents":
+            agents.apply_state(snap)
+
+        approvals = self._approvals_view()
+        if approvals and hasattr(approvals, "apply_state") and current_view == "approvals":
+            approvals.apply_state(snap)
+
         if snap.chat_status == "streaming":
             self._last_terminal_chat_key = None
         self._overlay_mode = snap.settings.overlay_mode

@@ -4,15 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import customtkinter as ctk
+
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.views.chat_view import ChatView
+from ai_command_center.ui.views.agents_view import AgentsView
+from ai_command_center.ui.views.approvals_view import ApprovalsView
 from ai_command_center.ui.views.command_center_view import CommandCenterView
 from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
+from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
-from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.providers_view import ProvidersView
 from ai_command_center.ui.views.capabilities_view import CapabilitiesView
@@ -81,9 +85,21 @@ class ViewManagerMixin:
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
-        self._view_registry["goals"] = lambda: PlaceholderView(self._content, "goals")
-        self._view_registry["agents"] = lambda: PlaceholderView(self._content, "agents")
-        self._view_registry["approvals"] = lambda: PlaceholderView(self._content, "approvals")
+        self._view_registry["goals"] = lambda: GoalView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
+        self._view_registry["agents"] = lambda: AgentsView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
+        self._view_registry["approvals"] = lambda: ApprovalsView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
         self._view_registry["chat"] = lambda: ChatView(
             self._content,
             on_cancel=self._controller.publish_chat_cancel,
@@ -174,7 +190,12 @@ class ViewManagerMixin:
                 if view_id == "timeline" and hasattr(view, "apply_state"):
                     view.apply_state(list(self._controller.snapshot().execution_timeline.events))
             else:
-                self._views[view_id] = PlaceholderView(self._content, view_id)
+                self._views[view_id] = ctk.CTkLabel(
+                    self._content,
+                    text=f"View '{view_id}' is not registered",
+                    font=("Segoe UI", 14),
+                    text_color="red",
+                )
         return self._views[view_id]
 
     def _home_view(self) -> HomeView | None:
@@ -409,6 +430,18 @@ class ViewManagerMixin:
     def _executions_view(self) -> "ExecutionsView | None":
         v = self._views.get("executions")
         return v if isinstance(v, ExecutionsView) else None
+
+    def _goal_view(self) -> "GoalView | None":
+        v = self._views.get("goals")
+        return v if isinstance(v, GoalView) else None
+
+    def _agents_view(self) -> "AgentsView | None":
+        v = self._views.get("agents")
+        return v if isinstance(v, AgentsView) else None
+
+    def _approvals_view(self) -> "ApprovalsView | None":
+        v = self._views.get("approvals")
+        return v if isinstance(v, ApprovalsView) else None
 
     def _timeline_view(self) -> ExecutionTimelineView | None:
         v = self._views.get("timeline")
