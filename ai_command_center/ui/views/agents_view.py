@@ -24,6 +24,11 @@ from ai_command_center.ui.views.agent_monitor import (
     PipelineProgressPanel,
     TaskAssignmentPanel,
 )
+from ai_command_center.ui.views.surface_state import (
+    article18_empty,
+    domain_error_from_snap,
+    set_surface_state,
+)
 
 
 class AgentsView(ctk.CTkFrame):
@@ -96,6 +101,17 @@ class AgentsView(ctk.CTkFrame):
         )
         self._hero_action.pack(side="right")
 
+        self._surface_state = ctk.CTkLabel(
+            self._hero,
+            text="Loading…",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            justify="left",
+            wraplength=720,
+        )
+        self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
         body.grid_columnconfigure(0, weight=3)
@@ -120,14 +136,22 @@ class AgentsView(ctk.CTkFrame):
         self._history = ExecutionHistoryPanel(body)
         self._history.grid(row=2, column=1, sticky="nsew")
 
-    def apply_state(self, snapshot: AppState | Any) -> None:
+    def apply_state(self, snapshot: AppState | Any | None) -> None:
         """Project AppState.agent_pipeline into Hero + all panels."""
+        if snapshot is None:
+            set_surface_state(self._surface_state, kind="loading")
+            return
         if isinstance(snapshot, AppState):
             pipeline = snapshot.agent_pipeline
+            err = domain_error_from_snap(
+                snapshot,
+                topic_prefixes=("agent.", "pipeline."),
+            )
         else:
             pipeline = getattr(snapshot, "agent_pipeline", None)
             if pipeline is None:
                 return
+            err = ""
         self._last_pipeline = pipeline
 
         active = list(pipeline.active_runs)
@@ -152,6 +176,30 @@ class AgentsView(ctk.CTkFrame):
             self._metrics.configure(text_color=T.STATUS_ERROR)
         else:
             self._metrics.configure(text_color=T.TEXT_SECONDARY)
+
+        fail_msg = ""
+        if failed:
+            first = failed[0]
+            fail_msg = str(getattr(first, "error", "") or "").strip() or (
+                f"Agent run {first.agent_id} is in state {first.state}."
+            )
+        if err:
+            set_surface_state(self._surface_state, kind="error", message=err)
+        elif fail_msg:
+            set_surface_state(self._surface_state, kind="error", message=fail_msg)
+        elif not pipeline.runs and not pipeline.pipeline_active:
+            set_surface_state(
+                self._surface_state,
+                kind="empty",
+                message=article18_empty(
+                    why="No agent pipeline or agent runs are projected yet.",
+                    creates="Agent runs appear when a multi-agent pipeline or "
+                    "supervised agent is started.",
+                    next_action="Start an agent pipeline from Chat or Goals.",
+                ),
+            )
+        else:
+            set_surface_state(self._surface_state, kind="data")
 
         self._update_cancel_context(pipeline)
         selected = self._selected_agent_id or pipeline.active_run_id

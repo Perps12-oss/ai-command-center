@@ -53,9 +53,9 @@ class DecisionHistoryPanel(ctk.CTkFrame):
             ctk.CTkLabel(
                 self._body,
                 text=(
-                    "No decisions recorded.\n"
-                    "Resolved approvals and denials appear here after Review Next "
-                    "and Approve/Deny on a pending check."
+                    "No decisions recorded yet.\n"
+                    "Resolved approvals and denials appear after Approve/Deny on a pending check.\n"
+                    "Next: use Review Next when a supervised check is pending."
                 ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,

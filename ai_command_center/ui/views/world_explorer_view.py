@@ -17,6 +17,11 @@ from ai_command_center.core.app_state import AppState
 from ai_command_center.domain.world_model_snapshot import WorldModelSnapshot
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.views.surface_state import (
+    article18_empty,
+    domain_error_from_snap,
+    set_surface_state,
+)
 from ai_command_center.ui.views.world_model import (
     EntityExplorerPanel,
     KnowledgeGraphPanel,
@@ -88,6 +93,17 @@ class WorldExplorerView(ctk.CTkFrame):
         )
         self._new_entity_btn.pack(side="right")
 
+        self._surface_state = ctk.CTkLabel(
+            self._hero,
+            text="Loading…",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            justify="left",
+            wraplength=720,
+        )
+        self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
         body.grid_columnconfigure(0, weight=3)
@@ -117,12 +133,20 @@ class WorldExplorerView(ctk.CTkFrame):
         self._journal = MutationJournalPanel(body)
         self._journal.grid(row=2, column=0, columnspan=2, sticky="nsew")
 
-    def apply_state(self, snapshot: AppState | WorldModelSnapshot) -> None:
+    def apply_state(self, snapshot: AppState | WorldModelSnapshot | None) -> None:
         """Project AppState (or WorldModelSnapshot) into all panels."""
+        if snapshot is None:
+            set_surface_state(self._surface_state, kind="loading")
+            return
         if isinstance(snapshot, WorldModelSnapshot):
             wm = snapshot
+            err = ""
         else:
             wm = snapshot.world_model
+            err = domain_error_from_snap(
+                snapshot,
+                topic_prefixes=("world_model.", "world."),
+            )
         edge_count = len(wm.edges)
         entity_count = wm.node_count or len(wm.nodes)
         goals = len(wm.active_goals)
@@ -130,6 +154,23 @@ class WorldExplorerView(ctk.CTkFrame):
             text=f"{entity_count} entities, {edge_count} relationships"
         )
         self._hero_goals.configure(text=f"{goals} active goals")
+
+        if err:
+            set_surface_state(self._surface_state, kind="error", message=err)
+        elif entity_count == 0:
+            set_surface_state(
+                self._surface_state,
+                kind="empty",
+                message=article18_empty(
+                    why="The World Model has no entities yet.",
+                    creates="Entities appear when notes, goals, or workspace activity "
+                    "is indexed into the graph.",
+                    next_action="Click New Entity or open Goals/Chat to create linked work.",
+                ),
+            )
+        else:
+            set_surface_state(self._surface_state, kind="data")
+
         self._graph.apply_snapshot(wm)
         self._explorer.apply_snapshot(wm)
         self._inspector.apply_snapshot(wm)

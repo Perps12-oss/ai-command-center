@@ -91,10 +91,15 @@ class ActiveAgentsPanel(ctk.CTkFrame):
         if not runs:
             ctk.CTkLabel(
                 self._list,
-                text="No agent runs in the current projection.",
+                text=(
+                    "No agent runs in the current projection.\n"
+                    "Runs appear when a multi-agent pipeline or supervised agent starts.\n"
+                    "Next: start an agent pipeline from Chat or Goals."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
                 anchor="w",
+                justify="left",
             ).pack(fill="x", padx=4, pady=12)
             return
         for run in runs:

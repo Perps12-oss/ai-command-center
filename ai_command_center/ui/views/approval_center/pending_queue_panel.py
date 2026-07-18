@@ -113,10 +113,9 @@ class PendingQueuePanel(ctk.CTkFrame):
                 self._body,
                 text=(
                     "No pending approvals.\n"
-                    "Interactive permission checks appear here when an agent or "
+                    "Interactive permission checks appear when an agent or "
                     "execution step requests supervised authorization.\n"
-                    "Suggested next step: run a supervised agent or execution that "
-                    "requires approval."
+                    "Next: run a supervised agent or execution that requires approval."
                 ),
                 font=T.FONT_BODY,
                 text_color=T.TEXT_MUTED,

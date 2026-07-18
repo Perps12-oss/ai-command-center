@@ -74,9 +74,15 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
             self._canvas.create_text(
                 width // 2,
                 height // 2,
-                text="No entities in World Model",
+                text=(
+                    "No entities in the World Model yet.\n"
+                    "Entities appear when notes, goals, or workspace activity is indexed.\n"
+                    "Next: click New Entity or open Goals/Chat to create linked work."
+                ),
                 fill=T.TEXT_MUTED,
                 font=(T.FONT_FAMILY, 11),
+                justify="center",
+                width=max(width - 40, 120),
             )
             return
 

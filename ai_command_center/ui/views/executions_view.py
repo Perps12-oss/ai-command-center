@@ -23,6 +23,11 @@ from ai_command_center.ui.views.execution_center import (
     ReceiptViewerPanel,
     TruthValidationPanel,
 )
+from ai_command_center.ui.views.surface_state import (
+    article18_empty,
+    domain_error_from_snap,
+    set_surface_state,
+)
 
 
 class ExecutionsView(ctk.CTkFrame):
@@ -78,17 +83,29 @@ class ExecutionsView(ctk.CTkFrame):
         self._hero_hint.pack(side="left")
         self._hero_action = ctk.CTkButton(
             bottom,
-            text="Open Latest Execution",
+            text="No Executions",
             font=T.FONT_BODY,
             fg_color=T.EXECUTION_BLUE,
             hover_color=T.ACCENT_HOVER,
             text_color=T.TEXT_PRIMARY,
             height=28,
             width=180,
+            state="disabled",
             command=self._on_hero_action,
         )
         self._hero_action.pack(side="right")
         self._hero_target_id = ""
+
+        self._surface_state = ctk.CTkLabel(
+            self._hero,
+            text="Loading…",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            justify="left",
+            wraplength=720,
+        )
+        self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
@@ -135,8 +152,13 @@ class ExecutionsView(ctk.CTkFrame):
         )
         self._status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
 
-    def apply_state(self, snapshot: AppState | list[Any]) -> None:
+    def apply_state(self, snapshot: AppState | list[Any] | None) -> None:
         """Project AppState into all panels. List[Any] legacy path ignored."""
+        if snapshot is None:
+            set_surface_state(self._surface_state, kind="loading")
+            self._hero_target_id = ""
+            self._hero_action.configure(text="No Executions", state="disabled")
+            return
         if not isinstance(snapshot, AppState):
             return
         self._last_snap = snapshot
@@ -153,6 +175,26 @@ class ExecutionsView(ctk.CTkFrame):
             text=f"{active} active · {total} total · {failed} failed · {success_rate} success"
         )
 
+        plan_error = str(getattr(lib.active_plan, "error", "") or "").strip()
+        err = plan_error or domain_error_from_snap(
+            snapshot,
+            topic_prefixes=("execution.", "orchestration.", "tool."),
+        )
+        if err:
+            set_surface_state(self._surface_state, kind="error", message=err)
+        elif total == 0 and not lib.active_plan.is_active:
+            set_surface_state(
+                self._surface_state,
+                kind="empty",
+                message=article18_empty(
+                    why="No execution runs are projected yet.",
+                    creates="Runs appear when Chat, Goals, or Agents start an orchestration.",
+                    next_action="Open Chat or Goals and start a task that executes.",
+                ),
+            )
+        else:
+            set_surface_state(self._surface_state, kind="data")
+
         if lib.active_plan.is_active:
             target = lib.active_plan.request_id or lib.active_plan.run_id
             self._hero_target_id = target
@@ -161,7 +203,7 @@ class ExecutionsView(ctk.CTkFrame):
             self._hero_hint.configure(
                 text=f"Active: {target[:24] or 'run'} · step {step_name}"
             )
-            self._hero_action.configure(text="View Active Execution")
+            self._hero_action.configure(text="View Active Execution", state="normal")
         else:
             latest = lib.last_run
             if latest is None and snapshot.execution_runs:
@@ -176,9 +218,10 @@ class ExecutionsView(ctk.CTkFrame):
                 if not self._hero_target_id
                 else f"Latest: {self._hero_target_id[:24]}"
             )
-            self._hero_action.configure(
-                text="Open Latest Execution" if self._hero_target_id else "No Executions"
-            )
+            if self._hero_target_id:
+                self._hero_action.configure(text="Open Latest Execution", state="normal")
+            else:
+                self._hero_action.configure(text="No Executions", state="disabled")
 
         selected = self._selected_request_id
         self._list.apply_snapshot(snapshot, selected_request_id=selected)
@@ -223,6 +266,7 @@ class ExecutionsView(ctk.CTkFrame):
             self._on_scrub(self._selected_request_id, index)
 
     def _on_hero_action(self) -> None:
-        if not self._hero_target_id:
+        # Guard: never silently no-op while the control looks enabled.
+        if str(self._hero_action.cget("state")) == "disabled" or not self._hero_target_id:
             return
         self._select(self._hero_target_id)

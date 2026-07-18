@@ -26,6 +26,11 @@ from ai_command_center.ui.views.approval_center import (
     PendingQueuePanel,
     RiskClassificationPanel,
 )
+from ai_command_center.ui.views.surface_state import (
+    article18_empty,
+    domain_error_from_snap,
+    set_surface_state,
+)
 
 
 class ApprovalsView(ctk.CTkFrame):
@@ -99,6 +104,17 @@ class ApprovalsView(ctk.CTkFrame):
         )
         self._hero_action.pack(side="right", padx=(8, 0))
 
+        self._surface_state = ctk.CTkLabel(
+            self._hero,
+            text="Loading…",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+            justify="left",
+            wraplength=720,
+        )
+        self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
         body.grid_columnconfigure(0, weight=3)
@@ -130,8 +146,11 @@ class ApprovalsView(ctk.CTkFrame):
         self._stats = ApprovalStatisticsPanel(body)
         self._stats.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
-    def apply_state(self, snapshot: AppState | Any) -> None:
+    def apply_state(self, snapshot: AppState | Any | None) -> None:
         """Project AppState.permission_snapshot into Hero + panels."""
+        if snapshot is None:
+            set_surface_state(self._surface_state, kind="loading")
+            return
         if not isinstance(snapshot, AppState):
             return
         self._last_snap = snapshot
@@ -144,6 +163,32 @@ class ApprovalsView(ctk.CTkFrame):
                 f"{permission.total_denied} denied · {last}"
             )
         )
+        err = domain_error_from_snap(
+            snapshot,
+            topic_prefixes=("permission.", "approval."),
+        )
+        has_activity = (
+            permission.has_pending
+            or permission.total_granted > 0
+            or permission.total_denied > 0
+            or bool(permission.resolved)
+        )
+        if err:
+            set_surface_state(self._surface_state, kind="error", message=err)
+        elif not has_activity:
+            set_surface_state(
+                self._surface_state,
+                kind="empty",
+                message=article18_empty(
+                    why="No pending approvals or decision history yet.",
+                    creates="Interactive permission checks appear when an agent or "
+                    "execution step requests supervised authorization.",
+                    next_action="Run a supervised agent or execution that requires approval.",
+                ),
+            )
+        else:
+            set_surface_state(self._surface_state, kind="data")
+
         if permission.has_pending and permission.pending is not None:
             self._hero_hint.configure(
                 text=f"Pending: {permission.pending.summary or permission.pending.check_id}"

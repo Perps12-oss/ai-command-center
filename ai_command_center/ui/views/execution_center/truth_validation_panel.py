@@ -93,9 +93,14 @@ class TruthValidationPanel(ctk.CTkFrame):
         self.configure(border_color=T.EXECUTION_BLUE)
         ctk.CTkLabel(
             self._body,
-            text="No truth validation for this execution.",
+            text=(
+                "No truth validation for this execution.\n"
+                "Validation appears when an orchestration run records truth results.\n"
+                "Next: select a run that completed truth validation."
+            ),
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
+            justify="left",
         ).pack(pady=20)
 
     def _row(self, label: str, value: str, *, color: str = T.TEXT_PRIMARY) -> None:
