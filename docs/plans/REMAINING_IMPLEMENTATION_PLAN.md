@@ -130,17 +130,20 @@ class OllamaAdapter(ModelAdapter):
 
 ### Remaining Work
 
-| Task | File | Status | Effort |
-|------|------|--------|--------|
-| GoalEngine | `orchestration/goals/goal_engine.py` | **TODO** | 2 weeks |
-| GoalStatus enum | `orchestration/goals/goal_status.py` | **TODO** | 0.5 week |
-| PlanningEngine | `orchestration/goals/planning_engine.py` | **TODO** | 3 weeks |
-| TaskGraph DAG | `orchestration/goals/task_graph.py` | **TODO** | 2 weeks |
-| ExecutionPlan | `orchestration/goals/execution_plan.py` | **TODO** | 1 week |
-| AgentContract | `orchestration/agents/agent_contract.py` | **TODO** | 1 week |
-| AgentRegistry | `orchestration/agents/agent_registry.py` | **TODO** | 1 week |
-| AgentCoordinator | `orchestration/agents/agent_coordinator.py` | **TODO** | 2 weeks |
-| PolicyEngine (agent) | `orchestration/agents/agent_policy_engine.py` | **TODO** | 1 week |
+Orchestration goal/agent core modules listed below are implemented (see "Components Implemented").
+No outstanding placeholder stubs for this package; further work is enhancement-only outside Phase 11 UI closeout.
+
+| Task | File | Status |
+|------|------|--------|
+| GoalEngine | `orchestration/goals/goal_engine.py` | Done |
+| GoalStatus enum | `orchestration/goals/goal_status.py` | Done |
+| PlanningEngine | `orchestration/goals/planning_engine.py` | Done |
+| TaskGraph DAG | `orchestration/goals/task_graph.py` | Done |
+| ExecutionPlan | `orchestration/goals/execution_plan.py` | Done |
+| AgentContract | `orchestration/agents/agent_contract.py` | Done |
+| AgentRegistry | `orchestration/agents/agent_registry.py` | Done |
+| AgentCoordinator | `orchestration/agents/agent_coordinator.py` | Done |
+| PolicyEngine (agent) | `orchestration/agents/agent_policy_engine.py` | Done |
 
 ### Deliverables
 

@@ -73,6 +73,15 @@ PHASE_11E_FILES: tuple[Path, ...] = (
     UI_ROOT / "views" / "approval_center" / "approval_statistics_panel.py",
 )
 
+PHASE_11F_FILES: tuple[Path, ...] = (
+    UI_ROOT / "views" / "goal_view.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_list_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_detail_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "plan_preview_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_progress_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_history_panel.py",
+)
+
 
 class Violation:
     """Collects a single constitutional violation."""
@@ -563,6 +572,80 @@ def _check_approval_center_workspace(v: Violation) -> None:
         v.add("Sidebar label for approvals is not 'Approval Center'")
 
 
+def _check_goal_dashboard_workspace(v: Violation) -> None:
+    """Verify Phase 11F / Article 16 Goal Dashboard workspace contracts."""
+    for path in PHASE_11F_FILES:
+        if not path.exists():
+            v.add(f"Missing Goal Dashboard file: {path.relative_to(REPO)}")
+
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    if "GOAL_AMBER" not in theme:
+        v.add("theme_v2.py missing GOAL_AMBER token")
+
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    if "GOAL_AMBER" not in constitution:
+        v.add("UI_CONSTITUTION.md missing GOAL_AMBER token reference")
+
+    shell = UI_ROOT / "views" / "goal_view.py"
+    if not shell.exists():
+        return
+    text = _read(shell)
+    required_symbols = (
+        ("Hero", "_hero"),
+        ("Goal List", "GoalListPanel"),
+        ("Goal Detail", "GoalDetailPanel"),
+        ("Plan Preview", "PlanPreviewPanel"),
+        ("Goal Progress", "GoalProgressPanel"),
+        ("Goal History", "GoalHistoryPanel"),
+        ("GOAL_AMBER accent", "GOAL_AMBER"),
+        ("apply_state projection", "def apply_state"),
+        ("New Goal action", "_hero_action"),
+        ("brain_state projection", "brain_state"),
+        ("surface state banner", "_surface_state"),
+    )
+    for label, symbol in required_symbols:
+        if symbol not in text:
+            v.add(f"Goal Dashboard workspace missing {label} ({symbol})")
+
+    if "GOAL_ACTIVATED" in text or "GOAL_PAUSED" in text or "GOAL_CANCELLED" in text:
+        v.add("goal_view.py must not publish lifecycle fact topics")
+
+    forbidden_patterns = (
+        "ai_command_center.repositories",
+        "ai_command_center.services",
+        "add_listener",
+    )
+    for path in PHASE_11F_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        for forbidden in forbidden_patterns:
+            if forbidden in panel_text:
+                v.add(f"{path.relative_to(REPO)} contains forbidden symbol {forbidden}")
+        if path.name not in {"__init__.py", "goal_sorting.py"} and "GOAL_AMBER" not in panel_text:
+            v.add(f"{path.relative_to(REPO)} does not use GOAL_AMBER token")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["goals"]' not in view_manager:
+        v.add("view_manager missing goals factory")
+    if "_on_goal_new" not in view_manager and "publish_goal_submit_request" not in view_manager:
+        v.add("view_manager missing goal New Goal wiring")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "goals"' not in state_applier:
+        v.add("state_applier does not gate goals apply_state on current_view")
+
+    controller = _read(UI_ROOT / "controller.py")
+    if "publish_goal_submit_request" not in controller:
+        v.add("UIController missing publish_goal_submit_request")
+    if "GOAL_SUBMIT_REQUEST" not in controller:
+        v.add("UIController does not publish GOAL_SUBMIT_REQUEST")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("goals", "Goal Dashboard")' not in sidebar:
+        v.add("Sidebar label for goals is not 'Goal Dashboard'")
+
+
 def main() -> int:
     v = Violation()
     _check_no_local_status_maps(v)
@@ -578,6 +661,7 @@ def main() -> int:
     _check_execution_center_workspace(v)
     _check_agent_monitor_workspace(v)
     _check_approval_center_workspace(v)
+    _check_goal_dashboard_workspace(v)
 
     if v.errors:
         v.report()

@@ -85,6 +85,8 @@ class ViewManagerMixin:
         )
         self._view_registry["goals"] = lambda: GoalView(
             self._content,
+            on_new_goal=self._on_goal_new,
+            on_select=self._on_goal_select,
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
@@ -376,6 +378,22 @@ class ViewManagerMixin:
             label=cid,
             payload={"check_id": cid},
         )
+
+    def _on_goal_select(self, goal_id: str) -> None:
+        """Focus a goal via existing inspect selection flow."""
+        gid = str(goal_id).strip()
+        if not gid:
+            return
+        self._controller.publish_inspect_select(
+            "goal",
+            gid,
+            label=gid,
+            payload={"goal_id": gid},
+        )
+
+    def _on_goal_new(self, title: str, priority: int = 0) -> None:
+        """Publish GOAL_SUBMIT_REQUEST for Hero New Goal (never lifecycle facts)."""
+        self._controller.publish_goal_submit_request(title, priority=priority)
 
     def _on_approval_decide(
         self,
