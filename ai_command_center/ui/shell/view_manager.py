@@ -92,6 +92,8 @@ class ViewManagerMixin:
         )
         self._view_registry["agents"] = lambda: AgentsView(
             self._content,
+            on_select=self._on_agent_select,
+            on_cancel=self._on_agent_cancel,
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
@@ -351,6 +353,22 @@ class ViewManagerMixin:
             chat = self._chat_view()
             if chat is not None:
                 chat.focus_input()
+
+    def _on_agent_select(self, agent_id: str) -> None:
+        """Existing inspect selection flow — AppState refresh re-projects panels."""
+        aid = str(agent_id).strip()
+        if not aid:
+            return
+        self._controller.publish_inspect_select(
+            "agent",
+            aid,
+            label=aid,
+            payload={"agent_id": aid},
+        )
+
+    def _on_agent_cancel(self, agent_id: str, reason: str = "cancelled") -> None:
+        """Publish AGENT_CANCEL_REQUEST for the contextual agent target."""
+        self._controller.publish_agent_cancel_request(agent_id, reason=reason)
 
     def _on_execution_select(self, request_id: str) -> None:
         """Open execution detail and request timeline projection."""

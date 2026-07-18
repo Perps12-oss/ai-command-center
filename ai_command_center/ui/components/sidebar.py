@@ -27,7 +27,7 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("plugins", "Plugins"),
     ("settings", "Settings"),
     ("goals", "Goals"),
-    ("agents", "Agents"),
+    ("agents", "Agent Monitor"),
     ("approvals", "Approvals"),
 )
 

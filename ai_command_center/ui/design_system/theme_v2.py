@@ -54,7 +54,7 @@ RIBBON_PILL_BORDER = "#3A3F53"
 
 # UI Constitution subsystem colors — Article 5
 GOAL_AMBER = "#FFB300"
-AGENT_PURPLE = "#9B59B6"
+AGENT_PURPLE = "#9B59B6"  # Agent Monitor operational accent
 WORLD_TEAL = "#009688"
 APPROVAL_ORANGE = "#FF9800"
 EXECUTION_BLUE = "#3B82F6"  # Execution Center operational accent
