@@ -415,7 +415,16 @@ class StateApplierMixin:
         )
 
     def _catalog_fingerprint(self, snap) -> tuple:
-        """Fields that drive catalog view rebuilds (excludes polling system metrics)."""
+        """Fields that drive catalog view rebuilds (excludes polling system metrics).
+
+        Artifact invalidation uses only the recent-artifacts tuple — not the full
+        ModelArtifactSnapshot — so MODEL_SELECTED / tool lifecycle revision bumps
+        do not rebuild Memory/Notes/Plugins/Providers/Capabilities/System/Workspace.
+        """
+        artifacts_snap = getattr(snap, "model_artifact", None)
+        recent_artifacts = getattr(artifacts_snap, "recent_artifacts", None)
+        if recent_artifacts is None:
+            recent_artifacts = snap.recent_artifacts
         return (
             snap.memory_catalog,
             snap.memory_selected,
@@ -430,8 +439,7 @@ class StateApplierMixin:
             snap.provider_health_map,
             snap.runtime_capability_providers,
             snap.capability_lifecycle,
-            getattr(snap, "model_artifact", None),
-            getattr(snap.execution_context, "artifacts", ()),
+            recent_artifacts,
         )
 
     def _apply_catalog_views(self, snap) -> None:

@@ -56,6 +56,15 @@ PHASE_11C_FILES: tuple[Path, ...] = (
     UI_ROOT / "views" / "execution_center" / "truth_validation_panel.py",
 )
 
+PHASE_11D_FILES: tuple[Path, ...] = (
+    UI_ROOT / "views" / "agents_view.py",
+    UI_ROOT / "views" / "agent_monitor" / "active_agents_panel.py",
+    UI_ROOT / "views" / "agent_monitor" / "agent_state_panel.py",
+    UI_ROOT / "views" / "agent_monitor" / "pipeline_progress_panel.py",
+    UI_ROOT / "views" / "agent_monitor" / "task_assignment_panel.py",
+    UI_ROOT / "views" / "agent_monitor" / "execution_history_panel.py",
+)
+
 
 class Violation:
     """Collects a single constitutional violation."""
@@ -396,6 +405,87 @@ def _check_execution_center_workspace(v: Violation) -> None:
         v.add("Sidebar label for executions is not 'Execution Center'")
 
 
+def _check_agent_monitor_workspace(v: Violation) -> None:
+    """Verify Phase 11D / Article 14 Agent Monitor workspace contracts."""
+    for path in PHASE_11D_FILES:
+        if not path.exists():
+            v.add(f"Missing Agent Monitor file: {path.relative_to(REPO)}")
+
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    if "AGENT_PURPLE" not in theme:
+        v.add("theme_v2.py missing AGENT_PURPLE token")
+
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    if "AGENT_PURPLE" not in constitution:
+        v.add("UI_CONSTITUTION.md missing AGENT_PURPLE token reference")
+
+    shell = UI_ROOT / "views" / "agents_view.py"
+    if not shell.exists():
+        return
+    text = _read(shell)
+    required_symbols = (
+        ("Hero", "_hero"),
+        ("Active Agents", "ActiveAgentsPanel"),
+        ("Agent State", "AgentStatePanel"),
+        ("Pipeline Progress", "PipelineProgressPanel"),
+        ("Task Assignment", "TaskAssignmentPanel"),
+        ("Execution History", "ExecutionHistoryPanel"),
+        ("AGENT_PURPLE accent", "AGENT_PURPLE"),
+        ("apply_state projection", "def apply_state"),
+        ("Hero cancel action", "_hero_action"),
+        ("Contextual cancel", "_cancel_agent_id"),
+    )
+    for label, symbol in required_symbols:
+        if symbol not in text:
+            v.add(f"Agent Monitor workspace missing {label} ({symbol})")
+
+    if "agent_pipeline" not in text:
+        v.add("agents_view.py must project AppState.agent_pipeline")
+
+    forbidden_patterns = (
+        "ai_command_center.repositories",
+        "ai_command_center.services",
+        "add_listener",
+    )
+    for path in PHASE_11D_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        for forbidden in forbidden_patterns:
+            if forbidden in panel_text:
+                v.add(f"{path.relative_to(REPO)} contains forbidden symbol {forbidden}")
+        if path.name != "__init__.py" and "AGENT_PURPLE" not in panel_text:
+            v.add(f"{path.relative_to(REPO)} does not use AGENT_PURPLE token")
+
+    # No AppState field additions from Agent Monitor UI modules
+    for path in PHASE_11D_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        if "dataclass" in panel_text and "AppState" in panel_text and "replace(" in panel_text:
+            v.add(f"{path.relative_to(REPO)} must not mutate AppState")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["agents"]' not in view_manager:
+        v.add("view_manager missing agents factory")
+    if "publish_agent_cancel_request" not in view_manager and "_on_agent_cancel" not in view_manager:
+        v.add("view_manager missing agent cancel wiring")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "agents"' not in state_applier:
+        v.add("state_applier does not gate agents apply_state on current_view")
+
+    controller = _read(UI_ROOT / "controller.py")
+    if "publish_agent_cancel_request" not in controller:
+        v.add("UIController missing publish_agent_cancel_request")
+    if "AGENT_CANCEL_REQUEST" not in controller:
+        v.add("UIController does not publish AGENT_CANCEL_REQUEST")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("agents", "Agent Monitor")' not in sidebar:
+        v.add("Sidebar label for agents is not 'Agent Monitor'")
+
+
 def main() -> int:
     v = Violation()
     _check_no_local_status_maps(v)
@@ -409,6 +499,7 @@ def main() -> int:
     _check_theme_tokens(v)
     _check_world_model_workspace(v)
     _check_execution_center_workspace(v)
+    _check_agent_monitor_workspace(v)
 
     if v.errors:
         v.report()

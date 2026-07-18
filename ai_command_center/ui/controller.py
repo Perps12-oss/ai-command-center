@@ -12,6 +12,7 @@ except Exception:  # pragma: no cover - optional clipboard dependency
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
+    AGENT_CANCEL_REQUEST,
     CHAT_EXPORT_REQUEST,
     CLIPBOARD_CONTENT,
     CLIPBOARD_REQUEST,
@@ -532,5 +533,21 @@ class UIController:
                 "description": str(description),
                 "metadata": dict(metadata or {}),
             },
+            source="ui",
+        )
+
+    def publish_agent_cancel_request(
+        self,
+        agent_id: str,
+        *,
+        reason: str = "cancelled",
+    ) -> None:
+        """Publish contextual agent cancel intent (AgentRuntimeService subscriber)."""
+        aid = str(agent_id).strip()
+        if not aid:
+            return
+        self._bus.publish(
+            AGENT_CANCEL_REQUEST,
+            {"agent_id": aid, "reason": str(reason or "cancelled")},
             source="ui",
         )

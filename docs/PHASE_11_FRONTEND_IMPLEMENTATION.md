@@ -172,34 +172,38 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 **Objective:** Expose multi-agent runtime and pipeline progress.
 
-**UI Constitution Articles:** 5 (Purple), 14.
+**UI Constitution Articles:** 5 (Purple / `AGENT_PURPLE`), 14.
+
+**Status:** Complete (pipeline-first layout + failure visibility).
 
 ### Required Panels (Article 14)
 
-1. **Active Agents** — `agent_pipeline.runs` / `agent_pipeline.active_runs`.
-2. **Agent State** — per-agent `task`, `state`, `steps`, `error`.
-3. **Pipeline Progress** — `agent_pipeline.pipeline_stage` and `agent_pipeline.planned_tools`.
-4. **Task Assignment** — mapping of agent to current task.
-5. **Execution History** — completed agent runs.
+1. **Pipeline Progress** (primary visual) — `pipeline_stage`, `planned_tools`, derived completed/remaining.
+2. **Active Agents** — `agent_pipeline.runs` (Running → Waiting → Failed → Completed).
+3. **Agent State** — state, error, last transition, runtime metadata.
+4. **Task Assignment** — read-only task/role/request/pipeline mapping.
+5. **Execution History** — all projected runs only (no history service).
 
 ### Hero Section
 
 - Workspace Name: "Agent Monitor"
-- Current State: "`<active>` active agents"
-- Primary Metric: pipeline stage (e.g., "Research Phase")
-- Immediate Action: "Cancel" (publishes `AGENT_CANCEL_REQUEST`)
+- Metrics: Active Agents · Pipeline Stage · Planned Tools · Running Tasks · Failure count
+- Immediate Action: contextual **Cancel Active Pipeline** / **Cancel Selected Agent Run**
+  (publishes `AGENT_CANCEL_REQUEST`; disabled when no active run)
 
 ### Files
 
-- `ai_command_center/ui/views/agent_monitor_view.py` (new)
-- `ai_command_center/ui/components/agent_card.py` (new)
-- `ai_command_center/ui/components/pipeline_progress.py` (new)
+- `ai_command_center/ui/views/agents_view.py` (shell, route `agents`)
+- `ai_command_center/ui/views/agent_monitor/` panels
+- `tests/ui/test_agent_monitor_projection.py`
+- `scripts/verify_ui_constitution.py` Phase 11D checks
 
 ### Acceptance Criteria
 
-- [ ] Active agents list shows role, task, state, progress.
-- [ ] Pipeline Progress shows stage and planned tools count.
-- [ ] Cancel button publishes `AGENT_CANCEL_REQUEST`.
+- [x] Hero + five Article 14 panels project `AppState.agent_pipeline` only.
+- [x] Pipeline Progress dominates layout; failures visible in Hero + history.
+- [x] Contextual Cancel publishes `AGENT_CANCEL_REQUEST`.
+- [x] `AGENT_PURPLE` documented; no new AppState/services/repositories.
 
 ---
 
