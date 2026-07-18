@@ -51,10 +51,15 @@ class TaskAssignmentPanel(ctk.CTkFrame):
         if not runs:
             ctk.CTkLabel(
                 self._body,
-                text="No task assignments in the current projection.",
+                text=(
+                    "No task assignments in the current projection.\n"
+                    "Assignments appear when agent runs are spawned with tasks.\n"
+                    "Next: start an agent pipeline that assigns work."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
                 anchor="w",
+                justify="left",
             ).pack(fill="x", padx=4, pady=12)
             return
 

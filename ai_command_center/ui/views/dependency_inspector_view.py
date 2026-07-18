@@ -22,32 +22,19 @@ from ai_command_center.core.state.world_model_state import (
     WorldModelState,
 )
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.design_system.status_tokens import (
+    goal_state_color,
+    mutation_type_color,
+)
 from ai_command_center.ui.widget_utils import clear_children
-
-_MUTATION_COLORS = {
-    "create_node": "#22C55E",
-    "update_node": "#3B82F6",
-    "delete_node": "#EF4444",
-    "create_edge": "#A78BFA",
-    "delete_edge": "#F87171",
-    "unknown": T.TEXT_MUTED,
-}
-
-_GOAL_STATUS_COLORS = {
-    "active": "#22C55E",
-    "submitted": "#3B82F6",
-    "queued": "#EAB308",
-    "failed": "#EF4444",
-    "complete": T.TEXT_MUTED,
-}
 
 
 def _mut_color(mtype: str) -> str:
-    return _MUTATION_COLORS.get(mtype.lower(), T.TEXT_MUTED)
+    return mutation_type_color(mtype)
 
 
 def _goal_color(status: str) -> str:
-    return _GOAL_STATUS_COLORS.get(status.lower(), T.TEXT_MUTED)
+    return goal_state_color(status)[0]
 
 
 def _format_ts(ts: str) -> str:

@@ -10,7 +10,8 @@ from ai_command_center.ui.views.chat.stream_renderer import CLR_META
 
 _PILL_MAX_LINES = 4
 _LINE_H = 22
-_PLACEHOLDER = "Message…"
+# Intentional empty-input hint (UX affordance, not a content stub).
+_INPUT_HINT = "Message…"
 _HINT_TEXT = "⏎ send  ·  Shift+⏎ new line  ·  Ctrl+K  ·  ?"
 
 PROMPT_TEMPLATES: list[tuple[str, str, str]] = [
@@ -107,7 +108,7 @@ class InputPill(ctk.CTkFrame):
         self._on_send = on_send
         self._on_stop = on_stop
         self._streaming = False
-        self._ph_active = True
+        self._hint_active = True
 
         pill = ctk.CTkFrame(
             self,
@@ -143,7 +144,7 @@ class InputPill(ctk.CTkFrame):
             corner_radius=0,
         )
         self._tb.pack(side="left", fill="x", expand=True, padx=6, pady=5)
-        self._tb.insert("1.0", _PLACEHOLDER)
+        self._tb.insert("1.0", _INPUT_HINT)
         self._tb.configure(text_color=CLR_META)
         self._tb.bind("<FocusIn>",    self._focus_in)
         self._tb.bind("<FocusOut>",   self._focus_out)
@@ -177,20 +178,20 @@ class InputPill(ctk.CTkFrame):
         self._status.pack(side="right", padx=20, pady=(0, 5))
 
     def _focus_in(self, _=None) -> None:
-        if self._ph_active:
+        if self._hint_active:
             self._tb.delete("1.0", "end")
             self._tb.configure(text_color=T.TEXT_PRIMARY)
-            self._ph_active = False
+            self._hint_active = False
 
     def _focus_out(self, _=None) -> None:
         if not self._tb.get("1.0", "end-1c").strip():
-            self._tb.insert("1.0", _PLACEHOLDER)
+            self._tb.insert("1.0", _INPUT_HINT)
             self._tb.configure(text_color=CLR_META)
-            self._ph_active = True
+            self._hint_active = True
             self._tb.configure(height=34)
 
     def _grow(self, _=None) -> None:
-        if self._ph_active:
+        if self._hint_active:
             return
         lines = int(self._tb.index("end-1c").split(".")[0])
         h = max(34, min(lines * _LINE_H, _PILL_MAX_LINES * _LINE_H))
@@ -203,7 +204,7 @@ class InputPill(ctk.CTkFrame):
         return "break"
 
     def _submit(self) -> None:
-        if self._ph_active:
+        if self._hint_active:
             return
         text = self._tb.get("1.0", "end-1c").strip()
         if not text:

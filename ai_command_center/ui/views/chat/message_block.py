@@ -33,7 +33,8 @@ from ai_command_center.ui.views.chat.response_action_strip import ResponseAction
 _BUBBLE_WRAP = 520
 _BUBBLE_TBX_W = 540
 _CURSOR_CHAR = "▌"
-_PLACEHOLDER = "●  ●  ●"
+# Intentional UX affordance shown while waiting for the first stream chunk.
+_STREAMING_INDICATOR = "●  ●  ●"
 _META_FONT = (T.FONT_FAMILY, 9)
 _FOOTER_FONT = (T.FONT_FAMILY, 9)
 
@@ -218,7 +219,7 @@ class AssistantMessageBlock(ctk.CTkFrame):
         )
         self._textbox.pack(padx=12, pady=10, fill="x")
         self._textbox.configure(state="normal")
-        self._textbox.insert("end", _PLACEHOLDER)
+        self._textbox.insert("end", _STREAMING_INDICATOR)
         self._textbox.configure(state="disabled")
         bind_inspect_gestures(
             (self, self._bubble),

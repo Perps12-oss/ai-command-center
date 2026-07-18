@@ -1,11 +1,10 @@
-"""ArtifactViewer — preview stub for artifact types.
+"""ArtifactViewer — preview panel for artifact types.
 
-Supported preview types: markdown, code, image, pdf (stub), email, calendar.
+Supported preview types: markdown, code, text, data.
+Unsupported types (intentional no-preview): image, pdf, email, calendar.
 
 Architecture contract: pure display widget, no bus/service imports.
 Actions publish via on_action callback (→ UIController → bus ui.artifact.action).
-
-UI Refurbishment P3 Slice 1b: Improved stub display with styled message.
 """
 from __future__ import annotations
 
@@ -96,8 +95,8 @@ class ArtifactViewer(ctk.CTkFrame):
             child.destroy()
 
         normalized = ArtifactRendererFactory.normalize_kind(kind)
-        if ArtifactRendererFactory.is_stub_kind(normalized):
-            self._show_stub(normalized)
+        if ArtifactRendererFactory.is_unsupported_kind(normalized):
+            self._show_unsupported(normalized)
         elif ArtifactRendererFactory.uses_text_preview(normalized):
             preview = ArtifactRendererFactory.preview_content(
                 kind=normalized,
@@ -130,18 +129,16 @@ class ArtifactViewer(ctk.CTkFrame):
         tb.insert("end", content or "(empty)")
         tb.configure(state="disabled")
 
-    def _show_stub(self, kind: str) -> None:
-        """Show stub preview with styled message."""
-        # Container for centered content
+    def _show_unsupported(self, kind: str) -> None:
+        """Show intentional unsupported-preview message with styled layout."""
         container = ctk.CTkFrame(self._content, fg_color="transparent")
         container.pack(fill="both", expand=True)
 
-        msg = ArtifactRendererFactory.stub_message(kind)
+        msg = ArtifactRendererFactory.unsupported_message(kind)
         lines = msg.split("\n", 1)
         title = lines[0] if lines else ""
         description = lines[1] if len(lines) > 1 else ""
 
-        # Title label with accent styling
         title_label = ctk.CTkLabel(
             container,
             text=title,
@@ -150,7 +147,6 @@ class ArtifactViewer(ctk.CTkFrame):
         )
         title_label.pack(pady=(40, 8))
 
-        # Description label
         if description:
             desc_label = ctk.CTkLabel(
                 container,
@@ -161,7 +157,6 @@ class ArtifactViewer(ctk.CTkFrame):
             )
             desc_label.pack(pady=(0, 20))
 
-        # Action buttons for stub types
         btn_frame = ctk.CTkFrame(container, fg_color="transparent")
         btn_frame.pack(pady=10)
 

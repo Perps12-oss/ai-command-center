@@ -92,7 +92,6 @@ class ApplicationShellMixin:
                 ("🔍  Dependencies", "Mutation log, goals, and dependency inspector", lambda: self._navigate("dependencies")),
                 ("⚙  System", "System monitor", lambda: self._navigate("system")),
                 ("🧩  Plugins", "Manage plugins", lambda: self._navigate("plugins")),
-                ("🎨  Component Gallery", "Design-system tokens and components", lambda: self._navigate("gallery")),
                 ("◈  Settings", "Open settings & themes", lambda: self._navigate("settings")),
                 ("⬇  Export Chat", "Save conversation to markdown", self._on_chat_export_request),
                 ("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate),

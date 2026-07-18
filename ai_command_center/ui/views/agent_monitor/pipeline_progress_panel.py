@@ -121,10 +121,15 @@ class PipelineProgressPanel(ctk.CTkFrame):
         if not tools:
             ctk.CTkLabel(
                 self._tools,
-                text="No planned tools in the current projection.",
+                text=(
+                    "No planned tools in the current projection.\n"
+                    "Tool steps appear when a pipeline plans capabilities to run.\n"
+                    "Next: start a pipeline that schedules tools."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
                 anchor="w",
+                justify="left",
             ).pack(fill="x", padx=4, pady=8)
             return
         for idx, tool in enumerate(tools):

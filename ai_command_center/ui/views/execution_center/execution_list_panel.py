@@ -235,9 +235,14 @@ class ExecutionListPanel(ctk.CTkFrame):
         if not rows:
             ctk.CTkLabel(
                 self._list,
-                text="No executions match filters.",
+                text=(
+                    "No executions match the current filters.\n"
+                    "Runs appear when Chat, Goals, or Agents start an orchestration.\n"
+                    "Next: clear filters or start a task that executes."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
+                justify="left",
             ).pack(pady=24)
             return
         for row in rows:

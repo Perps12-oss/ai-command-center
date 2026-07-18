@@ -65,6 +65,45 @@ PHASE_11D_FILES: tuple[Path, ...] = (
     UI_ROOT / "views" / "agent_monitor" / "execution_history_panel.py",
 )
 
+PHASE_11E_FILES: tuple[Path, ...] = (
+    UI_ROOT / "views" / "approvals_view.py",
+    UI_ROOT / "views" / "approval_center" / "pending_queue_panel.py",
+    UI_ROOT / "views" / "approval_center" / "risk_classification_panel.py",
+    UI_ROOT / "views" / "approval_center" / "decision_history_panel.py",
+    UI_ROOT / "views" / "approval_center" / "approval_statistics_panel.py",
+)
+
+PHASE_11F_FILES: tuple[Path, ...] = (
+    UI_ROOT / "views" / "goal_view.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_list_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_detail_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "plan_preview_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_progress_panel.py",
+    UI_ROOT / "views" / "goal_dashboard" / "goal_history_panel.py",
+)
+
+PHASE_11_WORKSPACE_FILES: tuple[Path, ...] = (
+    *PHASE_11A_FILES,
+    *PHASE_11B_FILES,
+    *PHASE_11C_FILES,
+    *PHASE_11D_FILES,
+    *PHASE_11E_FILES,
+    *PHASE_11F_FILES,
+    UI_ROOT / "views" / "surface_state.py",
+    UI_ROOT / "views" / "command_center_view.py",
+    UI_ROOT / "views" / "executions_view.py",
+)
+
+STATUS_TOKEN_CONSUMERS: tuple[Path, ...] = (
+    UI_ROOT / "components" / "timeline_renderer.py",
+    UI_ROOT / "components" / "trace_tree.py",
+    UI_ROOT / "views" / "dependency_inspector_view.py",
+    UI_ROOT / "views" / "chat" / "chat_header.py",
+    UI_ROOT / "views" / "chat" / "tool_execution_card.py",
+    UI_ROOT / "views" / "chat" / "inspector" / "inspector_provider_tab.py",
+    UI_ROOT / "views" / "providers" / "provider_live_monitor.py",
+)
+
 
 class Violation:
     """Collects a single constitutional violation."""
@@ -187,13 +226,19 @@ def _check_view_registry(v: Violation) -> None:
 
 
 def _check_no_placeholders(v: Violation) -> None:
-    """Fail if known placeholder markers remain in Phase 11A UI source or if PlaceholderView persists."""
+    """Fail if prohibited markers remain in any Phase 11 workspace source."""
     markers = ("TODO", "FIXME", "COMING_SOON", "PLACEHOLDER", "TEMP", "MOCK", "DUMMY", "STUB")
-    for path in PHASE_11A_FILES:
+    seen: set[Path] = set()
+    for path in PHASE_11_WORKSPACE_FILES:
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
         text = _read(path)
         for marker in markers:
             if re.search(rf"\b{re.escape(marker)}\b", text):
                 v.add(f"{path.relative_to(REPO)} contains placeholder marker '{marker}'")
+        if re.search(r"coming\s+soon", text, re.IGNORECASE):
+            v.add(f"{path.relative_to(REPO)} contains 'coming soon' language")
 
     placeholder_file = UI_ROOT / "views" / "placeholder.py"
     if placeholder_file.exists() and "class PlaceholderView" in _read(placeholder_file):
@@ -202,6 +247,45 @@ def _check_no_placeholders(v: Violation) -> None:
     view_manager = UI_ROOT / "shell" / "view_manager.py"
     if "PlaceholderView" in _read(view_manager):
         v.add("view_manager.py still references PlaceholderView")
+
+    gallery = UI_ROOT / "views" / "component_gallery_view.py"
+    if gallery.exists():
+        v.add("Orphan ComponentGalleryView file remains; remove or register it")
+
+
+def _check_status_token_consolidation(v: Violation) -> None:
+    """Require listed consumers to import status_tokens; ban local status color dicts."""
+    for path in STATUS_TOKEN_CONSUMERS:
+        if not path.exists():
+            v.add(f"Missing status-token consumer: {path.relative_to(REPO)}")
+            continue
+        text = _read(path)
+        if "status_tokens" not in text:
+            v.add(f"{path.relative_to(REPO)} must import ai_command_center.ui.design_system.status_tokens")
+        if re.search(r"_STATUS_COLORS\s*=", text) or re.search(r"_GOAL_STATUS_COLORS\s*=", text):
+            v.add(f"{path.relative_to(REPO)} still defines a local status color map")
+        if re.search(r"_MUTATION_COLORS\s*=", text):
+            v.add(f"{path.relative_to(REPO)} still defines a local mutation color map")
+
+
+def _check_command_center_naming(v: Violation) -> None:
+    """Canonical workspace name is Command Center (not AI Command Center)."""
+    shell = _read(UI_ROOT / "views" / "command_center_view.py")
+    if 'text="AI Command Center"' in shell:
+        v.add("Command Center hero title must be 'Command Center' (canonical)")
+    if 'text="Command Center"' not in shell:
+        v.add("Command Center hero title 'Command Center' missing")
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("command_center", "Command Center")' not in sidebar:
+        v.add("Sidebar label for command_center is not 'Command Center'")
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    for token in ("GOAL_AMBER", "WORLD_TEAL", "EXECUTION_BLUE", "AGENT_PURPLE", "APPROVAL_ORANGE"):
+        if token not in constitution:
+            v.add(f"UI_CONSTITUTION.md missing workspace token {token}")
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    for token in ("GOAL_AMBER", "WORLD_TEAL", "EXECUTION_BLUE", "AGENT_PURPLE", "APPROVAL_ORANGE"):
+        if token not in theme:
+            v.add(f"theme_v2.py missing workspace token {token}")
 
 
 def _check_route_reachability(v: Violation) -> None:
@@ -217,7 +301,7 @@ def _check_route_reachability(v: Violation) -> None:
     view_ids = [m.strip('"\'') for m in re.findall(r'"([^"]+)"', view_ids_match.group(1))]
 
     for vid in view_ids:
-        if vid in ("timeline", "workflow", "relationships", "dependencies", "gallery", "world_explorer"):
+        if vid in ("timeline", "workflow", "relationships", "dependencies", "world_explorer"):
             continue
         if vid not in sidebar:
             v.add(f"Sidebar does not expose route for '{vid}'")
@@ -486,20 +570,167 @@ def _check_agent_monitor_workspace(v: Violation) -> None:
         v.add("Sidebar label for agents is not 'Agent Monitor'")
 
 
+def _check_approval_center_workspace(v: Violation) -> None:
+    """Verify Phase 11E / Article 15 Approval Center workspace contracts."""
+    for path in PHASE_11E_FILES:
+        if not path.exists():
+            v.add(f"Missing Approval Center file: {path.relative_to(REPO)}")
+
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    if "APPROVAL_ORANGE" not in theme:
+        v.add("theme_v2.py missing APPROVAL_ORANGE token")
+
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    if "APPROVAL_ORANGE" not in constitution:
+        v.add("UI_CONSTITUTION.md missing APPROVAL_ORANGE token reference")
+
+    shell = UI_ROOT / "views" / "approvals_view.py"
+    if not shell.exists():
+        return
+    text = _read(shell)
+    required_symbols = (
+        ("Hero", "_hero"),
+        ("Pending Queue", "PendingQueuePanel"),
+        ("Risk Classification", "RiskClassificationPanel"),
+        ("Decision History", "DecisionHistoryPanel"),
+        ("Approval Statistics", "ApprovalStatisticsPanel"),
+        ("APPROVAL_ORANGE accent", "APPROVAL_ORANGE"),
+        ("apply_state projection", "def apply_state"),
+        ("Review Next action", "_hero_action"),
+        ("permission_snapshot", "permission_snapshot"),
+    )
+    for label, symbol in required_symbols:
+        if symbol not in text:
+            v.add(f"Approval Center workspace missing {label} ({symbol})")
+
+    forbidden_patterns = (
+        "ai_command_center.repositories",
+        "ai_command_center.services",
+        "add_listener",
+    )
+    for path in PHASE_11E_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        for forbidden in forbidden_patterns:
+            if forbidden in panel_text:
+                v.add(f"{path.relative_to(REPO)} contains forbidden symbol {forbidden}")
+        if path.name != "__init__.py" and "APPROVAL_ORANGE" not in panel_text:
+            v.add(f"{path.relative_to(REPO)} does not use APPROVAL_ORANGE token")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["approvals"]' not in view_manager:
+        v.add("view_manager missing approvals factory")
+    if "publish_permission_result" not in view_manager and "_on_approval_decide" not in view_manager:
+        v.add("view_manager missing approval decide wiring")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "approvals"' not in state_applier:
+        v.add("state_applier does not gate approvals apply_state on current_view")
+
+    controller = _read(UI_ROOT / "controller.py")
+    if "publish_permission_result" not in controller:
+        v.add("UIController missing publish_permission_result")
+    if "PERMISSION_CHECK_RESULT" not in controller:
+        v.add("UIController does not publish PERMISSION_CHECK_RESULT")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("approvals", "Approval Center")' not in sidebar:
+        v.add("Sidebar label for approvals is not 'Approval Center'")
+
+
+def _check_goal_dashboard_workspace(v: Violation) -> None:
+    """Verify Phase 11F / Article 16 Goal Dashboard workspace contracts."""
+    for path in PHASE_11F_FILES:
+        if not path.exists():
+            v.add(f"Missing Goal Dashboard file: {path.relative_to(REPO)}")
+
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    if "GOAL_AMBER" not in theme:
+        v.add("theme_v2.py missing GOAL_AMBER token")
+
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    if "GOAL_AMBER" not in constitution:
+        v.add("UI_CONSTITUTION.md missing GOAL_AMBER token reference")
+
+    shell = UI_ROOT / "views" / "goal_view.py"
+    if not shell.exists():
+        return
+    text = _read(shell)
+    required_symbols = (
+        ("Hero", "_hero"),
+        ("Goal List", "GoalListPanel"),
+        ("Goal Detail", "GoalDetailPanel"),
+        ("Plan Preview", "PlanPreviewPanel"),
+        ("Goal Progress", "GoalProgressPanel"),
+        ("Goal History", "GoalHistoryPanel"),
+        ("GOAL_AMBER accent", "GOAL_AMBER"),
+        ("apply_state projection", "def apply_state"),
+        ("New Goal action", "_hero_action"),
+        ("brain_state projection", "brain_state"),
+        ("surface state banner", "_surface_state"),
+    )
+    for label, symbol in required_symbols:
+        if symbol not in text:
+            v.add(f"Goal Dashboard workspace missing {label} ({symbol})")
+
+    if "GOAL_ACTIVATED" in text or "GOAL_PAUSED" in text or "GOAL_CANCELLED" in text:
+        v.add("goal_view.py must not publish lifecycle fact topics")
+
+    forbidden_patterns = (
+        "ai_command_center.repositories",
+        "ai_command_center.services",
+        "add_listener",
+    )
+    for path in PHASE_11F_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        for forbidden in forbidden_patterns:
+            if forbidden in panel_text:
+                v.add(f"{path.relative_to(REPO)} contains forbidden symbol {forbidden}")
+        if path.name not in {"__init__.py", "goal_sorting.py"} and "GOAL_AMBER" not in panel_text:
+            v.add(f"{path.relative_to(REPO)} does not use GOAL_AMBER token")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["goals"]' not in view_manager:
+        v.add("view_manager missing goals factory")
+    if "_on_goal_new" not in view_manager and "publish_goal_submit_request" not in view_manager:
+        v.add("view_manager missing goal New Goal wiring")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "goals"' not in state_applier:
+        v.add("state_applier does not gate goals apply_state on current_view")
+
+    controller = _read(UI_ROOT / "controller.py")
+    if "publish_goal_submit_request" not in controller:
+        v.add("UIController missing publish_goal_submit_request")
+    if "GOAL_SUBMIT_REQUEST" not in controller:
+        v.add("UIController does not publish GOAL_SUBMIT_REQUEST")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("goals", "Goal Dashboard")' not in sidebar:
+        v.add("Sidebar label for goals is not 'Goal Dashboard'")
+
+
 def main() -> int:
     v = Violation()
     _check_no_local_status_maps(v)
     _check_status_tokens_usage(v)
+    _check_status_token_consolidation(v)
     _check_top_bar_pills(v)
     _check_hero_action(v)
     _check_ops_cards_timestamp(v)
     _check_view_registry(v)
     _check_no_placeholders(v)
+    _check_command_center_naming(v)
     _check_route_reachability(v)
     _check_theme_tokens(v)
     _check_world_model_workspace(v)
     _check_execution_center_workspace(v)
     _check_agent_monitor_workspace(v)
+    _check_approval_center_workspace(v)
+    _check_goal_dashboard_workspace(v)
 
     if v.errors:
         v.report()

@@ -1,0 +1,32 @@
+# Phase completion — main is the only truth
+
+**This rule is mandatory for local Cursor agents and Cursor Cloud agents.**
+
+A phase may **not** be declared `COMPLETE`, `COMPLIANT`, or merge-ready unless **all** of the following are true:
+
+1. **All phase features exist on `main`.**
+2. **All phase audits exist on `main`.**
+3. **All constitution / UI-constitution updates for the phase exist on `main`.**
+4. **No active branch contains phase functionality that is absent from `main`.**
+
+## Forbidden
+
+- Declaring a phase complete from a feature-branch tip alone
+- Treating squash-merged partial PRs as full phase delivery when later commits remain unmerged
+- Leaving Article/workspace deliverables only on side branches while claiming phase closeout
+
+## Required agent behavior
+
+Before claiming phase completion:
+
+1. Diff the phase deliverable set against `origin/main` (features, audits, constitution docs, verifier checks).
+2. If any deliverable is missing from `main`, status is at most `PARTIALLY_IMPLEMENTED`.
+3. Prefer an integration branch onto latest `main` (merge/rebase + gates + Tom) over parallel “competing truths.”
+4. After merge to `main`, re-inventory active branches for orphaned phase functionality and close/delete superseded branches.
+
+## Related
+
+- Authority: `PROJECT_CONSTITUTION_V4.md`
+- UI authority: `docs/UI_CONSTITUTION.md`
+- Written rule: `docs/governance/PHASE_COMPLETION_RULE.md`
+- Inventory format: `docs/audits/REPOSITORY_TRUTH_AUDIT.md`

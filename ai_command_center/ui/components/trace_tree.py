@@ -13,12 +13,7 @@ import customtkinter as ctk
 
 from ai_command_center.domain.trace_span import TraceSpan
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_STATUS_COLORS: dict[str, str] = {
-    "ok":    T.STATUS_READY,
-    "error": T.STATUS_ERROR,
-    "unset": T.TEXT_MUTED,
-}
+from ai_command_center.ui.design_system.status_tokens import status_color
 
 
 class _SpanNode(ctk.CTkFrame):
@@ -31,7 +26,7 @@ class _SpanNode(ctk.CTkFrame):
         indent: int = 0,
     ) -> None:
         super().__init__(master, fg_color="transparent")
-        color = _STATUS_COLORS.get(span.status, T.TEXT_MUTED)
+        color = status_color(span.status)
         self._expanded = indent == 0  # expand roots by default
         self._span = span
 

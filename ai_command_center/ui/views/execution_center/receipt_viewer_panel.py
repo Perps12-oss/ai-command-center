@@ -88,9 +88,14 @@ class ReceiptViewerPanel(ctk.CTkFrame):
         clear_children(self._body)
         ctk.CTkLabel(
             self._body,
-            text="No receipt for this execution.",
+            text=(
+                "No receipt for this execution.\n"
+                "Receipts appear when an orchestration run completes with evidence.\n"
+                "Next: select a completed run that produced a receipt_id."
+            ),
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
+            justify="left",
         ).pack(pady=20)
 
     def _row(self, label: str, value: str) -> None:

@@ -51,7 +51,11 @@ class ExecutionDetailPanel(ctk.CTkFrame):
         matches_ctx = rid == ctx.request_id
         if not matches_plan and not matches_ctx:
             self._row("Request ID", rid)
-            self._muted("No detail available for this selection yet.")
+            self._muted(
+                "No detail available for this selection yet.\n"
+                "Detail projects from the active plan or execution context for the request.\n"
+                "Next: select a run that still has plan/context in AppState."
+            )
             return
 
         goal = plan.goal if matches_plan else (ctx.query if matches_ctx else "")
@@ -75,7 +79,11 @@ class ExecutionDetailPanel(ctk.CTkFrame):
 
     def _empty(self) -> None:
         clear_children(self._body)
-        self._muted("Select an execution to inspect detail.")
+        self._muted(
+            "No execution selected for detail.\n"
+            "Detail appears when you select a run from the list or hero action.\n"
+            "Next: select an execution in the list."
+        )
 
     def _muted(self, text: str) -> None:
         ctk.CTkLabel(

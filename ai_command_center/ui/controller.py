@@ -17,6 +17,7 @@ from ai_command_center.core.events.topics import (
     CLIPBOARD_CONTENT,
     CLIPBOARD_REQUEST,
     ENTITY_CREATE_REQUEST,
+    GOAL_SUBMIT_REQUEST,
     MEMORY_DELETE_REQUEST,
     MEMORY_REMEMBER,
     NOTE_SELECT,
@@ -551,3 +552,24 @@ class UIController:
             {"agent_id": aid, "reason": str(reason or "cancelled")},
             source="ui",
         )
+
+    def publish_goal_submit_request(
+        self,
+        title: str,
+        *,
+        priority: int = 0,
+        description: str = "",
+        goal_id: str = "",
+    ) -> None:
+        """Publish goal submit intent (GoalSchedulerService subscriber only)."""
+        text = str(title or "").strip() or "New Goal"
+        payload: dict[str, object] = {
+            "title": text,
+            "goal": text,
+            "description": str(description or ""),
+            "priority": int(priority),
+        }
+        gid = str(goal_id or "").strip()
+        if gid:
+            payload["goal_id"] = gid
+        self._bus.publish(GOAL_SUBMIT_REQUEST, payload, source="ui")

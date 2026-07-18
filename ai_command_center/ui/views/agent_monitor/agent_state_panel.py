@@ -92,10 +92,15 @@ class AgentStatePanel(ctk.CTkFrame):
         clear_children(self._body)
         ctk.CTkLabel(
             self._body,
-            text="Select an agent run to inspect operational state.",
+            text=(
+                "No agent run selected for state inspection.\n"
+                "Operational state appears when you select a run in Active Agents.\n"
+                "Next: select an agent run from the list."
+            ),
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
             anchor="w",
+            justify="left",
         ).pack(fill="x", padx=4, pady=12)
 
     def _row(self, label: str, value: str, *, color: str = T.TEXT_PRIMARY) -> None:

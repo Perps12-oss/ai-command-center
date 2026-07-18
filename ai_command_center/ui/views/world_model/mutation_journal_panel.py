@@ -64,9 +64,14 @@ class MutationJournalPanel(ctk.CTkFrame):
         if not self._entries:
             ctk.CTkLabel(
                 self._list,
-                text="No mutations recorded.",
+                text=(
+                    "No mutations recorded yet.\n"
+                    "Mutation journal entries appear when entities or relationships change.\n"
+                    "Next: create or update an entity to produce a mutation."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
+                justify="left",
             ).pack(pady=24)
             return
 

@@ -125,10 +125,50 @@ def test_ops_cards_display_metric_status_and_timestamp() -> None:
     for key in ("executions", "agents", "approvals", "providers"):
         card = view._ops_cards[key]
         assert card._metric.cget("text") != ""
-        assert card._status.cget("text") == "●"
+        status_text = str(card._status.cget("text")).lower()
+        assert status_text in {"ready", "running", "offline", "degraded", "error"}
         assert card._sub.cget("text") != ""
         updated = card._updated.cget("text")
         assert updated.startswith("Updated")
+
+
+def test_recent_changes_empty_is_article_18() -> None:
+    view = CommandCenterView(
+        None,
+        on_command=lambda _x: None,
+        on_navigate=lambda _x: None,
+    )
+    view.apply_state(AppState())
+    texts = [lbl.cget("text") for lbl in view._recent_changes._items]
+    empty = texts[0]
+    assert empty
+    assert "No recent" in empty or "appear" in empty.lower()
+    assert "Next" in empty
+    assert all(not t for t in texts[1:])
+
+
+def test_surface_state_loading_when_snap_none() -> None:
+    view = CommandCenterView(
+        None,
+        on_command=lambda _x: None,
+        on_navigate=lambda _x: None,
+    )
+    view.apply_state(None)
+    assert "Loading" in view._surface_state.cget("text")
+
+
+def test_ops_cards_status_uses_status_color_token() -> None:
+    from ai_command_center.ui.design_system.status_tokens import status_color
+
+    view = CommandCenterView(
+        None,
+        on_command=lambda _x: None,
+        on_navigate=lambda _x: None,
+    )
+    snap = _sample_snap()
+    view.apply_state(snap)
+    card = view._ops_cards["executions"]
+    assert card._status.cget("text_color") == status_color("running")
 
 
 def test_system_awareness_workspace_health() -> None:

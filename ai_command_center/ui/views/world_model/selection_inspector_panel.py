@@ -102,9 +102,14 @@ class SelectionInspectorPanel(ctk.CTkFrame):
         clear_children(self._body)
         ctk.CTkLabel(
             self._body,
-            text="Select an entity to inspect.",
+            text=(
+                "Nothing selected to inspect.\n"
+                "Inspector details appear when you select an entity in the graph or list.\n"
+                "Next: click an entity in Knowledge Graph or Entity Explorer."
+            ),
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
+            justify="left",
         ).pack(pady=24)
 
     def _row(self, label: str, value: str) -> None:

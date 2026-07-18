@@ -13,15 +13,7 @@ import customtkinter as ctk
 
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_STATUS_COLORS: dict[str, str] = {
-    "healthy":   T.STATUS_READY,
-    "ok":        T.STATUS_READY,
-    "degraded":  T.STATUS_BUSY,
-    "error":     T.STATUS_ERROR,
-    "offline":   T.TEXT_MUTED,
-    "unknown":   T.TEXT_MUTED,
-}
+from ai_command_center.ui.design_system.status_tokens import status_color
 
 
 class _ProviderCard(ctk.CTkFrame):
@@ -43,7 +35,7 @@ class _ProviderCard(ctk.CTkFrame):
             border_color=T.BG_GLASS_BORDER,
             **kwargs,
         )
-        color = _STATUS_COLORS.get(health.lower(), T.TEXT_MUTED)
+        color = status_color(health)
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=8, pady=(6, 2))

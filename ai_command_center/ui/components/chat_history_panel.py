@@ -161,23 +161,23 @@ class ChatHistoryPanel(ctk.CTkFrame):
         )
         self._list.pack(fill="both", expand=True, padx=4)
 
-        # Empty placeholder
-        self._placeholder = ctk.CTkLabel(
+        # Empty-state label when no sessions exist.
+        self._empty_label = ctk.CTkLabel(
             self._list,
             text="No sessions yet.\nStart typing to\ncreate one.",
             font=T.FONT_BODY,
             text_color=T.TEXT_MUTED,
             justify="center",
         )
-        self._placeholder.pack(pady=28)
+        self._empty_label.pack(pady=28)
 
     # ── public API ─────────────────────────────────────────────────────────────
 
     def add_session(
         self, sid: str, title: str, ts: str, *, active: bool = False
     ) -> None:
-        if self._placeholder.winfo_ismapped():
-            self._placeholder.pack_forget()
+        if self._empty_label.winfo_ismapped():
+            self._empty_label.pack_forget()
 
         # Remove old row if it exists (re-add at top)
         if sid in self._rows:
@@ -218,10 +218,10 @@ class ChatHistoryPanel(ctk.CTkFrame):
         if row:
             row.destroy()
         if not self._rows:
-            self._placeholder.pack(pady=28)
+            self._empty_label.pack(pady=28)
 
     def clear(self) -> None:
         for row in self._rows.values():
             row.destroy()
         self._rows.clear()
-        self._placeholder.pack(pady=28)
+        self._empty_label.pack(pady=28)

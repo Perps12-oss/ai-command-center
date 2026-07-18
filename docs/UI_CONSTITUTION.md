@@ -198,6 +198,10 @@ Color:
 
 Amber
 
+Token:
+
+`GOAL_AMBER`
+
 Purpose:
 
 Objectives
@@ -246,6 +250,10 @@ Color:
 
 Teal
 
+Token:
+
+`WORLD_TEAL`
+
 Purpose:
 
 Knowledge
@@ -272,6 +280,10 @@ Connectivity
 Color:
 
 Orange
+
+Token:
+
+`APPROVAL_ORANGE`
 
 Purpose:
 
@@ -612,6 +624,10 @@ Approval Statistics
 Goals represent system intent.
 
 Goals must remain visible across the application.
+
+Accent token: `GOAL_AMBER` (defined in `theme_v2.py`). Goal Dashboard shell and all Article 16 panels must use `GOAL_AMBER` — never hardcoded amber hex values.
+
+Hero Immediate Action **New Goal** publishes `GOAL_SUBMIT_REQUEST` only. Lifecycle facts (`GOAL_ACTIVATED`, `GOAL_PAUSED`, `GOAL_CANCELLED`) are service-owned and must not be published by UI.
 
 ---
 

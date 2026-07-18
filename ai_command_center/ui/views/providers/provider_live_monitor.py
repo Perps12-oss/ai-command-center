@@ -9,15 +9,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_STATUS_COLORS: dict[str, str] = {
-    "healthy":  T.STATUS_READY,
-    "ok":       T.STATUS_READY,
-    "degraded": T.STATUS_BUSY,
-    "error":    T.STATUS_ERROR,
-    "offline":  T.TEXT_MUTED,
-    "unknown":  T.TEXT_MUTED,
-}
+from ai_command_center.ui.design_system.status_tokens import status_color
 
 
 class _HealthCard(ctk.CTkFrame):
@@ -31,7 +23,7 @@ class _HealthCard(ctk.CTkFrame):
         tokens_used: int,
         error_count: int,
     ) -> None:
-        color = _STATUS_COLORS.get(health.lower(), T.TEXT_MUTED)
+        color = status_color(health)
         super().__init__(
             master,
             fg_color=T.BG_GLASS,
