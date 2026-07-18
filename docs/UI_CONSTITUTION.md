@@ -230,6 +230,10 @@ Color:
 
 Purple
 
+Token:
+
+`AGENT_PURPLE`
+
 Purpose:
 
 Autonomous Operations
