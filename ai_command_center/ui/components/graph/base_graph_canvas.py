@@ -281,14 +281,15 @@ class BaseGraphCanvas(ctk.CTkFrame):
         tags = ("edge", edge.edge_id, *edge.tags)
 
         arrow = self._arrow_option(edge.arrow)
-        self._tk_canvas.create_line(
-            sx, sy, tx, ty,
-            fill=color,
-            width=line_width,
-            arrow=arrow,
-            arrowshape=(8, 10, 4) if arrow != tk.NONE else (),
-            tags=tags,
-        )
+        line_kwargs: dict[str, Any] = {
+            "fill": color,
+            "width": line_width,
+            "tags": tags,
+        }
+        if arrow:
+            line_kwargs["arrow"] = arrow
+            line_kwargs["arrowshape"] = (8, 10, 4)
+        self._tk_canvas.create_line(sx, sy, tx, ty, **line_kwargs)
         mid_x = (sx + tx) / 2
         mid_y = (sy + ty) / 2
         self._edge_hit_pads[edge.edge_id] = (mid_x - 15, mid_y - 8, mid_x + 15, mid_y + 8)
@@ -310,7 +311,7 @@ class BaseGraphCanvas(ctk.CTkFrame):
             return tk.FIRST
         if arrow == "both":
             return tk.BOTH
-        return tk.NONE
+        return ""
 
     # --- hooks for domain adapters ---
 

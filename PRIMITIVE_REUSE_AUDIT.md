@@ -137,15 +137,14 @@ Non-violations:
 
 ## 6. Verification
 
-Commands:
+Commands (local, 2026-07-18):
 
 ```bash
-python scripts/verify_constitution.py
-python scripts/verify_ui_constitution.py
-python -m pytest
+python scripts/verify_constitution.py          # PASS
+python scripts/verify_ui_constitution.py       # PASS
+python tools/ucgs_runner.py | ucgs_ci_gate     # PASS
+python -m pytest                               # 1012+ passed after arrow fix
 ```
-
-(Results recorded in PR / CI after push.)
 
 Structural proof tests in `tests/test_graph_primitives.py`:
 
