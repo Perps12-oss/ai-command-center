@@ -99,6 +99,8 @@ class ViewManagerMixin:
         )
         self._view_registry["approvals"] = lambda: ApprovalsView(
             self._content,
+            on_decide=self._on_approval_decide,
+            on_select=self._on_approval_select,
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
@@ -364,6 +366,35 @@ class ViewManagerMixin:
             aid,
             label=aid,
             payload={"agent_id": aid},
+        )
+
+    def _on_approval_select(self, check_id: str) -> None:
+        """Focus a pending approval check via existing inspect selection flow."""
+        cid = str(check_id).strip()
+        if not cid:
+            return
+        self._controller.publish_inspect_select(
+            "approval",
+            cid,
+            label=cid,
+            payload={"check_id": cid},
+        )
+
+    def _on_approval_decide(
+        self,
+        check_id: str,
+        granted: bool,
+        permissions: tuple[str, ...],
+        actor_type: str,
+        actor_id: str,
+    ) -> None:
+        """Publish PERMISSION_CHECK_RESULT for Approve / Deny."""
+        self._controller.publish_permission_result(
+            check_id=check_id,
+            granted=granted,
+            permissions=permissions,
+            actor_type=actor_type,
+            actor_id=actor_id,
         )
 
     def _on_agent_cancel(self, agent_id: str, reason: str = "cancelled") -> None:

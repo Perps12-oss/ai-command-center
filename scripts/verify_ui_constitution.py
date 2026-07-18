@@ -65,6 +65,14 @@ PHASE_11D_FILES: tuple[Path, ...] = (
     UI_ROOT / "views" / "agent_monitor" / "execution_history_panel.py",
 )
 
+PHASE_11E_FILES: tuple[Path, ...] = (
+    UI_ROOT / "views" / "approvals_view.py",
+    UI_ROOT / "views" / "approval_center" / "pending_queue_panel.py",
+    UI_ROOT / "views" / "approval_center" / "risk_classification_panel.py",
+    UI_ROOT / "views" / "approval_center" / "decision_history_panel.py",
+    UI_ROOT / "views" / "approval_center" / "approval_statistics_panel.py",
+)
+
 
 class Violation:
     """Collects a single constitutional violation."""
@@ -486,6 +494,75 @@ def _check_agent_monitor_workspace(v: Violation) -> None:
         v.add("Sidebar label for agents is not 'Agent Monitor'")
 
 
+def _check_approval_center_workspace(v: Violation) -> None:
+    """Verify Phase 11E / Article 15 Approval Center workspace contracts."""
+    for path in PHASE_11E_FILES:
+        if not path.exists():
+            v.add(f"Missing Approval Center file: {path.relative_to(REPO)}")
+
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    if "APPROVAL_ORANGE" not in theme:
+        v.add("theme_v2.py missing APPROVAL_ORANGE token")
+
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    if "APPROVAL_ORANGE" not in constitution:
+        v.add("UI_CONSTITUTION.md missing APPROVAL_ORANGE token reference")
+
+    shell = UI_ROOT / "views" / "approvals_view.py"
+    if not shell.exists():
+        return
+    text = _read(shell)
+    required_symbols = (
+        ("Hero", "_hero"),
+        ("Pending Queue", "PendingQueuePanel"),
+        ("Risk Classification", "RiskClassificationPanel"),
+        ("Decision History", "DecisionHistoryPanel"),
+        ("Approval Statistics", "ApprovalStatisticsPanel"),
+        ("APPROVAL_ORANGE accent", "APPROVAL_ORANGE"),
+        ("apply_state projection", "def apply_state"),
+        ("Review Next action", "_hero_action"),
+        ("permission_snapshot", "permission_snapshot"),
+    )
+    for label, symbol in required_symbols:
+        if symbol not in text:
+            v.add(f"Approval Center workspace missing {label} ({symbol})")
+
+    forbidden_patterns = (
+        "ai_command_center.repositories",
+        "ai_command_center.services",
+        "add_listener",
+    )
+    for path in PHASE_11E_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        for forbidden in forbidden_patterns:
+            if forbidden in panel_text:
+                v.add(f"{path.relative_to(REPO)} contains forbidden symbol {forbidden}")
+        if path.name != "__init__.py" and "APPROVAL_ORANGE" not in panel_text:
+            v.add(f"{path.relative_to(REPO)} does not use APPROVAL_ORANGE token")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["approvals"]' not in view_manager:
+        v.add("view_manager missing approvals factory")
+    if "publish_permission_result" not in view_manager and "_on_approval_decide" not in view_manager:
+        v.add("view_manager missing approval decide wiring")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "approvals"' not in state_applier:
+        v.add("state_applier does not gate approvals apply_state on current_view")
+
+    controller = _read(UI_ROOT / "controller.py")
+    if "publish_permission_result" not in controller:
+        v.add("UIController missing publish_permission_result")
+    if "PERMISSION_CHECK_RESULT" not in controller:
+        v.add("UIController does not publish PERMISSION_CHECK_RESULT")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("approvals", "Approval Center")' not in sidebar:
+        v.add("Sidebar label for approvals is not 'Approval Center'")
+
+
 def main() -> int:
     v = Violation()
     _check_no_local_status_maps(v)
@@ -500,6 +577,7 @@ def main() -> int:
     _check_world_model_workspace(v)
     _check_execution_center_workspace(v)
     _check_agent_monitor_workspace(v)
+    _check_approval_center_workspace(v)
 
     if v.errors:
         v.report()

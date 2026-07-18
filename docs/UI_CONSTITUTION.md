@@ -273,6 +273,10 @@ Color:
 
 Orange
 
+Token:
+
+`APPROVAL_ORANGE`
+
 Purpose:
 
 Human Attention Required

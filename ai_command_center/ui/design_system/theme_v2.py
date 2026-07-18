@@ -56,7 +56,7 @@ RIBBON_PILL_BORDER = "#3A3F53"
 GOAL_AMBER = "#FFB300"
 AGENT_PURPLE = "#9B59B6"  # Agent Monitor operational accent
 WORLD_TEAL = "#009688"
-APPROVAL_ORANGE = "#FF9800"
+APPROVAL_ORANGE = "#FF9800"  # Approval Center operational accent
 EXECUTION_BLUE = "#3B82F6"  # Execution Center operational accent
 
 # Chat message bubbles

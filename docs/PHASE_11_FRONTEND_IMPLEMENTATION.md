@@ -211,34 +211,36 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 **Objective:** Make approvals a permanent, visible workspace.
 
-**UI Constitution Articles:** 5 (Orange), 15.
+**UI Constitution Articles:** 5 (Orange / `APPROVAL_ORANGE`), 15.
+
+**Status:** Complete (Pending Queue primary; explicit risk rationale).
 
 ### Required Panels (Article 15)
 
-1. **Pending Queue** — `permission_snapshot.pending`.
-2. **Decision History** — `permission_snapshot.resolved`.
-3. **Risk Classification** — risk level from `ExecutionStepSnapshot.risk` or `permission_snapshot` payload.
-4. **Approval Statistics** — `total_requested`, `total_granted`, `total_denied`.
+1. **Pending Queue** (primary) — `permission_snapshot.pending` + Approve/Deny.
+2. **Risk Classification** — composed (execution step → capability map → unknown) with reason/source.
+3. **Decision History** — `permission_snapshot.resolved` only (no invented timestamps).
+4. **Approval Statistics** — `total_requested` / `granted` / `denied` + pending count.
 
 ### Hero Section
 
 - Workspace Name: "Approval Center"
-- Current State: "`<pending>` pending"
-- Primary Metric: last decision outcome
-- Immediate Action: "Review Next"
+- Metrics: Pending · Granted · Denied · Last Decision (`resolved[0]` or "No decisions recorded")
+- Immediate Action: **Review Next** (focus only; never approve/deny)
 
 ### Files
 
-- `ai_command_center/ui/views/approval_center_view.py` (new)
-- `ai_command_center/ui/components/approval_item.py` (new)
-- `ai_command_center/ui/controller.py` (publish `PERMISSION_CHECK_RESULT`)
+- `ai_command_center/ui/views/approvals_view.py` (shell, route `approvals`)
+- `ai_command_center/ui/views/approval_center/` panels
+- `tests/ui/test_approval_center_projection.py`
+- `scripts/verify_ui_constitution.py` Phase 11E checks
 
 ### Acceptance Criteria
 
-- [ ] Pending Queue shows description, risk, timestamp, actor.
-- [ ] Approve/Deny buttons publish `PERMISSION_CHECK_RESULT`.
-- [ ] Decision History shows outcome, timestamp, summary, correlation ID.
-- [ ] Empty state explains why no approvals are pending and suggests next action.
+- [x] Pending Queue dominates layout; empty state explains next step.
+- [x] Approve/Deny publish `PERMISSION_CHECK_RESULT`.
+- [x] Risk Classification shows tier + reason + source (unknown explicit).
+- [x] Last Decision from resolved ordering only; `APPROVAL_ORANGE` documented.
 
 ---
 

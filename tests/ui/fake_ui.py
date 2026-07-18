@@ -359,6 +359,13 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.views.agent_monitor.execution_history_panel",
     "ai_command_center.ui.views.agent_monitor",
     "ai_command_center.ui.views.agents_view",
+    "ai_command_center.ui.views.approval_center.risk_classification",
+    "ai_command_center.ui.views.approval_center.pending_queue_panel",
+    "ai_command_center.ui.views.approval_center.risk_classification_panel",
+    "ai_command_center.ui.views.approval_center.decision_history_panel",
+    "ai_command_center.ui.views.approval_center.approval_statistics_panel",
+    "ai_command_center.ui.views.approval_center",
+    "ai_command_center.ui.views.approvals_view",
 )
 
 
@@ -379,6 +386,7 @@ def _patch_and_import():
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
         from ai_command_center.ui.views.executions_view import ExecutionsView
         from ai_command_center.ui.views.agents_view import AgentsView
+        from ai_command_center.ui.views.approvals_view import ApprovalsView
     finally:
         # Drop fake-bound UI modules so later tests can import real Tk widgets.
         for name in _UI_MODULES_TO_RELOAD:
@@ -392,7 +400,21 @@ def _patch_and_import():
             sys.modules.pop("tkinter", None)
         else:
             sys.modules["tkinter"] = orig_tk
-    return CommandCenterView, TopBar, WorldExplorerView, ExecutionsView, AgentsView
+    return (
+        CommandCenterView,
+        TopBar,
+        WorldExplorerView,
+        ExecutionsView,
+        AgentsView,
+        ApprovalsView,
+    )
 
 
-CommandCenterView, TopBar, WorldExplorerView, ExecutionsView, AgentsView = _patch_and_import()
+(
+    CommandCenterView,
+    TopBar,
+    WorldExplorerView,
+    ExecutionsView,
+    AgentsView,
+    ApprovalsView,
+) = _patch_and_import()
