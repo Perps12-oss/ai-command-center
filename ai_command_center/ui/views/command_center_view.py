@@ -28,6 +28,7 @@ class CommandCenterView(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self._on_command = on_command
         self._on_navigate = on_navigate
+        self._action_view = "chat"
         self._build()
 
     def _build(self) -> None:

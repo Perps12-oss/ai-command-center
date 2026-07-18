@@ -123,6 +123,7 @@ class StateApplierMixin:
                 home.update_ollama(False)
 
         chat = self._chat_view()
+        # In-view cosmetic projections only when chat is visible.
         if chat and current_view == "chat":
             chat.set_model(snap.settings.default_model)
             chat.update_entity_context(
@@ -167,62 +168,6 @@ class StateApplierMixin:
                 chat.load_history(messages)
                 self._last_chat_history_revision = snap.chat_history_revision
 
-            if (
-                snap.chat_streaming
-                and snap.active_chat_request_id
-                and snap.active_chat_request_id != self._last_started_request_id
-            ):
-                self._navigate("chat")
-                chat = self._chat_view()
-                if chat:
-                    if snap.chat_started_user_text:
-                        chat.show_user_message(snap.chat_started_user_text)
-                    chat.begin_assistant(snap.active_chat_request_id)
-                    self._last_started_request_id = snap.active_chat_request_id
-                    self._last_stream_buffer_len = 0
-
-            if (
-                snap.chat_streaming
-                and chat
-                and snap.active_chat_request_id == self._last_started_request_id
-            ):
-                buffer_len = len(snap.chat_stream_buffer)
-                if buffer_len > self._last_stream_buffer_len:
-                    delta = snap.chat_stream_buffer[self._last_stream_buffer_len :]
-                    chat.append_chunk(delta)
-                    self._last_stream_buffer_len = buffer_len
-
-            terminal_key = (str(snap.chat_status), str(snap.last_chat_request_id))
-            if snap.chat_status == "complete":
-                if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
-                    chat.finish_assistant(str(snap.last_assistant_message))
-                    if snap.last_chat_request_id not in self._completed_request_ids:
-                        self._completed_request_ids.append(snap.last_chat_request_id)
-                    self._last_started_request_id = None
-                    self._last_stream_buffer_len = 0
-                    self._top.update_status("ready", snap.settings.default_model)
-                    self._last_terminal_chat_key = terminal_key
-            elif snap.chat_status == "cancelled":
-                if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
-                    chat.show_cancelled()
-                    if snap.last_chat_request_id not in self._completed_request_ids:
-                        self._completed_request_ids.append(snap.last_chat_request_id)
-                    self._last_started_request_id = None
-                    self._last_stream_buffer_len = 0
-                    self._last_terminal_chat_key = terminal_key
-            elif snap.chat_status == "error":
-                if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
-                    self._navigate("chat")
-                    chat = self._chat_view()
-                    if chat:
-                        chat.show_error(str(snap.last_chat_error or "Unknown error"))
-                    if snap.last_chat_request_id not in self._completed_request_ids:
-                        self._completed_request_ids.append(snap.last_chat_request_id)
-                    self._last_started_request_id = None
-                    self._last_stream_buffer_len = 0
-                    self._top.update_status("error", snap.settings.default_model)
-                    self._last_terminal_chat_key = terminal_key
-
             if chat and hasattr(chat, "update_artifact_stream"):
                 req_id = snap.active_chat_request_id or snap.last_chat_request_id
                 if req_id:
@@ -234,6 +179,67 @@ class StateApplierMixin:
                     )
                     scoped = artifacts_for_request(artifact_catalog, str(req_id))
                     chat.update_artifact_stream(str(req_id), scoped)
+
+        # Streaming lifecycle must run from any view (command box is global).
+        if (
+            snap.chat_streaming
+            and snap.active_chat_request_id
+            and snap.active_chat_request_id != self._last_started_request_id
+        ):
+            self._navigate("chat")
+            chat = self._chat_view()
+            if chat:
+                if snap.chat_started_user_text:
+                    chat.show_user_message(snap.chat_started_user_text)
+                chat.begin_assistant(snap.active_chat_request_id)
+                self._last_started_request_id = snap.active_chat_request_id
+                self._last_stream_buffer_len = 0
+
+        if (
+            snap.chat_streaming
+            and chat
+            and snap.active_chat_request_id == self._last_started_request_id
+        ):
+            buffer_len = len(snap.chat_stream_buffer)
+            if buffer_len > self._last_stream_buffer_len:
+                delta = snap.chat_stream_buffer[self._last_stream_buffer_len :]
+                chat.append_chunk(delta)
+                self._last_stream_buffer_len = buffer_len
+
+        terminal_key = (str(snap.chat_status), str(snap.last_chat_request_id))
+        if snap.chat_status == "complete":
+            if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
+                chat = chat or self._chat_view()
+                if chat:
+                    chat.finish_assistant(str(snap.last_assistant_message))
+                if snap.last_chat_request_id not in self._completed_request_ids:
+                    self._completed_request_ids.append(snap.last_chat_request_id)
+                self._last_started_request_id = None
+                self._last_stream_buffer_len = 0
+                self._top.update_status("ready", snap.settings.default_model)
+                self._last_terminal_chat_key = terminal_key
+        elif snap.chat_status == "cancelled":
+            if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
+                chat = chat or self._chat_view()
+                if chat:
+                    chat.show_cancelled()
+                if snap.last_chat_request_id not in self._completed_request_ids:
+                    self._completed_request_ids.append(snap.last_chat_request_id)
+                self._last_started_request_id = None
+                self._last_stream_buffer_len = 0
+                self._last_terminal_chat_key = terminal_key
+        elif snap.chat_status == "error":
+            if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
+                self._navigate("chat")
+                chat = self._chat_view()
+                if chat:
+                    chat.show_error(str(snap.last_chat_error or "Unknown error"))
+                if snap.last_chat_request_id not in self._completed_request_ids:
+                    self._completed_request_ids.append(snap.last_chat_request_id)
+                self._last_started_request_id = None
+                self._last_stream_buffer_len = 0
+                self._top.update_status("error", snap.settings.default_model)
+                self._last_terminal_chat_key = terminal_key
 
         if snap.inspector.navigate_revision != getattr(
             self, "_last_inspector_navigate_revision", 0

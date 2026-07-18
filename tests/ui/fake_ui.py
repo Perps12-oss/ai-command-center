@@ -328,18 +328,43 @@ def _build_fake_tkinter() -> types.ModuleType:
     return mod
 
 
+# UI modules that bind customtkinter classes at import time. Must be reloaded
+# under the fake so projection tests do not inherit a prior real-Tk import.
+_UI_MODULES_TO_RELOAD = (
+    "ai_command_center.ui.components.glass_card",
+    "ai_command_center.ui.components.status_pill",
+    "ai_command_center.ui.components.top_bar",
+    "ai_command_center.ui.views.command_center_view",
+)
+
+
 def _patch_and_import():
     """Swap out real tkinter/customtkinter, import UI classes, then restore."""
     orig_ctk = sys.modules.get("customtkinter")
     orig_tk = sys.modules.get("tkinter")
+    saved_ui = {
+        name: sys.modules.pop(name)
+        for name in _UI_MODULES_TO_RELOAD
+        if name in sys.modules
+    }
     sys.modules["customtkinter"] = _build_fake_customtkinter()
     sys.modules["tkinter"] = _build_fake_tkinter()
     try:
         from ai_command_center.ui.views.command_center_view import CommandCenterView
         from ai_command_center.ui.components.top_bar import TopBar
     finally:
-        sys.modules["customtkinter"] = orig_ctk
-        sys.modules["tkinter"] = orig_tk
+        # Drop fake-bound UI modules so later tests can import real Tk widgets.
+        for name in _UI_MODULES_TO_RELOAD:
+            sys.modules.pop(name, None)
+        sys.modules.update(saved_ui)
+        if orig_ctk is None:
+            sys.modules.pop("customtkinter", None)
+        else:
+            sys.modules["customtkinter"] = orig_ctk
+        if orig_tk is None:
+            sys.modules.pop("tkinter", None)
+        else:
+            sys.modules["tkinter"] = orig_tk
     return CommandCenterView, TopBar
 
 

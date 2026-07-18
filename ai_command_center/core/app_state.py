@@ -2048,10 +2048,11 @@ def _reduce_execution_inspector_snapshot(state: AppState, event: Event) -> AppSt
         execution_timeline=state.execution_timeline,
         recent_execution_events=state.recent_execution_events,
         planner_last_plan=planner_last_plan,
-        revision=state.execution_inspector.revision + 1,
+        revision=state.execution_inspector.revision,
     )
     if new_snap == state.execution_inspector:
         return state
+    new_snap = new_snap.with_revision(state.execution_inspector.revision + 1)
     return replace(
         state,
         execution_inspector=new_snap,
