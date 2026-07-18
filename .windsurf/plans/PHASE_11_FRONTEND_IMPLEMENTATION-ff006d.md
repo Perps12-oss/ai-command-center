@@ -105,7 +105,7 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 - Workspace Name: "World Model"
 - Current State: "`<node_count>` entities, `<edge_count>` relationships"
 - Primary Metric: active goals count
-- Immediate Action: "New Entity" (publishes `WORLD_MODEL_MUTATION_APPLIED`)
+- Immediate Action: "New Entity" (publishes `ENTITY_CREATE_REQUEST`; never `WORLD_MODEL_MUTATION_APPLIED`)
 
 ### Files
 
