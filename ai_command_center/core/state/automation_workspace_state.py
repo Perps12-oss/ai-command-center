@@ -14,8 +14,6 @@ from ai_command_center.core.events.topics import (
     WORKFLOW_FAILED,
     WORKFLOW_RUNS_LOADED,
     WORKFLOW_STARTED,
-    WORKFLOW_STEP_COMPLETED,
-    WORKFLOW_STEP_STARTED,
 )
 from ai_command_center.core.projectors.automation_workspace_projector import (
     AutomationWorkspaceProjector,
@@ -27,8 +25,6 @@ from ai_command_center.domain.automation_workspace import (
 
 _WORKFLOW_TOPICS = {
     WORKFLOW_STARTED,
-    WORKFLOW_STEP_STARTED,
-    WORKFLOW_STEP_COMPLETED,
     WORKFLOW_COMPLETED,
     WORKFLOW_FAILED,
     WORKFLOW_RUNS_LOADED,

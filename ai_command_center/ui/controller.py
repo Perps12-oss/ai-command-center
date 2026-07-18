@@ -15,6 +15,7 @@ from ai_command_center.core.events.topics import (
     CHAT_EXPORT_REQUEST,
     CLIPBOARD_CONTENT,
     CLIPBOARD_REQUEST,
+    ENTITY_CREATE_REQUEST,
     MEMORY_DELETE_REQUEST,
     MEMORY_REMEMBER,
     NOTE_SELECT,
@@ -47,6 +48,7 @@ from ai_command_center.core.events.topics import (
     UI_AUTOMATION_SELECT,
     UI_WORKFLOW_RUN,
     WORKFLOW_START,
+    WORLD_MODEL_NODE_SELECTED,
 )
 
 
@@ -98,26 +100,40 @@ class UIController:
     def current_workspace_scope(self) -> dict[str, str]:
         """Workspace scope derived from AppState for UI-originated intents."""
         snap = self._state_store.snapshot
+        workspace_entity = getattr(snap, "workspace_entity", None)
         scope: dict[str, str] = {}
-        active_ws = str(snap.active_workspace_id).strip()
+        active_ws = str(
+            getattr(workspace_entity, "active_workspace_id", snap.active_workspace_id)
+        ).strip()
         if active_ws:
             scope["workspace_id"] = active_ws
-            if snap.active_workspace_title:
-                scope["active_workspace_title"] = snap.active_workspace_title
+            title = str(
+                getattr(workspace_entity, "active_workspace_title", snap.active_workspace_title)
+            ).strip()
+            if title:
+                scope["active_workspace_title"] = title
         entity = self.active_chat_workspace_entity()
         if entity is None:
-            selected_id = str(snap.selected_entity_id).strip()
+            selected_id = str(
+                getattr(workspace_entity, "selected_entity_id", snap.selected_entity_id)
+            ).strip()
             if selected_id:
                 scope["workspace_entity_id"] = selected_id
-                if snap.selected_entity_type:
-                    scope["workspace_entity_type"] = snap.selected_entity_type
-                if snap.selected_entity_title:
-                    scope["workspace_entity_title"] = snap.selected_entity_title
+                selected_type = str(
+                    getattr(workspace_entity, "selected_entity_type", snap.selected_entity_type)
+                ).strip()
+                selected_title = str(
+                    getattr(workspace_entity, "selected_entity_title", snap.selected_entity_title)
+                ).strip()
+                if selected_type:
+                    scope["workspace_entity_type"] = selected_type
+                if selected_title:
+                    scope["workspace_entity_title"] = selected_title
                 scope["selected_entity_id"] = selected_id
-                if snap.selected_entity_type:
-                    scope["selected_entity_type"] = snap.selected_entity_type
-                if snap.selected_entity_title:
-                    scope["selected_entity_title"] = snap.selected_entity_title
+                if selected_type:
+                    scope["selected_entity_type"] = selected_type
+                if selected_title:
+                    scope["selected_entity_title"] = selected_title
             return scope
         scope["workspace_entity_id"] = entity["entity_id"]
         scope["workspace_entity_type"] = entity.get("entity_type", "")
@@ -490,3 +506,31 @@ class UIController:
             text = None
         if text:
             self._bus.publish(CLIPBOARD_CONTENT, {"text": text}, source="ui")
+
+    def publish_world_model_node_selected(self, node_id: str) -> None:
+        """Publish world-model node selection intent."""
+        self._bus.publish(
+            WORLD_MODEL_NODE_SELECTED,
+            {"node_id": str(node_id)},
+            source="ui",
+        )
+
+    def publish_entity_create_request(
+        self,
+        *,
+        entity_type: str = "note",
+        title: str = "New Entity",
+        description: str = "",
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        """Publish entity creation intent (never WORLD_MODEL_MUTATION_APPLIED)."""
+        self._bus.publish(
+            ENTITY_CREATE_REQUEST,
+            {
+                "entity_type": str(entity_type),
+                "title": str(title),
+                "description": str(description),
+                "metadata": dict(metadata or {}),
+            },
+            source="ui",
+        )

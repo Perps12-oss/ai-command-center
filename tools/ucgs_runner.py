@@ -42,6 +42,7 @@ def _collect_git_diff(project_root: Path) -> tuple[list[str], str, bool]:
             cwd=project_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
         )
         diff = subprocess.run(
@@ -49,6 +50,7 @@ def _collect_git_diff(project_root: Path) -> tuple[list[str], str, bool]:
             cwd=project_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
         )
         if staged.returncode != 0 or diff.returncode != 0:
