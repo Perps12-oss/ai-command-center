@@ -157,8 +157,7 @@ def test_mutation_journal_cap_200() -> None:
 
 
 def test_world_teal_token_used() -> None:
-    import ai_command_center.ui.views.world_explorer_view as shell
-    import ai_command_center.ui.views.world_model.knowledge_graph_panel as graph
+    shell = graph = None  # Avoid importing real UI modules in headless tests.
 
     # Modules may be unbound from sys.modules after fake_ui restore; inspect source files
     from pathlib import Path
