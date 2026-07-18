@@ -121,3 +121,17 @@ def truth_validation_color(state: str) -> tuple[str, str]:
     if s in {"failed", "false", "invalid", "error", "rejected"}:
         return _ERROR
     return _OFFLINE
+
+
+def mutation_type_color(mutation_type: str) -> str:
+    """Foreground color for World Model mutation journal entry types."""
+    s = str(mutation_type or "").lower().strip()
+    mapping = {
+        "create_node": T.STATUS_READY,
+        "update_node": T.EXECUTION_BLUE,
+        "delete_node": T.STATUS_ERROR,
+        "create_edge": T.AGENT_PURPLE,
+        "delete_edge": T.STATUS_ERROR,
+        "unknown": T.TEXT_MUTED,
+    }
+    return mapping.get(s, T.TEXT_MUTED)

@@ -25,6 +25,7 @@ from ai_command_center.ui.views.execution_center import (
 )
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
+    article18_loading,
     domain_error_from_snap,
     set_surface_state,
 )
@@ -155,7 +156,15 @@ class ExecutionsView(ctk.CTkFrame):
     def apply_state(self, snapshot: AppState | list[Any] | None) -> None:
         """Project AppState into all panels. List[Any] legacy path ignored."""
         if snapshot is None:
-            set_surface_state(self._surface_state, kind="loading")
+            set_surface_state(
+                self._surface_state,
+                kind="loading",
+                message=article18_loading(
+                    status="Status: loading Execution Center",
+                    what="execution_library run history and active plan",
+                    next_action="Wait for AppState refresh; Hero stays disabled until a run exists.",
+                ),
+            )
             self._hero_target_id = ""
             self._hero_action.configure(text="No Executions", state="disabled")
             return

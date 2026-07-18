@@ -82,6 +82,28 @@ PHASE_11F_FILES: tuple[Path, ...] = (
     UI_ROOT / "views" / "goal_dashboard" / "goal_history_panel.py",
 )
 
+PHASE_11_WORKSPACE_FILES: tuple[Path, ...] = (
+    *PHASE_11A_FILES,
+    *PHASE_11B_FILES,
+    *PHASE_11C_FILES,
+    *PHASE_11D_FILES,
+    *PHASE_11E_FILES,
+    *PHASE_11F_FILES,
+    UI_ROOT / "views" / "surface_state.py",
+    UI_ROOT / "views" / "command_center_view.py",
+    UI_ROOT / "views" / "executions_view.py",
+)
+
+STATUS_TOKEN_CONSUMERS: tuple[Path, ...] = (
+    UI_ROOT / "components" / "timeline_renderer.py",
+    UI_ROOT / "components" / "trace_tree.py",
+    UI_ROOT / "views" / "dependency_inspector_view.py",
+    UI_ROOT / "views" / "chat" / "chat_header.py",
+    UI_ROOT / "views" / "chat" / "tool_execution_card.py",
+    UI_ROOT / "views" / "chat" / "inspector" / "inspector_provider_tab.py",
+    UI_ROOT / "views" / "providers" / "provider_live_monitor.py",
+)
+
 
 class Violation:
     """Collects a single constitutional violation."""
@@ -204,13 +226,19 @@ def _check_view_registry(v: Violation) -> None:
 
 
 def _check_no_placeholders(v: Violation) -> None:
-    """Fail if known placeholder markers remain in Phase 11A UI source or if PlaceholderView persists."""
+    """Fail if prohibited markers remain in any Phase 11 workspace source."""
     markers = ("TODO", "FIXME", "COMING_SOON", "PLACEHOLDER", "TEMP", "MOCK", "DUMMY", "STUB")
-    for path in PHASE_11A_FILES:
+    seen: set[Path] = set()
+    for path in PHASE_11_WORKSPACE_FILES:
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
         text = _read(path)
         for marker in markers:
             if re.search(rf"\b{re.escape(marker)}\b", text):
                 v.add(f"{path.relative_to(REPO)} contains placeholder marker '{marker}'")
+        if re.search(r"coming\s+soon", text, re.IGNORECASE):
+            v.add(f"{path.relative_to(REPO)} contains 'coming soon' language")
 
     placeholder_file = UI_ROOT / "views" / "placeholder.py"
     if placeholder_file.exists() and "class PlaceholderView" in _read(placeholder_file):
@@ -219,6 +247,45 @@ def _check_no_placeholders(v: Violation) -> None:
     view_manager = UI_ROOT / "shell" / "view_manager.py"
     if "PlaceholderView" in _read(view_manager):
         v.add("view_manager.py still references PlaceholderView")
+
+    gallery = UI_ROOT / "views" / "component_gallery_view.py"
+    if gallery.exists():
+        v.add("Orphan ComponentGalleryView file remains; remove or register it")
+
+
+def _check_status_token_consolidation(v: Violation) -> None:
+    """Require listed consumers to import status_tokens; ban local status color dicts."""
+    for path in STATUS_TOKEN_CONSUMERS:
+        if not path.exists():
+            v.add(f"Missing status-token consumer: {path.relative_to(REPO)}")
+            continue
+        text = _read(path)
+        if "status_tokens" not in text:
+            v.add(f"{path.relative_to(REPO)} must import ai_command_center.ui.design_system.status_tokens")
+        if re.search(r"_STATUS_COLORS\s*=", text) or re.search(r"_GOAL_STATUS_COLORS\s*=", text):
+            v.add(f"{path.relative_to(REPO)} still defines a local status color map")
+        if re.search(r"_MUTATION_COLORS\s*=", text):
+            v.add(f"{path.relative_to(REPO)} still defines a local mutation color map")
+
+
+def _check_command_center_naming(v: Violation) -> None:
+    """Canonical workspace name is Command Center (not AI Command Center)."""
+    shell = _read(UI_ROOT / "views" / "command_center_view.py")
+    if 'text="AI Command Center"' in shell:
+        v.add("Command Center hero title must be 'Command Center' (canonical)")
+    if 'text="Command Center"' not in shell:
+        v.add("Command Center hero title 'Command Center' missing")
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("command_center", "Command Center")' not in sidebar:
+        v.add("Sidebar label for command_center is not 'Command Center'")
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    for token in ("GOAL_AMBER", "WORLD_TEAL", "EXECUTION_BLUE", "AGENT_PURPLE", "APPROVAL_ORANGE"):
+        if token not in constitution:
+            v.add(f"UI_CONSTITUTION.md missing workspace token {token}")
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    for token in ("GOAL_AMBER", "WORLD_TEAL", "EXECUTION_BLUE", "AGENT_PURPLE", "APPROVAL_ORANGE"):
+        if token not in theme:
+            v.add(f"theme_v2.py missing workspace token {token}")
 
 
 def _check_route_reachability(v: Violation) -> None:
@@ -650,11 +717,13 @@ def main() -> int:
     v = Violation()
     _check_no_local_status_maps(v)
     _check_status_tokens_usage(v)
+    _check_status_token_consolidation(v)
     _check_top_bar_pills(v)
     _check_hero_action(v)
     _check_ops_cards_timestamp(v)
     _check_view_registry(v)
     _check_no_placeholders(v)
+    _check_command_center_naming(v)
     _check_route_reachability(v)
     _check_theme_tokens(v)
     _check_world_model_workspace(v)

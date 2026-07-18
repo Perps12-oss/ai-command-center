@@ -48,7 +48,7 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 | Component | Article | Content |
 |---|---|---|
-| Hero Section | 7, 8 | Workspace name "Command Center", current state, active goal, critical summary, immediate action |
+| Hero Section | 7, 8 | Workspace name **Command Center** (canonical), current state, active goal, critical summary, immediate action |
 | Operations Grid | 8, 10 | Cards for Executions, Agents, Approvals, Providers — each with header, metric, status, timestamp, action |
 | System Awareness | 8 | World Model summary, knowledge stats, recent changes |
 
@@ -95,7 +95,7 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 **Objective:** Make the knowledge graph a first-class operating surface.
 
-**UI Constitution Articles:** 5 (Teal), 12.
+**UI Constitution Articles:** 5 (`WORLD_TEAL`), 12.
 
 ### Required Panels (Article 12)
 

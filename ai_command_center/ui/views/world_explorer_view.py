@@ -19,6 +19,7 @@ from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
+    article18_loading,
     domain_error_from_snap,
     set_surface_state,
 )
@@ -136,7 +137,15 @@ class WorldExplorerView(ctk.CTkFrame):
     def apply_state(self, snapshot: AppState | WorldModelSnapshot | None) -> None:
         """Project AppState (or WorldModelSnapshot) into all panels."""
         if snapshot is None:
-            set_surface_state(self._surface_state, kind="loading")
+            set_surface_state(
+                self._surface_state,
+                kind="loading",
+                message=article18_loading(
+                    status="Status: loading World Model",
+                    what="world_model nodes, edges, and mutation journal",
+                    next_action="Wait for AppState refresh; then create or select an entity.",
+                ),
+            )
             return
         if isinstance(snapshot, WorldModelSnapshot):
             wm = snapshot

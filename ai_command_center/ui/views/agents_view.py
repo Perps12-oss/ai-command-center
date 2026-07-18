@@ -26,6 +26,7 @@ from ai_command_center.ui.views.agent_monitor import (
 )
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
+    article18_loading,
     domain_error_from_snap,
     set_surface_state,
 )
@@ -139,7 +140,15 @@ class AgentsView(ctk.CTkFrame):
     def apply_state(self, snapshot: AppState | Any | None) -> None:
         """Project AppState.agent_pipeline into Hero + all panels."""
         if snapshot is None:
-            set_surface_state(self._surface_state, kind="loading")
+            set_surface_state(
+                self._surface_state,
+                kind="loading",
+                message=article18_loading(
+                    status="Status: loading Agent Monitor",
+                    what="agent_pipeline runs and pipeline stage",
+                    next_action="Wait for AppState refresh; then cancel or inspect a run.",
+                ),
+            )
             return
         if isinstance(snapshot, AppState):
             pipeline = snapshot.agent_pipeline

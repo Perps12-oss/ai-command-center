@@ -31,6 +31,7 @@ from ai_command_center.ui.views.goal_dashboard.goal_sorting import (
 )
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
+    article18_loading,
     domain_error_from_snap,
     set_surface_state,
 )
@@ -151,7 +152,15 @@ class GoalView(ctk.CTkFrame):
     def apply_state(self, snapshot: AppState | Any | None) -> None:
         """Project AppState.brain_state into Hero + panels."""
         if snapshot is None:
-            set_surface_state(self._surface_state, kind="loading")
+            set_surface_state(
+                self._surface_state,
+                kind="loading",
+                message=article18_loading(
+                    status="Status: loading Goal Dashboard",
+                    what="brain_state.recent_goals and plan projection",
+                    next_action="Wait for AppState refresh; then click New Goal if empty.",
+                ),
+            )
             return
         if not isinstance(snapshot, AppState):
             return

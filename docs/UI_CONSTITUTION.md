@@ -250,6 +250,10 @@ Color:
 
 Teal
 
+Token:
+
+`WORLD_TEAL`
+
 Purpose:
 
 Knowledge

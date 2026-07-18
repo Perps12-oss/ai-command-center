@@ -28,6 +28,7 @@ from ai_command_center.ui.views.approval_center import (
 )
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
+    article18_loading,
     domain_error_from_snap,
     set_surface_state,
 )
@@ -149,7 +150,15 @@ class ApprovalsView(ctk.CTkFrame):
     def apply_state(self, snapshot: AppState | Any | None) -> None:
         """Project AppState.permission_snapshot into Hero + panels."""
         if snapshot is None:
-            set_surface_state(self._surface_state, kind="loading")
+            set_surface_state(
+                self._surface_state,
+                kind="loading",
+                message=article18_loading(
+                    status="Status: loading Approval Center",
+                    what="permission_snapshot pending and resolved decisions",
+                    next_action="Wait for AppState refresh; then Review Next pending item.",
+                ),
+            )
             return
         if not isinstance(snapshot, AppState):
             return

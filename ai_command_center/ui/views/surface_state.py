@@ -19,6 +19,11 @@ def article18_empty(*, why: str, creates: str, next_action: str) -> str:
     return f"{why}\n{creates}\nNext: {next_action}"
 
 
+def article18_loading(*, status: str, what: str, next_action: str) -> str:
+    """Format a three-part loading banner (status / what / next action)."""
+    return f"{status}\nLoading: {what}\nNext: {next_action}"
+
+
 def domain_error_from_snap(
     snap: Any,
     *,
@@ -71,7 +76,15 @@ def set_surface_state(
     """
     kind = (kind or "data").lower().strip()
     if kind == "loading":
-        label.configure(text=LOADING_TEXT, text_color=T.TEXT_MUTED)
+        label.configure(
+            text=message
+            or article18_loading(
+                status="Status: loading workspace projection",
+                what="AppState snapshot for this surface",
+                next_action="Wait for the next state refresh; no action required.",
+            ),
+            text_color=T.TEXT_MUTED,
+        )
     elif kind == "error":
         label.configure(
             text=message or "An error occurred.",

@@ -16,6 +16,7 @@ from ai_command_center.ui.design_system.status_tokens import (
 )
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
+    article18_loading,
     domain_error_from_snap,
     set_surface_state,
 )
@@ -46,7 +47,7 @@ class CommandCenterView(ctk.CTkFrame):
 
         ctk.CTkLabel(
             hero_top,
-            text="AI Command Center",
+            text="Command Center",
             font=T.FONT_TITLE,
             text_color=T.TEXT_PRIMARY,
         ).pack(side="left")
@@ -197,19 +198,16 @@ class CommandCenterView(ctk.CTkFrame):
     def apply_state(self, snap: Any) -> None:
         """Project AppState into the dashboard."""
         if snap is None:
-            set_surface_state(self._surface_state, kind="loading")
+            set_surface_state(
+                self._surface_state,
+                kind="loading",
+                message=article18_loading(
+                    status="Status: loading Command Center",
+                    what="brain_state, executions, agents, approvals, providers, world_model",
+                    next_action="Wait for AppState refresh; then use the Hero action.",
+                ),
+            )
             return
-
-        err = domain_error_from_snap(
-            snap,
-            topic_prefixes=("service.", "app.", "tool."),
-        )
-        if err:
-            set_surface_state(self._surface_state, kind="error", message=err)
-        else:
-            # Command Center always has structural health rows; treat as Data
-            # once a snapshot arrives (empty activity is shown in Recent Changes).
-            set_surface_state(self._surface_state, kind="data")
 
         now = time.time()
         brain_state = getattr(snap, "brain_state", None)
@@ -251,6 +249,33 @@ class CommandCenterView(ctk.CTkFrame):
         mutation_count = getattr(world_model, "mutation_count", 0) if world_model else 0
 
         active_goal_count = sum(1 for g in goals if getattr(g, "status", "") == "active")
+
+        err = domain_error_from_snap(
+            snap,
+            topic_prefixes=("service.", "app.", "tool."),
+        )
+        quiet = (
+            active_goal_count == 0
+            and running_count == 0
+            and pending_count == 0
+            and agent_count == 0
+            and mutation_count == 0
+        )
+        if err:
+            set_surface_state(self._surface_state, kind="error", message=err)
+        elif quiet:
+            set_surface_state(
+                self._surface_state,
+                kind="empty",
+                message=article18_empty(
+                    why="Command Center has no active goals, executions, agents, or approvals yet.",
+                    creates="Activity appears when goals run, executions start, "
+                    "agents spawn, or approvals are requested.",
+                    next_action="Click New Goal or Open Chat from the Hero to begin.",
+                ),
+            )
+        else:
+            set_surface_state(self._surface_state, kind="data")
 
         # Update hero
         self._status_label.configure(
