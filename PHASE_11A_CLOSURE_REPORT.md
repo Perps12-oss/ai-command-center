@@ -78,8 +78,8 @@ Skipped tests are expected platform gates (`test_artifact_stream_ui.py` cannot i
 
 ## 6. Known Items
 
-- `.windsurf/` contains local IDE plan files and is intentionally left untracked.
-- UCGS runner scripts (`tools/ucgs_runner.py`, `tools/ucgs_ci_gate.py`) are not present in this checkout; the `verify_constitution.py` gate was used instead.
+- `.windsurf/plans/` contains local IDE planning documents (currently tracked in this PR).
+- UCGS runner scripts (`tools/ucgs_runner.py`, `tools/ucgs_ci_gate.py`) are present; this report used the `verify_constitution.py` gate instead.
 
 ## 7. Conclusion
 
