@@ -124,7 +124,7 @@ class EventCoordinatorMixin:
             home = self._home_view()
             if home:
                 home.update_vault(indexing=False, files=files, ms=ms)
-            self._apply_state()
+            self._queue_state_refresh()
 
         self._ui_queue.enqueue(update)
 
@@ -212,7 +212,7 @@ class EventCoordinatorMixin:
             system = self._system_view()
             if system:
                 system.push_tool_event(f"{tool}: {summary}")
-            self._apply_state()
+            self._queue_state_refresh()
 
         self._ui_queue.enqueue(update)
 
@@ -276,7 +276,7 @@ class EventCoordinatorMixin:
         def update() -> None:
             self._overlay_mode = mode
             self._apply_overlay_geometry(mode, x, y)
-            self._apply_state()
+            self._queue_state_refresh()
 
         self._ui_queue.enqueue(update)
 
@@ -318,11 +318,11 @@ class EventCoordinatorMixin:
 
     def _on_system_snapshot(self, event: Event) -> None:
         """Refresh system meters only; AppState owns structural projection."""
+        if getattr(self, "_current_view", "") != "system":
+            return
         payload = event.payload or {}
 
         def update() -> None:
-            if getattr(self, "_current_view", "") != "system":
-                return
             system = self._system_view()
             if system is None:
                 return
@@ -347,7 +347,7 @@ class EventCoordinatorMixin:
             home = self._home_view()
             if home:
                 home.update_ollama(online, model)
-            self._apply_state()
+            self._queue_state_refresh()
 
         self._ui_queue.enqueue(update)
 
@@ -369,7 +369,7 @@ class EventCoordinatorMixin:
             home = self._home_view()
             if home:
                 home.apply_command_history(payload)
-            self._apply_state()
+            self._queue_state_refresh()
 
         self._ui_queue.enqueue(update)
 

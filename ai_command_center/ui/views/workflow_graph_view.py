@@ -146,14 +146,14 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._library = WorkflowNodeLibrary(left, on_preview=self._handle_node_preview)
         self._library.pack(fill="both", expand=True)
 
-        self._canvas = GraphCanvas(
+        self._graph_canvas = GraphCanvas(
             center,
             on_node_select=self._handle_node_select,
             on_node_move=self._handle_node_move,
             on_edge_create=self._handle_edge_create,
             on_edge_delete=self._handle_edge_delete,
         )
-        self._canvas.pack(fill="both", expand=True)
+        self._graph_canvas.pack(fill="both", expand=True)
 
         bottom = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=0, height=220)
         bottom.pack(fill="x")
@@ -226,7 +226,7 @@ class WorkflowGraphView(ctk.CTkFrame):
 
     def _handle_undo(self) -> None:
         """Handle undo for graph edits."""
-        self._canvas.record_node_move("", 0, 0)  # Trigger undo via canvas
+        self._graph_canvas.record_node_move("", 0, 0)  # Trigger undo via canvas
         self._update_toolbar_buttons()
 
     def _handle_redo(self) -> None:
@@ -241,24 +241,24 @@ class WorkflowGraphView(ctk.CTkFrame):
 
     def _handle_zoom_in(self) -> None:
         """Zoom in the canvas."""
-        self._canvas.zoom_in()
-        self._toolbar.set_zoom_level(self._canvas.get_zoom_level())
+        self._graph_canvas.zoom_in()
+        self._toolbar.set_zoom_level(self._graph_canvas.get_zoom_level())
 
     def _handle_zoom_out(self) -> None:
         """Zoom out the canvas."""
-        self._canvas.zoom_out()
-        self._toolbar.set_zoom_level(self._canvas.get_zoom_level())
+        self._graph_canvas.zoom_out()
+        self._toolbar.set_zoom_level(self._graph_canvas.get_zoom_level())
 
     def _handle_zoom_reset(self) -> None:
         """Reset zoom to 100%."""
-        self._canvas.zoom_reset()
-        self._toolbar.set_zoom_level(self._canvas.get_zoom_level())
+        self._graph_canvas.zoom_reset()
+        self._toolbar.set_zoom_level(self._graph_canvas.get_zoom_level())
 
     def _update_toolbar_buttons(self) -> None:
         """Update toolbar button states based on canvas state."""
-        self._toolbar.set_undo_enabled(self._canvas.can_undo())
-        self._toolbar.set_redo_enabled(self._canvas.can_redo())
-        self._toolbar.set_zoom_level(self._canvas.get_zoom_level())
+        self._toolbar.set_undo_enabled(self._graph_canvas.can_undo())
+        self._toolbar.set_redo_enabled(self._graph_canvas.can_redo())
+        self._toolbar.set_zoom_level(self._graph_canvas.get_zoom_level())
 
     def _handle_node_preview(self, category: str, label: str) -> None:
         node_id = f"lib-{category.lower()}-{label.lower().replace(' ', '-')}"
@@ -270,7 +270,7 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._on_node_select(node.node_id, node.label, workflow_id)
         if self._graph_state is not None:
             graph = self._graph_from_state(self._graph_state)
-            self._canvas.render(graph, selected_node_ids={node.node_id})
+            self._graph_canvas.render(graph, selected_node_ids={node.node_id})
 
     def _handle_node_move(self, node_id: str, x: float, y: float) -> None:
         self._on_node_move(node_id, x, y)
@@ -351,7 +351,7 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._toolbar.set_running(state.running)
         graph = self._graph_from_state(state)
         selected_ids = {state.selected_node_id} if state.selected_node_id else set()
-        self._canvas.render(graph, selected_node_ids=selected_ids)
+        self._graph_canvas.render(graph, selected_node_ids=selected_ids)
         self._update_toolbar_buttons()
 
         steps = [

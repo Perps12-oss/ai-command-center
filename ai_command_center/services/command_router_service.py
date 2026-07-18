@@ -36,6 +36,15 @@ _VIEW_ALIASES: dict[str, str] = {
     "workspace": "workspace",
     "system": "system",
     "memory": "memory",
+    "command_center": "command_center",
+    "goals": "goals",
+    "agents": "agents",
+    "approvals": "approvals",
+    "providers": "providers",
+    "executions": "executions",
+    "automation": "automation",
+    "capabilities": "capabilities",
+    "artifacts": "artifacts",
 }
 
 # Navigation and inspector flows may proceed without an active workspace (soft gate).

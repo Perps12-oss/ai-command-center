@@ -120,12 +120,14 @@ class NotesView(ctk.CTkFrame):
 
     def load_from_appstate(self, snap) -> None:
         """Render notes catalog and selected note from AppState projection."""
+        notes_memory = getattr(snap, "notes_memory", None)
+        catalog = notes_memory.notes_catalog if notes_memory is not None else snap.notes_catalog
+        selected = notes_memory.note_selected if notes_memory is not None else snap.note_selected
         results = [
             {"path": item.path, "title": item.title, "snippet": item.snippet}
-            for item in snap.notes_catalog
+            for item in catalog
         ]
         self.show_results("", results)
-        selected = snap.note_selected
         if selected:
             self.show_preview(selected.path, selected.title, selected.snippet)
 

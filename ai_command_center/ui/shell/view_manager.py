@@ -4,14 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import customtkinter as ctk
+
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.views.chat_view import ChatView
+from ai_command_center.ui.views.agents_view import AgentsView
+from ai_command_center.ui.views.approvals_view import ApprovalsView
+from ai_command_center.ui.views.command_center_view import CommandCenterView
 from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
+from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
-from ai_command_center.ui.views.placeholder import PlaceholderView
 from ai_command_center.ui.views.plugins_view import PluginsView
 from ai_command_center.ui.views.providers_view import ProvidersView
 from ai_command_center.ui.views.capabilities_view import CapabilitiesView
@@ -32,6 +37,7 @@ ViewFactory = Callable[[], object]
 
 VIEW_IDS: tuple[str, ...] = (
     "workspace",
+    "command_center",
     "home",
     "chat",
     "executions",
@@ -50,6 +56,9 @@ VIEW_IDS: tuple[str, ...] = (
     "plugins",
     "settings",
     "gallery",
+    "goals",
+    "agents",
+    "approvals",
 )
 
 
@@ -70,6 +79,26 @@ class ViewManagerMixin:
         self._view_registry["home"] = lambda: HomeView(
             self._content,
             on_command=self._on_command,
+        )
+        self._view_registry["command_center"] = lambda: CommandCenterView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
+        self._view_registry["goals"] = lambda: GoalView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
+        self._view_registry["agents"] = lambda: AgentsView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
+        self._view_registry["approvals"] = lambda: ApprovalsView(
+            self._content,
+            on_command=self._on_command,
+            on_navigate=self._navigate,
         )
         self._view_registry["chat"] = lambda: ChatView(
             self._content,
@@ -106,6 +135,7 @@ class ViewManagerMixin:
             self._content,
             on_select=self._on_execution_select,
             on_scrub=self._on_execution_timeline_scrub,
+            on_navigate=self._navigate,
         )
         self._view_registry["timeline"] = lambda: ExecutionTimelineView(
             self._content,
@@ -137,8 +167,9 @@ class ViewManagerMixin:
         )
         self._view_registry["world_explorer"] = lambda: WorldExplorerView(
             self._content,
-            bus=self._bus,
-            state=self._world_model_state,
+            on_select=self._controller.publish_world_model_node_selected,
+            on_create_entity=self._on_world_model_create_entity,
+            on_navigate=self._navigate,
         )
         self._view_registry["relationships"] = lambda: RelationshipView(
             self._content,
@@ -161,7 +192,12 @@ class ViewManagerMixin:
                 if view_id == "timeline" and hasattr(view, "apply_state"):
                     view.apply_state(list(self._controller.snapshot().execution_timeline.events))
             else:
-                self._views[view_id] = PlaceholderView(self._content, view_id)
+                self._views[view_id] = ctk.CTkLabel(
+                    self._content,
+                    text=f"View '{view_id}' is not registered",
+                    font=("Segoe UI", 14),
+                    text_color="red",
+                )
         return self._views[view_id]
 
     def _home_view(self) -> HomeView | None:
@@ -192,8 +228,23 @@ class ViewManagerMixin:
         v = self._views.get("workspace")
         return v if isinstance(v, WorkspaceView) else None
 
+    def _command_center_view(self) -> CommandCenterView | None:
+        v = self._views.get("command_center")
+        return v if isinstance(v, CommandCenterView) else None
+
+    def _world_explorer_view(self) -> WorldExplorerView | None:
+        v = self._views.get("world_explorer")
+        return v if isinstance(v, WorldExplorerView) else None
+
+    def _on_world_model_create_entity(self) -> None:
+        """Hero New Entity → ENTITY_CREATE_REQUEST via UIController."""
+        self._controller.publish_entity_create_request(
+            entity_type="note",
+            title="New Entity",
+        )
+
     def _workspace_os_routing_enabled(self) -> bool:
-        return self._default_view == "workspace"
+        return getattr(self, "_workspace_os_enabled", self._default_view == "workspace")
 
     def _policy_resolve_view(self, view_id: str) -> str:
         """Workspace-centric routing: chat consumes active workspace scope."""
@@ -228,6 +279,9 @@ class ViewManagerMixin:
             chat = self._chat_view()
             if chat:
                 chat.focus_input()
+
+        if hasattr(self, "_queue_state_refresh"):
+            self._queue_state_refresh()
 
     def _on_sidebar_navigate(self, view_id: str) -> None:
         self._navigate(view_id)
@@ -389,6 +443,18 @@ class ViewManagerMixin:
     def _executions_view(self) -> "ExecutionsView | None":
         v = self._views.get("executions")
         return v if isinstance(v, ExecutionsView) else None
+
+    def _goal_view(self) -> "GoalView | None":
+        v = self._views.get("goals")
+        return v if isinstance(v, GoalView) else None
+
+    def _agents_view(self) -> "AgentsView | None":
+        v = self._views.get("agents")
+        return v if isinstance(v, AgentsView) else None
+
+    def _approvals_view(self) -> "ApprovalsView | None":
+        v = self._views.get("approvals")
+        return v if isinstance(v, ApprovalsView) else None
 
     def _timeline_view(self) -> ExecutionTimelineView | None:
         v = self._views.get("timeline")

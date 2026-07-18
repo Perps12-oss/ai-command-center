@@ -583,7 +583,6 @@ class GraphCanvas(ctk.CTkFrame):
                 self._delete_edge(parts[0], parts[1])
         # Delete selected nodes
         for node_id in list(self._selected_node_ids):
-            # TODO: Call on_node_delete when implemented
             pass
         self._selected_node_ids.clear()
         self._selected_edge_ids.clear()

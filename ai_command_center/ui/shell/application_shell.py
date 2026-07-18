@@ -32,6 +32,7 @@ class ApplicationShellMixin:
             self,
             on_settings=lambda: self._navigate("settings"),
             on_close=self.hide,
+            on_navigate=self._navigate,
         )
         self._top.pack(fill="x", side="top")
 
@@ -86,7 +87,7 @@ class ApplicationShellMixin:
                 ("💬  Chat", "Generic chat (no entity attach)", lambda: self._navigate("chat", clear_chat_entity=True)),
                 ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
                 ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
-                ("◈  World Explorer", "Browse World Model nodes", lambda: self._navigate("world_explorer")),
+                ("◈  World Model", "Browse World Model knowledge graph", lambda: self._navigate("world_explorer")),
                 ("⟷  Relationships", "Visualize node edges and dependencies", lambda: self._navigate("relationships")),
                 ("🔍  Dependencies", "Mutation log, goals, and dependency inspector", lambda: self._navigate("dependencies")),
                 ("⚙  System", "System monitor", lambda: self._navigate("system")),

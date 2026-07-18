@@ -140,6 +140,16 @@ from ai_command_center.domain.orchestration_run_snapshot import (
 from ai_command_center.domain.execution_inspector_snapshot import (
     ExecutionInspectorSnapshot,
 )
+from ai_command_center.domain.model_artifact_snapshot import ModelArtifactSnapshot
+from ai_command_center.domain.workspace_entity_snapshot import (
+    WorkspaceEntityItem as WorkspaceEntitySnapshotItem,
+    WorkspaceEntitySnapshot,
+)
+from ai_command_center.domain.notes_memory_snapshot import (
+    MemoryCatalogItem as NotesMemoryCatalogItem,
+    NoteCatalogItem as NotesMemoryNoteItem,
+    NotesMemorySnapshot,
+)
 from ai_command_center.core.state.artifact_state import ARTIFACT_REDUCERS, ArtifactCatalogItem
 from ai_command_center.core.state.execution_event_state import (
     EXECUTION_EVENT_REDUCERS,
@@ -514,8 +524,11 @@ class AppState:
     settings: SettingsSnapshot = field(default_factory=SettingsSnapshot)
     system_snapshot: SystemSnapshot = field(default_factory=SystemSnapshot)
     workspace_os: WorkspaceOsSnapshot = field(default_factory=WorkspaceOsSnapshot)
+    # Blueprint Phase 14 — Workspace Entity consolidated snapshot
+    workspace_entity: WorkspaceEntitySnapshot = field(default_factory=WorkspaceEntitySnapshot)
     last_event_topic: str = ""
     last_event_source: str = ""
+    last_event_timestamp: float = 0.0
     settings_version: int = 0
     last_command: str = ""
     last_command_intent: str = ""
@@ -558,6 +571,8 @@ class AppState:
     note_index_status: tuple[int, int] = ()  # (files, ms)
     memory_catalog: tuple[MemoryItem, ...] = ()
     memory_selected: tuple[str, ...] = ()
+    # Blueprint Phase 15 — Notes/Memory consolidated snapshot
+    notes_memory: NotesMemorySnapshot = field(default_factory=NotesMemorySnapshot)
     plugin_catalog: tuple[PluginItem, ...] = ()
 
     # Track R7 â€” agent / workflow run projections
@@ -609,6 +624,8 @@ class AppState:
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
     recent_artifacts: tuple[ArtifactCatalogItem, ...] = ()
+    # Blueprint Phase 16 — Model/Artifact consolidated snapshot
+    model_artifact: ModelArtifactSnapshot = field(default_factory=ModelArtifactSnapshot)
     recent_execution_events: tuple[ExecutionEventItem, ...] = ()
     execution_timeline: ExecutionTimelineState = field(default_factory=ExecutionTimelineState)
     # Blueprint Phase 13 — Execution Inspector consolidated snapshot
@@ -1035,6 +1052,107 @@ def _reduce_memory_cleared(state: AppState, event: Event) -> AppState:
     return replace(
         state,
         memory_selected=(),
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+_NOTES_MEMORY_TOPICS = frozenset({
+    NOTE_SEARCH_RESULTS,
+    NOTE_SELECTED,
+    NOTE_CREATED,
+    NOTE_INDEX_COMPLETE,
+    NOTES_INDEXED,
+    MEMORY_STORED,
+    MEMORY_SELECTED,
+    MEMORY_CLEARED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
+})
+
+
+def _reduce_notes_memory_snapshot(state: AppState, event: Event) -> AppState:
+    """Project notes + memory catalogs into a single immutable snapshot."""
+    if event.topic not in _NOTES_MEMORY_TOPICS:
+        return state
+    current = state.notes_memory
+    notes_catalog = tuple(
+        NotesMemoryNoteItem(path=item.path, title=item.title, snippet=item.snippet)
+        for item in state.notes_catalog
+    )
+    note_selected = (
+        NotesMemoryNoteItem(
+            path=state.note_selected.path,
+            title=state.note_selected.title,
+            snippet=state.note_selected.snippet,
+        )
+        if state.note_selected is not None
+        else None
+    )
+    memory_catalog = tuple(
+        NotesMemoryCatalogItem(
+            node_id=item.node_id,
+            label=item.label,
+            workspace_id=item.workspace_id,
+            entity_id=item.entity_id,
+        )
+        for item in state.memory_catalog
+    )
+    if (
+        current.notes_catalog == notes_catalog
+        and current.note_selected == note_selected
+        and current.note_index_status == state.note_index_status
+        and current.memory_catalog == memory_catalog
+        and current.memory_selected == state.memory_selected
+    ):
+        return state
+    new_snap = NotesMemorySnapshot.from_components(
+        notes_catalog=notes_catalog,
+        note_selected=note_selected,
+        note_index_status=state.note_index_status,
+        memory_catalog=memory_catalog,
+        memory_selected=state.memory_selected,
+        revision=current.revision + 1,
+    )
+    return replace(
+        state,
+        notes_memory=new_snap,
+        last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+_MODEL_ARTIFACT_TOPICS = frozenset({
+    MODEL_SELECTED,
+    TOOL_STARTED,
+    TOOL_COMPLETED,
+    TOOL_FAILED,
+    ARTIFACT_CREATED,
+    ARTIFACT_UPDATED,
+    ARTIFACTS_LOADED,
+})
+
+
+def _reduce_model_artifact_snapshot(state: AppState, event: Event) -> AppState:
+    """Project model selection, tool runs, and artifacts into one snapshot."""
+    if event.topic not in _MODEL_ARTIFACT_TOPICS:
+        return state
+    current = state.model_artifact
+    if (
+        current.model_selection == state.model_selection
+        and current.recent_tool_runs == state.recent_tool_runs
+        and current.recent_artifacts == state.recent_artifacts
+    ):
+        return state
+    new_snap = ModelArtifactSnapshot.from_components(
+        model_selection=state.model_selection,
+        recent_tool_runs=state.recent_tool_runs,
+        recent_artifacts=state.recent_artifacts,
+        revision=current.revision + 1,
+    )
+    return replace(
+        state,
+        model_artifact=new_snap,
         last_event_topic=event.topic,
         last_event_source=event.source,
     )
@@ -1930,14 +2048,156 @@ def _reduce_execution_inspector_snapshot(state: AppState, event: Event) -> AppSt
         execution_timeline=state.execution_timeline,
         recent_execution_events=state.recent_execution_events,
         planner_last_plan=planner_last_plan,
-        revision=state.execution_inspector.revision + 1,
+        revision=state.execution_inspector.revision,
     )
     if new_snap == state.execution_inspector:
         return state
+    new_snap = new_snap.with_revision(state.execution_inspector.revision + 1)
     return replace(
         state,
         execution_inspector=new_snap,
         last_event_topic=event.topic,
+        last_event_source=event.source,
+    )
+
+
+_WORKSPACE_ENTITY_TOPICS = frozenset({
+    ENTITY_CREATED,
+    ENTITY_UPDATED,
+    ENTITY_DELETED,
+    EVENT_RELATIONSHIP_CREATED,
+    EVENT_ACTION_REGISTERED,
+    EVENT_TIMELINE_EVENT,
+    NOTES_INDEXED,
+    WORKSPACE_ACTIVE,
+    WORKSPACE_DEACTIVATED,
+    UI_SELECT_ENTITY,
+    UI_INSPECT_SELECT,
+    UI_INSPECT_CLEAR,
+    UI_INSPECT_NAVIGATE,
+})
+
+
+def _reduce_workspace_entity_snapshot(state: AppState, event: Event) -> AppState:
+    """Project workspace/entity selection into a single immutable snapshot."""
+    if event.topic not in _WORKSPACE_ENTITY_TOPICS:
+        return state
+
+    current = state.workspace_entity
+    topic = event.topic
+    payload = event.payload
+    workspace_entities = current.workspace_entities
+    active_workspace_id = current.active_workspace_id
+    active_workspace_title = current.active_workspace_title
+    selected_entity_id = current.selected_entity_id
+    selected_entity_type = current.selected_entity_type
+    selected_entity_title = current.selected_entity_title
+    inspector = current.inspector
+    changed = False
+
+    if topic == ENTITY_CREATED:
+        raw = state.workspace_os.entities[-1] if state.workspace_os.entities else None
+        if raw is not None:
+            new_item = WorkspaceEntitySnapshotItem(
+                entity_id=raw.entity_id,
+                entity_type=raw.entity_type,
+                title=raw.title,
+                metadata=tuple(raw.metadata),
+            )
+            workspace_entities = workspace_entities + (new_item,)
+            changed = True
+
+    elif topic == ENTITY_UPDATED:
+        updated_id = str(payload.get("entity_id", ""))
+        if updated_id:
+            new_entities: list[WorkspaceEntitySnapshotItem] = []
+            for item in workspace_entities:
+                if item.entity_id == updated_id:
+                    raw = next(
+                        (e for e in state.workspace_os.entities if e.entity_id == updated_id),
+                        None,
+                    )
+                    if raw is not None:
+                        new_entities.append(
+                            WorkspaceEntitySnapshotItem(
+                                entity_id=raw.entity_id,
+                                entity_type=raw.entity_type,
+                                title=raw.title,
+                                metadata=tuple(raw.metadata),
+                            )
+                        )
+                    else:
+                        new_entities.append(item)
+                    changed = True
+                else:
+                    new_entities.append(item)
+            workspace_entities = tuple(new_entities)
+
+    elif topic == ENTITY_DELETED:
+        deleted_id = str(payload.get("entity_id", ""))
+        if deleted_id:
+            workspace_entities = tuple(e for e in workspace_entities if e.entity_id != deleted_id)
+            changed = len(workspace_entities) != len(current.workspace_entities)
+
+    elif topic == NOTES_INDEXED:
+        workspace_entities = tuple(
+            WorkspaceEntitySnapshotItem(
+                entity_id=item.entity_id,
+                entity_type=item.entity_type,
+                title=item.title,
+                metadata=tuple(item.metadata),
+            )
+            for item in state.workspace_os.entities
+        )
+        changed = workspace_entities != current.workspace_entities
+
+    elif topic == WORKSPACE_ACTIVE:
+        active_workspace_id = str(payload.get("workspace_id", ""))
+        active_workspace_title = str(payload.get("title", ""))
+        changed = (
+            active_workspace_id != current.active_workspace_id
+            or active_workspace_title != current.active_workspace_title
+        )
+
+    elif topic == WORKSPACE_DEACTIVATED:
+        active_workspace_id = ""
+        active_workspace_title = ""
+        changed = (
+            active_workspace_id != current.active_workspace_id
+            or active_workspace_title != current.active_workspace_title
+        )
+
+    elif topic == UI_SELECT_ENTITY:
+        selected_entity_id = str(payload.get("entity_id", ""))
+        selected_entity_type = str(payload.get("entity_type", ""))
+        selected_entity_title = str(payload.get("title", ""))
+        changed = (
+            selected_entity_id != current.selected_entity_id
+            or selected_entity_type != current.selected_entity_type
+            or selected_entity_title != current.selected_entity_title
+        )
+
+    elif topic in {UI_INSPECT_SELECT, UI_INSPECT_CLEAR, UI_INSPECT_NAVIGATE}:
+        inspector = state.inspector
+        changed = inspector != current.inspector
+
+    if not changed:
+        return state
+
+    new_snap = WorkspaceEntitySnapshot.from_components(
+        active_workspace_id=active_workspace_id,
+        active_workspace_title=active_workspace_title,
+        selected_entity_id=selected_entity_id,
+        selected_entity_type=selected_entity_type,
+        selected_entity_title=selected_entity_title,
+        workspace_entities=workspace_entities,
+        inspector=inspector,
+        revision=current.revision + 1,
+    )
+    return replace(
+        state,
+        workspace_entity=new_snap,
+        last_event_topic=topic,
         last_event_source=event.source,
     )
 
@@ -3259,6 +3519,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_memory_selected,
     _reduce_memory_cleared,
     _reduce_workspace_memory_catalog,
+    _reduce_notes_memory_snapshot,
     _reduce_plugin_catalog,
     _reduce_capability_providers_ready,
     _reduce_capability_lifecycle_snapshot,
@@ -3277,6 +3538,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_execution_context,
     _reduce_execution_timeline,
     _reduce_inspector,
+    _reduce_workspace_entity_snapshot,
     _reduce_workflow_graph,
     _reduce_automation_workspace,
     _reduce_brain_state,
@@ -3284,6 +3546,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     *MODEL_REDUCERS,
     *TOOL_REDUCERS,
     *ARTIFACT_REDUCERS,
+    _reduce_model_artifact_snapshot,
     *EXECUTION_EVENT_REDUCERS,
     _reduce_execution_inspector_snapshot,
     _reduce_operation_saved,
@@ -3339,6 +3602,7 @@ class AppStateStore:
             for reducer in self._reducers:
                 new_state = reducer(new_state, event)
             if new_state != self._state:
+                object.__setattr__(new_state, "last_event_timestamp", event.timestamp)
                 self._state = new_state
                 notify_listeners = True
                 if (
