@@ -4,11 +4,11 @@ Architecture contract:
 - Pure display widget. No repository access. No service calls.
 - Reads from WorldModelState (AppState layer).
 - Publishes WORLD_MODEL_NODE_SELECTED when user navigates to a connected node.
+- Graph drawing reuses shared BaseGraphCanvas (no private canvas engine).
 """
 
 from __future__ import annotations
 
-import tkinter as tk
 from collections.abc import Callable
 from typing import Any
 
@@ -17,6 +17,12 @@ import customtkinter as ctk
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import WORLD_MODEL_NODE_SELECTED
 from ai_command_center.core.state.world_model_state import EdgeSummary, NodeSummary, WorldModelState
+from ai_command_center.ui.components.graph import (
+    BaseGraphCanvas,
+    GraphEdgeVisual,
+    GraphNodeVisual,
+    radial_layout,
+)
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.widget_utils import clear_children
 
@@ -31,6 +37,10 @@ _EDGE_COLOR = {
     "requires": "#A78BFA",
     "produces": "#00FFFF",
 }
+
+_NODE_R = 28.0
+_CANVAS_W = 340.0
+_CANVAS_H = 260.0
 
 
 def _edge_color(edge_type: str) -> str:
@@ -114,101 +124,10 @@ class _EdgeRow(ctk.CTkFrame):
         ).pack(side="right", padx=(0, 8))
 
 
-class _GraphCanvas(tk.Canvas):
-    """Minimal canvas that draws a radial edge graph for the selected node."""
-
-    _NODE_R = 28
-    _CANVAS_W = 340
-    _CANVAS_H = 260
-
-    def __init__(self, master: Any) -> None:
-        super().__init__(
-            master,
-            width=self._CANVAS_W,
-            height=self._CANVAS_H,
-            bg=T.BG_PANEL,
-            highlightthickness=0,
-        )
-        self._on_peer_click: Callable[[str], None] | None = None
-        self._peer_ids: list[str] = []
-
-    def set_click_handler(self, fn: Callable[[str], None]) -> None:
-        self._on_peer_click = fn
-
-    def render(
-        self,
-        center_node: NodeSummary | None,
-        edges: list[EdgeSummary],
-        all_nodes: dict[str, NodeSummary],
-    ) -> None:
-        import math
-
-        self.delete("all")
-        if center_node is None:
-            self.create_text(
-                self._CANVAS_W // 2, self._CANVAS_H // 2,
-                text="Select a node", fill=T.TEXT_MUTED, font=(T.FONT_FAMILY, 11),
-            )
-            return
-
-        cx, cy = self._CANVAS_W // 2, self._CANVAS_H // 2
-        peers: list[tuple[str, str, str, str]] = []
-        for edge in edges:
-            if edge.from_node_id == center_node.node_id:
-                peer_id = edge.to_node_id
-                peer_label = edge.to_label or peer_id[:10]
-                arrow = "→"
-            else:
-                peer_id = edge.from_node_id
-                peer_label = edge.from_label or peer_id[:10]
-                arrow = "←"
-            peers.append((peer_id, peer_label, arrow, edge.edge_type))
-
-        n = len(peers)
-        radius = min(100, max(60, 30 * n))
-
-        for i, (peer_id, peer_label, arrow, edge_type) in enumerate(peers):
-            angle = (2 * math.pi * i / n) if n > 0 else 0
-            px = cx + int(radius * math.cos(angle))
-            py = cy + int(radius * math.sin(angle))
-
-            color = _edge_color(edge_type)
-            self.create_line(cx, cy, px, py, fill=color, width=2, arrow=tk.LAST if arrow == "→" else tk.FIRST)
-
-            self.create_oval(
-                px - self._NODE_R, py - self._NODE_R,
-                px + self._NODE_R, py + self._NODE_R,
-                fill=T.BG_GLASS, outline=color, width=2,
-            )
-            self.create_text(px, py - 6, text=peer_label[:8], fill=T.TEXT_PRIMARY, font=(T.FONT_FAMILY, 9))
-            self.create_text(px, py + 6, text=edge_type[:8], fill=color, font=(T.FONT_FAMILY, 8))
-
-            tag = f"peer_{i}"
-            self.create_oval(
-                px - self._NODE_R, py - self._NODE_R,
-                px + self._NODE_R, py + self._NODE_R,
-                fill="", outline="", tags=tag,
-            )
-            captured_id = peer_id
-            self.tag_bind(tag, "<Button-1>", lambda _e, pid=captured_id: self._click_peer(pid))
-
-        self.create_oval(
-            cx - self._NODE_R, cy - self._NODE_R,
-            cx + self._NODE_R, cy + self._NODE_R,
-            fill=T.ACCENT_DEFAULT, outline=T.HERO_CYAN, width=2,
-        )
-        label = center_node.label[:10] if center_node else ""
-        self.create_text(cx, cy, text=label, fill=T.TEXT_PRIMARY, font=(T.FONT_FAMILY, 9, "bold"))
-
-    def _click_peer(self, peer_id: str) -> None:
-        if self._on_peer_click:
-            self._on_peer_click(peer_id)
-
-
 class RelationshipView(ctk.CTkFrame):
     """World Model edge visualizer.
 
-    Top: radial graph canvas.
+    Top: radial graph via shared BaseGraphCanvas.
     Bottom: scrollable edge list with direction, type, and navigate button.
     """
 
@@ -246,9 +165,20 @@ class RelationshipView(ctk.CTkFrame):
         )
         self._node_label.pack(side="right", padx=16)
 
-        self._canvas = _GraphCanvas(self)
-        self._canvas.set_click_handler(self._navigate_to)
-        self._canvas.pack(fill="x", padx=12, pady=(8, 4))
+        self._surface = BaseGraphCanvas(
+            self,
+            on_node_select=self._on_graph_select,
+            enable_zoom=False,
+            enable_pan=False,
+            enable_multi_select=False,
+            enable_node_drag=False,
+            enable_selection_box=False,
+            show_scrollbars=False,
+            empty_message="Select a node",
+            canvas_bg=T.BG_PANEL,
+        )
+        self._surface.pack(fill="x", padx=12, pady=(8, 4))
+        self._surface.tk_canvas.configure(width=int(_CANVAS_W), height=int(_CANVAS_H))
 
         sep = ctk.CTkFrame(self, fg_color=T.BG_GLASS_BORDER, height=1)
         sep.pack(fill="x", padx=12, pady=(0, 4))
@@ -269,22 +199,137 @@ class RelationshipView(ctk.CTkFrame):
     def _refresh(self) -> None:
         node = self._state.selected_node
         edges = self._state.edges_for_selected
-        all_nodes = {n.node_id: n for n in self._state.nodes}
 
         if node:
             self._node_label.configure(text=f"Node: {node.label}")
         else:
             self._node_label.configure(text="no node selected")
 
-        self._canvas.render(node, edges, all_nodes)
+        self._project_graph(node, edges)
         self._render_edge_list(edges, node)
+
+    def _project_graph(
+        self,
+        center_node: NodeSummary | None,
+        edges: list[EdgeSummary],
+    ) -> None:
+        if center_node is None:
+            self._surface.set_scene([], [])
+            return
+
+        peers: list[tuple[str, str, str, str]] = []
+        for edge in edges:
+            if edge.from_node_id == center_node.node_id:
+                peers.append(
+                    (
+                        edge.to_node_id,
+                        edge.to_label or edge.to_node_id[:10],
+                        "forward",
+                        edge.edge_type,
+                    )
+                )
+            else:
+                peers.append(
+                    (
+                        edge.from_node_id,
+                        edge.from_label or edge.from_node_id[:10],
+                        "backward",
+                        edge.edge_type,
+                    )
+                )
+
+        positions = radial_layout(
+            center_node.node_id,
+            [p[0] for p in peers],
+            width=_CANVAS_W,
+            height=_CANVAS_H,
+        )
+
+        visuals: list[GraphNodeVisual] = [
+            GraphNodeVisual(
+                node_id=center_node.node_id,
+                x=positions[center_node.node_id][0],
+                y=positions[center_node.node_id][1],
+                label=center_node.label[:10],
+                width=_NODE_R * 2,
+                height=_NODE_R * 2,
+                shape="oval",
+                fill=T.ACCENT_DEFAULT,
+                outline=T.HERO_CYAN,
+                outline_width=2,
+                text_color=T.TEXT_PRIMARY,
+                font_size=9,
+                font_bold=True,
+            )
+        ]
+        edge_visuals: list[GraphEdgeVisual] = []
+        for peer_id, peer_label, arrow, edge_type in peers:
+            color = _edge_color(edge_type)
+            px, py = positions[peer_id]
+            visuals.append(
+                GraphNodeVisual(
+                    node_id=peer_id,
+                    x=px,
+                    y=py,
+                    label=peer_label[:8],
+                    width=_NODE_R * 2,
+                    height=_NODE_R * 2,
+                    shape="oval",
+                    fill=T.BG_GLASS,
+                    outline=color,
+                    outline_width=2,
+                    text_color=T.TEXT_PRIMARY,
+                    font_size=9,
+                    secondary_label=edge_type[:8],
+                    secondary_color=color,
+                )
+            )
+            # Directional edge from center to peer (arrow encodes inbound/outbound)
+            if arrow == "forward":
+                edge_visuals.append(
+                    GraphEdgeVisual(
+                        edge_id=GraphEdgeVisual.make_id(center_node.node_id, peer_id),
+                        source_id=center_node.node_id,
+                        target_id=peer_id,
+                        color=color,
+                        width=2,
+                        arrow="forward",
+                    )
+                )
+            else:
+                edge_visuals.append(
+                    GraphEdgeVisual(
+                        edge_id=GraphEdgeVisual.make_id(peer_id, center_node.node_id),
+                        source_id=peer_id,
+                        target_id=center_node.node_id,
+                        color=color,
+                        width=2,
+                        arrow="forward",
+                    )
+                )
+
+        self._surface.set_scene(
+            visuals,
+            edge_visuals,
+            selected_node_ids={center_node.node_id},
+        )
+
+    def _on_graph_select(self, node_id: str) -> None:
+        center = self._state.selected_node
+        if center is not None and node_id == center.node_id:
+            return
+        self._navigate_to(node_id)
 
     def _render_edge_list(self, edges: list[EdgeSummary], node: NodeSummary | None) -> None:
         clear_children(self._edge_list)
         if not edges:
             ctk.CTkLabel(
                 self._edge_list,
-                text="No relationships for this node." if node else "Select a node to view relationships.",
+                text=(
+                    "No relationships for this node."
+                    if node
+                    else "Select a node to view relationships."
+                ),
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
                 justify="center",
