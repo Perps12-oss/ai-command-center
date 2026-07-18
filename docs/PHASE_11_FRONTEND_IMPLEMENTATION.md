@@ -132,35 +132,39 @@ A state-first, UI-Constitution-compliant implementation plan that exposes ACC's 
 
 **Objective:** Give operators complete runtime visibility and evidence.
 
-**UI Constitution Articles:** 5 (Blue), 13.
+**UI Constitution Articles:** 5 (Blue / `EXECUTION_BLUE`), 13.
 
 ### Required Panels (Article 13)
 
 1. **Execution List** — `execution_library.run_history` filtered by status.
-2. **Execution Timeline** — `execution_timeline` and `execution_library.active_plan.steps`.
-3. **Execution Detail** — `execution_context` + `orchestration_run` for the selected run.
-4. **Receipt Viewer** — `orchestration_run.run_history[].receipt_id`.
-5. **Truth Validation** — `orchestration_run.run_history[].truth_valid` / `truth_detail`.
+2. **Execution Timeline** — `execution_timeline` / scrubber and `execution_library.active_plan.steps`.
+3. **Execution Detail** — `execution_library.active_plan` + `execution_context`.
+4. **Receipt Viewer** — visualization of `orchestration_run` only (no separate receipt model).
+5. **Truth Validation** — `orchestration_run.truth_valid` / `truth_detail` (separate from receipts).
 
 ### Hero Section
 
 - Workspace Name: "Execution Center"
-- Current State: "`<running>` running, `<total>` total"
-- Primary Metric: active run ID and current step
-- Immediate Action: "View All" / filter
+- Metrics: active, total, failed, success rate
+- Immediate Action: "View Active Execution" / "Open Latest Execution"
 
 ### Files
 
-- `ai_command_center/ui/views/executions_view.py` (enhance)
-- `ai_command_center/ui/views/execution_detail.py` (new)
-- `ai_command_center/ui/components/execution_timeline.py` (reuse/extend)
+- `ai_command_center/ui/views/executions_view.py` (orchestration shell)
+- `ai_command_center/ui/views/execution_center/execution_list_panel.py`
+- `ai_command_center/ui/views/execution_center/execution_timeline_panel.py`
+- `ai_command_center/ui/views/execution_center/execution_detail_panel.py`
+- `ai_command_center/ui/views/execution_center/receipt_viewer_panel.py`
+- `ai_command_center/ui/views/execution_center/truth_validation_panel.py`
 
 ### Acceptance Criteria
 
-- [ ] Execution list shows run ID, goal, status badge, duration.
-- [ ] Timeline shows steps with status (running, completed, failed).
-- [ ] Receipt Viewer shows receipt ID, provider, facts, success.
-- [ ] Truth Validation shows `truth_valid` and `truth_detail`.
+- [x] Execution list shows run ID, goal, status badge, duration (failures-first sort).
+- [x] Timeline shows steps with status (running, completed, failed, waiting).
+- [x] Receipt Viewer shows receipt ID, response source, outcome, evidence from `orchestration_run`.
+- [x] Truth Validation shows valid/partial/failed via centralized status tokens.
+- [x] Uses existing execution projections only; no new AppState/services/repos.
+- [x] `EXECUTION_BLUE` token + `verify_ui_constitution.py` Phase 11C checks.
 
 ---
 

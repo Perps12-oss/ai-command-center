@@ -47,6 +47,15 @@ PHASE_11B_FILES: tuple[Path, ...] = (
     UI_ROOT / "views" / "world_model" / "mutation_journal_panel.py",
 )
 
+PHASE_11C_FILES: tuple[Path, ...] = (
+    UI_ROOT / "views" / "executions_view.py",
+    UI_ROOT / "views" / "execution_center" / "execution_list_panel.py",
+    UI_ROOT / "views" / "execution_center" / "execution_timeline_panel.py",
+    UI_ROOT / "views" / "execution_center" / "execution_detail_panel.py",
+    UI_ROOT / "views" / "execution_center" / "receipt_viewer_panel.py",
+    UI_ROOT / "views" / "execution_center" / "truth_validation_panel.py",
+)
+
 
 class Violation:
     """Collects a single constitutional violation."""
@@ -308,6 +317,85 @@ def _check_world_model_workspace(v: Violation) -> None:
             v.add(f"{path.relative_to(REPO)} does not use WORLD_TEAL token")
 
 
+def _check_execution_center_workspace(v: Violation) -> None:
+    """Verify Phase 11C / Article 13 Execution Center workspace contracts."""
+    for path in PHASE_11C_FILES:
+        if not path.exists():
+            v.add(f"Missing Execution Center file: {path.relative_to(REPO)}")
+
+    theme = _read(UI_ROOT / "design_system" / "theme_v2.py")
+    if "EXECUTION_BLUE" not in theme:
+        v.add("theme_v2.py missing EXECUTION_BLUE token")
+
+    constitution = _read(REPO / "docs" / "UI_CONSTITUTION.md")
+    if "EXECUTION_BLUE" not in constitution:
+        v.add("UI_CONSTITUTION.md missing EXECUTION_BLUE token reference")
+
+    shell = UI_ROOT / "views" / "executions_view.py"
+    if not shell.exists():
+        return
+    text = _read(shell)
+    required_symbols = (
+        ("Hero", "_hero"),
+        ("Execution List", "ExecutionListPanel"),
+        ("Timeline", "ExecutionTimelinePanel"),
+        ("Detail", "ExecutionDetailPanel"),
+        ("Receipt Viewer", "ReceiptViewerPanel"),
+        ("Truth Validation", "TruthValidationPanel"),
+        ("EXECUTION_BLUE accent", "EXECUTION_BLUE"),
+        ("apply_state projection", "def apply_state"),
+        ("Hero action", "_hero_action"),
+    )
+    for label, symbol in required_symbols:
+        if symbol not in text:
+            v.add(f"Execution Center workspace missing {label} ({symbol})")
+
+    forbidden_patterns = (
+        "ai_command_center.repositories",
+        "ai_command_center.services",
+        "WORLD_MODEL_MUTATION_APPLIED",
+    )
+    for path in PHASE_11C_FILES:
+        if not path.exists():
+            continue
+        panel_text = _read(path)
+        for forbidden in forbidden_patterns:
+            if forbidden in panel_text:
+                v.add(f"{path.relative_to(REPO)} contains forbidden symbol {forbidden}")
+        if path.name != "__init__.py" and "EXECUTION_BLUE" not in panel_text:
+            v.add(f"{path.relative_to(REPO)} does not use EXECUTION_BLUE token")
+
+    # Receipt/Truth must project orchestration_run, not invent models
+    receipt = _read(UI_ROOT / "views" / "execution_center" / "receipt_viewer_panel.py")
+    truth = _read(UI_ROOT / "views" / "execution_center" / "truth_validation_panel.py")
+    if "orchestration_run" not in receipt:
+        v.add("Receipt Viewer must project orchestration_run")
+    if "orchestration_run" not in truth:
+        v.add("Truth Validation must project orchestration_run")
+    if "class Receipt" in receipt and "OrchestrationRun" not in receipt:
+        v.add("Receipt Viewer must not introduce a separate receipt data model")
+
+    status_tokens = _read(UI_ROOT / "design_system" / "status_tokens.py")
+    if "def truth_validation_color" not in status_tokens:
+        v.add("status_tokens.py missing truth_validation_color helper")
+    if "truth_validation_color" not in truth:
+        v.add("Truth Validation must use centralized truth_validation_color")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["executions"]' not in view_manager:
+        v.add("view_manager missing executions factory")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "executions"' not in state_applier:
+        v.add("state_applier does not gate executions apply_state on current_view")
+    if "executions.apply_state(list(snap.execution_runs))" in state_applier:
+        v.add("state_applier still feeds only execution_runs list to Execution Center")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("executions", "Execution Center")' not in sidebar:
+        v.add("Sidebar label for executions is not 'Execution Center'")
+
+
 def main() -> int:
     v = Violation()
     _check_no_local_status_maps(v)
@@ -320,6 +408,7 @@ def main() -> int:
     _check_route_reachability(v)
     _check_theme_tokens(v)
     _check_world_model_workspace(v)
+    _check_execution_center_workspace(v)
 
     if v.errors:
         v.report()

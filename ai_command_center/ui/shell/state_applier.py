@@ -99,6 +99,14 @@ class StateApplierMixin:
         ):
             world_explorer.apply_state(snap)
 
+        executions = self._executions_view()
+        if (
+            executions
+            and hasattr(executions, "apply_state")
+            and current_view == "executions"
+        ):
+            executions.apply_state(snap)
+
         if snap.chat_status == "streaming":
             self._last_terminal_chat_key = None
         self._overlay_mode = snap.settings.overlay_mode
@@ -458,10 +466,6 @@ class StateApplierMixin:
         workspace = self._workspace_view()
         if workspace:
             workspace.load_from_appstate(snap)
-
-        executions = self._executions_view()
-        if executions and hasattr(executions, "apply_state"):
-            executions.apply_state(list(snap.execution_runs))
 
         providers = self._providers_view()
         if providers and hasattr(providers, "apply_state"):

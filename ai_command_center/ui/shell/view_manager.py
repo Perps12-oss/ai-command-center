@@ -135,6 +135,7 @@ class ViewManagerMixin:
             self._content,
             on_select=self._on_execution_select,
             on_scrub=self._on_execution_timeline_scrub,
+            on_navigate=self._navigate,
         )
         self._view_registry["timeline"] = lambda: ExecutionTimelineView(
             self._content,

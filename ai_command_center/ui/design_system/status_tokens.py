@@ -92,3 +92,18 @@ def execution_state_color(state: str) -> tuple[str, str]:
     if s in {"offline"}:
         return _OFFLINE
     return _READY
+
+
+def truth_validation_color(state: str) -> tuple[str, str]:
+    """(foreground, background) for truth-validation states.
+
+    Green = valid, Amber = partial, Red = failed.
+    """
+    s = str(state).lower().strip()
+    if s in {"valid", "true", "passed", "ok", "verified"}:
+        return _READY
+    if s in {"partial", "degraded", "incomplete", "warning"}:
+        return _BUSY
+    if s in {"failed", "false", "invalid", "error", "rejected"}:
+        return _ERROR
+    return _OFFLINE

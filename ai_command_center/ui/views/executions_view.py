@@ -1,185 +1,191 @@
-"""ExecutionsView — master list of execution runs.
+"""Execution Center workspace — Article 13 operational surface (Phase 11C).
 
-Shows all execution_runs from AppState in a scrollable list.
-Clicking a row opens ExecutionDetailView.
-
-Architecture contract
-─────────────────────
-• Pure display view — no EventBus, service, or repository imports.
-• Data supplied via apply_state() called from UIQueue.
-• on_select callback triggers execution query + detail navigation.
+Architecture contract:
+- Pure renderer. Reads AppState via apply_state(snapshot) only.
+- No repositories, services, or direct execution subscriptions.
+- Receipt/Truth panels visualize orchestration_run only.
 """
+
 from __future__ import annotations
 
-import time
 from collections.abc import Callable, Sequence
 from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.core.app_state import AppState
+from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
-from ai_command_center.ui.views.execution_detail_view import ExecutionDetailView
-
-_STATUS_COLORS: dict[str, str] = {
-    "chat":          T.ACCENT_DEFAULT,
-    "orchestration": T.STATUS_READY,
-    "agent":         "#A78BFA",
-    "workflow":      T.STATUS_BUSY,
-}
-
-
-class _ExecutionRow(ctk.CTkFrame):
-    def __init__(
-        self,
-        master: Any,
-        request_id: str,
-        source: str,
-        summary: str,
-        created_at: float,
-        on_select: Callable[[str], None],
-    ) -> None:
-        super().__init__(
-            master,
-            fg_color=T.BG_GLASS,
-            corner_radius=T.SMALL_RADIUS,
-            height=52,
-        )
-        self.pack_propagate(False)
-        self._request_id = request_id
-
-        color = _STATUS_COLORS.get(source, T.TEXT_MUTED)
-
-        row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="both", expand=True, padx=8, pady=6)
-
-        ctk.CTkLabel(
-            row,
-            text=f"● {source}",
-            font=(T.FONT_FAMILY, 9),
-            text_color=color,
-            width=80,
-        ).pack(side="left")
-
-        ctk.CTkLabel(
-            row,
-            text=summary[:60] if summary else request_id[:24],
-            font=(T.FONT_FAMILY, 11),
-            text_color=T.TEXT_PRIMARY,
-            anchor="w",
-        ).pack(side="left", fill="x", expand=True, padx=(6, 0))
-
-        if created_at:
-            ts = time.strftime("%H:%M", time.localtime(created_at))
-            ctk.CTkLabel(
-                row,
-                text=ts,
-                font=(T.FONT_FAMILY, 9),
-                text_color=T.TEXT_MUTED,
-            ).pack(side="right", padx=4)
-
-        ctk.CTkButton(
-            row,
-            text="▶",
-            width=22, height=22,
-            font=(T.FONT_FAMILY, 10),
-            fg_color="transparent",
-            hover_color=T.BG_GLASS_BORDER,
-            text_color=T.TEXT_MUTED,
-            corner_radius=4,
-            command=lambda: on_select(self._request_id),
-        ).pack(side="right")
-
-        self.bind("<Button-1>", lambda _: on_select(self._request_id))
+from ai_command_center.ui.views.execution_center import (
+    ExecutionDetailPanel,
+    ExecutionListPanel,
+    ExecutionTimelinePanel,
+    ReceiptViewerPanel,
+    TruthValidationPanel,
+)
 
 
 class ExecutionsView(ctk.CTkFrame):
-    """Master list view for all execution runs with optional detail drill-down."""
+    """Execution Center orchestration shell (Hero + five Article 13 panels)."""
 
     def __init__(
         self,
         master: Any,
         on_select: Callable[[str], None] | None = None,
         on_scrub: Callable[[str, int], None] | None = None,
+        on_navigate: Callable[[str], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color=T.BG_DEEP, **kwargs)
-        self._on_select = on_select or (lambda _request_id: None)
-        self._on_scrub = on_scrub or (lambda _request_id, _index: None)
+        self._on_select = on_select or (lambda _rid: None)
+        self._on_scrub = on_scrub or (lambda _rid, _i: None)
+        self._on_navigate = on_navigate
         self._selected_request_id = ""
+        self._last_snap: AppState | None = None
         self._build()
 
     def _build(self) -> None:
-        self._list_host = ctk.CTkFrame(self, fg_color="transparent")
-        self._list_host.pack(fill="both", expand=True)
+        self._hero = GlassCard(self, fg_color=T.BG_PANEL, border_color=T.EXECUTION_BLUE)
+        self._hero.pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
 
-        header = ctk.CTkFrame(self._list_host, fg_color=T.BG_PANEL, corner_radius=0, height=50)
-        header.pack(fill="x")
-        header.pack_propagate(False)
+        top = ctk.CTkFrame(self._hero, fg_color="transparent")
+        top.pack(fill="x", padx=T.PAD, pady=(T.PAD, 0))
         ctk.CTkLabel(
-            header,
-            text="Executions",
+            top,
+            text="Execution Center",
+            font=T.FONT_TITLE,
+            text_color=T.EXECUTION_BLUE,
+            anchor="w",
+        ).pack(side="left")
+        self._metrics = ctk.CTkLabel(
+            top,
+            text="0 active · 0 total · 0 failed · —% success",
+            font=T.FONT_BODY,
+            text_color=T.TEXT_SECONDARY,
+            anchor="e",
+        )
+        self._metrics.pack(side="right")
+
+        bottom = ctk.CTkFrame(self._hero, fg_color="transparent")
+        bottom.pack(fill="x", padx=T.PAD, pady=(8, T.PAD))
+        self._hero_hint = ctk.CTkLabel(
+            bottom,
+            text="No active execution",
             font=T.FONT_HEADER,
             text_color=T.TEXT_PRIMARY,
             anchor="w",
-        ).pack(side="left", padx=T.PAD, pady=12)
-
-        self._scroll = ctk.CTkScrollableFrame(
-            self._list_host,
-            fg_color="transparent",
-            corner_radius=0,
         )
-        self._scroll.pack(fill="both", expand=True, padx=8, pady=8)
-
-        self._detail = ExecutionDetailView(
-            self,
-            on_back=self._show_list,
-            on_scrub=self._handle_scrub,
+        self._hero_hint.pack(side="left")
+        self._hero_action = ctk.CTkButton(
+            bottom,
+            text="Open Latest Execution",
+            font=T.FONT_BODY,
+            fg_color=T.EXECUTION_BLUE,
+            hover_color=T.ACCENT_HOVER,
+            text_color=T.TEXT_PRIMARY,
+            height=28,
+            width=180,
+            command=self._on_hero_action,
         )
+        self._hero_action.pack(side="right")
+        self._hero_target_id = ""
 
-    def _show_list(self) -> None:
-        self._selected_request_id = ""
-        self._detail.pack_forget()
-        self._list_host.pack(fill="both", expand=True)
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
+        body.grid_columnconfigure(0, weight=3)
+        body.grid_columnconfigure(1, weight=2)
+        body.grid_rowconfigure(0, weight=2)
+        body.grid_rowconfigure(1, weight=2)
+        body.grid_rowconfigure(2, weight=1)
 
-    def _show_detail(self) -> None:
-        self._list_host.pack_forget()
-        self._detail.pack(fill="both", expand=True)
+        self._list = ExecutionListPanel(body, on_select=self._select)
+        self._list.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=(0, 8))
 
-    def _handle_scrub(self, index: int) -> None:
-        if self._selected_request_id:
-            self._on_scrub(self._selected_request_id, index)
+        self._timeline = ExecutionTimelinePanel(body, on_scrub=self._scrub)
+        self._timeline.grid(row=1, column=0, sticky="nsew", padx=(0, 8), pady=(0, 8))
 
-    def open_request(self, request_id: str) -> None:
-        self._selected_request_id = request_id
-        self._on_select(request_id)
-        self._show_detail()
+        right = ctk.CTkFrame(body, fg_color="transparent")
+        right.grid(row=0, column=1, rowspan=2, sticky="nsew", pady=(0, 8))
+        right.grid_rowconfigure(0, weight=1)
+        right.grid_rowconfigure(1, weight=1)
+        right.grid_columnconfigure(0, weight=1)
 
-    def apply_state(self, execution_runs: list[Any]) -> None:
-        """Refresh the list from AppState.execution_runs."""
-        for child in self._scroll.winfo_children():
-            child.destroy()
+        self._detail = ExecutionDetailPanel(right)
+        self._detail.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
 
-        if not execution_runs:
-            ctk.CTkLabel(
-                self._scroll,
-                text="No executions yet.",
-                font=T.FONT_BODY,
-                text_color=T.TEXT_MUTED,
-            ).pack(pady=40)
+        evidence = ctk.CTkFrame(right, fg_color="transparent")
+        evidence.grid(row=1, column=0, sticky="nsew")
+        evidence.grid_columnconfigure(0, weight=1)
+        evidence.grid_columnconfigure(1, weight=1)
+        evidence.grid_rowconfigure(0, weight=1)
+
+        self._receipt = ReceiptViewerPanel(evidence)
+        self._receipt.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
+
+        self._truth = TruthValidationPanel(evidence)
+        self._truth.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
+
+        # Keep journal-like bottom strip for timeline overflow / status
+        self._status_bar = ctk.CTkLabel(
+            body,
+            text="Receipt and Truth panels project orchestration_run only.",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        )
+        self._status_bar.grid(row=2, column=0, columnspan=2, sticky="ew")
+
+    def apply_state(self, snapshot: AppState | list[Any]) -> None:
+        """Project AppState into all panels. List[Any] legacy path ignored."""
+        if not isinstance(snapshot, AppState):
             return
+        self._last_snap = snapshot
+        lib = snapshot.execution_library
+        history = list(lib.run_history)
+        total = lib.total_runs or len(history) or len(snapshot.execution_runs)
+        failed = sum(1 for r in history if str(r.status).lower() in {"failed", "error"})
+        active = 1 if lib.active_plan.is_active else 0
+        complete = sum(
+            1 for r in history if str(r.status).lower() in {"complete", "completed", "success"}
+        )
+        success_rate = f"{int((complete / total) * 100)}%" if total else "—"
+        self._metrics.configure(
+            text=f"{active} active · {total} total · {failed} failed · {success_rate} success"
+        )
 
-        for run in reversed(list(execution_runs)):
-            request_id = str(getattr(run, "request_id", ""))
-            if not request_id:
-                continue
-            _ExecutionRow(
-                self._scroll,
-                request_id=request_id,
-                source=str(getattr(run, "source", "chat")),
-                summary=str(getattr(run, "summary", "")),
-                created_at=float(getattr(run, "created_at", 0.0)),
-                on_select=self.open_request,
-            ).pack(fill="x", pady=3)
+        if lib.active_plan.is_active:
+            target = lib.active_plan.request_id or lib.active_plan.run_id
+            self._hero_target_id = target
+            step = lib.active_plan.current_step
+            step_name = (step.capability or step.step_id) if step else "—"
+            self._hero_hint.configure(
+                text=f"Active: {target[:24] or 'run'} · step {step_name}"
+            )
+            self._hero_action.configure(text="View Active Execution")
+        else:
+            latest = lib.last_run
+            if latest is None and snapshot.execution_runs:
+                run = snapshot.execution_runs[-1]
+                self._hero_target_id = run.request_id or run.run_id
+            elif latest is not None:
+                self._hero_target_id = latest.request_id or latest.run_id
+            else:
+                self._hero_target_id = ""
+            self._hero_hint.configure(
+                text="No active execution"
+                if not self._hero_target_id
+                else f"Latest: {self._hero_target_id[:24]}"
+            )
+            self._hero_action.configure(
+                text="Open Latest Execution" if self._hero_target_id else "No Executions"
+            )
+
+        selected = self._selected_request_id
+        self._list.apply_snapshot(snapshot, selected_request_id=selected)
+        self._timeline.apply_snapshot(snapshot, selected_request_id=selected)
+        self._detail.apply_snapshot(snapshot, selected_request_id=selected)
+        self._receipt.apply_snapshot(snapshot, selected_request_id=selected)
+        self._truth.apply_snapshot(snapshot, selected_request_id=selected)
 
     def apply_timeline(
         self,
@@ -191,26 +197,32 @@ class ExecutionsView(ctk.CTkFrame):
         timeline_source: str,
         spans: Sequence[dict[str, Any]] | None = None,
     ) -> None:
-        """Update the detail panel from AppState.execution_scrubber."""
-        if request_id != self._selected_request_id:
+        """Scrubber projection compatibility for StateApplier."""
+        del spans
+        if request_id and request_id != self._selected_request_id:
             return
-        run = type(
-            "ExecutionRunView",
-            (),
-            {
-                "run_id": request_id,
-                "request_id": request_id,
-                "source": timeline_source,
-                "status": "complete",
-                "provider_id": "",
-                "model": "",
-            },
-        )()
-        self._detail.show_execution(
-            run,
-            list(spans or []),
+        self._timeline.apply_timeline(
+            request_id=request_id,
             timeline_steps=timeline_steps,
             scrub_labels=scrub_labels,
             scrub_index=scrub_index,
             timeline_source=timeline_source,
         )
+
+    def open_request(self, request_id: str) -> None:
+        self._select(request_id)
+
+    def _select(self, request_id: str) -> None:
+        self._selected_request_id = request_id
+        self._on_select(request_id)
+        if self._last_snap is not None:
+            self.apply_state(self._last_snap)
+
+    def _scrub(self, index: int) -> None:
+        if self._selected_request_id:
+            self._on_scrub(self._selected_request_id, index)
+
+    def _on_hero_action(self) -> None:
+        if not self._hero_target_id:
+            return
+        self._select(self._hero_target_id)

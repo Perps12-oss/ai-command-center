@@ -57,6 +57,7 @@ GOAL_AMBER = "#FFB300"
 AGENT_PURPLE = "#9B59B6"
 WORLD_TEAL = "#009688"
 APPROVAL_ORANGE = "#FF9800"
+EXECUTION_BLUE = "#3B82F6"  # Execution Center operational accent
 
 # Chat message bubbles
 MSG_USER_BG = "#1E2D4A"

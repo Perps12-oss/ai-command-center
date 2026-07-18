@@ -212,6 +212,10 @@ Color:
 
 Blue
 
+Token:
+
+`EXECUTION_BLUE`
+
 Purpose:
 
 Work
