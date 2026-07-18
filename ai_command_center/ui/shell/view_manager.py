@@ -11,7 +11,6 @@ from ai_command_center.ui.views.chat_view import ChatView
 from ai_command_center.ui.views.agents_view import AgentsView
 from ai_command_center.ui.views.approvals_view import ApprovalsView
 from ai_command_center.ui.views.command_center_view import CommandCenterView
-from ai_command_center.ui.views.component_gallery_view import ComponentGalleryView
 from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.home_view import HomeView
@@ -55,7 +54,6 @@ VIEW_IDS: tuple[str, ...] = (
     "system",
     "plugins",
     "settings",
-    "gallery",
     "goals",
     "agents",
     "approvals",
@@ -185,7 +183,6 @@ class ViewManagerMixin:
             bus=self._bus,
             state=self._world_model_state,
         )
-        self._view_registry["gallery"] = lambda: ComponentGalleryView(self._content)
 
     def _ensure_view(self, view_id: str) -> object:
         if view_id not in self._views:

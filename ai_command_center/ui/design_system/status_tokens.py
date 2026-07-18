@@ -14,7 +14,17 @@ _OFFLINE = (T.TEXT_MUTED, T.STATUS_OFFLINE_BG)
 def _canonical_status(state: str) -> tuple[str, str]:
     """Map arbitrary status strings to a canonical (foreground, background) pair."""
     s = str(state).lower().strip()
-    if s in {"ready", "complete", "completed", "success", "passed", "healthy", "ok"}:
+    if s in {
+        "ready",
+        "complete",
+        "completed",
+        "success",
+        "passed",
+        "healthy",
+        "ok",
+        "online",
+        "done",
+    }:
         return _READY
     if s in {
         "running",
@@ -31,11 +41,15 @@ def _canonical_status(state: str) -> tuple[str, str]:
         "awaiting_approval",
         "pending",
         "in_progress",
+        "streaming",
+        "submitted",
+        "loading",
+        "indexing",
     }:
         return _BUSY
     if s in {"error", "failed", "failure", "denied", "rejected", "stopped", "abandoned", "cancelled"}:
         return _ERROR
-    if s in {"offline", "none", "no", "offline"}:
+    if s in {"offline", "none", "no", "idle", "unset", "unknown"}:
         return _OFFLINE
     return _READY
 
@@ -67,7 +81,7 @@ def kernel_state_color(state: str) -> tuple[str, str]:
 def goal_state_color(state: str) -> tuple[str, str]:
     """(foreground, background) for a goal state."""
     s = str(state).lower().strip()
-    if s in {"active", "running", "queued", "in_progress"}:
+    if s in {"active", "running", "queued", "in_progress", "submitted"}:
         return _BUSY
     if s in {"paused", "blocked", "waiting"}:
         return _BUSY
@@ -75,7 +89,7 @@ def goal_state_color(state: str) -> tuple[str, str]:
         return _READY
     if s in {"failed", "error", "cancelled", "abandoned", "denied"}:
         return _ERROR
-    if s in {"offline"}:
+    if s in {"offline", "idle", "unknown"}:
         return _OFFLINE
     return _READY
 
@@ -85,11 +99,11 @@ def execution_state_color(state: str) -> tuple[str, str]:
     s = str(state).lower().strip()
     if s in {"running", "awaiting_approval", "busy", "starting", "queued", "in_progress"}:
         return _BUSY
-    if s in {"complete", "completed", "ready", "done", "success"}:
+    if s in {"complete", "completed", "ready", "done", "success", "ok"}:
         return _READY
     if s in {"failed", "error", "stopped", "cancelled"}:
         return _ERROR
-    if s in {"offline"}:
+    if s in {"offline", "pending", "idle", "unknown"}:
         return _OFFLINE
     return _READY
 

@@ -22,6 +22,7 @@ from ai_command_center.core.state.world_model_state import (
     WorldModelState,
 )
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.design_system.status_tokens import goal_state_color
 from ai_command_center.ui.widget_utils import clear_children
 
 _MUTATION_COLORS = {
@@ -33,21 +34,13 @@ _MUTATION_COLORS = {
     "unknown": T.TEXT_MUTED,
 }
 
-_GOAL_STATUS_COLORS = {
-    "active": "#22C55E",
-    "submitted": "#3B82F6",
-    "queued": "#EAB308",
-    "failed": "#EF4444",
-    "complete": T.TEXT_MUTED,
-}
-
 
 def _mut_color(mtype: str) -> str:
     return _MUTATION_COLORS.get(mtype.lower(), T.TEXT_MUTED)
 
 
 def _goal_color(status: str) -> str:
-    return _GOAL_STATUS_COLORS.get(status.lower(), T.TEXT_MUTED)
+    return goal_state_color(status)[0]
 
 
 def _format_ts(ts: str) -> str:

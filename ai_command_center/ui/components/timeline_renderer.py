@@ -12,16 +12,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
-
-_STATUS_COLORS: dict[str, str] = {
-    "pending":   T.TEXT_MUTED,
-    "running":   T.STATUS_BUSY,
-    "completed": T.STATUS_READY,
-    "failed":    T.STATUS_ERROR,
-    "error":     T.STATUS_ERROR,
-    "cancelled": T.TEXT_MUTED,
-    "ok":        T.STATUS_READY,
-}
+from ai_command_center.ui.design_system.status_tokens import execution_state_color
 
 
 class _StepTile(ctk.CTkFrame):
@@ -36,7 +27,7 @@ class _StepTile(ctk.CTkFrame):
         duration_ms: float = 0,
         active: bool = False,
     ) -> None:
-        color = _STATUS_COLORS.get(status, T.TEXT_MUTED)
+        color = execution_state_color(status)[0]
         bg = T.BG_GLASS if active else T.BG_PANEL
         super().__init__(
             master,

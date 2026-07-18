@@ -225,7 +225,7 @@ def _check_route_reachability(v: Violation) -> None:
     view_ids = [m.strip('"\'') for m in re.findall(r'"([^"]+)"', view_ids_match.group(1))]
 
     for vid in view_ids:
-        if vid in ("timeline", "workflow", "relationships", "dependencies", "gallery", "world_explorer"):
+        if vid in ("timeline", "workflow", "relationships", "dependencies", "world_explorer"):
             continue
         if vid not in sidebar:
             v.add(f"Sidebar does not expose route for '{vid}'")
