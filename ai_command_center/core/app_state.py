@@ -43,12 +43,12 @@ from ai_command_center.core.events.topics import (
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
-    COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
     ENTITY_CREATED,
     ENTITY_DELETED,
     ENTITY_RELATIONSHIPS_CHANGED,
     ENTITY_UPDATED,
+    EXECUTION_AUTHORITY_DECISION,
     GOAL_ACTIVATED,
     GOAL_CANCELLED,
     GOAL_COMPLETED,
@@ -252,7 +252,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     SERVICE_ERROR,
     SETTINGS_CHANGED,
     SETTINGS_SNAPSHOT,
-    COMMAND_ROUTED,
+    EXECUTION_AUTHORITY_DECISION,
     CHAT_STARTED,
     CHAT_CHUNK,
     CHAT_COMPLETE,
@@ -1549,11 +1549,13 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
     if existing is None:
         existing = AgentRunItem(agent_id=agent_id, request_id=request_id)
 
-    if event.topic == AGENT_TASK_REQUEST:
+    elif event.topic == AGENT_TASK_REQUEST:
         run_state = "running"
         steps = existing.steps + 1
     elif event.topic == AGENT_TASK_COMPLETE:
         run_state = "waiting"
+        # Prefer producer-reported steps (agent_runtime), else keep existing.
+        steps = _coerce_int(payload.get("steps"), existing.steps)
     elif event.topic == AGENT_TERMINATED:
         run_state = "failed" if error else "terminated"
     else:
@@ -1808,6 +1810,7 @@ def _reduce_permission_check(state: AppState, event: Event) -> AppState:
 
 from ai_command_center.core.state.chat_state import (  # noqa: E402
     _is_pending_chat_user_text as _chat_is_pending_user_text,
+    _reduce_authority_decision,
     _reduce_chat_cancelled,
     _reduce_chat_chunk,
     _reduce_chat_complete,
@@ -1815,7 +1818,6 @@ from ai_command_center.core.state.chat_state import (  # noqa: E402
     _reduce_chat_history_loaded,
     _reduce_chat_started,
     _reduce_chat_workspace_entity,
-    _reduce_command_routed,
     _reduce_context_snapshot,
     _reduce_ui_chat_new_session,
 )
@@ -2365,9 +2367,26 @@ def _reduce_brain_state_snapshot(state: AppState, event: Event) -> AppState:
         return replace(state, brain_state=bs.with_kernel_state(state.brain_kernel_state))
     if topic in _BRAIN_GOAL_TOPICS:
         raw = state.brain_recent_goals[0] if state.brain_recent_goals else {}
+        try:
+            goal_snap = BrainGoalSnapshot.from_dict(dict(raw))
+        except (TypeError, ValueError):
+            # Priority may be enum/string ("normal") from Goal.to_payload().
+            patched = dict(raw)
+            priority = patched.get("priority", 0)
+            if isinstance(priority, str):
+                patched["priority"] = {
+                    "critical": 0,
+                    "high": 1,
+                    "normal": 2,
+                    "low": 3,
+                }.get(priority.lower(), 2)
+            try:
+                goal_snap = BrainGoalSnapshot.from_dict(patched)
+            except (TypeError, ValueError):
+                return state
         return replace(
             state,
-            brain_state=bs.with_goal(BrainGoalSnapshot.from_dict(dict(raw))),
+            brain_state=bs.with_goal(goal_snap),
         )
     if topic == OBSERVATION_RECEIVED:
         raw = state.brain_recent_observations[0] if state.brain_recent_observations else {}
@@ -2970,7 +2989,7 @@ def _reduce_agent_pipeline_snapshot(state: AppState, event: Event) -> AppState:
             error = str(p.get("error") or (prev.error if prev else ""))
         elif topic == AGENT_TASK_COMPLETE:
             run_state = "waiting"
-            steps = prev.steps if prev else 0
+            steps = (prev.steps if prev else 0) + 1
             error = str(p.get("error") or (prev.error if prev else ""))
         else:  # AGENT_TERMINATED
             error = str(p.get("error") or "")
@@ -3493,7 +3512,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_service_state,
     _reduce_settings_changed,
     _reduce_settings_snapshot,
-    _reduce_command_routed,
+    _reduce_authority_decision,
     _reduce_chat_started,
     _reduce_chat_chunk,
     _reduce_chat_complete,

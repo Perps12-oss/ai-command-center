@@ -86,10 +86,13 @@ from ai_command_center.services.goal_scheduler_service import SingleGoalSchedule
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
 from ai_command_center.services.model_router_service import ModelRouterService
 from ai_command_center.providers.provider_registry import ProviderRegistry, build_default_registry
+from ai_command_center.orchestration.state_capability_tools import bind_state_capability_tools
 from ai_command_center.services.obsidian_service import ObsidianService
+from ai_command_center.services.state_authority_service import StateAuthorityService
 from ai_command_center.services.ollama_http_service import OllamaHttpService
 from ai_command_center.services.openai_http_service import OpenAIHttpService
 from ai_command_center.services.observer_service import ObserverService
@@ -242,6 +245,38 @@ def build_services(
     qwenpaw_sidecar = QwenPawSidecarService(bus, health_state=qwenpaw_health)
     # PermissionService wired above with tool_executor.
 
+    def _goal_lookup(*, workspace_id: str = "") -> list[dict]:
+        goals = goal_repo.list_goals()
+        out: list[dict] = []
+        for goal in goals[:20]:
+            out.append(
+                {
+                    "id": goal.id,
+                    "title": goal.title,
+                    "status": goal.status.value if hasattr(goal.status, "value") else str(goal.status),
+                    "workspace_id": workspace_id,
+                }
+            )
+        return out
+
+    state_authority = StateAuthorityService(
+        bus,
+        world_model,
+        memory_lookup=memory_graph.lookup_for_state,
+        goal_lookup=_goal_lookup,
+    )
+    execution_authority = ExecutionAuthorityService(
+        bus,
+        agent_runtime=agent_runtime,
+        state_authority=state_authority,
+    )
+    bind_state_capability_tools(
+        shared_tool_registry,
+        bus=bus,
+        notes=obsidian,
+        memory=memory_graph,
+    )
+
     for svc in (
         telemetry,
         tracing,
@@ -263,6 +298,8 @@ def build_services(
         chat_export,
         system_monitor,
         SettingsService(bus, settings_repo),
+        state_authority,
+        execution_authority,
         CommandRouterService(bus),
         orchestration,
         runtime_provider_registry,

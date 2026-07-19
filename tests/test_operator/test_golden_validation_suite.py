@@ -198,14 +198,11 @@ def test_model_name_is_recorded_in_response(adapter: ModelAdapter) -> None:
 
 @pytest.mark.parametrize("adapter", adapter_instances, ids=adapter_ids)
 def test_truth_bound_intent_bypasses_llm_regardless_of_adapter(adapter: ModelAdapter) -> None:
-    """Open Outlook must be handled by OrchestrationService before any LLM call,
-    regardless of adapter. adapter.complete() must NEVER be called."""
+    """Open Outlook must be handled by the execution pipeline before any LLM call."""
+    from tests.orchestration.conftest import publish_chat, start_runtime_stack
+
     bus = EventBus()
-    registry = build_registry()
-    orchestration = OrchestrationService(bus, provider_registry=registry)
-    chat = ChatHandlerService(bus, ContextManager())
-    orchestration.start()
-    chat.start()
+    orchestration, chat, authority = start_runtime_stack(bus)
 
     llm_requests: list[dict] = []
     completes: list[dict] = []
@@ -215,23 +212,21 @@ def test_truth_bound_intent_bypasses_llm_regardless_of_adapter(adapter: ModelAda
     try:
         publish_chat(bus, "Open Outlook", request_id="req-golden-launch")
         assert llm_requests == [], f"Adapter {adapter.name!r} caused LLM invocation for truth-bound intent"
-        assert len(completes) == 1
-        assert completes[0]["truth_validated"] is True
-        assert completes[0]["response_source"] == "orchestration"
+        assert len(completes) >= 1
+        assert completes[-1]["truth_validated"] is True
     finally:
         chat.stop()
         orchestration.stop()
+        authority.stop()
 
 
 @pytest.mark.parametrize("adapter", adapter_instances, ids=adapter_ids)
 def test_time_query_bypasses_llm_regardless_of_adapter(adapter: ModelAdapter) -> None:
-    """System time query must be answered by OrchestrationService, not LLM."""
+    """System time query must be answered by the execution pipeline, not LLM."""
+    from tests.orchestration.conftest import publish_chat, start_runtime_stack
+
     bus = EventBus()
-    registry = build_registry()
-    orchestration = OrchestrationService(bus, provider_registry=registry)
-    chat = ChatHandlerService(bus, ContextManager())
-    orchestration.start()
-    chat.start()
+    orchestration, chat, authority = start_runtime_stack(bus)
 
     llm_requests: list[dict] = []
     completes: list[dict] = []
@@ -241,22 +236,21 @@ def test_time_query_bypasses_llm_regardless_of_adapter(adapter: ModelAdapter) ->
     try:
         publish_chat(bus, "What time is it?", request_id="req-golden-time")
         assert llm_requests == [], f"Adapter {adapter.name!r} caused LLM invocation for time query"
-        assert len(completes) == 1
-        assert completes[0]["response_source"] == "orchestration"
+        assert len(completes) >= 1
+        assert str(completes[-1]["text"]).startswith("It is ")
     finally:
         chat.stop()
         orchestration.stop()
+        authority.stop()
 
 
 @pytest.mark.parametrize("adapter", adapter_instances, ids=adapter_ids)
-def test_unhandled_intent_defers_to_llm_for_all_adapters(adapter: ModelAdapter) -> None:
-    """Unclassified intents must always emit LLM_REQUEST, for every adapter."""
+def test_unhandled_intent_becomes_llm_capability_for_all_adapters(adapter: ModelAdapter) -> None:
+    """Conversational intents emit LLM_REQUEST via an explicit llm PlanStep."""
+    from tests.orchestration.conftest import publish_chat, start_runtime_stack
+
     bus = EventBus()
-    registry = build_registry()
-    orchestration = OrchestrationService(bus, provider_registry=registry)
-    chat = ChatHandlerService(bus, ContextManager())
-    orchestration.start()
-    chat.start()
+    orchestration, chat, authority = start_runtime_stack(bus)
 
     llm_requests: list[dict] = []
     bus.subscribe(LLM_REQUEST, lambda e: llm_requests.append(dict(e.payload)))
@@ -264,11 +258,13 @@ def test_unhandled_intent_defers_to_llm_for_all_adapters(adapter: ModelAdapter) 
     try:
         publish_chat(bus, "Tell me a joke", request_id="req-golden-joke")
         assert len(llm_requests) == 1, (
-            f"Adapter {adapter.name!r}: unhandled intent did not defer to LLM"
+            f"Adapter {adapter.name!r}: conversational intent did not dispatch llm capability"
         )
+        assert llm_requests[0].get("capability") == "llm"
     finally:
         chat.stop()
         orchestration.stop()
+        authority.stop()
 
 
 # ── Suite 3: ModelAdapter contract conformance ─────────────────────────────

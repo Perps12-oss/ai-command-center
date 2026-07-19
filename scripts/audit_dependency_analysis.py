@@ -385,7 +385,6 @@ def analyze_workspace_os(eb: dict) -> dict:
     wos_default_on = "workspace_os_enabled: bool = True" in factory
 
     # Count services: wos cluster vs bus-only palette stack
-    sg = build_service_graph()
     wos_services = {
         "WorkspaceOsService",
         "WorkspaceService",
@@ -484,7 +483,11 @@ def main() -> None:
     print("--- Top 20 topics by (publishers + subscribers) ---")
     for t, pub_n, sub_n, fanout, _, _ in eb["rows"][:20]:
         crit = "SYNC_CRITICAL" if t in {
-            "ui.command", "command.routed", "settings.snapshot", "settings.set.request"
+            "ui.command",
+            "execution.authority.decision",
+            "goal.submit.request",
+            "settings.snapshot",
+            "settings.set_request",
         } else ""
         print(f"  {t:40s}  pub={pub_n:2d}  sub={sub_n:2d}  fan-out={fanout:2d}  {crit}")
     print()
@@ -537,13 +540,13 @@ def main() -> None:
     print()
     print("--- Features BYPASSING Workspace OS (bus-native palette path) ---")
     bypass = [
-        "Chat (UI_COMMAND -> CommandRouter -> ChatHandler -> LLM)",
+        "Chat (UI_COMMAND -> ExecutionAuthority -> LLM step -> LLM)",
         "Notes/Obsidian search (NOTE_* topics)",
         "Memory graph (MEMORY_* topics)",
         "Plugins (PLUGIN_* topics)",
         "Settings (SETTINGS_* topics)",
         "System monitor (SYSTEM_SNAPSHOT)",
-        "Shell tools (COMMAND_ROUTED -> TOOL_INVOKE)",
+        "Shell tools (ExecutionOrchestrator -> TOOL_INVOKE)",
         "Agents (AGENT_* topics)",
         "Workflows (WORKFLOW_* topics)",
     ]

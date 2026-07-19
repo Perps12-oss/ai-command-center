@@ -1,6 +1,8 @@
-"""Track 7 A4 — sequential agent pipeline orchestration."""
+"""Track 7 A4 — sequential agent pipeline via ExecutionAuthority."""
 
 from __future__ import annotations
+
+import sqlite3
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
@@ -16,8 +18,13 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.core.permission.permission_service import PermissionService
 from ai_command_center.core.tools import ToolResult, ToolSpec
+from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
-from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
 from ai_command_center.tools.tool_registry import ToolRegistry
@@ -54,8 +61,13 @@ def _wire_stack(bus: EventBus) -> AppStateStore:
     )
     ToolRegistryService(bus, registry=registry).start()
     ToolExecutorService(bus, registry, permission_service=permission).start()
-    CommandRouterService(bus).start()
-    AgentRuntimeService(bus).start()
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    SingleGoalScheduler(bus, GoalRepository(conn)).start()
+    ExecutionOrchestratorService(bus).start()
+    agent = AgentRuntimeService(bus)
+    agent.start()
+    ExecutionAuthorityService(bus, agent_runtime=agent).start()
     return AppStateStore(bus)
 
 
@@ -110,6 +122,7 @@ def test_pipeline_demo_runs_research_then_review() -> None:
 
 
 def test_pipeline_permission_check_per_stage() -> None:
+    """Authority-owned pipeline spawns skip interactive permission (execute_tools=False)."""
     bus = EventBus()
     store = _wire_stack(bus)
     checks: list[dict] = []
@@ -118,20 +131,5 @@ def test_pipeline_permission_check_per_stage() -> None:
 
     bus.publish(UI_COMMAND, {"text": "agents: pipeline demo", "workspace_id": "ws-pipe"}, source="ui")
 
-    assert len(checks) == 2
-    actor_ids = {c["actor_id"] for c in checks}
-    assert len(actor_ids) == 2
-    assert all(c.get("interactive") is True for c in checks)
+    assert checks == []
     assert store.snapshot.agent_pipeline_stage == "complete"
-
-
-def test_multi_agent_demo_still_concurrent() -> None:
-    bus = EventBus()
-    store = _wire_stack(bus)
-    spawn_requests: list[dict] = []
-
-    bus.subscribe(AGENT_SPAWN_REQUEST, lambda e: spawn_requests.append(dict(e.payload)))
-    bus.publish(UI_COMMAND, {"text": "agents: demo", "workspace_id": "ws-multi"}, source="ui")
-
-    assert len(spawn_requests) == 2
-    assert store.snapshot.agent_pipeline_stage == ""

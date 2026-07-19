@@ -1,19 +1,28 @@
-"""EventBus-driven sequential workflow engine (W0/W1 skeleton)."""
+"""EventBus-driven workflow definition / status provider (W0/W1).
+
+Does **not** publish TOOL_INVOKE. ExecutionAuthority converts WORKFLOW_START into
+an ExecutionPlan; ExecutionOrchestrator alone dispatches tools. This service
+publishes workflow lifecycle status by observing execution runs.
+"""
 
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Callable
 from typing import Any
 
-from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
+from ai_command_center.core.contracts import build_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
+    EXECUTION_RUN_COMPLETE,
+    EXECUTION_RUN_FAILED,
+    EXECUTION_RUN_STARTED,
+    EXECUTION_STEP_COMPLETED,
+    EXECUTION_STEP_FAILED,
+    EXECUTION_STEP_STARTED,
     TELEMETRY_EVENT,
-    TOOL_INVOKE,
-    TOOL_RESULT,
     WORKFLOW_COMPLETED,
+    WORKFLOW_EXECUTION_REQUEST,
     WORKFLOW_FAILED,
     WORKFLOW_START,
     WORKFLOW_STARTED,
@@ -26,7 +35,7 @@ _logger = logging.getLogger(__name__)
 
 
 class WorkflowEngineService(BaseService):
-    """Runs linear tool-step workflows via tool.invoke / tool.result."""
+    """Workflow definition + status projection. Never publishes TOOL_INVOKE."""
 
     name = "workflow_engine"
     _MAX_STEPS = 16
@@ -35,13 +44,29 @@ class WorkflowEngineService(BaseService):
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
         self._runs: dict[str, dict[str, Any]] = {}
+        self._execution_to_workflow: dict[str, str] = {}
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
             self._bus.subscribe(WORKFLOW_START, self._on_workflow_start)
         )
         self._unsubscribers.append(
-            self._bus.subscribe(TOOL_RESULT, self._on_tool_result)
+            self._bus.subscribe(EXECUTION_RUN_STARTED, self._on_execution_started)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_STEP_STARTED, self._on_execution_step_started)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_STEP_COMPLETED, self._on_execution_step_completed)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_STEP_FAILED, self._on_execution_step_failed)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_RUN_COMPLETE, self._on_execution_complete)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_RUN_FAILED, self._on_execution_failed)
         )
 
     def _on_unload(self) -> None:
@@ -49,14 +74,24 @@ class WorkflowEngineService(BaseService):
             unsub()
         self._unsubscribers.clear()
         self._runs.clear()
+        self._execution_to_workflow.clear()
 
     def _on_workflow_start(self, event: Event) -> None:
+        import uuid
+
         run_id = str(event.payload.get("run_id") or uuid.uuid4().hex)
         steps = list(event.payload.get("steps") or [])
         if not steps:
             self._bus.publish(
                 WORKFLOW_FAILED,
                 {"run_id": run_id, "error": "workflow has no steps"},
+                source=self.name,
+            )
+            return
+        if len(steps) > self._MAX_STEPS:
+            self._bus.publish(
+                WORKFLOW_FAILED,
+                {"run_id": run_id, "error": "max workflow steps exceeded"},
                 source=self.name,
             )
             return
@@ -73,101 +108,130 @@ class WorkflowEngineService(BaseService):
             "index": 0,
             "workflow_id": workflow_id,
             "workspace_context": workspace_context,
+            "total_steps": len(steps),
         }
         _logger.info("workflow.start run_id=%s steps=%d", run_id, len(steps))
-        self._bus.publish(
-            WORKFLOW_STARTED,
-            {
-                "run_id": run_id,
-                "workflow_id": workflow_id,
-                "total_steps": len(steps),
-                "steps": steps,
-            },
-            source=self.name,
-        )
-        self._dispatch_step(run_id)
+        started_payload = {
+            "run_id": run_id,
+            "workflow_id": workflow_id,
+            "total_steps": len(steps),
+            "steps": steps,
+        }
+        self._bus.publish(WORKFLOW_STARTED, started_payload, source=self.name)
+        # Hand off to ExecutionAuthority after local status registration.
+        intake = dict(event.payload)
+        intake["run_id"] = run_id
+        if workspace_context and "workspace_context" not in intake:
+            intake["workspace_context"] = workspace_context
+        self._bus.publish(WORKFLOW_EXECUTION_REQUEST, intake, source=self.name)
 
-    def _dispatch_step(self, run_id: str) -> None:
-        run = self._runs.get(run_id)
-        if run is None:
+    def _on_execution_started(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id") or "")
+        execution_run_id = str(event.payload.get("run_id") or "")
+        if request_id in self._runs and execution_run_id:
+            self._execution_to_workflow[execution_run_id] = request_id
+
+    def _workflow_id_for_execution(self, execution_run_id: str) -> str:
+        return self._execution_to_workflow.get(execution_run_id, "")
+
+    def _on_execution_step_started(self, event: Event) -> None:
+        execution_run_id = str(event.payload.get("run_id") or "")
+        workflow_run_id = self._workflow_id_for_execution(execution_run_id)
+        if not workflow_run_id or workflow_run_id not in self._runs:
             return
-        index = int(run["index"])
-        steps: list[dict[str, Any]] = run["steps"]
-        if index >= len(steps):
-            self._runs.pop(run_id, None)
-            self._bus.publish(
-                WORKFLOW_COMPLETED,
-                {"run_id": run_id, "workflow_id": run.get("workflow_id"), "steps": len(steps)},
-                source=self.name,
-            )
-            self._bus.publish(
-                TELEMETRY_EVENT,
-                {"name": "workflow.completed", "run_id": run_id},
-                source=self.name,
-            )
-            return
-        if index >= self._MAX_STEPS:
-            self._fail(run_id, "max workflow steps exceeded")
-            return
-        step = steps[index]
-        step_id = str(step.get("id") or f"step-{index}")
-        step_type = str(step.get("type") or "tool")
+        run = self._runs[workflow_run_id]
+        index = int(event.payload.get("index", run.get("index", 0)))
+        step_id = str(event.payload.get("step_id") or f"step-{index}")
         self._bus.publish(
             WORKFLOW_STEP_STARTED,
-            {"run_id": run_id, "step_id": step_id, "index": index, "type": step_type},
-            source=self.name,
-        )
-        if step_type != "tool":
-            self._fail(run_id, f"unsupported step type: {step_type}")
-            return
-        tool_name = str(step.get("tool") or "")
-        args = dict(step.get("args") or {})
-        if not tool_name:
-            self._fail(run_id, "tool step missing tool name")
-            return
-        self._bus.publish(
-            TOOL_INVOKE,
             {
-                "contract_version": TOOL_CONTRACT_VERSION,
-                "invoke_id": uuid.uuid4().hex,
-                "run_id": run_id,
+                "run_id": workflow_run_id,
                 "step_id": step_id,
-                "tool": tool_name,
-                "args": args,
-                "actor_type": "workflow",
-                "workspace_context": run.get("workspace_context") or {},
+                "index": index,
+                "type": "tool",
             },
             source=self.name,
         )
 
-    def _on_tool_result(self, event: Event) -> None:
-        run_id = str(event.payload.get("run_id") or "")
-        if not run_id or run_id not in self._runs:
+    def _on_execution_step_completed(self, event: Event) -> None:
+        execution_run_id = str(event.payload.get("run_id") or "")
+        workflow_run_id = self._workflow_id_for_execution(execution_run_id)
+        if not workflow_run_id or workflow_run_id not in self._runs:
             return
-        run = self._runs[run_id]
-        index = int(run["index"])
+        run = self._runs[workflow_run_id]
+        index = int(event.payload.get("index", run.get("index", 0)))
         step_id = str(event.payload.get("step_id") or f"step-{index}")
-        success = bool(event.payload.get("success", True))
         self._bus.publish(
             WORKFLOW_STEP_COMPLETED,
             {
-                "run_id": run_id,
+                "run_id": workflow_run_id,
                 "step_id": step_id,
                 "index": index,
-                "success": success,
+                "success": True,
             },
             source=self.name,
         )
-        if not success:
-            self._fail(run_id, str(event.payload.get("error") or "tool step failed"))
-            return
         run["index"] = index + 1
-        self._dispatch_step(run_id)
 
-    def _fail(self, run_id: str, error: str) -> None:
-        self._runs.pop(run_id, None)
+    def _on_execution_step_failed(self, event: Event) -> None:
+        execution_run_id = str(event.payload.get("run_id") or "")
+        workflow_run_id = self._workflow_id_for_execution(execution_run_id)
+        if not workflow_run_id or workflow_run_id not in self._runs:
+            return
+        index = int(event.payload.get("index", 0))
+        step_id = str(event.payload.get("step_id") or f"step-{index}")
+        self._bus.publish(
+            WORKFLOW_STEP_COMPLETED,
+            {
+                "run_id": workflow_run_id,
+                "step_id": step_id,
+                "index": index,
+                "success": False,
+            },
+            source=self.name,
+        )
+
+    def _on_execution_complete(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id") or "")
+        execution_run_id = str(event.payload.get("run_id") or "")
+        workflow_run_id = request_id if request_id in self._runs else self._workflow_id_for_execution(
+            execution_run_id
+        )
+        if not workflow_run_id or workflow_run_id not in self._runs:
+            return
+        run = self._runs.pop(workflow_run_id, None) or {}
+        self._execution_to_workflow.pop(execution_run_id, None)
+        total = int(run.get("total_steps") or len(run.get("steps") or []))
+        self._bus.publish(
+            WORKFLOW_COMPLETED,
+            {
+                "run_id": workflow_run_id,
+                "workflow_id": run.get("workflow_id"),
+                "steps": total,
+            },
+            source=self.name,
+        )
+        self._bus.publish(
+            TELEMETRY_EVENT,
+            {"name": "workflow.completed", "run_id": workflow_run_id},
+            source=self.name,
+        )
+
+    def _on_execution_failed(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id") or "")
+        execution_run_id = str(event.payload.get("run_id") or "")
+        workflow_run_id = request_id if request_id in self._runs else self._workflow_id_for_execution(
+            execution_run_id
+        )
+        if not workflow_run_id or workflow_run_id not in self._runs:
+            return
+        self._runs.pop(workflow_run_id, None)
+        self._execution_to_workflow.pop(execution_run_id, None)
         self._bus.publish(
             WORKFLOW_FAILED,
-            {"run_id": run_id, "error": error},
+            {
+                "run_id": workflow_run_id,
+                "error": str(event.payload.get("error") or "execution failed"),
+            },
             source=self.name,
         )

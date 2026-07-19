@@ -3,61 +3,58 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock
 from uuid import uuid4
 
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
-    CAPABILITY_CLASSIFIED,
-    CAPABILITY_DISPATCH,
-    COMMAND_ROUTED,
+    GOAL_SUBMIT_REQUEST,
     MODEL_RESOLVE_REQUEST,
     MODEL_RESOLVE_RESULT,
     MODEL_SELECTED,
-    ORCHESTRATION_INTENT_CLASSIFIED,
     SETTINGS_SNAPSHOT,
+    UI_COMMAND,
     WORKSPACE_ACTIVE,
 )
 from ai_command_center.core.entity.entity import ENTITY_TYPE_CARD
+from ai_command_center.domain.runtime_capability import CapabilityKind
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.model_router_service import ModelRouterService
-from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.services.runtime_capability_router_service import (
     RuntimeCapabilityRouterService,
 )
 
 
 class Phase6bOrchestrationScopeTests(unittest.TestCase):
-    def test_orchestration_classified_includes_workspace_scope(self) -> None:
+    def test_authority_goal_submit_includes_workspace_scope(self) -> None:
         bus = EventBus()
-        service = OrchestrationService(bus)
+        service = ExecutionAuthorityService(bus)
         service.load()
-        classified: list[dict] = []
-        bus.subscribe(
-            ORCHESTRATION_INTENT_CLASSIFIED,
-            lambda e: classified.append(dict(e.payload)),
-        )
+        goals: list[dict] = []
+        bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
         try:
             ws_id = uuid4().hex
             bus.publish(
-                COMMAND_ROUTED,
+                WORKSPACE_ACTIVE,
+                {"workspace_id": ws_id, "title": "Scope"},
+                source="tests",
+            )
+            bus.publish(
+                UI_COMMAND,
                 {
-                    "intent": INTENT_CHAT,
-                    "request_id": "req-orch",
-                    "args": {"prompt": "what time is it"},
-                    "workspace_id": ws_id,
+                    "text": "hello capability",
                     "selected_entity_id": "card-1",
                     "selected_entity_type": ENTITY_TYPE_CARD,
                     "selected_entity_title": "Ops",
                 },
-                source="command_router",
+                source="tests",
             )
-            self.assertEqual(1, len(classified))
-            payload = classified[0]
+            self.assertEqual(1, len(goals))
+            payload = goals[0]
             self.assertEqual(ws_id, payload.get("workspace_id"))
-            self.assertEqual("card-1", payload.get("selected_entity_id"))
-            args = payload.get("args") or {}
-            self.assertEqual(ws_id, args.get("workspace_id"))
+            self.assertEqual("llm", payload["plan"]["steps"][0]["capability"])
+            self.assertEqual("card-1", payload["workspace_context"].get("entity_id"))
+            self.assertEqual(ENTITY_TYPE_CARD, payload["workspace_context"].get("entity_type"))
         finally:
             service.unload()
 
@@ -126,39 +123,21 @@ class Phase6bModelRouterScopeTests(unittest.TestCase):
 
 
 class Phase6bRuntimeCapabilityScopeTests(unittest.TestCase):
-    def test_capability_dispatch_includes_workspace_scope(self) -> None:
+    def test_runtime_capability_router_is_classifier_and_provider_map_only(self) -> None:
         bus = EventBus()
-        service = RuntimeCapabilityRouterService(bus, obsidian=MagicMock())
+        service = RuntimeCapabilityRouterService(bus)
         service.load()
-        classified: list[dict] = []
-        dispatched: list[dict] = []
-        bus.subscribe(CAPABILITY_CLASSIFIED, lambda e: classified.append(dict(e.payload)))
-        bus.subscribe(CAPABILITY_DISPATCH, lambda e: dispatched.append(dict(e.payload)))
         try:
-            ws_id = uuid4().hex
             bus.publish(
-                WORKSPACE_ACTIVE,
-                {"workspace_id": ws_id, "title": "Scope"},
-                source="tests",
+                SETTINGS_SNAPSHOT,
+                {"capability_provider_planning": "native"},
+                source="settings",
             )
-            bus.publish(
-                COMMAND_ROUTED,
-                {
-                    "intent": INTENT_CHAT,
-                    "request_id": "cap-1",
-                    "args": {"prompt": "hello capability"},
-                    "workspace_id": ws_id,
-                    "selected_entity_id": "ent-22",
-                    "selected_entity_type": ENTITY_TYPE_CARD,
-                    "selected_entity_title": "Canvas",
-                },
-                source="command_router",
+            self.assertEqual(
+                CapabilityKind.PLANNING,
+                RuntimeCapabilityRouterService.classify("schedule standup"),
             )
-            self.assertEqual(1, len(classified))
-            self.assertEqual(1, len(dispatched))
-            self.assertEqual(ws_id, classified[0].get("workspace_id"))
-            self.assertEqual("ent-22", dispatched[0].get("workspace_entity_id"))
-            self.assertEqual(ENTITY_TYPE_CARD, dispatched[0].get("workspace_entity_type"))
+            self.assertEqual("native", service.resolve_provider(CapabilityKind.PLANNING))
         finally:
             service.unload()
 

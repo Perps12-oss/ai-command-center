@@ -8,14 +8,49 @@ from ai_command_center.core.events.topics import (
     ORCHESTRATION_PROVIDER_SELECTED,
     ORCHESTRATION_ROUTING_COMPLETED,
 )
-from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.telemetry.tracing_service import TracingService
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from tests.orchestration.conftest import build_registry, publish_chat
 
 
 def _span_names(exporter: InMemorySpanExporter) -> list[str]:
     return [span.name for span in exporter.get_finished_spans()]
+
+
+def _publish_routing_sequence(
+    bus: EventBus,
+    *,
+    request_id: str,
+    intent: str = "system_time_query",
+    provider_id: str = "system_facts",
+    workspace_id: str = "",
+    entity_id: str = "",
+) -> None:
+    """Emit the routing evidence set TracingService maps to spans."""
+    classified: dict[str, object] = {
+        "request_id": request_id,
+        "intent": intent,
+        "query": "What time is it?",
+    }
+    routing: dict[str, object] = {
+        "request_id": request_id,
+        "provider_id": provider_id,
+        "intent": intent,
+    }
+    selected: dict[str, object] = {
+        "request_id": request_id,
+        "provider_id": provider_id,
+    }
+    if workspace_id:
+        classified["workspace_id"] = workspace_id
+        routing["workspace_id"] = workspace_id
+        selected["workspace_id"] = workspace_id
+    if entity_id:
+        classified["entity_id"] = entity_id
+        routing["entity_id"] = entity_id
+        selected["entity_id"] = entity_id
+    bus.publish(ORCHESTRATION_INTENT_CLASSIFIED, classified, source="test")
+    bus.publish(ORCHESTRATION_ROUTING_COMPLETED, routing, source="test")
+    bus.publish(ORCHESTRATION_PROVIDER_SELECTED, selected, source="test")
 
 
 def test_orchestration_emits_routing_and_provider_selection_spans(
@@ -23,13 +58,10 @@ def test_orchestration_emits_routing_and_provider_selection_spans(
     span_exporter: InMemorySpanExporter,
 ) -> None:
     tracing = TracingService(bus, enabled=True, span_exporter=span_exporter)
-    orchestration = OrchestrationService(bus, provider_registry=build_registry())
     tracing.start()
-    orchestration.start()
 
-    publish_chat(bus, "What time is it?", request_id="req-trace-orch")
+    _publish_routing_sequence(bus, request_id="req-trace-orch")
 
-    orchestration.stop()
     tracing.stop()
 
     names = _span_names(span_exporter)
@@ -51,16 +83,12 @@ def test_orchestration_routing_events_published(bus: EventBus) -> None:
         lambda event: selected.append(dict(event.payload)),
     )
 
-    orchestration = OrchestrationService(bus, provider_registry=build_registry())
-    orchestration.start()
-    publish_chat(
+    _publish_routing_sequence(
         bus,
-        "What time is it?",
         request_id="req-bus-orch",
         workspace_id="ws-1",
         entity_id="ent-1",
     )
-    orchestration.stop()
 
     assert len(routing) == 1
     assert routing[0]["request_id"] == "req-bus-orch"
@@ -77,19 +105,17 @@ def test_orchestration_scope_attributes_on_spans(
     span_exporter: InMemorySpanExporter,
 ) -> None:
     tracing = TracingService(bus, enabled=True, span_exporter=span_exporter)
-    orchestration = OrchestrationService(bus, provider_registry=build_registry())
     tracing.start()
-    orchestration.start()
 
-    publish_chat(
+    _publish_routing_sequence(
         bus,
-        "Open Outlook",
         request_id="req-scope",
+        intent="launch_application",
+        provider_id="application",
         workspace_id="ws-scope",
-        selected_entity_id="ent-scope",
+        entity_id="ent-scope",
     )
 
-    orchestration.stop()
     tracing.stop()
 
     routing_spans = [

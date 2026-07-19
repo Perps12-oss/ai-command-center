@@ -11,7 +11,6 @@ from typing import Callable
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
     NOTE_CONTEXT_REQUEST,
     NOTE_CONTEXT_RESULT,
     NOTE_CREATED,
@@ -26,7 +25,6 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.repositories.note_repository import NoteRepository
 from ai_command_center.services.base import BaseService
-from ai_command_center.core.events.intents import INTENT_NOTE_NEW, INTENT_NOTE_SEARCH
 
 _SKIP_DIRS = {".obsidian", ".trash", ".git"}
 _MAX_NOTE_BYTES = 512_000
@@ -85,9 +83,9 @@ class ObsidianService(BaseService):
         )
         self._index_thread.start()
         self._unsubscribers.append(self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot))
-        self._unsubscribers.append(self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed))
         self._unsubscribers.append(self._bus.subscribe(NOTE_SELECT, self._on_note_select))
         self._unsubscribers.append(self._bus.subscribe(NOTE_CONTEXT_REQUEST, self._on_note_context_request))
+        # Notes execute via notes.create / notes.search tools.
 
     def _apply_vault_path(self, raw: str) -> None:
         path = str(raw or "").strip()
@@ -131,16 +129,52 @@ class ObsidianService(BaseService):
     def selected_path(self) -> str | None:
         return self._selected_path
 
-    def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
-            return
-        intent = event.payload.get("intent")
-        args = event.payload.get("args") or {}
+    def create_note(self, body: str) -> tuple[bool, str, str]:
+        """Capability API: create Inbox note. Returns (ok, message, relative_path)."""
+        if not body:
+            return False, "new note: requires note body", ""
+        vault = self._vault_path
+        if vault is None or not vault.is_dir():
+            return False, "Obsidian vault not configured. Set obsidian_vault_path in settings.", ""
+        inbox = vault / "Inbox"
+        inbox.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        path = inbox / f"Quick-{stamp}.md"
+        title = _title_from_markdown(path, body)
+        content = body if body.lstrip().startswith("#") else f"# {title}\n\n{body}"
+        written = self._repo.write_note(path.relative_to(vault), content)
+        if written is None:
+            return False, "Could not write note to vault", ""
+        self._index_file(vault, path)
+        rel = str(path.relative_to(vault)).replace("\\", "/")
+        self._bus.publish(
+            NOTE_CREATED,
+            {"path": rel, "title": title},
+            source=self.name,
+        )
+        return True, f"created note {rel}", rel
 
-        if intent == INTENT_NOTE_SEARCH:
-            self._handle_search(str(args.get("query", "")))
-        elif intent == INTENT_NOTE_NEW:
-            self._handle_new_note(str(args.get("body", "")))
+    def search_notes(self, query: str) -> tuple[bool, str, list[dict[str, str]]]:
+        """Capability API: search vault. Returns (ok, message, hits)."""
+        if not query:
+            return False, "note: requires a search query", []
+        vault = self._vault_path
+        if vault is None or not vault.is_dir():
+            return False, "Obsidian vault not configured. Set obsidian_vault_path in settings.", []
+        self._pending_search_query = query
+        self._schedule_index(vault)
+        search_start = time.perf_counter()
+        with self._repo_lock:
+            hits = self._repo.search(query)
+        search_ms = (time.perf_counter() - search_start) * 1000.0
+        indexing = self._index_in_progress
+        self._publish_search_results(query, hits, search_ms=search_ms, indexing=indexing)
+        if hits or not indexing:
+            self._pending_search_query = None
+        results = [
+            {"path": h.path, "title": h.title, "snippet": h.snippet} for h in hits
+        ]
+        return True, f"found {len(results)} notes", results
 
     def _on_note_select(self, event: Event) -> None:
         path = str(event.payload.get("path", "")).strip()
@@ -182,29 +216,10 @@ class ObsidianService(BaseService):
         self._index_queue.put(vault)
 
     def _handle_search(self, query: str) -> None:
-        if not query:
-            self._bus.publish(
-                NOTE_ERROR,
-                {"message": "note: requires a search query"},
-                source=self.name,
-            )
-            return
-        vault = self._require_vault()
-        if vault is None:
-            return
+        self.search_notes(query)
 
-        self._pending_search_query = query
-        self._schedule_index(vault)
-
-        search_start = time.perf_counter()
-        with self._repo_lock:
-            hits = self._repo.search(query)
-        search_ms = (time.perf_counter() - search_start) * 1000.0
-
-        indexing = self._index_in_progress
-        self._publish_search_results(query, hits, search_ms=search_ms, indexing=indexing)
-        if hits or not indexing:
-            self._pending_search_query = None
+    def _handle_new_note(self, body: str) -> None:
+        self.create_note(body)
 
     def _publish_search_results(
         self,
@@ -232,39 +247,6 @@ class ObsidianService(BaseService):
                 "search_ms": round(search_ms, 2),
                 "indexing": indexing,
             },
-            source=self.name,
-        )
-
-    def _handle_new_note(self, body: str) -> None:
-        if not body:
-            self._bus.publish(
-                NOTE_ERROR,
-                {"message": "new note: requires note body"},
-                source=self.name,
-            )
-            return
-        vault = self._require_vault()
-        if vault is None:
-            return
-
-        inbox = vault / "Inbox"
-        inbox.mkdir(parents=True, exist_ok=True)
-        stamp = time.strftime("%Y%m%d-%H%M%S")
-        path = inbox / f"Quick-{stamp}.md"
-        title = _title_from_markdown(path, body)
-        content = body if body.lstrip().startswith("#") else f"# {title}\n\n{body}"
-        written = self._repo.write_note(path.relative_to(vault), content)
-        if written is None:
-            self._bus.publish(
-                NOTE_ERROR,
-                {"message": "Could not write note to vault"},
-                source=self.name,
-            )
-            return
-        self._index_file(vault, path)
-        self._bus.publish(
-            NOTE_CREATED,
-            {"path": str(path.relative_to(vault)).replace("\\", "/"), "title": title},
             source=self.name,
         )
 

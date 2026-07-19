@@ -16,11 +16,12 @@ ContextBundle v1.2 (current):
     v1.2 adds workspace_state section labels from workspace_snippets (vNext M1).
     v1.0 and v1.1 remain in SUPPORTED_VERSIONS for backward compatibility.
 
-command.routed v1.0:
-    contract_version: "1.0"
+command.deferred v1.0:
+    Producer: ExecutionAuthorityService
+    Consumer: UI workspace gate / AppState diagnostics
 
 tool.invoke / tool.result v1.0 (Phase 4B):
-    Producer: ShellToolService (and future tool bridges)
+    Producer: ExecutionOrchestratorService (exclusive)
     Consumer: ToolExecutorService — one invocation per event, no loops
 
 OllamaService API v1.0: unchanged.
@@ -41,8 +42,8 @@ CONTEXT_BUNDLE_VERSION = "1.2"
 CONTEXT_BUNDLE_VERSION_LEGACY = "1.0"
 CONTEXT_BUNDLE_VERSION_V11 = "1.1"
 
-# command.routed envelope (CommandRouter → handlers)
-COMMAND_ROUTED_VERSION = "1.0"
+# command.deferred envelope (ExecutionAuthority → UI workspace gate)
+COMMAND_DEFERRED_VERSION = "1.0"
 
 # OllamaService public API surface
 OLLAMA_SERVICE_API_VERSION = "1.0"
@@ -65,7 +66,7 @@ SUPPORTED_VERSIONS: dict[str, tuple[str, ...]] = {
         CONTEXT_BUNDLE_VERSION_V11,
         CONTEXT_BUNDLE_VERSION,
     ),
-    "command_routed": (COMMAND_ROUTED_VERSION,),
+    "command_deferred": (COMMAND_DEFERRED_VERSION,),
     "ollama_service": (OLLAMA_SERVICE_API_VERSION,),
     "tool": (TOOL_CONTRACT_VERSION,),
     "operation": (OPERATION_CONTRACT_VERSION,),

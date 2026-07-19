@@ -57,7 +57,7 @@ SYNC_CRITICAL_TOPICS: frozenset[str] = frozenset(
         T.BUS_HANDLER_ERROR,
         T.UI_COMMAND,
         T.UI_NAVIGATE,
-        T.COMMAND_ROUTED,
+        T.EXECUTION_AUTHORITY_DECISION,
     }
 )
 

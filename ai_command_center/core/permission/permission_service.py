@@ -48,6 +48,10 @@ class PermissionService:
                 Permission.ANALYZE_ENTITY.value,
                 Permission.LAUNCH_TOOL.value,
             },  # Agents have limited permissions by default (supervised demo uses LAUNCH_TOOL)
+            "workflow": {
+                Permission.LAUNCH_TOOL.value,
+                Permission.USE_AI.value,
+            },
             "system": {perm.value for perm in Permission},  # System has all permissions
         }
         # Agent-specific permissions (agent_id -> set of permissions)

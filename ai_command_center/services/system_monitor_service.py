@@ -8,7 +8,15 @@ from collections import deque
 from typing import Callable
 
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.topics import COMMAND_HISTORY, COMMAND_ROUTED, OLLAMA_STATUS, OPENAI_STATUS, SYSTEM_EVENTS, SYSTEM_SNAPSHOT, UI_COMMAND
+from ai_command_center.core.events.topics import (
+    COMMAND_HISTORY,
+    EXECUTION_AUTHORITY_DECISION,
+    OLLAMA_STATUS,
+    OPENAI_STATUS,
+    SYSTEM_EVENTS,
+    SYSTEM_SNAPSHOT,
+    UI_COMMAND,
+)
 from ai_command_center.services.base import BaseService
 
 _POLL_INTERVAL_S = 2.0
@@ -33,7 +41,7 @@ class SystemMonitorService(BaseService):
             self._bus.subscribe(UI_COMMAND, self._on_command)
         )
         self._unsubs.append(
-            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
+            self._bus.subscribe(EXECUTION_AUTHORITY_DECISION, self._on_authority_decision)
         )
         self._unsubs.append(
             self._bus.subscribe(OLLAMA_STATUS, self._on_ollama_status)
@@ -70,12 +78,14 @@ class SystemMonitorService(BaseService):
         if text:
             self._record_event("command", text[:80])
 
-    def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
+    def _on_authority_decision(self, event: Event) -> None:
+        from ai_command_center.core.routing_authority import is_routing_authority
+
+        if not is_routing_authority(event.source):
             return
-        intent = str(event.payload.get("intent", ""))
+        capability = str(event.payload.get("capability", ""))
         self._command_count += 1
-        self._record_event("routed", intent)
+        self._record_event("decided", capability)
         self._publish_history()
 
     def _record_event(self, kind: str, detail: str) -> None:

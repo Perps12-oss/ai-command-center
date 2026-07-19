@@ -22,6 +22,8 @@ from ai_command_center.core.events.topics import (
     EXECUTION_STEP_COMPLETED,
     EXECUTION_STEP_FAILED,
     EXECUTION_STEP_STARTED,
+    LLM_STEP_REQUEST,
+    TOOL_FAILED,
     TOOL_INVOKE,
     TOOL_RESULT,
 )
@@ -33,11 +35,20 @@ from ai_command_center.services.base import BaseService
 _logger = logging.getLogger(__name__)
 
 _EXTERNAL_PREFIXES = ("mcp.", "external.", "mcp:")
+_LLM_CAPABILITIES = frozenset({"llm", "chat"})
 
 
 def _is_external_capability(capability: str) -> bool:
     lowered = capability.lower()
     return any(lowered.startswith(prefix) for prefix in _EXTERNAL_PREFIXES)
+
+
+def _is_llm_capability(capability: str) -> bool:
+    return capability.strip().lower() in _LLM_CAPABILITIES
+
+
+def _is_agent_capability(capability: str) -> bool:
+    return capability.strip().lower().startswith("agent.")
 
 
 def _step_needs_approval(step: PlanStep, *, auto_approve: bool) -> bool:
@@ -65,6 +76,9 @@ class ExecutionOrchestratorService(BaseService):
         )
         self._unsubscribers.append(
             self._bus.subscribe(TOOL_RESULT, self._on_tool_result)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(TOOL_FAILED, self._on_tool_failed)
         )
         self._unsubscribers.append(
             self._bus.subscribe(CAPABILITY_COMPLETE, self._on_capability_complete)
@@ -107,6 +121,8 @@ class ExecutionOrchestratorService(BaseService):
             "correlation": CorrelationContext.from_payload(event.payload).to_payload(),
             "auto_approve": bool(event.payload.get("auto_approve", False)),
             "paused": False,
+            "step_outputs": [],
+            "goal": plan.goal,
         }
         _logger.info("execution.run.started run_id=%s steps=%d", run_id, len(plan.steps))
         self._bus.publish(
@@ -164,6 +180,26 @@ class ExecutionOrchestratorService(BaseService):
                 run_id,
                 str(event.payload.get("error") or event.payload.get("message") or "tool failed"),
             )
+
+    def _on_tool_failed(self, event: Event) -> None:
+        run_id = str(event.payload.get("run_id", "")).strip()
+        if not run_id or run_id not in self._runs:
+            return
+        run = self._runs[run_id]
+        if run.get("paused"):
+            return
+        step_id = str(event.payload.get("step_id", "")).strip()
+        plan: ExecutionPlan = run["plan"]
+        index = int(run["index"])
+        if index >= len(plan.steps):
+            return
+        current = plan.steps[index]
+        if step_id and current.step_id != step_id:
+            return
+        self._fail_step(
+            run_id,
+            str(event.payload.get("error") or event.payload.get("message") or "tool failed"),
+        )
 
     def _on_capability_complete(self, event: Event) -> None:
         run_id = str(event.payload.get("run_id", "")).strip()
@@ -245,6 +281,30 @@ class ExecutionOrchestratorService(BaseService):
         step = plan.steps[index]
         workspace_context = dict(run.get("workspace_context") or {})
         invoke_id = uuid.uuid4().hex
+        request_id = str(run.get("request_id") or invoke_id)
+
+        if _is_llm_capability(step.capability):
+            self._bus.publish(
+                LLM_STEP_REQUEST,
+                {
+                    "request_id": request_id,
+                    "run_id": run_id,
+                    "step_id": step.step_id,
+                    "capability": "llm",
+                    "args": dict(step.args),
+                    "prompt": str(step.args.get("prompt") or plan.goal),
+                    "workspace_context": workspace_context,
+                    "command_payload": {
+                        "request_id": request_id,
+                        "workspace_id": workspace_context.get("workspace_id", ""),
+                        "workspace_entity_id": workspace_context.get("entity_id", ""),
+                        "workspace_entity_type": workspace_context.get("entity_type", ""),
+                        "args": dict(step.args),
+                    },
+                },
+                source=self.name,
+            )
+            return
 
         if _is_external_capability(step.capability):
             provider_id = str(step.args.get("provider_id") or "mcp").strip() or "mcp"
@@ -264,16 +324,97 @@ class ExecutionOrchestratorService(BaseService):
             )
             return
 
+        if _is_agent_capability(step.capability):
+            self._dispatch_agent_step(
+                run_id=run_id,
+                step=step,
+                invoke_id=invoke_id,
+                request_id=request_id,
+                workspace_context=workspace_context,
+                plan_goal=plan.goal,
+            )
+            return
+
+        actor_type = str(step.args.get("actor_type") or "user")
+        tool_args = {
+            k: v
+            for k, v in dict(step.args).items()
+            if k not in {"actor_type", "workflow_run_id", "workflow_id"}
+        }
+        # Inject workspace scope into tool args so capability handlers can namespace.
+        if workspace_context.get("workspace_id") and "workspace_id" not in tool_args:
+            tool_args["workspace_id"] = workspace_context["workspace_id"]
+        if workspace_context.get("entity_id") and "entity_id" not in tool_args:
+            tool_args["entity_id"] = workspace_context["entity_id"]
         self._bus.publish(
             TOOL_INVOKE,
             {
                 "contract_version": TOOL_CONTRACT_VERSION,
                 "invoke_id": invoke_id,
                 "tool": step.capability,
-                "args": dict(step.args),
+                "args": tool_args,
                 "run_id": run_id,
                 "step_id": step.step_id,
-                "actor_type": "user",
+                "actor_type": actor_type,
+                "workspace_context": workspace_context,
+                **(
+                    {"workflow_run_id": step.args["workflow_run_id"]}
+                    if step.args.get("workflow_run_id")
+                    else {}
+                ),
+            },
+            source=self.name,
+        )
+
+    def _dispatch_agent_step(
+        self,
+        *,
+        run_id: str,
+        step: PlanStep,
+        invoke_id: str,
+        request_id: str,
+        workspace_context: dict[str, Any],
+        plan_goal: str,
+    ) -> None:
+        """Exclusive TOOL_INVOKE publisher for agent.* plan steps."""
+        capability = step.capability.strip().lower()
+        args = dict(step.args)
+
+        if capability == "agent.task":
+            from ai_command_center.core.events.topics import UI_COMMAND
+
+            task = str(args.get("task") or plan_goal).strip()
+            payload: dict[str, Any] = {
+                "text": task,
+                "agent_id": args.get("agent_id"),
+                "request_id": request_id,
+            }
+            if workspace_context.get("workspace_id"):
+                payload["workspace_id"] = workspace_context["workspace_id"]
+            self._bus.publish(UI_COMMAND, payload, source=self.name)
+            self._complete_step(run_id, output=f"agent.task dispatched: {task}")
+            return
+
+        tool_name = str(args.get("tool") or "shell").strip() or "shell"
+        tool_args = dict(args.get("tool_args") or {})
+        if not tool_args and "command" in args:
+            tool_args = {"command": args.get("command")}
+        agent_id = str(args.get("agent_id") or "")
+        self._bus.publish(
+            TOOL_INVOKE,
+            {
+                "contract_version": TOOL_CONTRACT_VERSION,
+                "invoke_id": invoke_id,
+                "tool": tool_name,
+                "args": tool_args,
+                "run_id": run_id,
+                "step_id": step.step_id,
+                "actor_type": "agent",
+                "agent_id": agent_id,
+                "request_id": request_id,
+                "spawn_role": str(args.get("spawn_role") or ""),
+                "task": str(args.get("task") or ""),
+                "pipeline_id": str(args.get("pipeline_id") or ""),
                 "workspace_context": workspace_context,
             },
             source=self.name,
@@ -286,6 +427,16 @@ class ExecutionOrchestratorService(BaseService):
         plan: ExecutionPlan = run["plan"]
         index = int(run["index"])
         step = plan.steps[index]
+        outputs = list(run.get("step_outputs") or [])
+        outputs.append(
+            {
+                "step_id": step.step_id,
+                "capability": step.capability,
+                "output": output,
+                "success": True,
+            }
+        )
+        run["step_outputs"] = outputs
         self._bus.publish(
             EXECUTION_STEP_COMPLETED,
             {
@@ -307,6 +458,17 @@ class ExecutionOrchestratorService(BaseService):
         plan: ExecutionPlan = run["plan"]
         index = int(run["index"])
         step = plan.steps[index]
+        outputs = list(run.get("step_outputs") or [])
+        outputs.append(
+            {
+                "step_id": step.step_id,
+                "capability": step.capability,
+                "output": "",
+                "success": False,
+                "error": error,
+            }
+        )
+        run["step_outputs"] = outputs
         self._bus.publish(
             EXECUTION_STEP_FAILED,
             {
@@ -324,9 +486,19 @@ class ExecutionOrchestratorService(BaseService):
         run = self._runs.pop(run_id, None)
         request_id = str(run.get("request_id", "")) if run else ""
         correlation = dict(run.get("correlation") or {}) if run else {}
+        plan = run.get("plan") if run else None
         self._bus.publish(
             EXECUTION_RUN_COMPLETE,
-            {"run_id": run_id, "request_id": request_id, "correlation": correlation},
+            {
+                "run_id": run_id,
+                "request_id": request_id,
+                "correlation": correlation,
+                "goal": getattr(plan, "goal", "") if plan else str(run.get("goal", "") if run else ""),
+                "success": True,
+                "step_outputs": list(run.get("step_outputs") or []) if run else [],
+                "plan": plan.to_dict() if isinstance(plan, ExecutionPlan) else {},
+                "workspace_context": dict(run.get("workspace_context") or {}) if run else {},
+            },
             source=self.name,
         )
 
@@ -334,6 +506,7 @@ class ExecutionOrchestratorService(BaseService):
         run = self._runs.pop(run_id, None)
         request_id = str(run.get("request_id", "")) if run else ""
         correlation = dict(run.get("correlation") or {}) if run else {}
+        plan = run.get("plan") if run else None
         self._bus.publish(
             EXECUTION_RUN_FAILED,
             {
@@ -341,6 +514,11 @@ class ExecutionOrchestratorService(BaseService):
                 "request_id": request_id,
                 "error": error,
                 "correlation": correlation,
+                "goal": getattr(plan, "goal", "") if plan else "",
+                "success": False,
+                "step_outputs": list(run.get("step_outputs") or []) if run else [],
+                "plan": plan.to_dict() if isinstance(plan, ExecutionPlan) else {},
+                "workspace_context": dict(run.get("workspace_context") or {}) if run else {},
             },
             source=self.name,
         )

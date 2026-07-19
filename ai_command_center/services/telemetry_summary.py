@@ -10,7 +10,7 @@ from ai_command_center.core.events.topics import (
     CHAT_COMPLETE,
     CHAT_ERROR,
     CHAT_STARTED,
-    COMMAND_ROUTED,
+    EXECUTION_AUTHORITY_DECISION,
     MEMORY_STORED,
     NOTE_CREATED,
     NOTE_ERROR,
@@ -29,18 +29,23 @@ _RETRY_WINDOW_S = 30.0
 
 _INTENT_OUTCOMES: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "chat": (frozenset({CHAT_COMPLETE}), frozenset({CHAT_ERROR, CHAT_CANCELLED})),
+    "llm": (frozenset({CHAT_COMPLETE}), frozenset({CHAT_ERROR, CHAT_CANCELLED})),
     "shell": (frozenset({TOOL_RESULT}), frozenset({TOOL_ERROR})),
     "note_search": (frozenset({NOTE_SEARCH_RESULTS}), frozenset({NOTE_ERROR})),
+    "notes.search": (frozenset({NOTE_SEARCH_RESULTS}), frozenset({NOTE_ERROR})),
     "note_new": (frozenset({NOTE_CREATED}), frozenset({NOTE_ERROR})),
+    "notes.create": (frozenset({NOTE_CREATED}), frozenset({NOTE_ERROR})),
     "memory_remember": (frozenset({MEMORY_STORED}), frozenset()),
+    "memory.store": (frozenset({MEMORY_STORED}), frozenset()),
     "memory_select": (frozenset({MEMORY_STORED}), frozenset()),
-    "navigate": (frozenset({UI_NAVIGATE}), frozenset()),
+    "memory.query": (frozenset({TOOL_RESULT}), frozenset({TOOL_ERROR})),
+    "navigate": (frozenset({UI_NAVIGATE, TOOL_RESULT}), frozenset()),
 }
 
 _SESSION_EVENT_TOPICS = frozenset(
     {
         UI_COMMAND,
-        COMMAND_ROUTED,
+        EXECUTION_AUTHORITY_DECISION,
         CHAT_STARTED,
         CHAT_COMPLETE,
         CHAT_ERROR,
@@ -122,13 +127,12 @@ def _derive_commands(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str, A
             if topic == UI_COMMAND:
                 break
 
-            if topic == COMMAND_ROUTED and pl.get("bus_source") == "command_router":
-                if str(pl.get("status", "pending")) == "pending":
-                    intent = str(pl.get("intent", ""))
-                    if intent == "navigate":
-                        outcome = "success"
-                        outcome_at = _parse_ts(nxt)
-                        break
+            if topic == EXECUTION_AUTHORITY_DECISION and pl.get("bus_source") == "execution_authority":
+                intent = str(pl.get("capability") or "")
+                if intent == "navigate":
+                    outcome = "success"
+                    outcome_at = _parse_ts(nxt)
+                    break
 
             if topic == CHAT_STARTED:
                 request_id = str(pl.get("request_id", ""))
@@ -221,6 +225,22 @@ def _derive_ollama_latencies(rows: list[TelemetryEvent | dict[str, Any]]) -> lis
     return latencies
 
 
+def _payload_workspace_scoped(payload: dict[str, Any]) -> bool:
+    if str(payload.get("workspace_id", "")).strip():
+        return True
+    if str(payload.get("entity_id", "")).strip():
+        return True
+    if str(payload.get("workspace_entity_id", "")).strip():
+        return True
+    ctx = payload.get("workspace_context")
+    if isinstance(ctx, dict):
+        if str(ctx.get("workspace_id", "")).strip():
+            return True
+        if str(ctx.get("entity_id", "")).strip():
+            return True
+    return False
+
+
 def _derive_scope_ratio(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str, Any]:
     scoped = 0
     total = 0
@@ -228,10 +248,7 @@ def _derive_scope_ratio(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str
         if _event_name(row) not in _SESSION_EVENT_TOPICS:
             continue
         total += 1
-        payload = _payload(row)
-        if str(payload.get("workspace_id", "")).strip() or str(
-            payload.get("entity_id", "")
-        ).strip():
+        if _payload_workspace_scoped(_payload(row)):
             scoped += 1
     ratio = round((scoped / total) * 100, 1) if total else 0.0
     return {"total": total, "scoped": scoped, "ratio_pct": ratio}

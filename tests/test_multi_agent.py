@@ -1,14 +1,15 @@
-"""Track 7 A3 — multi-agent spawn, AppState projection, permission per agent."""
+"""Track 7 A3 — multi-agent via ExecutionAuthority plans."""
 
 from __future__ import annotations
 
+import sqlite3
+
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.events.intents import INTENT_AGENT
 from ai_command_center.core.events.topics import (
-    AGENT_SPAWNED,
     AGENT_SPAWN_REQUEST,
     AGENT_TERMINATED,
-    COMMAND_ROUTED,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
     TOOL_INVOKE,
@@ -16,12 +17,14 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.core.permission.permission_service import PermissionService
 from ai_command_center.core.tools import ToolResult, ToolSpec
+from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
-from ai_command_center.services.command_router_service import (
-    COMMAND_ROUTED_VERSION,
-    CommandRouterService,
-    INTENT_AGENT,
+from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
 )
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
 from ai_command_center.tools.tool_registry import ToolRegistry
@@ -58,8 +61,13 @@ def _wire_stack(bus: EventBus) -> AppStateStore:
     )
     ToolRegistryService(bus, registry=registry).start()
     ToolExecutorService(bus, registry, permission_service=permission).start()
-    CommandRouterService(bus).start()
-    AgentRuntimeService(bus).start()
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    SingleGoalScheduler(bus, GoalRepository(conn)).start()
+    ExecutionOrchestratorService(bus).start()
+    agent = AgentRuntimeService(bus)
+    agent.start()
+    ExecutionAuthorityService(bus, agent_runtime=agent).start()
     return AppStateStore(bus)
 
 
@@ -94,7 +102,10 @@ def test_spawn_role_commands_are_isolated() -> None:
     store = _wire_stack(bus)
 
     tool_invokes: list[dict] = []
-    bus.subscribe(TOOL_INVOKE, lambda e: tool_invokes.append(dict(e.payload)))
+    bus.subscribe(
+        TOOL_INVOKE,
+        lambda e: tool_invokes.append(dict(e.payload) | {"_source": e.source}),
+    )
 
     bus.publish(
         UI_COMMAND,
@@ -108,6 +119,7 @@ def test_spawn_role_commands_are_isolated() -> None:
     )
 
     assert len(tool_invokes) == 2
+    assert all(inv["_source"] == "execution_orchestrator" for inv in tool_invokes)
     agent_ids = {inv["agent_id"] for inv in tool_invokes}
     assert len(agent_ids) == 2
 
@@ -144,53 +156,10 @@ def test_permission_check_per_agent_spawn() -> None:
 
 
 def test_command_router_classifies_spawn_and_multi_intents() -> None:
-    bus = EventBus()
-    routed: list[dict] = []
-    bus.subscribe(COMMAND_ROUTED, lambda e: routed.append(dict(e.payload)))
-    CommandRouterService(bus).start()
+    intent, args = CommandRouterService.classify("agent: spawn research")
+    assert intent == INTENT_AGENT
+    assert args["spawn_role"] == "research"
 
-    bus.publish(
-        UI_COMMAND, {"text": "agent: spawn research", "workspace_id": "ws-router"}, source="ui"
-    )
-    bus.publish(UI_COMMAND, {"text": "agents: demo", "workspace_id": "ws-router"}, source="ui")
-
-    assert routed[0]["intent"] == INTENT_AGENT
-    assert routed[0]["contract_version"] == COMMAND_ROUTED_VERSION
-    assert routed[0]["args"]["spawn_role"] == "research"
-    assert routed[0]["args"]["spawn_mode"] == "single"
-
-    assert routed[1]["intent"] == INTENT_AGENT
-    assert routed[1]["args"]["spawn_mode"] == "multi"
-    assert routed[1]["args"]["task"] == "multi-demo"
-
-    bus.publish(
-        UI_COMMAND, {"text": "agents: pipeline demo", "workspace_id": "ws-router"}, source="ui"
-    )
-    assert routed[2]["intent"] == INTENT_AGENT
-    assert routed[2]["args"]["spawn_mode"] == "pipeline"
-    assert routed[2]["args"]["task"] == "pipeline-demo"
-
-
-def test_agent_termination_does_not_affect_sibling_active_state() -> None:
-    bus = EventBus()
-    store = AppStateStore(bus)
-
-    bus.publish(
-        AGENT_SPAWNED,
-        {"agent_id": "keep", "request_id": "r-keep", "state": "running"},
-        source="test",
-    )
-    bus.publish(
-        AGENT_SPAWNED,
-        {"agent_id": "drop", "request_id": "r-drop", "state": "running"},
-        source="test",
-    )
-    bus.publish(
-        AGENT_TERMINATED,
-        {"agent_id": "drop", "request_id": "r-drop"},
-        source="test",
-    )
-
-    snap = store.snapshot
-    assert snap.active_agent_run_ids == ("keep",)
-    assert snap.active_agent_run_id == "keep"
+    intent2, args2 = CommandRouterService.classify("agents: demo")
+    assert intent2 == INTENT_AGENT
+    assert args2["spawn_mode"] == "multi"

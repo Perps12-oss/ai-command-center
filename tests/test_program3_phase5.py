@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import unittest
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -9,16 +10,22 @@ from uuid import uuid4
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.entity.entity_bus_handlers import register_entity_bus_handlers
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_SHELL
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
+    COMMAND_DEFERRED,
+    GOAL_SUBMIT_REQUEST,
     TIMELINE_RECORD_REQUEST,
     TOOL_INVOKE,
     TOOL_RESULT,
+    UI_COMMAND,
     WORKSPACE_ACTIVE,
 )
 from ai_command_center.core.tools import ToolResult, ToolSpec
-from ai_command_center.services.shell_tool_service import ShellToolService
+from ai_command_center.repositories.goal_repository import GoalRepository
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
@@ -28,11 +35,24 @@ class Phase5ShellToolScopeTests(unittest.TestCase):
         self.bus = EventBus()
         self.invokes: list[dict] = []
         self.bus.subscribe(TOOL_INVOKE, lambda e: self.invokes.append(dict(e.payload)))
-        self.shell = ShellToolService(self.bus)
-        self.shell.load()
+        self.goals: list[dict] = []
+        self.deferred: list[dict] = []
+        self.bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: self.goals.append(dict(e.payload)))
+        self.bus.subscribe(COMMAND_DEFERRED, lambda e: self.deferred.append(dict(e.payload)))
+        self.conn = sqlite3.connect(":memory:")
+        self.conn.row_factory = sqlite3.Row
+        self.scheduler = SingleGoalScheduler(self.bus, GoalRepository(self.conn))
+        self.orchestrator = ExecutionOrchestratorService(self.bus)
+        self.authority = ExecutionAuthorityService(self.bus)
+        self.scheduler.load()
+        self.orchestrator.load()
+        self.authority.load()
 
     def tearDown(self) -> None:
-        self.shell.unload()
+        self.authority.unload()
+        self.orchestrator.unload()
+        self.scheduler.unload()
+        self.conn.close()
 
     def test_shell_invoke_includes_workspace_context_from_active_workspace(self) -> None:
         self.bus.publish(
@@ -41,51 +61,48 @@ class Phase5ShellToolScopeTests(unittest.TestCase):
             source="tests",
         )
         self.bus.publish(
-            COMMAND_ROUTED,
-            {
-                "intent": INTENT_SHELL,
-                "args": {"command": "echo scoped"},
-            },
-            source="command_router",
+            UI_COMMAND,
+            {"text": "> echo scoped"},
+            source="tests",
         )
+        self.assertEqual(1, len(self.goals))
+        self.assertEqual("shell", self.goals[0]["plan"]["steps"][0]["capability"])
         self.assertEqual(1, len(self.invokes))
         ctx = self.invokes[0].get("workspace_context")
         self.assertIsInstance(ctx, dict)
         self.assertEqual("ws-active", ctx.get("workspace_id"))
+        self.assertEqual("echo scoped", self.invokes[0]["args"]["command"])
 
-    def test_shell_invoke_merges_command_routed_entity_scope(self) -> None:
+    def test_shell_invoke_merges_ui_command_entity_scope(self) -> None:
         self.bus.publish(
             WORKSPACE_ACTIVE,
             {"workspace_id": "ws-active", "title": "Active"},
             source="tests",
         )
         self.bus.publish(
-            COMMAND_ROUTED,
+            UI_COMMAND,
             {
-                "intent": INTENT_SHELL,
-                "args": {"command": "echo entity"},
+                "text": "> echo entity",
                 "workspace_id": "ws-routed",
                 "workspace_entity_id": "card-9",
                 "workspace_entity_type": "card",
             },
-            source="command_router",
+            source="tests",
         )
         ctx = self.invokes[0]["workspace_context"]
         self.assertEqual("ws-routed", ctx.get("workspace_id"))
         self.assertEqual("card-9", ctx.get("entity_id"))
         self.assertEqual("card", ctx.get("entity_type"))
 
-    def test_shell_invoke_always_carries_workspace_context_key(self) -> None:
+    def test_shell_without_workspace_is_deferred_not_invoked(self) -> None:
         self.bus.publish(
-            COMMAND_ROUTED,
-            {
-                "intent": INTENT_SHELL,
-                "args": {"command": "echo bare"},
-            },
-            source="command_router",
+            UI_COMMAND,
+            {"text": "> echo bare"},
+            source="tests",
         )
-        self.assertIn("workspace_context", self.invokes[0])
-        self.assertIsInstance(self.invokes[0]["workspace_context"], dict)
+        self.assertEqual([], self.invokes)
+        self.assertEqual(1, len(self.deferred))
+        self.assertEqual("shell", self.deferred[0].get("intent"))
 
 
 class Phase5ToolTimelineTests(unittest.TestCase):

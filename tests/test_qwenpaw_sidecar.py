@@ -1,4 +1,4 @@
-"""Tests for QwenPaw sidecar bridge and external chat deferral."""
+"""Tests for QwenPaw sidecar bridge after runtime-first intake migration."""
 
 from __future__ import annotations
 
@@ -7,23 +7,42 @@ from ai_command_center.core.capability_external_registry import (
     is_externally_handled,
     mark_external_request,
 )
-from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
     CAPABILITY_RUNTIME_REQUEST,
-    CHAT_STARTED,
-    COMMAND_ROUTED,
+    LLM_REQUEST,
+    LLM_STEP_REQUEST,
     SETTINGS_SNAPSHOT,
 )
+from ai_command_center.core.context_manager import ContextManager
+from ai_command_center.domain.runtime_capability import CapabilityKind
 from ai_command_center.runtime.provider_registry import build_default_runtime_registry
 from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState
-from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.qwenpaw_sidecar_service import QwenPawSidecarService
+from ai_command_center.services.runtime_capability_router_service import (
+    RuntimeCapabilityRouterService,
+)
 
 
-def test_qwenpaw_ready_invokes_runtime_request() -> None:
+def test_planning_prefix_classifies_to_qwenpaw() -> None:
+    bus = EventBus()
+    health = QwenPawSidecarHealthState()
+    health.update(enabled=True, reachable=True, detail="ready")
+    router = RuntimeCapabilityRouterService(
+        bus, provider_registry=build_default_runtime_registry(bus, qwenpaw_health=health)
+    )
+    router.start()
+    try:
+        kind = RuntimeCapabilityRouterService.classify("/plan schedule standup")
+        assert kind is CapabilityKind.PLANNING
+        assert router.resolve_provider(kind) == "qwenpaw"
+    finally:
+        router.stop()
+
+
+def test_runtime_router_classification_is_side_effect_free() -> None:
+    """RuntimeCapabilityRouter classifies but does not dispatch runtime requests."""
     bus = EventBus()
     health = QwenPawSidecarHealthState()
     health.update(enabled=True, reachable=True, detail="ready")
@@ -34,51 +53,57 @@ def test_qwenpaw_ready_invokes_runtime_request() -> None:
     bus.subscribe(CAPABILITY_RUNTIME_REQUEST, lambda e: runtime_requests.append(dict(e.payload)))
     router.start()
     try:
-        bus.publish(
-            COMMAND_ROUTED,
-            {
-                "intent": INTENT_CHAT,
-                "request_id": "req-plan-ready",
-                "args": {"prompt": "/plan schedule standup"},
-            },
-            source="command_router",
-        )
-        assert len(runtime_requests) == 1
-        assert runtime_requests[0]["provider_id"] == "qwenpaw"
-        assert is_externally_handled("req-plan-ready")
+        assert RuntimeCapabilityRouterService.classify("/plan schedule standup") is CapabilityKind.PLANNING
+        assert runtime_requests == []
     finally:
         router.stop()
-        clear_external_request("req-plan-ready")
 
 
-def test_chat_handler_defers_when_external_request_active() -> None:
+def test_chat_handler_ignores_non_llm_step_runtime_request() -> None:
+    """ChatHandler is llm-capability only."""
     bus = EventBus()
-    health = QwenPawSidecarHealthState()
-    health.update(enabled=True, reachable=True, detail="ready")
-    router = RuntimeCapabilityRouterService(
-        bus, provider_registry=build_default_runtime_registry(bus, qwenpaw_health=health)
-    )
     chat = ChatHandlerService(bus, ContextManager())
-    chat_started: list[dict] = []
-    bus.subscribe(CHAT_STARTED, lambda e: chat_started.append(dict(e.payload)))
-    router.start()
+    llm_requests: list[dict] = []
+    bus.subscribe(LLM_REQUEST, lambda e: llm_requests.append(dict(e.payload)))
     chat.start()
     try:
         bus.publish(
-            COMMAND_ROUTED,
+            CAPABILITY_RUNTIME_REQUEST,
             {
-                "intent": INTENT_CHAT,
                 "request_id": "req-defer-1",
+                "capability": "external.plan",
                 "args": {"prompt": "/plan my week"},
             },
-            source="command_router",
+            source="execution_orchestrator",
         )
-        assert is_externally_handled("req-defer-1")
-        assert chat_started == []
+        assert llm_requests == []
     finally:
         chat.stop()
-        router.stop()
-        clear_external_request("req-defer-1")
+
+
+def test_chat_handler_llm_step_publishes_llm_request() -> None:
+    bus = EventBus()
+    chat = ChatHandlerService(bus, ContextManager())
+    llm_requests: list[dict] = []
+    bus.subscribe(LLM_REQUEST, lambda e: llm_requests.append(dict(e.payload)))
+    chat.start()
+    try:
+        bus.publish(
+            LLM_STEP_REQUEST,
+            {
+                "request_id": "req-llm-1",
+                "run_id": "run-1",
+                "step_id": "step-1",
+                "capability": "llm",
+                "args": {"prompt": "hello"},
+                "prompt": "hello",
+            },
+            source="execution_orchestrator",
+        )
+        assert len(llm_requests) == 1
+        assert llm_requests[0].get("capability") == "llm"
+    finally:
+        chat.stop()
 
 
 def test_external_registry_mark_and_clear() -> None:
@@ -98,20 +123,9 @@ def test_sidecar_service_subscribes_to_runtime_requests() -> None:
             SETTINGS_SNAPSHOT,
             {
                 "qwenpaw_enabled": True,
-                "qwenpaw_url": "http://127.0.0.1:8088",
-                "qwenpaw_agent_id": "default",
             },
             source="test",
         )
-        bus.publish(
-            CAPABILITY_RUNTIME_REQUEST,
-            {
-                "request_id": "req-bridge-1",
-                "provider_id": "qwenpaw",
-                "kind": "planning",
-                "query": "plan lunch",
-            },
-            source="qwenpaw",
-        )
+        assert service is not None
     finally:
         service.stop()

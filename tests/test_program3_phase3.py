@@ -17,13 +17,14 @@ from ai_command_center.core.entity.entity_bus_handlers import register_entity_bu
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
     CONTEXT_COMPLETE,
     CONTEXT_SNAPSHOT_CREATED,
+    EXECUTION_AUTHORITY_DECISION,
     ENTITY_CONTEXT_REQUEST,
     ENTITY_CONTEXT_RESULT,
+    GOAL_SUBMIT_REQUEST,
+    LLM_STEP_REQUEST,
     LLM_REQUEST,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
@@ -40,7 +41,7 @@ from ai_command_center.core.relationship.relationship_service import Relationshi
 from ai_command_center.core.workspace.workspace_service import WorkspaceService
 from ai_command_center.db.connection import connect, init_database
 from ai_command_center.services.chat_handler_service import ChatHandlerService
-from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.ui.controller import UIController
 
 
@@ -213,9 +214,7 @@ class Phase3ChatIntegrationTests(unittest.TestCase):
             workspace_service.add_entity(workspace.id, card.id)
             store = AppStateStore(bus)
             controller = UIController(bus, store, MagicMock())
-            router = CommandRouterService(bus)
             chat = ChatHandlerService(bus, ContextManager())
-            router.load()
             chat.load()
 
             snapshots: list[dict] = []
@@ -235,9 +234,26 @@ class Phase3ChatIntegrationTests(unittest.TestCase):
                 },
                 source="tests",
             )
-            controller.publish_command("status check")
+            scope = controller.current_workspace_scope()
+            bus.publish(
+                LLM_STEP_REQUEST,
+                {
+                    "request_id": "req-phase3",
+                    "run_id": "run-phase3",
+                    "step_id": "step-1",
+                    "capability": "llm",
+                    "args": {"prompt": "status check"},
+                    "prompt": "status check",
+                    "workspace_context": {
+                        "workspace_id": str(workspace.id),
+                        "entity_id": str(card.id),
+                        "entity_type": ENTITY_TYPE_CARD,
+                    },
+                    "command_payload": scope,
+                },
+                source="execution_orchestrator",
+            )
 
-            router.unload()
             chat.unload()
 
             self.assertTrue(snapshots)
@@ -251,19 +267,16 @@ class Phase3ChatIntegrationTests(unittest.TestCase):
         finally:
             db.close()
 
-    def test_command_routed_carries_selected_entity_scope(self) -> None:
+    def test_goal_submit_carries_selected_entity_scope(self) -> None:
         bus = EventBus()
         store = AppStateStore(bus)
         controller = UIController(bus, store, MagicMock())
-        router = CommandRouterService(bus)
-        router.load()
-        routed: list[dict] = []
-
-        def capture_routed(event) -> None:
-            if event.source == "command_router":
-                routed.append(dict(event.payload))
-
-        bus.subscribe(COMMAND_ROUTED, capture_routed)
+        authority = ExecutionAuthorityService(bus)
+        authority.load()
+        decisions: list[dict] = []
+        goals: list[dict] = []
+        bus.subscribe(EXECUTION_AUTHORITY_DECISION, lambda e: decisions.append(dict(e.payload)))
+        bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
         ws_id = "ws-phase3"
         bus.publish(
             WORKSPACE_ACTIVE,
@@ -280,10 +293,12 @@ class Phase3ChatIntegrationTests(unittest.TestCase):
             source="tests",
         )
         controller.publish_command("hello workspace")
-        router.unload()
-        self.assertEqual(1, len(routed))
-        self.assertEqual("ent-55", routed[0].get("selected_entity_id"))
-        self.assertEqual(INTENT_CHAT, routed[0].get("intent"))
+        authority.unload()
+        self.assertEqual(1, len(decisions))
+        self.assertEqual(1, len(goals))
+        self.assertEqual("ent-55", decisions[0].get("selected_entity_id"))
+        self.assertEqual("llm", goals[0]["plan"]["steps"][0]["capability"])
+        self.assertEqual("ent-55", goals[0]["workspace_context"].get("entity_id"))
 
 
 if __name__ == "__main__":

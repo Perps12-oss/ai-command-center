@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 import sys
 import tempfile
 import time
@@ -21,10 +20,10 @@ def main() -> int:
     from ai_command_center.core.clipboard_intent import wants_clipboard
     from ai_command_center.core.context_manager import ContextManager
     from ai_command_center.core.event_bus import EventBus
+    from ai_command_center.core.events.topics import LLM_STEP_REQUEST
     from ai_command_center.db.connection import connect, init_database
     from ai_command_center.repositories.note_repository import NoteRepository
     from ai_command_center.services.chat_handler_service import ChatHandlerService
-    from ai_command_center.services.ollama_http_service import OllamaHttpService
 
     clip_cases = (
         ("Summarize this clipboard", True),
@@ -104,16 +103,18 @@ def main() -> int:
     errors: list[dict] = []
     bus.subscribe("chat.error", lambda e: errors.append(dict(e.payload)))
     handler = ChatHandlerService(bus, ContextManager())
-    ollama = OllamaHttpService(bus)
     handler.load()
     bus.publish(
-        "command.routed",
+        LLM_STEP_REQUEST,
         {
-            "intent": "chat",
-            "status": "pending",
+            "request_id": "clip-typo",
+            "run_id": "run-clip-typo",
+            "step_id": "step-1",
+            "capability": "llm",
             "args": {"prompt": "Summarize clipboad", "clipboard": ""},
+            "prompt": "Summarize clipboad",
         },
-        source="command_router",
+        source="execution_orchestrator",
     )
     time.sleep(0.05)
     handler.unload()

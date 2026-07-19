@@ -1,9 +1,13 @@
-"""QwenPaw sidecar provider — delegates HTTP/SSE to QwenPawSidecarService."""
+"""QwenPaw sidecar provider — delegates HTTP/SSE to QwenPawSidecarService.
+
+Must not publish CAPABILITY_RUNTIME_REQUEST — ExecutionOrchestratorService is
+the exclusive publisher of that topic.
+"""
 
 from __future__ import annotations
 
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.topics import CAPABILITY_ERROR, CAPABILITY_RUNTIME_REQUEST
+from ai_command_center.core.events.topics import CAPABILITY_ERROR
 from ai_command_center.domain.runtime_capability import (
     CapabilityKind,
     ProviderHealth,
@@ -56,32 +60,23 @@ class QwenPawSidecarProvider:
         return kind in self._SUPPORTED
 
     def invoke(self, request: RuntimeInvocationRequest) -> None:
+        """Direct invoke is demoted — orchestrator owns CAPABILITY_RUNTIME_REQUEST."""
         if self._bus is None:
             return
         health = self.health()
-        if health.state != ProviderHealthState.READY:
-            self._bus.publish(
-                CAPABILITY_ERROR,
-                {
-                    "request_id": request.request_id,
-                    "provider_id": self.provider_id,
-                    "kind": request.kind.value,
-                    "message": health.detail or "QwenPaw sidecar unavailable",
-                },
-                source=self.provider_id,
+        message = health.detail or "QwenPaw sidecar unavailable"
+        if health.state == ProviderHealthState.READY:
+            message = (
+                "QwenPawSidecarProvider.invoke must not publish "
+                "CAPABILITY_RUNTIME_REQUEST; route via ExecutionOrchestrator"
             )
-            return
         self._bus.publish(
-            CAPABILITY_RUNTIME_REQUEST,
+            CAPABILITY_ERROR,
             {
                 "request_id": request.request_id,
-                "kind": request.kind.value,
                 "provider_id": self.provider_id,
-                "query": request.query,
-                "workspace_id": request.workspace_id,
-                "workspace_entity_id": request.workspace_entity_id,
-                "session_id": request.session_id,
-                "context_bundle": dict(request.context_bundle),
+                "kind": request.kind.value,
+                "message": message,
             },
             source=self.provider_id,
         )

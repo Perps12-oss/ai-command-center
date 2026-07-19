@@ -14,9 +14,8 @@ from ai_command_center.core.entity.entity_bus_handlers import register_entity_bu
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
+    GOAL_SUBMIT_REQUEST,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
     MEMORY_REMEMBER,
@@ -34,7 +33,7 @@ from ai_command_center.repositories.conversation_repository import (
     entity_conversation_id,
 )
 from ai_command_center.repositories.memory_repository import MemoryRepository
-from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
 from ai_command_center.services.session_service import SessionService
 from ai_command_center.ui.controller import UIController
@@ -92,17 +91,12 @@ class Phase1ActivateAppStateTests(unittest.TestCase):
 
 
 class Phase1CommandRoutingTests(unittest.TestCase):
-    def test_command_routed_defaults_workspace_id_from_active_workspace(self) -> None:
+    def test_goal_submit_defaults_workspace_id_from_active_workspace(self) -> None:
         bus = EventBus()
-        router = CommandRouterService(bus)
-        router.load()
-        routed: list[dict] = []
-
-        def capture(event) -> None:
-            if event.topic == COMMAND_ROUTED and event.source == "command_router":
-                routed.append(dict(event.payload))
-
-        bus.subscribe(COMMAND_ROUTED, capture)
+        authority = ExecutionAuthorityService(bus)
+        authority.load()
+        goals: list[dict] = []
+        bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
         ws_id = uuid4().hex
         bus.publish(
             WORKSPACE_ACTIVE,
@@ -110,13 +104,12 @@ class Phase1CommandRoutingTests(unittest.TestCase):
             source="tests",
         )
         bus.publish(UI_COMMAND, {"text": "hello"}, source="tests")
-        router.unload()
-        self.assertEqual(1, len(routed))
-        payload = routed[0]
-        self.assertEqual(INTENT_CHAT, payload.get("intent"))
+        authority.unload()
+        self.assertEqual(1, len(goals))
+        payload = goals[0]
+        self.assertEqual("llm", payload["plan"]["steps"][0]["capability"])
         self.assertEqual(ws_id, payload.get("workspace_id"))
-        args = payload.get("args") or {}
-        self.assertEqual(ws_id, args.get("workspace_id"))
+        self.assertEqual(ws_id, payload["workspace_context"].get("workspace_id"))
 
     def test_ui_controller_scope_includes_active_workspace_without_chat_entity(self) -> None:
         bus = EventBus()

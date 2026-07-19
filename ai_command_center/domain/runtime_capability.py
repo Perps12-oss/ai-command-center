@@ -54,4 +54,4 @@ class CapabilityDispatch:
     provider_id: str
     query: str
     fallback_provider_id: str = "native"
-    command_routed: dict[str, object] = field(default_factory=dict)
+    command_payload: dict[str, object] = field(default_factory=dict)

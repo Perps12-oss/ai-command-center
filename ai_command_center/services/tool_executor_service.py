@@ -116,19 +116,52 @@ class ToolExecutorService(BaseService):
         self._executor = ToolExecutor(registry)
 
     def _on_load(self) -> None:
-        if self._registry_get("shell") is None:
-            spec = ToolSpec(
-                name="shell",
-                description="Run a single shell command",
-                handler=_run_shell_command,
-            )
-            if hasattr(self._registry, "register_tool"):
-                self._registry.register_tool(spec)
-            elif hasattr(self._registry, "register"):
-                self._registry.register(spec)
+        self._ensure_builtin_tools()
         self._unsubscribers.append(
             self._bus.subscribe(TOOL_INVOKE, self._on_tool_invoke)
         )
+
+    def _ensure_builtin_tools(self) -> None:
+        from ai_command_center.orchestration.capability_tools import (
+            run_calendar_event_create,
+            run_calendar_query,
+            run_launch_application,
+            run_system_time_query,
+        )
+
+        builtins = (
+            ToolSpec(
+                name="shell",
+                description="Run a single shell command",
+                handler=_run_shell_command,
+            ),
+            ToolSpec(
+                name="launch_application",
+                description="Launch a whitelisted desktop application",
+                handler=run_launch_application,
+            ),
+            ToolSpec(
+                name="system_time_query",
+                description="Query the current system time",
+                handler=run_system_time_query,
+            ),
+            ToolSpec(
+                name="calendar_query",
+                description="Query calendar events",
+                handler=run_calendar_query,
+            ),
+            ToolSpec(
+                name="calendar_event_create",
+                description="Create a calendar event",
+                handler=run_calendar_event_create,
+            ),
+        )
+        for spec in builtins:
+            if self._registry_get(spec.name) is None:
+                if hasattr(self._registry, "register_tool"):
+                    self._registry.register_tool(spec)
+                elif hasattr(self._registry, "register"):
+                    self._registry.register(spec)
 
     def _registry_get(self, name: str):
         if hasattr(self._registry, "get_spec"):
@@ -262,6 +295,7 @@ class ToolExecutorService(BaseService):
         invoke_id = str(payload.get("invoke_id", ""))
         run_id = payload.get("run_id")
         step_id = payload.get("step_id")
+        agent_id = payload.get("agent_id")
         workspace_context = self._workspace_context(payload)
 
         if tool_name == "shell" and not self._shell_allowed(payload):
@@ -276,6 +310,7 @@ class ToolExecutorService(BaseService):
                     "step_id": step_id,
                     "success": False,
                     "error": "permission denied",
+                    **({"agent_id": agent_id} if agent_id else {}),
                 },
                 source=self.name,
             )
@@ -302,6 +337,7 @@ class ToolExecutorService(BaseService):
                     "success": False,
                     "error": error,
                     "workspace_context": workspace_context,
+                    **({"agent_id": agent_id} if agent_id else {}),
                 },
                 source=self.name,
             )
@@ -327,6 +363,7 @@ class ToolExecutorService(BaseService):
                 "run_id": run_id,
                 "step_id": step_id,
                 "workspace_context": workspace_context,
+                **({"agent_id": agent_id} if agent_id else {}),
             },
             source=self.name,
         )
