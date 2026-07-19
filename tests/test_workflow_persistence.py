@@ -5,11 +5,9 @@ from __future__ import annotations
 import sqlite3
 
 from ai_command_center.core.app_state import AppStateStore
-from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     TOOL_INVOKE,
-    TOOL_RESULT,
     WORKFLOW_COMPLETED,
     WORKFLOW_RUNS_LOADED,
     WORKFLOW_START,
@@ -105,35 +103,49 @@ def test_engine_and_persistence_vertical_slice() -> None:
     repo = WorkflowRunRepository(conn)
     bus = EventBus()
     AppStateStore(bus)
+
+    from ai_command_center.core.permission.permission_service import PermissionService
+    from ai_command_center.core.tools import ToolResult, ToolSpec
+    from ai_command_center.repositories.goal_repository import GoalRepository
+    from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+    from ai_command_center.services.execution_orchestrator_service import (
+        ExecutionOrchestratorService,
+    )
+    from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
+    from ai_command_center.services.tool_executor_service import ToolExecutorService
+    from ai_command_center.tools.tool_registry import ToolRegistry
+
+    permission = PermissionService(bus)
+    permission.wire_bus_handlers()
+    registry = ToolRegistry()
+    registry.register_tool(
+        ToolSpec(
+            name="shell",
+            description="shell",
+            handler=lambda args: ToolResult(success=True, output="ok"),
+        )
+    )
+    ToolExecutorService(bus, registry, permission_service=permission).start()
+    goal_conn = sqlite3.connect(":memory:")
+    goal_conn.row_factory = sqlite3.Row
+    SingleGoalScheduler(bus, GoalRepository(goal_conn)).start()
+    ExecutionOrchestratorService(bus).start()
+    ExecutionAuthorityService(bus).start()
     WorkflowEngineService(bus).start()
     WorkflowPersistenceService(bus, repo=repo).start()
 
     invokes: list[dict] = []
-
-    def on_invoke(event) -> None:
-        payload = dict(event.payload)
-        invokes.append(payload)
-        bus.publish(
-            TOOL_RESULT,
-            {
-                "contract_version": TOOL_CONTRACT_VERSION,
-                "invoke_id": payload.get("invoke_id", ""),
-                "run_id": payload.get("run_id"),
-                "step_id": payload.get("step_id"),
-                "tool": payload.get("tool"),
-                "success": True,
-                "output": "ok",
-            },
-            source="test",
-        )
-
-    bus.subscribe(TOOL_INVOKE, on_invoke)
+    bus.subscribe(
+        TOOL_INVOKE,
+        lambda e: invokes.append(dict(e.payload) | {"_source": e.source}),
+    )
 
     bus.publish(
         WORKFLOW_START,
         {
             "run_id": "run-engine",
             "workflow_id": "demo",
+            "workspace_context": {"workspace_id": "ws-engine"},
             "steps": [{"id": "a", "type": "tool", "tool": "shell", "args": {"command": "echo"}}],
         },
         source="test",
@@ -143,3 +155,4 @@ def test_engine_and_persistence_vertical_slice() -> None:
     assert stored is not None
     assert stored.state == "completed"
     assert len(invokes) == 1
+    assert invokes[0]["_source"] == "execution_orchestrator"

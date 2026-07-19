@@ -1549,11 +1549,12 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
     if existing is None:
         existing = AgentRunItem(agent_id=agent_id, request_id=request_id)
 
-    if event.topic == AGENT_TASK_REQUEST:
+    elif event.topic == AGENT_TASK_REQUEST:
         run_state = "running"
         steps = existing.steps + 1
     elif event.topic == AGENT_TASK_COMPLETE:
         run_state = "waiting"
+        steps = existing.steps + 1
     elif event.topic == AGENT_TERMINATED:
         run_state = "failed" if error else "terminated"
     else:
@@ -2365,9 +2366,26 @@ def _reduce_brain_state_snapshot(state: AppState, event: Event) -> AppState:
         return replace(state, brain_state=bs.with_kernel_state(state.brain_kernel_state))
     if topic in _BRAIN_GOAL_TOPICS:
         raw = state.brain_recent_goals[0] if state.brain_recent_goals else {}
+        try:
+            goal_snap = BrainGoalSnapshot.from_dict(dict(raw))
+        except (TypeError, ValueError):
+            # Priority may be enum/string ("normal") from Goal.to_payload().
+            patched = dict(raw)
+            priority = patched.get("priority", 0)
+            if isinstance(priority, str):
+                patched["priority"] = {
+                    "critical": 0,
+                    "high": 1,
+                    "normal": 2,
+                    "low": 3,
+                }.get(priority.lower(), 2)
+            try:
+                goal_snap = BrainGoalSnapshot.from_dict(patched)
+            except (TypeError, ValueError):
+                return state
         return replace(
             state,
-            brain_state=bs.with_goal(BrainGoalSnapshot.from_dict(dict(raw))),
+            brain_state=bs.with_goal(goal_snap),
         )
     if topic == OBSERVATION_RECEIVED:
         raw = state.brain_recent_observations[0] if state.brain_recent_observations else {}
@@ -2970,7 +2988,7 @@ def _reduce_agent_pipeline_snapshot(state: AppState, event: Event) -> AppState:
             error = str(p.get("error") or (prev.error if prev else ""))
         elif topic == AGENT_TASK_COMPLETE:
             run_state = "waiting"
-            steps = prev.steps if prev else 0
+            steps = (prev.steps if prev else 0) + 1
             error = str(p.get("error") or (prev.error if prev else ""))
         else:  # AGENT_TERMINATED
             error = str(p.get("error") or "")

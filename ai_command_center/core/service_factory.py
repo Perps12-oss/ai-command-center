@@ -264,7 +264,7 @@ def build_services(
         chat_export,
         system_monitor,
         SettingsService(bus, settings_repo),
-        ExecutionAuthorityService(bus),
+        ExecutionAuthorityService(bus, agent_runtime=agent_runtime),
         CommandRouterService(bus),
         orchestration,
         runtime_provider_registry,

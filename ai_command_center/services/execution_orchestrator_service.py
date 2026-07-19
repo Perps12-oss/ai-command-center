@@ -47,6 +47,10 @@ def _is_llm_capability(capability: str) -> bool:
     return capability.strip().lower() in _LLM_CAPABILITIES
 
 
+def _is_agent_capability(capability: str) -> bool:
+    return capability.strip().lower().startswith("agent.")
+
+
 def _step_needs_approval(step: PlanStep, *, auto_approve: bool) -> bool:
     if auto_approve:
         return False
@@ -320,16 +324,91 @@ class ExecutionOrchestratorService(BaseService):
             )
             return
 
+        if _is_agent_capability(step.capability):
+            self._dispatch_agent_step(
+                run_id=run_id,
+                step=step,
+                invoke_id=invoke_id,
+                request_id=request_id,
+                workspace_context=workspace_context,
+                plan_goal=plan.goal,
+            )
+            return
+
+        actor_type = str(step.args.get("actor_type") or "user")
         self._bus.publish(
             TOOL_INVOKE,
             {
                 "contract_version": TOOL_CONTRACT_VERSION,
                 "invoke_id": invoke_id,
                 "tool": step.capability,
-                "args": dict(step.args),
+                "args": {
+                    k: v
+                    for k, v in dict(step.args).items()
+                    if k not in {"actor_type", "workflow_run_id", "workflow_id"}
+                },
                 "run_id": run_id,
                 "step_id": step.step_id,
-                "actor_type": "user",
+                "actor_type": actor_type,
+                "workspace_context": workspace_context,
+                **(
+                    {"workflow_run_id": step.args["workflow_run_id"]}
+                    if step.args.get("workflow_run_id")
+                    else {}
+                ),
+            },
+            source=self.name,
+        )
+
+    def _dispatch_agent_step(
+        self,
+        *,
+        run_id: str,
+        step: PlanStep,
+        invoke_id: str,
+        request_id: str,
+        workspace_context: dict[str, Any],
+        plan_goal: str,
+    ) -> None:
+        """Exclusive TOOL_INVOKE publisher for agent.* plan steps."""
+        capability = step.capability.strip().lower()
+        args = dict(step.args)
+
+        if capability == "agent.task":
+            from ai_command_center.core.events.topics import UI_COMMAND
+
+            task = str(args.get("task") or plan_goal).strip()
+            payload: dict[str, Any] = {
+                "text": task,
+                "agent_id": args.get("agent_id"),
+                "request_id": request_id,
+            }
+            if workspace_context.get("workspace_id"):
+                payload["workspace_id"] = workspace_context["workspace_id"]
+            self._bus.publish(UI_COMMAND, payload, source=self.name)
+            self._complete_step(run_id, output=f"agent.task dispatched: {task}")
+            return
+
+        tool_name = str(args.get("tool") or "shell").strip() or "shell"
+        tool_args = dict(args.get("tool_args") or {})
+        if not tool_args and "command" in args:
+            tool_args = {"command": args.get("command")}
+        agent_id = str(args.get("agent_id") or "")
+        self._bus.publish(
+            TOOL_INVOKE,
+            {
+                "contract_version": TOOL_CONTRACT_VERSION,
+                "invoke_id": invoke_id,
+                "tool": tool_name,
+                "args": tool_args,
+                "run_id": run_id,
+                "step_id": step.step_id,
+                "actor_type": "agent",
+                "agent_id": agent_id,
+                "request_id": request_id,
+                "spawn_role": str(args.get("spawn_role") or ""),
+                "task": str(args.get("task") or ""),
+                "pipeline_id": str(args.get("pipeline_id") or ""),
                 "workspace_context": workspace_context,
             },
             source=self.name,

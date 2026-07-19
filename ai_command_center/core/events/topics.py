@@ -186,6 +186,9 @@ AGENT_PIPELINE_STAGE = "agent.pipeline.stage"
 AGENT_PIPELINE_PLANNED = "agent.pipeline.planned"
 AGENT_PIPELINE_COMPLETE = "agent.pipeline.complete"
 
+# Agent capability handoff — ExecutionAuthority owns plan creation (no TOOL_INVOKE).
+AGENT_EXECUTION_REQUEST = "agent.execution.request"
+
 # Capability runtime (Agent Runtime Interface — Invariant 13)
 CAPABILITY_CLASSIFIED = "capability.classified"
 CAPABILITY_DISPATCH = "capability.dispatch"
@@ -286,6 +289,8 @@ WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
 WORKFLOW_COMPLETED = "workflow.completed"
 WORKFLOW_FAILED = "workflow.failed"
 WORKFLOW_RUNS_LOADED = "workflow.runs.loaded"
+# Definition provider → ExecutionAuthority intake (never TOOL_INVOKE).
+WORKFLOW_EXECUTION_REQUEST = "workflow.execution.request"
 
 # Entity lifecycle (Workspace OS / entity service)
 ENTITY_CREATED = "entity.created"
@@ -522,6 +527,7 @@ __all__ = [
     "AGENT_PIPELINE_STAGE",
     "AGENT_PIPELINE_PLANNED",
     "AGENT_PIPELINE_COMPLETE",
+    "AGENT_EXECUTION_REQUEST",
     "CAPABILITY_CLASSIFIED",
     "CAPABILITY_DISPATCH",
     "CAPABILITY_RUNTIME_REQUEST",
@@ -594,6 +600,7 @@ __all__ = [
     "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",
     "WORKFLOW_STARTED",
+    "WORKFLOW_EXECUTION_REQUEST",
     "WORKFLOW_STEP_STARTED",
     "WORKFLOW_STEP_COMPLETED",
     "WORKFLOW_COMPLETED",

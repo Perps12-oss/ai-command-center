@@ -295,6 +295,7 @@ class ToolExecutorService(BaseService):
         invoke_id = str(payload.get("invoke_id", ""))
         run_id = payload.get("run_id")
         step_id = payload.get("step_id")
+        agent_id = payload.get("agent_id")
         workspace_context = self._workspace_context(payload)
 
         if tool_name == "shell" and not self._shell_allowed(payload):
@@ -309,6 +310,7 @@ class ToolExecutorService(BaseService):
                     "step_id": step_id,
                     "success": False,
                     "error": "permission denied",
+                    **({"agent_id": agent_id} if agent_id else {}),
                 },
                 source=self.name,
             )
@@ -335,6 +337,7 @@ class ToolExecutorService(BaseService):
                     "success": False,
                     "error": error,
                     "workspace_context": workspace_context,
+                    **({"agent_id": agent_id} if agent_id else {}),
                 },
                 source=self.name,
             )
@@ -360,6 +363,7 @@ class ToolExecutorService(BaseService):
                 "run_id": run_id,
                 "step_id": step_id,
                 "workspace_context": workspace_context,
+                **({"agent_id": agent_id} if agent_id else {}),
             },
             source=self.name,
         )
