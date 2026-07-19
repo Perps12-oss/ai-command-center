@@ -1554,7 +1554,8 @@ def _reduce_agent_run(state: AppState, event: Event) -> AppState:
         steps = existing.steps + 1
     elif event.topic == AGENT_TASK_COMPLETE:
         run_state = "waiting"
-        steps = existing.steps + 1
+        # Prefer producer-reported steps (agent_runtime), else keep existing.
+        steps = _coerce_int(payload.get("steps"), existing.steps)
     elif event.topic == AGENT_TERMINATED:
         run_state = "failed" if error else "terminated"
     else:

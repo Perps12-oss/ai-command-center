@@ -336,17 +336,23 @@ class ExecutionOrchestratorService(BaseService):
             return
 
         actor_type = str(step.args.get("actor_type") or "user")
+        tool_args = {
+            k: v
+            for k, v in dict(step.args).items()
+            if k not in {"actor_type", "workflow_run_id", "workflow_id"}
+        }
+        # Inject workspace scope into tool args so capability handlers can namespace.
+        if workspace_context.get("workspace_id") and "workspace_id" not in tool_args:
+            tool_args["workspace_id"] = workspace_context["workspace_id"]
+        if workspace_context.get("entity_id") and "entity_id" not in tool_args:
+            tool_args["entity_id"] = workspace_context["entity_id"]
         self._bus.publish(
             TOOL_INVOKE,
             {
                 "contract_version": TOOL_CONTRACT_VERSION,
                 "invoke_id": invoke_id,
                 "tool": step.capability,
-                "args": {
-                    k: v
-                    for k, v in dict(step.args).items()
-                    if k not in {"actor_type", "workflow_run_id", "workflow_id"}
-                },
+                "args": tool_args,
                 "run_id": run_id,
                 "step_id": step.step_id,
                 "actor_type": actor_type,

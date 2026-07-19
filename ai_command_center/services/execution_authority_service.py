@@ -1,6 +1,6 @@
 """Single Execution Authority — sole creator of executable work.
 
-Every typed UI_COMMAND becomes an ExecutionPlan (no legacy command.routed fan-out).
+Every typed UI_COMMAND becomes an ExecutionPlan.
 StateAuthority projects World Model context before planning/dispatch.
 Never publishes TOOL_INVOKE or LLM_REQUEST.
 """
@@ -13,16 +13,12 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
+from ai_command_center.core.command_classify import classify_command
 from ai_command_center.core.contracts import COMMAND_DEFERRED_VERSION, build_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.intents import (
     INTENT_AGENT,
     INTENT_CHAT,
-    INTENT_MEMORY_REMEMBER,
-    INTENT_MEMORY_SELECT,
-    INTENT_NAVIGATE,
-    INTENT_NOTE_NEW,
-    INTENT_NOTE_SEARCH,
     INTENT_SHELL,
 )
 from ai_command_center.core.events.topics import (
@@ -45,8 +41,6 @@ from ai_command_center.orchestration.intents.classifier import RuleBasedIntentCl
 from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
 from ai_command_center.services.base import BaseService
-from ai_command_center.services.command_router_service import CommandRouterService
-from ai_command_center.services.state_authority_service import StateAuthorityService
 
 _logger = logging.getLogger(__name__)
 
@@ -83,16 +77,16 @@ _ORCH_CAPABILITY: dict[OrchestrationIntent, str] = {
 }
 
 _PREFIX_CAPABILITY: dict[str, str] = {
-    INTENT_NAVIGATE: "navigate",
-    INTENT_NOTE_SEARCH: "notes.search",
-    INTENT_NOTE_NEW: "notes.create",
-    INTENT_MEMORY_REMEMBER: "memory.store",
-    INTENT_MEMORY_SELECT: "memory.query",
+    "navigate": "navigate",
+    "note_search": "notes.search",
+    "note_new": "notes.create",
+    "memory_remember": "memory.store",
+    "memory_select": "memory.query",
 }
 
 
 class ExecutionAuthorityService(BaseService):
-    """Owns intake. Emits GOAL_SUBMIT_REQUEST only — never COMMAND_ROUTED / TOOL_INVOKE."""
+    """Owns intake. Emits GOAL_SUBMIT_REQUEST only — never TOOL_INVOKE."""
 
     name = "execution_authority"
 
@@ -102,7 +96,7 @@ class ExecutionAuthorityService(BaseService):
         *,
         classifier: RuleBasedIntentClassifier | None = None,
         agent_runtime: AgentRuntimeService | None = None,
-        state_authority: StateAuthorityService | None = None,
+        state_authority: Any | None = None,
     ) -> None:
         super().__init__(bus)
         self._classifier = classifier or RuleBasedIntentClassifier()
@@ -505,7 +499,7 @@ class ExecutionAuthorityService(BaseService):
         """Classify into ACTIONABLE / CONVERSATIONAL / AMBIGUOUS. No legacy routes."""
         stripped = text.strip()
         ctx = state_context or StateContext.empty(query_text=stripped)
-        prefix_intent, prefix_args = CommandRouterService.classify(stripped)
+        prefix_intent, prefix_args = classify_command(stripped)
 
         if prefix_intent == INTENT_AGENT:
             spawn_mode = str(prefix_args.get("spawn_mode") or "single")

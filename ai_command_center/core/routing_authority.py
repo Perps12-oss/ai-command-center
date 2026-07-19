@@ -2,7 +2,7 @@
 
 ExecutionAuthorityService is the sole decision-maker for UI_COMMAND.
 Navigate and other state capabilities execute via ExecutionPlan tools
-(UI_NAVIGATE / TOOL_INVOKE), not COMMAND_ROUTED fan-out.
+(UI_NAVIGATE / TOOL_INVOKE).
 """
 
 from __future__ import annotations

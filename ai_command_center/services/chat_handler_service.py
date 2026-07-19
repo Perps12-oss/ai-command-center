@@ -1,8 +1,8 @@
 ﻿"""Routes llm capability steps through ContextManager before LLM dispatch.
 
-ChatHandlerService is a capability handler only. It must not own user requests
-from COMMAND_ROUTED — ExecutionAuthority + ExecutionOrchestrator invoke it via
-LLM_STEP_REQUEST when a PlanStep has capability=\"llm\"/\"chat\".
+ChatHandlerService is a capability handler only. It must not own user intake —
+ExecutionAuthority + ExecutionOrchestrator invoke it via LLM_STEP_REQUEST when
+a PlanStep has capability=\"llm\"/\"chat\".
 """
 
 from __future__ import annotations

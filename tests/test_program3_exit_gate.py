@@ -69,6 +69,8 @@ _UI_COMMAND_PUBLISH_ALLOWLIST = frozenset(
     {
         _PKG_ROOT / "ui" / "controller.py",
         _PKG_ROOT / "services" / "agent_runtime_service.py",
+        # agent.task plan steps re-enter intake through ExecutionAuthority.
+        _PKG_ROOT / "services" / "execution_orchestrator_service.py",
     }
 )
 

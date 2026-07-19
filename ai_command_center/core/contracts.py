@@ -21,7 +21,7 @@ command.deferred v1.0:
     Consumer: UI workspace gate / AppState diagnostics
 
 tool.invoke / tool.result v1.0 (Phase 4B):
-    Producer: ShellToolService (and future tool bridges)
+    Producer: ExecutionOrchestratorService (exclusive)
     Consumer: ToolExecutorService — one invocation per event, no loops
 
 OllamaService API v1.0: unchanged.

@@ -1,7 +1,7 @@
 """ARI capability classification helpers and settings tracking.
 
-No longer races on COMMAND_ROUTED. External capability dispatch is invoked only
-via CAPABILITY_RUNTIME_REQUEST from ExecutionOrchestratorService.
+External capability dispatch is invoked only via CAPABILITY_RUNTIME_REQUEST
+from ExecutionOrchestratorService.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ _CODING_HINTS: tuple[str, ...] = (
 
 
 class RuntimeCapabilityRouterService(BaseService):
-    """Capability kind classifier + provider map (no COMMAND_ROUTED intake)."""
+    """Capability kind classifier + provider map (no competing intake)."""
 
     name = "runtime_capability_router"
 

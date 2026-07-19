@@ -55,7 +55,12 @@ _SERVICE_INFRA_SUFFIXES = frozenset(
 )
 
 # Grandfathered service→service imports (pre-bus refactor). New edges must use EventBus.
-_SERVICE_PEER_IMPORT_ALLOWLIST: frozenset[tuple[str, str]] = frozenset()
+# execution_authority → agent_runtime: plan-builder classmethods only (no service calls).
+_SERVICE_PEER_IMPORT_ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("services/execution_authority_service.py", "agent_runtime_service"),
+    }
+)
 
 # Instance names treated as AppState snapshots for the R3 mutation check.
 _APPSTATE_INSTANCE_NAMES = {"app_state", "appstate"}

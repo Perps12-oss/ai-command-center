@@ -225,6 +225,22 @@ def _derive_ollama_latencies(rows: list[TelemetryEvent | dict[str, Any]]) -> lis
     return latencies
 
 
+def _payload_workspace_scoped(payload: dict[str, Any]) -> bool:
+    if str(payload.get("workspace_id", "")).strip():
+        return True
+    if str(payload.get("entity_id", "")).strip():
+        return True
+    if str(payload.get("workspace_entity_id", "")).strip():
+        return True
+    ctx = payload.get("workspace_context")
+    if isinstance(ctx, dict):
+        if str(ctx.get("workspace_id", "")).strip():
+            return True
+        if str(ctx.get("entity_id", "")).strip():
+            return True
+    return False
+
+
 def _derive_scope_ratio(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str, Any]:
     scoped = 0
     total = 0
@@ -232,10 +248,7 @@ def _derive_scope_ratio(rows: list[TelemetryEvent | dict[str, Any]]) -> dict[str
         if _event_name(row) not in _SESSION_EVENT_TOPICS:
             continue
         total += 1
-        payload = _payload(row)
-        if str(payload.get("workspace_id", "")).strip() or str(
-            payload.get("entity_id", "")
-        ).strip():
+        if _payload_workspace_scoped(_payload(row)):
             scoped += 1
     ratio = round((scoped / total) * 100, 1) if total else 0.0
     return {"total": total, "scoped": scoped, "ratio_pct": ratio}

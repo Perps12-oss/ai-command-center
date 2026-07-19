@@ -85,7 +85,7 @@ class ObsidianService(BaseService):
         self._unsubscribers.append(self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot))
         self._unsubscribers.append(self._bus.subscribe(NOTE_SELECT, self._on_note_select))
         self._unsubscribers.append(self._bus.subscribe(NOTE_CONTEXT_REQUEST, self._on_note_context_request))
-        # Notes execute via notes.create / notes.search tools (no COMMAND_ROUTED).
+        # Notes execute via notes.create / notes.search tools.
 
     def _apply_vault_path(self, raw: str) -> None:
         path = str(raw or "").strip()

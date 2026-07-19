@@ -1,7 +1,7 @@
 """Uniform receipt / truth / World-Model completion for every execution run.
 
-OrchestrationService no longer races on COMMAND_ROUTED. Shell and application
-execution flow through ExecutionAuthority → ExecutionOrchestrator → tools.
+Shell and application execution flow through
+ExecutionAuthority → ExecutionOrchestrator → tools.
 This service observes EXECUTION_RUN_COMPLETE / FAILED and emits the evidence
 set required by the Single Execution-Authority Contract (C-4).
 """
@@ -137,6 +137,19 @@ class OrchestrationService(BaseService):
         if error:
             facts["error"] = error
 
+        workspace_context = (
+            payload.get("workspace_context")
+            if isinstance(payload.get("workspace_context"), dict)
+            else {}
+        )
+        workspace_id = str(workspace_context.get("workspace_id") or payload.get("workspace_id") or "").strip()
+        entity_id = str(workspace_context.get("entity_id") or "").strip()
+        scope_fields: dict[str, str] = {}
+        if workspace_id:
+            scope_fields["workspace_id"] = workspace_id
+        if entity_id:
+            scope_fields["entity_id"] = entity_id
+
         receipt = ExecutionReceipt(
             receipt_id=uuid.uuid4().hex,
             request_id=request_id,
@@ -159,6 +172,7 @@ class OrchestrationService(BaseService):
                 "detail": truth_detail,
                 "response_source": response_source,
                 "run_id": run_id,
+                **scope_fields,
             },
             source=self.name,
         )
@@ -218,13 +232,19 @@ class OrchestrationService(BaseService):
                         "node_id": node["id"],
                         "node_type": node["type"],
                     },
+                    **scope_fields,
                 },
                 source=self.name,
             )
 
         self._bus.publish(
             CHAT_STARTED,
-            {"request_id": request_id, "orchestration": True, "execution_run": True},
+            {
+                "request_id": request_id,
+                "orchestration": True,
+                "execution_run": True,
+                **scope_fields,
+            },
             source=self.name,
         )
         if goal:
@@ -234,6 +254,7 @@ class OrchestrationService(BaseService):
                     "request_id": request_id,
                     "role": "user",
                     "content": goal,
+                    **scope_fields,
                 },
                 source=self.name,
             )
@@ -251,6 +272,7 @@ class OrchestrationService(BaseService):
                     "truth_detail": truth_detail,
                     "run_id": run_id,
                 },
+                **scope_fields,
             },
             source=self.name,
         )
@@ -260,6 +282,7 @@ class OrchestrationService(BaseService):
                 "request_id": request_id,
                 "role": "assistant",
                 "content": response_text,
+                **scope_fields,
             },
             source=self.name,
         )
@@ -272,6 +295,7 @@ class OrchestrationService(BaseService):
                 "capability": primary_capability,
                 "truth_valid": truth_valid,
                 "success": success,
+                **scope_fields,
             },
             source=self.name,
         )

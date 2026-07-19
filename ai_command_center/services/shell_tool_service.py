@@ -1,9 +1,7 @@
-"""Shell capability registration — no longer a COMMAND_ROUTED racer.
+"""Shell capability metadata — workspace scope diagnostics only.
 
 Shell execution is owned exclusively by ExecutionOrchestrator → TOOL_INVOKE →
-ToolExecutorService (tool=\"shell\"). This service tracks workspace scope for
-diagnostics only and does not publish TOOL_INVOKE from COMMAND_ROUTED
-(closes the OrchestrationService/_orchestrate_shell double-execution defect).
+ToolExecutorService (tool=\"shell\"). This service does not publish TOOL_INVOKE.
 """
 
 from __future__ import annotations

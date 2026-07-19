@@ -1,4 +1,4 @@
-"""State-domain capability tools — notes, memory, navigate (no COMMAND_ROUTED)."""
+"""State-domain capability tools — notes, memory, navigate."""
 
 from __future__ import annotations
 

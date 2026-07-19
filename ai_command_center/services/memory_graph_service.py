@@ -43,7 +43,7 @@ class MemoryGraphService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(MEMORY_CLEAR_SELECTION, self._on_clear)
         )
-        # Memory executes via memory.store / memory.query tools (no COMMAND_ROUTED).
+        # Memory executes via memory.store / memory.query tools.
         self._unsubscribers.append(
             self._bus.subscribe(MEMORY_LOOKUP_REQUEST, self._on_lookup_request)
         )

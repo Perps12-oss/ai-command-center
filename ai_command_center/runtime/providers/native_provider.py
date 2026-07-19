@@ -11,7 +11,7 @@ from ai_command_center.domain.runtime_capability import (
 
 
 class NativeRuntimeProvider:
-    """Default provider. Chat/agents handled by existing services on command.routed."""
+    """Default provider. Chat/agents handled via ExecutionAuthority plan steps."""
 
     provider_id = "native"
 
@@ -34,4 +34,4 @@ class NativeRuntimeProvider:
         return kind in self._SUPPORTED
 
     def invoke(self, request: RuntimeInvocationRequest) -> None:
-        """Native path is bus-delegated; ChatHandler listens to command.routed directly."""
+        """Native path is bus-delegated; ChatHandler listens to LLM_STEP_REQUEST."""
