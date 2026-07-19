@@ -33,6 +33,10 @@ class WorldModel:
     def get_node(self, node_id: str) -> Node | None:
         return self._nodes.get(node_id) or self._repository.get_node(node_id)
 
+    def iter_cached_nodes(self) -> list[Node]:
+        """Return nodes currently held in the hot cache (post-recover / apply)."""
+        return list(self._nodes.values())
+
     def get_edges(self, node_id: str, direction: str = "both") -> list[Edge]:
         return self._repository.get_edges(node_id, direction)
 

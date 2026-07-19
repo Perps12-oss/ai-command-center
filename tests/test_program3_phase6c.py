@@ -10,16 +10,14 @@ from ai_command_center.application import create_application
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.entity.entity import ENTITY_TYPE_WORKSPACE
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
     UI_COMMAND,
     WORKSPACE_ACTIVE,
 )
 from ai_command_center.core.state.chat_state import CHAT_REDUCERS
 from ai_command_center.core.state.workspace_state import WORKSPACE_REDUCERS
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
-from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.telemetry_service import TelemetryService
 from ai_command_center.services.telemetry_summary import compute_session_summary
 from ai_command_center.ui.controller import UIController
@@ -67,7 +65,7 @@ class Phase6cReducerOwnershipTests(unittest.TestCase):
             "notes.indexed",
         }
         chat_topics = {
-            "command.routed",
+            "execution.authority.decision",
             "ui.workspace_os.open_chat",
             "ui.chat.new_session",
             "context.snapshot.created",
@@ -139,12 +137,12 @@ class Phase6cWiiApproachTests(unittest.TestCase):
             app.shutdown()
 
 
-class Phase6cCommandRouterIntegrationTests(unittest.TestCase):
-    def test_scoped_command_routed_projects_to_chat_state(self) -> None:
+class Phase6cExecutionAuthorityIntegrationTests(unittest.TestCase):
+    def test_scoped_authority_decision_projects_to_chat_state(self) -> None:
         bus = EventBus()
         store = AppStateStore(bus)
-        router = CommandRouterService(bus)
-        router.load()
+        authority = ExecutionAuthorityService(bus)
+        authority.load()
         try:
             bus.publish(
                 WORKSPACE_ACTIVE,
@@ -154,9 +152,9 @@ class Phase6cCommandRouterIntegrationTests(unittest.TestCase):
             bus.publish(UI_COMMAND, {"text": "hello policy"}, source="tests")
             snap = store.snapshot
             self.assertEqual("ws-6c", snap.last_workspace_context_workspace_id)
-            self.assertEqual(INTENT_CHAT, snap.last_command_intent)
+            self.assertEqual("llm", snap.last_command_intent)
         finally:
-            router.unload()
+            authority.unload()
 
 
 if __name__ == "__main__":

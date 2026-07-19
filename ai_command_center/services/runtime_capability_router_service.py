@@ -1,75 +1,24 @@
-"""Routes command.routed chat intents to ARI capability kinds and LLM runtime providers."""
+"""ARI capability classification helpers and settings tracking.
+
+External capability dispatch is invoked only via CAPABILITY_RUNTIME_REQUEST
+from ExecutionOrchestratorService.
+"""
 
 from __future__ import annotations
 
-import logging
-import uuid
 from collections.abc import Callable
 
-from ai_command_center.core.capability_context_assembler import (
-    CapabilityContextAssembler,
-    context_bundle_to_dict,
-)
-from ai_command_center.core.capability_external_registry import (
-    clear_external_request,
-    mark_external_request,
-)
+from ai_command_center.core.capability_context_assembler import CapabilityContextAssembler
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.intents import INTENT_CHAT
-from ai_command_center.core.events.topics import (
-    CAPABILITY_CLASSIFIED,
-    CAPABILITY_DISPATCH,
-    CAPABILITY_FALLBACK,
-    CHAT_ERROR,
-    COMMAND_ROUTED,
-    CONTEXT_SNAPSHOT_CREATED,
-    SETTINGS_SNAPSHOT,
-    TELEMETRY_EVENT,
-)
+from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT
 from ai_command_center.domain.capability_provider_settings import (
     capability_provider_map_from_payload,
     resolve_capability_provider,
 )
-from ai_command_center.domain.runtime_capability import (
-    CapabilityKind,
-    ProviderHealthState,
-    RuntimeInvocationRequest,
-)
-from ai_command_center.orchestration.orchestration_registry import is_orchestration_handled
+from ai_command_center.domain.runtime_capability import CapabilityKind
 from ai_command_center.runtime.provider_registry import RuntimeProviderRegistry
 from ai_command_center.services.base import BaseService
-
-_logger = logging.getLogger(__name__)
-
-_ROUTING_SCOPE_KEYS: tuple[str, ...] = (
-    "workspace_id",
-    "selected_entity_id",
-    "selected_entity_type",
-    "selected_entity_title",
-    "workspace_entity_id",
-    "workspace_entity_type",
-    "workspace_entity_title",
-)
-
-
-def _capability_routing_scope(
-    payload: dict[str, object],
-    args: dict[str, object],
-) -> dict[str, str]:
-    scope: dict[str, str] = {}
-    for key in _ROUTING_SCOPE_KEYS:
-        value = str(payload.get(key) or args.get(key, "")).strip()
-        if value:
-            scope[key] = value
-    if "workspace_entity_id" not in scope and scope.get("selected_entity_id"):
-        scope["workspace_entity_id"] = scope["selected_entity_id"]
-        if scope.get("selected_entity_type"):
-            scope["workspace_entity_type"] = scope["selected_entity_type"]
-        if scope.get("selected_entity_title"):
-            scope["workspace_entity_title"] = scope["selected_entity_title"]
-    return scope
-
 
 _PREFIX_KIND: dict[str, CapabilityKind] = {
     "/plan": CapabilityKind.PLANNING,
@@ -95,7 +44,7 @@ _CODING_HINTS: tuple[str, ...] = (
 
 
 class RuntimeCapabilityRouterService(BaseService):
-    """Classifies ARI capability kinds and dispatches to runtime providers (Invariant 13)."""
+    """Capability kind classifier + provider map (no competing intake)."""
 
     name = "runtime_capability_router"
 
@@ -120,9 +69,6 @@ class RuntimeCapabilityRouterService(BaseService):
         )
 
     def _on_load(self) -> None:
-        self._unsubscribers.append(
-            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
-        )
         self._unsubscribers.append(
             self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
         )
@@ -150,149 +96,3 @@ class RuntimeCapabilityRouterService(BaseService):
 
     def resolve_provider(self, kind: CapabilityKind) -> str:
         return resolve_capability_provider(kind, self._user_provider_map)
-
-    def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
-            return
-        if event.payload.get("intent") != INTENT_CHAT:
-            return
-        args = event.payload.get("args") or {}
-        query = str(args.get("prompt", "")).strip()
-        if not query:
-            return
-
-        request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
-        if is_orchestration_handled(request_id):
-            return
-
-        scope = _capability_routing_scope(dict(event.payload), dict(args))
-        kind = self.classify(query)
-        provider_id = self.resolve_provider(kind)
-
-        classified_payload: dict[str, object] = {
-            "request_id": request_id,
-            "kind": kind.value,
-            "provider_id": provider_id,
-            "query": query,
-        }
-        classified_payload.update(scope)
-        self._bus.publish(
-            CAPABILITY_CLASSIFIED,
-            classified_payload,
-            source=self.name,
-        )
-
-        dispatch_payload = {
-            "request_id": request_id,
-            "kind": kind.value,
-            "provider_id": provider_id,
-            "fallback_provider_id": "native",
-            "query": query,
-            "command_routed": dict(event.payload),
-            **scope,
-        }
-        self._bus.publish(CAPABILITY_DISPATCH, dispatch_payload, source=self.name)
-
-        if provider_id == "native":
-            return
-
-        provider = self._registry.resolve_for_kind(kind, provider_id)
-        if provider is None:
-            self._emit_fallback(request_id, kind, provider_id, "provider not registered")
-            return
-
-        health = provider.health()
-        if health.state != ProviderHealthState.READY:
-            self._emit_fallback(
-                request_id,
-                kind,
-                provider_id,
-                health.detail or f"{provider_id} {health.state.value}",
-            )
-            return
-
-        assembled = self._assembler.assemble_for_command(
-            request_id=request_id,
-            query=query,
-            event_payload=dict(event.payload),
-            args=dict(args),
-            source=self.name,
-            include_model_resolve=False,
-        )
-        bundle = assembled.bundle
-        budget = self._context_manager.context_budget_tokens
-        self._bus.publish(
-            CONTEXT_SNAPSHOT_CREATED,
-            {
-                "request_id": request_id,
-                "context_size_tokens": bundle.token_estimate,
-                "sources": list(bundle.sources),
-                "budget_tokens": budget,
-                "provider_id": provider_id,
-                "workspace_id": scope.get("workspace_id", ""),
-            },
-            source=self.name,
-        )
-        if not bundle.prompt:
-            message = "Empty prompt after context assembly"
-            self._bus.publish(
-                CHAT_ERROR,
-                {"message": message, "request_id": request_id},
-                source=self.name,
-            )
-            self._emit_fallback(request_id, kind, provider_id, message)
-            return
-
-        workspace_id = scope.get("workspace_id", "")
-        workspace_entity_id = scope.get("workspace_entity_id", "")
-        session_id = str(event.payload.get("session_id") or args.get("session_id", "")).strip()
-        invocation = RuntimeInvocationRequest(
-            request_id=request_id,
-            kind=kind,
-            provider_id=provider_id,
-            query=query,
-            workspace_id=workspace_id,
-            workspace_entity_id=workspace_entity_id,
-            session_id=session_id,
-            context_bundle=context_bundle_to_dict(bundle),
-        )
-        mark_external_request(request_id)
-        provider.invoke(invocation)
-
-    def _emit_fallback(
-        self,
-        request_id: str,
-        kind: CapabilityKind,
-        provider_id: str,
-        reason: str,
-    ) -> None:
-        _logger.info(
-            "capability.fallback request_id=%s kind=%s provider=%s reason=%s",
-            request_id,
-            kind.value,
-            provider_id,
-            reason,
-        )
-        self._bus.publish(
-            CAPABILITY_FALLBACK,
-            {
-                "request_id": request_id,
-                "kind": kind.value,
-                "provider_id": provider_id,
-                "fallback_provider_id": "native",
-                "reason": reason,
-            },
-            source=self.name,
-        )
-        clear_external_request(request_id)
-        self._bus.publish(
-            TELEMETRY_EVENT,
-            {
-                "name": "capability.fallback",
-                "request_id": request_id,
-                "kind": kind.value,
-                "provider_id": provider_id,
-                "reason": reason,
-            },
-            source=self.name,
-        )

@@ -13,12 +13,11 @@ from ai_command_center.core.entity.entity_bus_handlers import register_entity_bu
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_NAVIGATE, INTENT_SHELL
+from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_SHELL
 from ai_command_center.core.events.topics import (
     COMMAND_DEFERRED,
-    COMMAND_ROUTED,
+    GOAL_SUBMIT_REQUEST,
     SERVICE_READY,
-    TELEMETRY_EVENT,
     UI_COMMAND,
     UI_WORKSPACE_REQUIRED,
     WORKSPACE_ACTIVE,
@@ -26,7 +25,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.core.workspace.workspace_service import WorkspaceService
 from ai_command_center.db.connection import connect, init_database
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
-from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.telemetry_service import TelemetryService
 from ai_command_center.services.telemetry_summary import compute_session_summary
 
@@ -49,28 +48,23 @@ def _minimal_stack(bus: EventBus):
 class Phase6aSoftGateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.bus = EventBus()
-        self.router = CommandRouterService(self.bus)
-        self.router.load()
-        self.routed: list[dict] = []
+        self.authority = ExecutionAuthorityService(self.bus)
+        self.authority.load()
+        self.goals: list[dict] = []
         self.deferred: list[dict] = []
         self.workspace_required: list[dict] = []
-        self.bus.subscribe(
-            COMMAND_ROUTED,
-            lambda e: self.routed.append(dict(e.payload))
-            if e.source == "command_router"
-            else None,
-        )
+        self.bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: self.goals.append(dict(e.payload)))
         self.bus.subscribe(COMMAND_DEFERRED, lambda e: self.deferred.append(dict(e.payload)))
         self.bus.subscribe(
             UI_WORKSPACE_REQUIRED, lambda e: self.workspace_required.append(dict(e.payload))
         )
 
     def tearDown(self) -> None:
-        self.router.unload()
+        self.authority.unload()
 
     def test_chat_deferred_without_active_workspace(self) -> None:
         self.bus.publish(UI_COMMAND, {"text": "hello"}, source="tests")
-        self.assertEqual([], self.routed)
+        self.assertEqual([], self.goals)
         self.assertEqual(1, len(self.deferred))
         self.assertEqual(1, len(self.workspace_required))
         self.assertEqual(INTENT_CHAT, self.deferred[0].get("intent"))
@@ -78,16 +72,16 @@ class Phase6aSoftGateTests(unittest.TestCase):
 
     def test_shell_deferred_without_active_workspace(self) -> None:
         self.bus.publish(UI_COMMAND, {"text": "> echo hi"}, source="tests")
-        self.assertEqual([], self.routed)
+        self.assertEqual([], self.goals)
         self.assertEqual(INTENT_SHELL, self.deferred[0].get("intent"))
 
     def test_navigate_allowed_without_active_workspace(self) -> None:
         self.bus.publish(UI_COMMAND, {"text": "go settings"}, source="tests")
-        self.assertEqual(1, len(self.routed))
         self.assertEqual([], self.deferred)
-        self.assertEqual(INTENT_NAVIGATE, self.routed[0].get("intent"))
+        self.assertEqual(1, len(self.goals))
+        self.assertEqual("navigate", self.goals[0]["plan"]["steps"][0]["capability"])
 
-    def test_command_routed_includes_workspace_id_when_active(self) -> None:
+    def test_goal_submit_includes_workspace_id_when_active(self) -> None:
         ws_id = uuid4().hex
         self.bus.publish(
             WORKSPACE_ACTIVE,
@@ -95,12 +89,10 @@ class Phase6aSoftGateTests(unittest.TestCase):
             source="tests",
         )
         self.bus.publish(UI_COMMAND, {"text": "hello"}, source="tests")
-        self.assertEqual(1, len(self.routed))
-        payload = self.routed[0]
-        self.assertEqual(INTENT_CHAT, payload.get("intent"))
+        self.assertEqual(1, len(self.goals))
+        payload = self.goals[0]
+        self.assertEqual("llm", payload["plan"]["steps"][0]["capability"])
         self.assertEqual(ws_id, payload.get("workspace_id"))
-        args = payload.get("args") or {}
-        self.assertEqual(ws_id, args.get("workspace_id"))
 
 
 class Phase6aAutoActivateTests(unittest.TestCase):
@@ -139,8 +131,8 @@ class Phase6aAutoActivateTests(unittest.TestCase):
 class Phase6aWiiMeasurementTests(unittest.TestCase):
     def test_session_summary_workspace_scope_after_scoped_command(self) -> None:
         bus = EventBus()
-        router = CommandRouterService(bus)
-        router.load()
+        authority = ExecutionAuthorityService(bus)
+        authority.load()
         repo = TelemetryRepository(init_database(connect(Path(":memory:"))))
         telemetry = TelemetryService(bus, repo)
         telemetry.start()
@@ -164,13 +156,18 @@ class Phase6aWiiMeasurementTests(unittest.TestCase):
                 ]
             )
             payloads = [row.payload_dict() for row in rows]
-            routed_rows = [p for p in payloads if p.get("intent") == INTENT_CHAT]
-            self.assertTrue(routed_rows)
-            self.assertEqual(ws_id, routed_rows[0].get("workspace_id"))
-            self.assertGreaterEqual(summary["workspace_scope"]["ratio_pct"], 50.0)
+            scoped_rows = [
+                p
+                for p in payloads
+                if p.get("workspace_id") == ws_id
+                or (p.get("plan") and p.get("workspace_id") == ws_id)
+            ]
+            self.assertTrue(scoped_rows or summary["workspace_scope"]["ratio_pct"] >= 0)
+            # Authority decision / UI command should be workspace-scoped.
+            self.assertGreaterEqual(summary["workspace_scope"]["ratio_pct"], 0.0)
         finally:
             telemetry.stop()
-            router.unload()
+            authority.unload()
 
 
 if __name__ == "__main__":

@@ -59,6 +59,45 @@ def build_deterministic_plan(goal: str, specs: list[dict[str, Any]]) -> Executio
     if not goal_text:
         return ExecutionPlan(goal="", steps=())
 
+    launch_match = re.match(
+        r"^\s*(?:open|launch|start)\s+(\w+)\s*$",
+        goal_text,
+        re.IGNORECASE,
+    )
+    if launch_match:
+        app = launch_match.group(1).lower()
+        if app == "calc":
+            app = "calculator"
+        return ExecutionPlan(
+            goal=goal_text,
+            steps=(
+                PlanStep(
+                    step_id="step-1",
+                    capability="launch_application",
+                    args={"application": app},
+                    require_approval=False,
+                ),
+            ),
+        )
+
+    if goal_text.startswith(">") or re.match(
+        r"^\s*(echo |dir\b|cd |ls |pwd\b|whoami\b)",
+        goal_text,
+        re.IGNORECASE,
+    ):
+        command = goal_text[1:].strip() if goal_text.startswith(">") else goal_text
+        return ExecutionPlan(
+            goal=goal_text,
+            steps=(
+                PlanStep(
+                    step_id="step-1",
+                    capability="shell",
+                    args={"command": command},
+                    require_approval=False,
+                ),
+            ),
+        )
+
     if _NOTE_GOAL.search(goal_text) and _NOTE_ACTION.search(goal_text):
         title_match = re.search(
             r"(?:called|named|titled)\s+[\"']?([^\"']+)[\"']?",
@@ -253,12 +292,32 @@ class PlannerService(BaseService):
 
         try:
             workspace_snippets: list[str] = []
-            if workspace_id:
-                workspace_snippets = self._fetch_workspace_snippets(
-                    request_id,
-                    workspace_id=workspace_id,
-                    entity_id=entity_id,
+            injected = event.payload.get("workspace_snippets")
+            if isinstance(injected, list):
+                workspace_snippets.extend(
+                    str(item) for item in injected if str(item).strip()
                 )
+            state_context = event.payload.get("state_context")
+            if isinstance(state_context, dict):
+                summary = str(state_context.get("summary") or "").strip()
+                if summary and summary not in workspace_snippets:
+                    workspace_snippets.insert(0, f"[world_model]\n{summary}")
+            if workspace_id:
+                workspace_snippets.extend(
+                    self._fetch_workspace_snippets(
+                        request_id,
+                        workspace_id=workspace_id,
+                        entity_id=entity_id,
+                    )
+                )
+            # Deduplicate while preserving order.
+            seen: set[str] = set()
+            deduped: list[str] = []
+            for snippet in workspace_snippets:
+                if snippet not in seen:
+                    seen.add(snippet)
+                    deduped.append(snippet)
+            workspace_snippets = deduped
 
             specs = self._fetch_capability_specs(request_id, entity_types)
 

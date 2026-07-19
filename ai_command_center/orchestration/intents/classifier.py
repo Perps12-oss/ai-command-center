@@ -74,8 +74,9 @@ class RuleBasedIntentClassifier:
             app = match.group(1).lower()
             if app == "calc":
                 app = "calculator"
-            if app in _LAUNCH_APPS:
-                return OrchestrationIntent.LAUNCH_APPLICATION, {"application": app}
+            # Always actionable — unsupported apps fail at the provider/capability
+            # layer with a receipt, never fall through to LLM.
+            return OrchestrationIntent.LAUNCH_APPLICATION, {"application": app}
 
         if lower in _TIME_PHRASES or lower.rstrip("?") in _TIME_PHRASES:
             return OrchestrationIntent.SYSTEM_TIME_QUERY, {}

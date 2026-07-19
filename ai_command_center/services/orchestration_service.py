@@ -1,4 +1,10 @@
-"""Truth-bound orchestration service — EventBus integration."""
+"""Uniform receipt / truth / World-Model completion for every execution run.
+
+Shell and application execution flow through
+ExecutionAuthority → ExecutionOrchestrator → tools.
+This service observes EXECUTION_RUN_COMPLETE / FAILED and emits the evidence
+set required by the Single Execution-Authority Contract (C-4).
+"""
 
 from __future__ import annotations
 
@@ -7,73 +13,38 @@ import uuid
 from collections.abc import Callable
 
 from ai_command_center.core.event_bus import Event
-from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_SHELL
 from ai_command_center.core.events.topics import (
     CAPABILITY_PROVIDERS_READY,
     CHAT_COMPLETE,
     CHAT_STARTED,
-    COMMAND_ROUTED,
-    ORCHESTRATION_INTENT_CLASSIFIED,
+    EXECUTION_RUN_COMPLETE,
+    EXECUTION_RUN_FAILED,
     ORCHESTRATION_PROVIDER_HEALTH,
-    ORCHESTRATION_PROVIDER_SELECTED,
     ORCHESTRATION_RECEIPT,
-    ORCHESTRATION_ROUTING_COMPLETED,
     ORCHESTRATION_RUN_SNAPSHOT,
     ORCHESTRATION_TRUTH_VALIDATED,
+    RUNTIME_ACTION_REQUEST,
     SESSION_UPDATE_REQUEST,
     TELEMETRY_EVENT,
 )
-from ai_command_center.orchestration.execution.executor import OrchestrationExecutor
-from ai_command_center.orchestration.execution.response_composer import ResponseComposer
-from ai_command_center.orchestration.intents.classifier import RuleBasedIntentClassifier
-from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
-from ai_command_center.orchestration.orchestration_registry import mark_orchestration_request
-from ai_command_center.orchestration.policies.fallback_policy import OrchestrationFallbackPolicy
-from ai_command_center.orchestration.providers.provider_registry import OrchestrationProviderRegistry
-from ai_command_center.orchestration.routing.intent_router import IntentRouter
-from ai_command_center.domain.orchestration_run_snapshot import OrchestrationRunSnapshot, _dict_to_immutable
-from ai_command_center.orchestration.verification.truth_boundary import TruthBoundary
+from ai_command_center.domain.correlation import CorrelationContext
+from ai_command_center.domain.orchestration_run_snapshot import (
+    OrchestrationRunSnapshot,
+    _dict_to_immutable,
+)
+from ai_command_center.domain.runtime_safety import SecurityTier
+from ai_command_center.domain.world_model import MutationType
+from ai_command_center.orchestration.providers.provider_registry import (
+    OrchestrationProviderRegistry,
+)
+from ai_command_center.orchestration.receipts.execution_receipt import ExecutionReceipt
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
 
-_SCOPE_KEYS: tuple[str, ...] = (
-    "workspace_id",
-    "selected_entity_id",
-    "selected_entity_type",
-    "selected_entity_title",
-)
-
-
-def _routing_scope(payload: dict[str, object], args: dict[str, object]) -> dict[str, str]:
-    """Workspace scope from command.routed for classify and provider execution."""
-    scope: dict[str, str] = {}
-    workspace_id = str(payload.get("workspace_id") or args.get("workspace_id", "")).strip()
-    if workspace_id:
-        scope["workspace_id"] = workspace_id
-    for key in _SCOPE_KEYS[1:]:
-        value = str(payload.get(key) or args.get(key, "")).strip()
-        if value:
-            scope[key] = value
-    return scope
-
-
-def _observability_scope(payload: dict[str, object]) -> dict[str, str]:
-    """Pass workspace/entity scope through orchestration events for tracing."""
-    scope: dict[str, str] = {}
-    workspace_id = str(payload.get("workspace_id", "")).strip()
-    if workspace_id:
-        scope["workspace_id"] = workspace_id
-    entity_id = str(payload.get("entity_id", "")).strip()
-    if not entity_id:
-        entity_id = str(payload.get("selected_entity_id", "")).strip()
-    if entity_id:
-        scope["entity_id"] = entity_id
-    return scope
-
 
 class OrchestrationService(BaseService):
-    """Classifies truth-bound intents and completes chat without LLM when matched."""
+    """Completion observer — receipts, truth validation, World Model, UI response."""
 
     name = "orchestration"
 
@@ -82,28 +53,19 @@ class OrchestrationService(BaseService):
         bus,
         *,
         provider_registry: OrchestrationProviderRegistry | None = None,
-        classifier: RuleBasedIntentClassifier | None = None,
-        intent_router: IntentRouter | None = None,
-        executor: OrchestrationExecutor | None = None,
-        truth_boundary: TruthBoundary | None = None,
-        response_composer: ResponseComposer | None = None,
+        **_deprecated: object,
     ) -> None:
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
-        registry = provider_registry or OrchestrationProviderRegistry()
-        self._classifier = classifier or RuleBasedIntentClassifier()
-        self._intent_router = intent_router or IntentRouter()
-        self._executor = executor or OrchestrationExecutor(registry)
-        self._truth_boundary = truth_boundary or TruthBoundary()
-        self._response_composer = response_composer or ResponseComposer()
-        self._registry = registry
+        self._registry = provider_registry or OrchestrationProviderRegistry()
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
-            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
+            self._bus.subscribe(EXECUTION_RUN_COMPLETE, self._on_execution_complete)
         )
-        # Refresh orchestration provider health when runtime providers reload, so the
-        # Runtime Inspector dashboard doesn't go stale after plugin changes.
+        self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_RUN_FAILED, self._on_execution_failed)
+        )
         self._unsubscribers.append(
             self._bus.subscribe(CAPABILITY_PROVIDERS_READY, self._on_capability_providers_ready)
         )
@@ -130,368 +92,369 @@ class OrchestrationService(BaseService):
             unsub()
         self._unsubscribers.clear()
 
-    def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
+    def _on_execution_complete(self, event: Event) -> None:
+        self._emit_completion(event, success=True, error="")
+
+    def _on_execution_failed(self, event: Event) -> None:
+        self._emit_completion(
+            event,
+            success=False,
+            error=str(event.payload.get("error") or "execution failed"),
+        )
+
+    def _emit_completion(
+        self,
+        event: Event,
+        *,
+        success: bool,
+        error: str,
+    ) -> None:
+        payload = dict(event.payload)
+        request_id = str(payload.get("request_id") or payload.get("run_id") or "").strip()
+        if not request_id:
             return
 
-        routed_intent = str(event.payload.get("intent", "")).strip()
-        args = event.payload.get("args") or {}
-        request_id = str(event.payload.get("request_id", "")).strip()
-        scope = _routing_scope(dict(event.payload), dict(args))
-        for key, value in _observability_scope(event.payload).items():
-            scope.setdefault(key, value)
+        run_id = str(payload.get("run_id", "")).strip()
+        goal = str(payload.get("goal") or "")
+        step_outputs = list(payload.get("step_outputs") or [])
+        plan = payload.get("plan") if isinstance(payload.get("plan"), dict) else {}
+        steps = list(plan.get("steps") or [])
+        primary_capability = ""
+        if steps and isinstance(steps[0], dict):
+            primary_capability = str(steps[0].get("capability") or "")
+        elif step_outputs and isinstance(step_outputs[0], dict):
+            primary_capability = str(step_outputs[0].get("capability") or "")
 
-        # Shell commands: route directly to ShellProvider via orchestration
-        if routed_intent == INTENT_SHELL:
-            command = str(args.get("command", "")).strip()
-            if not command:
-                return
-            self._orchestrate_shell(request_id, command, scope)
-            return
-
-        # Chat commands: classify and route
-        if routed_intent != INTENT_CHAT:
-            return
-
-        query = str(args.get("prompt", "")).strip()
-        if not query:
-            return
-
-        intent, intent_args = self._classifier.classify(query)
-        merged_args = {**intent_args, **scope}
-        classified_payload: dict[str, object] = {
-            "request_id": request_id,
-            "query": query,
-            "intent": intent.value,
-            "args": merged_args,
+        response_text = _compose_response_text(step_outputs, success=success, error=error)
+        facts: dict[str, object] = {
+            "run_id": run_id,
+            "goal": goal,
+            "capability": primary_capability,
+            "step_count": len(step_outputs) or len(steps),
+            "step_outputs": step_outputs,
+            "success": success,
         }
-        classified_payload.update(scope)
-        self._bus.publish(
-            ORCHESTRATION_INTENT_CLASSIFIED,
-            classified_payload,
-            source=self.name,
+        if error:
+            facts["error"] = error
+
+        workspace_context = (
+            payload.get("workspace_context")
+            if isinstance(payload.get("workspace_context"), dict)
+            else {}
         )
+        workspace_id = str(workspace_context.get("workspace_id") or payload.get("workspace_id") or "").strip()
+        entity_id = str(workspace_context.get("entity_id") or "").strip()
+        scope_fields: dict[str, str] = {}
+        if workspace_id:
+            scope_fields["workspace_id"] = workspace_id
+        if entity_id:
+            scope_fields["entity_id"] = entity_id
 
-        if OrchestrationFallbackPolicy.should_defer_to_llm(intent):
-            return
-
-        provider_id = self._intent_router.resolve_provider(intent)
-        self._bus.publish(
-            ORCHESTRATION_ROUTING_COMPLETED,
-            {
-                "request_id": request_id,
-                "intent": intent.value,
-                "provider_id": provider_id,
-                "routed": bool(provider_id),
-                **scope,
-            },
-            source=self.name,
-        )
-        if not provider_id:
-            return
-
-        self._bus.publish(
-            ORCHESTRATION_PROVIDER_SELECTED,
-            {
-                "request_id": request_id,
-                "intent": intent.value,
-                "provider_id": provider_id,
-                **scope,
-            },
-            source=self.name,
-        )
-
-        mark_orchestration_request(request_id)
-
-        self._execute_and_respond(
-            intent=intent,
-            provider_id=provider_id,
+        receipt = ExecutionReceipt(
+            receipt_id=uuid.uuid4().hex,
             request_id=request_id,
-            query=query,
-            args=merged_args,
+            intent=primary_capability or "execution_run",
+            provider_id="execution_orchestrator",
+            success=success,
+            facts=tuple(sorted(facts.items(), key=lambda item: item[0])),
+            error=error or None,
+        )
+        self._bus.publish(ORCHESTRATION_RECEIPT, receipt.to_dict(), source=self.name)
+
+        truth_valid = success
+        truth_detail = "execution run completed" if success else (error or "execution failed")
+        response_source = "execution" if success else "execution_rejected"
+        self._bus.publish(
+            ORCHESTRATION_TRUTH_VALIDATED,
+            {
+                "request_id": request_id,
+                "valid": truth_valid,
+                "detail": truth_detail,
+                "response_source": response_source,
+                "run_id": run_id,
+                **scope_fields,
+            },
+            source=self.name,
         )
 
-    def _orchestrate_shell(
-        self,
-        request_id: str,
-        command: str,
-        scope: dict[str, str],
-    ) -> None:
-        """Execute shell command via ShellProvider with receipts and truth validation.
+        snapshot = OrchestrationRunSnapshot(
+            request_id=request_id,
+            query=goal,
+            intent=primary_capability or "execution_run",
+            provider_id="execution_orchestrator",
+            execution_success=success,
+            execution_facts=_dict_to_immutable(facts),
+            execution_error=error or None,
+            truth_valid=truth_valid,
+            truth_detail=truth_detail,
+            response_source=response_source,
+            response_text=response_text,
+            receipt_id=receipt.receipt_id,
+            trace_id=uuid.uuid4().hex,
+            span_id=uuid.uuid4().hex[:16],
+        )
+        self._bus.publish(
+            ORCHESTRATION_RUN_SNAPSHOT,
+            snapshot.to_dict(),
+            source=self.name,
+        )
 
-        Shell commands REQUIRE a workspace_id for execution. Without a workspace,
-        commands are rejected at the truth boundary.
-        """
-        # Workspace enforcement: shell commands must have workspace_id
-        workspace_id = scope.get("workspace_id", "").strip()
-        if not workspace_id:
-            # Shell without workspace: emit rejection at truth boundary
+        correlation = CorrelationContext.from_payload(payload).with_action(run_id or request_id)
+        for node in _world_model_nodes_for_run(
+            request_id=request_id,
+            run_id=run_id,
+            goal=goal,
+            primary_capability=primary_capability,
+            success=success,
+            receipt_id=receipt.receipt_id,
+            plan=plan if isinstance(plan, dict) else {},
+            step_outputs=step_outputs,
+        ):
+            mutation_id = uuid.uuid4().hex
             self._bus.publish(
-                ORCHESTRATION_TRUTH_VALIDATED,
+                RUNTIME_ACTION_REQUEST,
                 {
-                    "request_id": request_id,
-                    "valid": False,
-                    "detail": "shell command requires active workspace",
-                    "response_source": "orchestration_rejected",
-                },
-                source=self.name,
-            )
-            self._bus.publish(
-                CHAT_COMPLETE,
-                {
-                    "request_id": request_id,
-                    "text": "Shell commands require an active workspace. Please select a workspace first.",
-                    "response_source": "orchestration_rejected",
-                    "truth_validated": False,
-                    "orchestration": {
-                        "intent": "execute_shell",
-                        "provider_id": "shell",
-                        "receipt_id": "",
-                        "truth_detail": "shell command requires active workspace",
+                    "action_id": run_id or request_id,
+                    "tier": SecurityTier.WRITE.value,
+                    "auto_approve": True,
+                    "summary": f"Record {node['type']} {node['id']}",
+                    "mutation": {
+                        "id": mutation_id,
+                        "type": MutationType.CREATE_NODE.value,
+                        "correlation": correlation.to_payload(),
+                        "payload": {"node": node},
                     },
+                    "correlation": correlation.to_payload(),
+                    "output": {
+                        "request_id": request_id,
+                        "run_id": run_id,
+                        "receipt_id": receipt.receipt_id,
+                        "node_id": node["id"],
+                        "node_type": node["type"],
+                    },
+                    **scope_fields,
                 },
                 source=self.name,
             )
-            return
-
-        intent = OrchestrationIntent.EXECUTE_SHELL
-        provider_id = "shell"
-        args = {"command": command, **scope}
 
         self._bus.publish(
-            ORCHESTRATION_INTENT_CLASSIFIED,
+            CHAT_STARTED,
             {
                 "request_id": request_id,
-                "query": command,
-                "intent": intent.value,
-                "args": args,
-                **scope,
+                "orchestration": True,
+                "execution_run": True,
+                **scope_fields,
             },
             source=self.name,
         )
-
+        if goal:
+            self._bus.publish(
+                SESSION_UPDATE_REQUEST,
+                {
+                    "request_id": request_id,
+                    "role": "user",
+                    "content": goal,
+                    **scope_fields,
+                },
+                source=self.name,
+            )
         self._bus.publish(
-            ORCHESTRATION_ROUTING_COMPLETED,
+            CHAT_COMPLETE,
             {
                 "request_id": request_id,
-                "intent": intent.value,
-                "provider_id": provider_id,
-                "routed": True,
-                **scope,
+                "text": response_text,
+                "response_source": response_source,
+                "truth_validated": truth_valid,
+                "orchestration": {
+                    "intent": primary_capability or "execution_run",
+                    "provider_id": "execution_orchestrator",
+                    "receipt_id": receipt.receipt_id,
+                    "truth_detail": truth_detail,
+                    "run_id": run_id,
+                },
+                **scope_fields,
             },
             source=self.name,
         )
-
         self._bus.publish(
-            ORCHESTRATION_PROVIDER_SELECTED,
+            SESSION_UPDATE_REQUEST,
             {
                 "request_id": request_id,
-                "intent": intent.value,
-                "provider_id": provider_id,
-                **scope,
+                "role": "assistant",
+                "content": response_text,
+                **scope_fields,
             },
             source=self.name,
         )
-
-        mark_orchestration_request(request_id)
+        self._bus.publish(
+            TELEMETRY_EVENT,
+            {
+                "name": "execution.complete",
+                "request_id": request_id,
+                "run_id": run_id,
+                "capability": primary_capability,
+                "truth_valid": truth_valid,
+                "success": success,
+                **scope_fields,
+            },
+            source=self.name,
+        )
         _logger.info(
-            "orchestration.dispatch request_id=%s intent=%s provider=%s",
+            "orchestration.completion_observed request_id=%s run_id=%s success=%s",
             request_id,
-            intent.value,
-            provider_id,
+            run_id,
+            success,
         )
 
-        run = self._executor.run(
-            intent,
-            provider_id,
-            request_id=request_id,
-            query=command,
-            args=args,
-        )
-        self._bus.publish(
-            ORCHESTRATION_RECEIPT,
-            run.receipt.to_dict(),
-            source=self.name,
-        )
 
-        validation = self._truth_boundary.validate(intent, run.result, run.receipt)
-        self._bus.publish(
-            ORCHESTRATION_TRUTH_VALIDATED,
-            {
-                "request_id": request_id,
-                "valid": validation.valid,
-                "detail": validation.detail,
-                "response_source": validation.response_source,
-            },
-            source=self.name,
-        )
+def _compose_response_text(
+    step_outputs: list[object],
+    *,
+    success: bool,
+    error: str,
+) -> str:
+    texts: list[str] = []
+    for item in step_outputs:
+        if not isinstance(item, dict):
+            continue
+        output = str(item.get("output") or "").strip()
+        if output:
+            texts.append(output)
+        elif not item.get("success", True):
+            step_error = str(item.get("error") or "").strip()
+            if step_error:
+                texts.append(step_error)
+    if texts:
+        return "\n".join(texts)
+    if success:
+        return "Done."
+    return f"I could not complete that action: {error or 'execution failed'}"
 
-        composed = self._response_composer.compose(
-            intent=intent,
-            provider_id=provider_id,
-            validation=validation,
-            receipt=run.receipt,
-        )
-        snapshot = OrchestrationRunSnapshot(
-            request_id=request_id,
-            query=command,
-            intent=intent.value,
-            provider_id=provider_id,
-            execution_success=run.result.success,
-            execution_facts=_dict_to_immutable(run.result.facts),  # IMMUTABLE
-            execution_error=run.result.error,
-            truth_valid=validation.valid,
-            truth_detail=validation.detail,
-            response_source=validation.response_source,
-            response_text=composed.text,
-            receipt_id=run.receipt.receipt_id,
-            trace_id=uuid.uuid4().hex,
-            span_id=uuid.uuid4().hex[:16],
-        )
-        self._bus.publish(
-            ORCHESTRATION_RUN_SNAPSHOT,
-            snapshot.to_dict(),
-            source=self.name,
-        )
 
-        self._bus.publish(
-            CHAT_STARTED,
-            {"request_id": request_id, "orchestration": True},
-            source=self.name,
-        )
-        self._bus.publish(
-            SESSION_UPDATE_REQUEST,
-            {
+def _world_model_nodes_for_run(
+    *,
+    request_id: str,
+    run_id: str,
+    goal: str,
+    primary_capability: str,
+    success: bool,
+    receipt_id: str,
+    plan: dict,
+    step_outputs: list[object],
+) -> list[dict]:
+    """Build World Model nodes: always an execution_run, plus domain entities."""
+    nodes: list[dict] = [
+        {
+            "id": f"execution_run:{run_id or request_id}",
+            "type": "execution_run",
+            "attributes": {
                 "request_id": request_id,
-                "role": "user",
-                "content": command,
+                "run_id": run_id,
+                "goal": goal,
+                "capability": primary_capability,
+                "success": success,
+                "receipt_id": receipt_id,
             },
-            source=self.name,
-        )
-        complete_payload = self._response_composer.to_chat_complete_payload(
-            composed,
-            request_id=request_id,
-        )
-        self._bus.publish(CHAT_COMPLETE, complete_payload, source=self.name)
-        self._bus.publish(
-            SESSION_UPDATE_REQUEST,
-            {
-                "request_id": request_id,
-                "role": "assistant",
-                "content": composed.text,
-            },
-            source=self.name,
-        )
-        self._bus.publish(
-            TELEMETRY_EVENT,
-            {
-                "name": "orchestration.complete",
-                "request_id": request_id,
-                "intent": intent.value,
-                "provider_id": provider_id,
-                "truth_valid": validation.valid,
-            },
-            source=self.name,
-        )
+        }
+    ]
+    if not success:
+        return nodes
 
-    def _execute_and_respond(
-        self,
-        intent: OrchestrationIntent,
-        provider_id: str,
-        request_id: str,
-        query: str,
-        args: dict[str, str],
-    ) -> None:
-        """Execute provider and emit all required events."""
-        run = self._executor.run(
-            intent,
-            provider_id,
-            request_id=request_id,
-            query=query,
-            args=args,
-        )
-        self._bus.publish(
-            ORCHESTRATION_RECEIPT,
-            run.receipt.to_dict(),
-            source=self.name,
-        )
+    steps = list(plan.get("steps") or [])
+    step0 = steps[0] if steps and isinstance(steps[0], dict) else {}
+    args = dict(step0.get("args") or {}) if isinstance(step0, dict) else {}
+    first_output = ""
+    for item in step_outputs:
+        if isinstance(item, dict) and str(item.get("output") or "").strip():
+            first_output = str(item.get("output") or "").strip()
+            break
 
-        validation = self._truth_boundary.validate(intent, run.result, run.receipt)
-        self._bus.publish(
-            ORCHESTRATION_TRUTH_VALIDATED,
+    cap = (primary_capability or str(step0.get("capability") or "")).strip()
+    if cap == "notes.create":
+        path = ""
+        if first_output.lower().startswith("created note "):
+            path = first_output[len("created note ") :].strip()
+        path = path or str(args.get("path") or args.get("body") or goal)[:120]
+        nodes.append(
             {
-                "request_id": request_id,
-                "valid": validation.valid,
-                "detail": validation.detail,
-                "response_source": validation.response_source,
-            },
-            source=self.name,
+                "id": f"note:{path or request_id}",
+                "type": "note",
+                "attributes": {
+                    "title": path or goal,
+                    "path": path,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
         )
-
-        composed = self._response_composer.compose(
-            intent=intent,
-            provider_id=provider_id,
-            validation=validation,
-            receipt=run.receipt,
-        )
-        snapshot = OrchestrationRunSnapshot(
-            request_id=request_id,
-            query=query,
-            intent=intent.value,
-            provider_id=provider_id,
-            execution_success=run.result.success,
-            execution_facts=_dict_to_immutable(run.result.facts),  # IMMUTABLE
-            execution_error=run.result.error,
-            truth_valid=validation.valid,
-            truth_detail=validation.detail,
-            response_source=validation.response_source,
-            response_text=composed.text,
-            receipt_id=run.receipt.receipt_id,
-            trace_id=uuid.uuid4().hex,
-            span_id=uuid.uuid4().hex[:16],
-        )
-        self._bus.publish(
-            ORCHESTRATION_RUN_SNAPSHOT,
-            snapshot.to_dict(),
-            source=self.name,
-        )
-
-        self._bus.publish(
-            CHAT_STARTED,
-            {"request_id": request_id, "orchestration": True},
-            source=self.name,
-        )
-        self._bus.publish(
-            SESSION_UPDATE_REQUEST,
+    elif cap == "notes.search":
+        query = str(args.get("query") or goal)
+        nodes.append(
             {
-                "request_id": request_id,
-                "role": "user",
-                "content": query,
-            },
-            source=self.name,
+                "id": f"note_search:{request_id}",
+                "type": "note",
+                "attributes": {
+                    "title": f"search:{query}",
+                    "query": query,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
         )
-        complete_payload = self._response_composer.to_chat_complete_payload(
-            composed,
-            request_id=request_id,
-        )
-        self._bus.publish(CHAT_COMPLETE, complete_payload, source=self.name)
-        self._bus.publish(
-            SESSION_UPDATE_REQUEST,
+    elif cap == "memory.store":
+        body = str(args.get("body") or goal)
+        label = body.split("|", 1)[0].strip() if "|" in body else body.split(" ", 1)[0]
+        nodes.append(
             {
-                "request_id": request_id,
-                "role": "assistant",
-                "content": composed.text,
-            },
-            source=self.name,
+                "id": f"memory:{label or request_id}",
+                "type": "memory",
+                "attributes": {
+                    "label": label,
+                    "content": body,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
         )
-        self._bus.publish(
-            TELEMETRY_EVENT,
+    elif cap == "memory.query":
+        query = str(args.get("query") or goal)
+        nodes.append(
             {
-                "name": "orchestration.complete",
-                "request_id": request_id,
-                "intent": intent.value,
-                "provider_id": provider_id,
-                "truth_valid": validation.valid,
-            },
-            source=self.name,
+                "id": f"memory_query:{request_id}",
+                "type": "memory",
+                "attributes": {
+                    "label": f"query:{query}",
+                    "query": query,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
         )
+    elif cap == "launch_application":
+        app = str(args.get("application") or goal).strip().lower()
+        if app:
+            nodes.append(
+                {
+                    "id": f"application:{app}",
+                    "type": "application",
+                    "attributes": {
+                        "name": app,
+                        "receipt_id": receipt_id,
+                        "request_id": request_id,
+                    },
+                }
+            )
+    elif cap == "navigate":
+        view = str(args.get("view") or "home").strip().lower()
+        nodes.append(
+            {
+                "id": f"navigate:{view}:{request_id}",
+                "type": "workspace",
+                "attributes": {
+                    "view": view,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
+        )
+    return nodes

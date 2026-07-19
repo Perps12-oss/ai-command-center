@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ai_command_center.core.contracts import (
-    COMMAND_ROUTED_VERSION,
+    COMMAND_DEFERRED_VERSION,
     CONTEXT_BUNDLE_VERSION,
     OLLAMA_SERVICE_API_VERSION,
     SUPPORTED_VERSIONS,
@@ -16,7 +16,7 @@ from ai_command_center.core.contracts import (
 
 # Locked contract surface (UCGS); anchors imports used by assembly boundaries.
 _CONTEXT_MANAGER_CONTRACT = (
-    COMMAND_ROUTED_VERSION,
+    COMMAND_DEFERRED_VERSION,
     CONTEXT_BUNDLE_VERSION,
     OLLAMA_SERVICE_API_VERSION,
     *SUPPORTED_VERSIONS,

@@ -1,15 +1,18 @@
-"""Supervised agent demo — end-to-end bus flow (Track 7)."""
+"""Supervised agent demo — Authority → plan → Orchestrator → TOOL_INVOKE."""
 
 from __future__ import annotations
 
+import sqlite3
+
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
+from ai_command_center.core.events.intents import INTENT_AGENT
 from ai_command_center.core.events.topics import (
     AGENT_SPAWNED,
     AGENT_SPAWN_REQUEST,
     AGENT_TASK_COMPLETE,
     AGENT_TERMINATED,
-    COMMAND_ROUTED,
+    GOAL_SUBMIT_REQUEST,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
     TOOL_INVOKE,
@@ -17,12 +20,14 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.core.permission.permission_service import PermissionService
 from ai_command_center.core.tools import ToolResult, ToolSpec
+from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
-from ai_command_center.services.command_router_service import (
-    COMMAND_ROUTED_VERSION,
-    CommandRouterService,
-    INTENT_AGENT,
+from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
 )
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
 from ai_command_center.tools.tool_registry import ToolRegistry
@@ -57,24 +62,38 @@ def _auto_approve_interactive(bus: EventBus, *, granted: bool = True) -> None:
     bus.subscribe(PERMISSION_CHECK_REQUEST, on_request)
 
 
-def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
-    bus = EventBus()
-    permission = _wire_permission(bus)
-    _auto_approve_interactive(bus)
+def _wire_execution_stack(bus: EventBus, permission: PermissionService) -> AgentRuntimeService:
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
     ToolExecutorService(bus, registry, permission_service=permission).start()
-    AgentRuntimeService(bus).start()
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    SingleGoalScheduler(bus, GoalRepository(conn)).start()
+    ExecutionOrchestratorService(bus).start()
+    agent = AgentRuntimeService(bus)
+    agent.start()
+    ExecutionAuthorityService(bus, agent_runtime=agent).start()
+    return agent
+
+
+def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
+    bus = EventBus()
+    permission = _wire_permission(bus)
+    _auto_approve_interactive(bus)
+    _wire_execution_stack(bus, permission)
 
     permission_checks: list[dict] = []
     tool_invokes: list[dict] = []
     terminated: list[dict] = []
 
     bus.subscribe(PERMISSION_CHECK_REQUEST, lambda e: permission_checks.append(dict(e.payload)))
-    bus.subscribe(TOOL_INVOKE, lambda e: tool_invokes.append(dict(e.payload)))
+    bus.subscribe(
+        TOOL_INVOKE,
+        lambda e: tool_invokes.append(dict(e.payload) | {"_source": e.source}),
+    )
     bus.subscribe(AGENT_TERMINATED, lambda e: terminated.append(dict(e.payload)))
 
     bus.publish(
@@ -88,6 +107,7 @@ def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
     assert {"use_ai", "launch_tool"}.issubset(set(permission_checks[0].get("permissions", [])))
     assert tool_invokes
     assert tool_invokes[0]["tool"] == "shell"
+    assert all(inv["_source"] == "execution_orchestrator" for inv in tool_invokes)
     assert terminated
     assert not terminated[0].get("error")
 
@@ -96,15 +116,8 @@ def test_supervised_demo_multi_tool_loop() -> None:
     bus = EventBus()
     permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
-    registry = ToolRegistry()
-    registry.register_tool(
-        ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
-    )
-    ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry, permission_service=permission).start()
+    _wire_execution_stack(bus, permission)
     store = AppStateStore(bus)
-    runtime = AgentRuntimeService(bus)
-    runtime.start()
 
     completes: list[dict] = []
     bus.subscribe(AGENT_TASK_COMPLETE, lambda e: completes.append(dict(e.payload)))
@@ -162,14 +175,8 @@ def test_supervised_demo_projects_into_app_state() -> None:
     bus = EventBus()
     permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
-    registry = ToolRegistry()
-    registry.register_tool(
-        ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
-    )
-    ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry, permission_service=permission).start()
+    _wire_execution_stack(bus, permission)
     store = AppStateStore(bus)
-    AgentRuntimeService(bus).start()
 
     bus.publish(
         AGENT_SPAWN_REQUEST,
@@ -193,14 +200,7 @@ def test_agent_command_routes_to_spawn_request() -> None:
     bus = EventBus()
     permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
-    registry = ToolRegistry()
-    registry.register_tool(
-        ToolSpec(name="shell", description="demo shell", handler=_demo_shell_tool)
-    )
-    ToolRegistryService(bus, registry=registry).start()
-    ToolExecutorService(bus, registry, permission_service=permission).start()
-    CommandRouterService(bus).start()
-    AgentRuntimeService(bus).start()
+    _wire_execution_stack(bus, permission)
 
     spawned: list[dict] = []
     bus.subscribe(AGENT_SPAWNED, lambda e: spawned.append(dict(e.payload)))
@@ -217,7 +217,7 @@ def test_agent_command_routes_to_spawn_request() -> None:
 
 def test_permission_denied_terminates_agent() -> None:
     bus = EventBus()
-    permission = _wire_permission(bus)
+    _wire_permission(bus)
     _auto_approve_interactive(bus, granted=False)
     terminated: list[dict] = []
     bus.subscribe(AGENT_TERMINATED, lambda e: terminated.append(dict(e.payload)))
@@ -234,16 +234,22 @@ def test_permission_denied_terminates_agent() -> None:
 
 
 def test_command_router_classifies_agent_intent() -> None:
+    intent, args = CommandRouterService.classify("agent: inspect vault")
+    assert intent == INTENT_AGENT
+    assert args["task"] == "inspect vault"
+
+
+def test_execution_authority_routes_agent_through_goal_submit() -> None:
     bus = EventBus()
-    routed: list[dict] = []
-    bus.subscribe(COMMAND_ROUTED, lambda e: routed.append(dict(e.payload)))
-    CommandRouterService(bus).start()
-
+    permission = _wire_permission(bus)
+    _auto_approve_interactive(bus)
+    _wire_execution_stack(bus, permission)
+    goals: list[dict] = []
+    bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
     bus.publish(
-        UI_COMMAND, {"text": "agent: inspect vault", "workspace_id": "ws-router"}, source="ui"
+        UI_COMMAND,
+        {"text": "agent: demo", "workspace_id": "ws-demo"},
+        source="ui",
     )
-
-    assert routed
-    assert routed[0]["intent"] == INTENT_AGENT
-    assert routed[0]["contract_version"] == COMMAND_ROUTED_VERSION
-    assert routed[0]["args"]["task"] == "inspect vault"
+    assert goals
+    assert goals[0]["authority_decision"]["capability"] == "agent.run"

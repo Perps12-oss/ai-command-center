@@ -52,6 +52,8 @@ class SingleGoalScheduler(BaseService):
         self._active_goal: Goal | None = None
         self._active_task_id = ""
         self._paused_goal_id = ""
+        self._prebuilt_plans: dict[str, dict] = {}
+        self._run_options: dict[str, dict] = {}
 
     def _on_load(self) -> None:
         self._unsubscribers.extend(
@@ -90,6 +92,8 @@ class SingleGoalScheduler(BaseService):
         self._active_goal = None
         self._active_task_id = ""
         self._paused_goal_id = ""
+        self._prebuilt_plans.clear()
+        self._run_options.clear()
 
     def submit_goal(self, goal: Goal) -> None:
         if self._has_unresolved_dependencies(goal):
@@ -180,6 +184,15 @@ class SingleGoalScheduler(BaseService):
         if not title:
             return
         priority = _parse_priority(payload.get("priority"))
+        if not correlation.correlation_id or correlation.correlation_id == goal_id:
+            # Prefer authority request_id as correlation when provided.
+            request_id = str(payload.get("request_id") or "").strip()
+            if request_id:
+                correlation = CorrelationContext(
+                    correlation_id=request_id,
+                    goal_id=goal_id,
+                    action_id=correlation.action_id,
+                )
         goal = Goal(
             id=goal_id,
             title=title,
@@ -188,6 +201,26 @@ class SingleGoalScheduler(BaseService):
             depends_on=tuple(str(item) for item in payload.get("depends_on") or ()),
             correlation=correlation.with_goal(goal_id),
         )
+        raw_plan = payload.get("plan")
+        if isinstance(raw_plan, dict) and raw_plan.get("steps"):
+            self._prebuilt_plans[goal_id] = dict(raw_plan)
+        options: dict = {
+            "auto_approve": bool(payload.get("auto_approve", False)),
+        }
+        workspace_context = payload.get("workspace_context")
+        if isinstance(workspace_context, dict):
+            options["workspace_context"] = dict(workspace_context)
+        if payload.get("workspace_id"):
+            options["workspace_id"] = str(payload.get("workspace_id"))
+        snippets = payload.get("workspace_snippets")
+        if isinstance(snippets, list):
+            options["workspace_snippets"] = [str(s) for s in snippets if str(s).strip()]
+        state_context = payload.get("state_context")
+        if isinstance(state_context, dict):
+            options["state_context"] = dict(state_context)
+        if payload.get("planner_mode"):
+            options["planner_mode"] = str(payload.get("planner_mode"))
+        self._run_options[goal_id] = options
         self.submit_goal(goal)
 
     def _activate_next_if_idle(self) -> None:
@@ -201,21 +234,53 @@ class SingleGoalScheduler(BaseService):
             {"goal": goal.to_payload(), "correlation": goal.correlation.to_payload()},
             source=self.name,
         )
+        prebuilt = self._prebuilt_plans.pop(goal.id, None)
+        if prebuilt is not None:
+            # Synthetic plan from ExecutionAuthority — skip PlannerService latency.
+            self._bus.publish(
+                PLAN_GENERATED,
+                {
+                    "request_id": goal.correlation.correlation_id,
+                    "goal": goal.title,
+                    "goal_id": goal.id,
+                    "plan": prebuilt,
+                    "planner_mode": "synthetic",
+                    "correlation": goal.correlation.to_payload(),
+                },
+                source=self.name,
+            )
+            return
         self._publish_plan_request(goal)
 
     def _publish_plan_request(self, goal: Goal | None) -> None:
         if goal is None or self._paused_goal_id:
             return
-        self._bus.publish(
-            PLAN_REQUEST,
-            {
-                "request_id": goal.correlation.correlation_id,
-                "goal": goal.title,
-                "goal_id": goal.id,
-                "correlation": goal.correlation.to_payload(),
-            },
-            source=self.name,
-        )
+        options = self._run_options.get(goal.id) or {}
+        payload: dict = {
+            "request_id": goal.correlation.correlation_id,
+            "goal": goal.title,
+            "goal_id": goal.id,
+            "correlation": goal.correlation.to_payload(),
+        }
+        if options.get("workspace_id"):
+            payload["workspace_id"] = options["workspace_id"]
+        workspace_context = options.get("workspace_context")
+        if isinstance(workspace_context, dict):
+            if workspace_context.get("workspace_id"):
+                payload["workspace_id"] = workspace_context["workspace_id"]
+            if workspace_context.get("entity_id"):
+                payload["entity_id"] = workspace_context["entity_id"]
+            if workspace_context.get("entity_type"):
+                payload["entity_type"] = workspace_context["entity_type"]
+        snippets = options.get("workspace_snippets")
+        if isinstance(snippets, list) and snippets:
+            payload["workspace_snippets"] = list(snippets)
+        state_context = options.get("state_context")
+        if isinstance(state_context, dict):
+            payload["state_context"] = dict(state_context)
+        if options.get("planner_mode"):
+            payload["planner_mode"] = options["planner_mode"]
+        self._bus.publish(PLAN_REQUEST, payload, source=self.name)
 
     def _on_plan_generated(self, event: Event) -> None:
         if self._active_goal is None:
@@ -225,18 +290,19 @@ class SingleGoalScheduler(BaseService):
         task = self.get_next_task(self._active_goal.correlation)
         if task is None:
             return
-        self._bus.publish(
-            EXECUTION_RUN_REQUEST,
-            {
-                "run_id": task.id,
-                "request_id": self._active_goal.correlation.correlation_id,
-                "goal_id": self._active_goal.id,
-                "plan": dict(event.payload.get("plan") or {}),
-                "auto_approve": False,
-                "correlation": self._active_goal.correlation.to_payload(),
-            },
-            source=self.name,
-        )
+        options = self._run_options.pop(self._active_goal.id, {}) or {}
+        run_payload: dict = {
+            "run_id": task.id,
+            "request_id": self._active_goal.correlation.correlation_id,
+            "goal_id": self._active_goal.id,
+            "plan": dict(event.payload.get("plan") or {}),
+            "auto_approve": bool(options.get("auto_approve", False)),
+            "correlation": self._active_goal.correlation.to_payload(),
+        }
+        workspace_context = options.get("workspace_context")
+        if isinstance(workspace_context, dict):
+            run_payload["workspace_context"] = workspace_context
+        self._bus.publish(EXECUTION_RUN_REQUEST, run_payload, source=self.name)
 
     def _on_plan_failed(self, event: Event) -> None:
         if self._active_goal is None:

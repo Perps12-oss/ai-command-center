@@ -1,7 +1,8 @@
-"""Command-router intent identifiers shared across services.
+"""Shared intent / capability prefix identifiers.
 
-These values appear in ``command.routed`` payloads. Services must import from
-this module — not from ``command_router_service`` — to avoid peer imports.
+Used by ``CommandRouterService.classify`` and ExecutionAuthority prefix maps.
+Services must import from this module — not from ``command_router_service`` —
+to avoid peer imports.
 """
 
 from __future__ import annotations

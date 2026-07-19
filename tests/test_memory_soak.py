@@ -25,7 +25,7 @@ from ai_command_center.core.app_state import AppStateStore  # noqa: E402
 from ai_command_center.core.context_manager import ContextBundle  # noqa: E402
 from ai_command_center.core.events.topics import (  # noqa: E402
     APP_PHASE,
-    COMMAND_ROUTED,
+    EXECUTION_AUTHORITY_DECISION,
     SYSTEM_SNAPSHOT,
 )
 from ai_command_center.services.ollama_service import StubOllamaService  # noqa: E402
@@ -41,11 +41,11 @@ _SAMPLE_EVERY = float(os.environ.get("AICC_SOAK_SAMPLE_SECONDS", "1"))
 def _one_interaction(bus: RecordingEventBus, ollama: StubOllamaService, n: int) -> None:
     # hotkey toggles a phase
     bus.publish(APP_PHASE, {"phase": "overlay" if n % 2 else "idle"}, source="hotkey")
-    # a routed RAG query
+    # an authority decision for a RAG-style query
     bus.publish(
-        COMMAND_ROUTED,
-        {"text": f"note: query {n}", "intent": "note_search"},
-        source="command_router",
+        EXECUTION_AUTHORITY_DECISION,
+        {"text": f"note: query {n}", "capability": "notes.search"},
+        source="execution_authority",
     )
     # a system snapshot tick
     bus.publish(

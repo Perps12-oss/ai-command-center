@@ -61,7 +61,6 @@ APP_PHASE = "app.phase"
 APP_ERROR = "app.error"
 APP_WARNING = "app.warning"
 BUS_HANDLER_ERROR = "bus.handler_error"
-COMMAND_ROUTED = "command.routed"
 COMMAND_DEFERRED = "command.deferred"
 UI_COMMAND = "ui.command"
 UI_WORKSPACE_REQUIRED = "ui.workspace.required"
@@ -186,6 +185,9 @@ AGENT_PIPELINE_STAGE = "agent.pipeline.stage"
 AGENT_PIPELINE_PLANNED = "agent.pipeline.planned"
 AGENT_PIPELINE_COMPLETE = "agent.pipeline.complete"
 
+# Agent capability handoff — ExecutionAuthority owns plan creation (no TOOL_INVOKE).
+AGENT_EXECUTION_REQUEST = "agent.execution.request"
+
 # Capability runtime (Agent Runtime Interface — Invariant 13)
 CAPABILITY_CLASSIFIED = "capability.classified"
 CAPABILITY_DISPATCH = "capability.dispatch"
@@ -261,6 +263,10 @@ EXTERNAL_CAPABILITY_REGISTERED = "external.capability.registered"
 EXTERNAL_CAPABILITY_CATALOG_UPDATED = "external.capability.catalog_updated"
 EXTERNAL_PROVIDER_DISCOVERED = "external.provider.discovered"
 
+# Execution authority (runtime-first intake for typed UI_COMMAND)
+EXECUTION_AUTHORITY_DECISION = "execution.authority.decision"
+LLM_STEP_REQUEST = "llm.step.request"
+
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
 ORCHESTRATION_ROUTING_COMPLETED = "orchestration.routing.completed"
@@ -282,6 +288,8 @@ WORKFLOW_STEP_COMPLETED = "workflow.step.completed"
 WORKFLOW_COMPLETED = "workflow.completed"
 WORKFLOW_FAILED = "workflow.failed"
 WORKFLOW_RUNS_LOADED = "workflow.runs.loaded"
+# Definition provider → ExecutionAuthority intake (never TOOL_INVOKE).
+WORKFLOW_EXECUTION_REQUEST = "workflow.execution.request"
 
 # Entity lifecycle (Workspace OS / entity service)
 ENTITY_CREATED = "entity.created"
@@ -377,6 +385,11 @@ WORLD_MODEL_MUTATION_APPLIED = "world_model.mutation.applied"
 WORLD_MODEL_EXPLORER_OPEN = "world_model.explorer.open"
 WORLD_MODEL_DEPENDENCY_INSPECT = "world_model.dependency.inspect"
 
+# State Authority — pre-decision World Model projection
+STATE_CONTEXT_BUILT = "state.context.built"
+STATE_CONTEXT_REQUEST = "state.context.request"
+STATE_CONTEXT_RESULT = "state.context.result"
+
 # Cross-Workspace Federation (Phase 10 — P4)
 FEDERATION_WORKSPACE_REGISTERED = "federation.workspace.registered"
 FEDERATION_WORKSPACE_UNREGISTERED = "federation.workspace.unregistered"
@@ -415,7 +428,6 @@ __all__ = [
     "APP_ERROR",
     "APP_WARNING",
     "BUS_HANDLER_ERROR",
-    "COMMAND_ROUTED",
     "COMMAND_DEFERRED",
     "UI_COMMAND",
     "UI_WORKSPACE_REQUIRED",
@@ -518,6 +530,7 @@ __all__ = [
     "AGENT_PIPELINE_STAGE",
     "AGENT_PIPELINE_PLANNED",
     "AGENT_PIPELINE_COMPLETE",
+    "AGENT_EXECUTION_REQUEST",
     "CAPABILITY_CLASSIFIED",
     "CAPABILITY_DISPATCH",
     "CAPABILITY_RUNTIME_REQUEST",
@@ -577,6 +590,8 @@ __all__ = [
     "EXTERNAL_CAPABILITY_REGISTERED",
     "EXTERNAL_CAPABILITY_CATALOG_UPDATED",
     "EXTERNAL_PROVIDER_DISCOVERED",
+    "EXECUTION_AUTHORITY_DECISION",
+    "LLM_STEP_REQUEST",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",
@@ -588,6 +603,7 @@ __all__ = [
     "PERMISSION_CHECK_RESULT",
     "WORKFLOW_START",
     "WORKFLOW_STARTED",
+    "WORKFLOW_EXECUTION_REQUEST",
     "WORKFLOW_STEP_STARTED",
     "WORKFLOW_STEP_COMPLETED",
     "WORKFLOW_COMPLETED",
@@ -652,6 +668,9 @@ __all__ = [
     "WORLD_MODEL_MUTATION_APPLIED",
     "WORLD_MODEL_EXPLORER_OPEN",
     "WORLD_MODEL_DEPENDENCY_INSPECT",
+    "STATE_CONTEXT_BUILT",
+    "STATE_CONTEXT_REQUEST",
+    "STATE_CONTEXT_RESULT",
     "FEDERATION_WORKSPACE_REGISTERED",
     "FEDERATION_WORKSPACE_UNREGISTERED",
     "FEDERATION_QUERY_REQUEST",

@@ -9,14 +9,15 @@ from ai_command_center.core.events.topics import (
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
-    COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    EXECUTION_AUTHORITY_DECISION,
+    GOAL_SUBMIT_REQUEST,
     UI_CHAT_NEW_SESSION,
     UI_COMMAND,
     UI_OPEN_CHAT,
 )
 from ai_command_center.repositories.conversation_repository import entity_conversation_id
-from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 
 
 class ChatWorkspaceV15StateTests(unittest.TestCase):
@@ -121,13 +122,25 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         bus = EventBus()
         store = AppStateStore(bus)
 
-        bus.publish(COMMAND_ROUTED, {"text": "What is Python?"}, source="command_router")
+        bus.publish(
+            EXECUTION_AUTHORITY_DECISION,
+            {"text": "What is Python?", "capability": "llm"},
+            source="execution_authority",
+        )
         self.assertEqual("What is Python?", store.snapshot.chat_pending_user_text)
 
-        bus.publish(COMMAND_ROUTED, {"text": "note: daily log"}, source="command_router")
+        bus.publish(
+            EXECUTION_AUTHORITY_DECISION,
+            {"text": "note: daily log", "capability": "notes.create"},
+            source="execution_authority",
+        )
         self.assertEqual("", store.snapshot.chat_pending_user_text)
 
-        bus.publish(COMMAND_ROUTED, {"text": "Explain async"}, source="command_router")
+        bus.publish(
+            EXECUTION_AUTHORITY_DECISION,
+            {"text": "Explain async", "capability": "llm"},
+            source="execution_authority",
+        )
         bus.publish(CHAT_STARTED, {"request_id": "r6"}, source="tests")
         snap = store.snapshot
         self.assertEqual("", snap.chat_pending_user_text)
@@ -232,17 +245,12 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         self.assertEqual("", snap.chat_workspace_entity_id)
         self.assertEqual("default", snap.chat_active_session_key)
 
-    def test_command_router_forwards_workspace_entity(self) -> None:
+    def test_execution_authority_forwards_workspace_entity(self) -> None:
         bus = EventBus()
-        router = CommandRouterService(bus)
-        router.load()
-        routed: list[dict] = []
-
-        def capture(event) -> None:
-            if event.topic == COMMAND_ROUTED and event.source == "command_router":
-                routed.append(dict(event.payload))
-
-        bus.subscribe(COMMAND_ROUTED, capture)
+        authority = ExecutionAuthorityService(bus)
+        authority.load()
+        goals: list[dict] = []
+        bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
         bus.publish(
             UI_COMMAND,
             {
@@ -254,24 +262,18 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
             },
             source="tests",
         )
-        router.unload()
-        self.assertEqual(1, len(routed))
-        args = routed[0].get("args") or {}
-        self.assertEqual("card-9", args.get("workspace_entity_id"))
-        self.assertEqual("card", args.get("workspace_entity_type"))
-        self.assertEqual("Sprint", args.get("workspace_entity_title"))
+        authority.unload()
+        self.assertEqual(1, len(goals))
+        ctx = goals[0].get("workspace_context") or {}
+        self.assertEqual("card-9", ctx.get("entity_id"))
+        self.assertEqual("card", ctx.get("entity_type"))
 
-    def test_command_router_forwards_workspace_entity_metadata(self) -> None:
+    def test_execution_authority_forwards_workspace_entity_metadata(self) -> None:
         bus = EventBus()
-        router = CommandRouterService(bus)
-        router.load()
-        routed: list[dict] = []
-
-        def capture(event) -> None:
-            if event.topic == COMMAND_ROUTED and event.source == "command_router":
-                routed.append(dict(event.payload))
-
-        bus.subscribe(COMMAND_ROUTED, capture)
+        authority = ExecutionAuthorityService(bus)
+        authority.load()
+        goals: list[dict] = []
+        bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
         bus.publish(
             UI_COMMAND,
             {
@@ -285,10 +287,13 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
             },
             source="tests",
         )
-        router.unload()
-        args = routed[0].get("args") or {}
-        self.assertEqual("Team wiki", args.get("workspace_entity_description"))
-        self.assertEqual("https://wiki.example/handbook", args.get("workspace_entity_url"))
+        authority.unload()
+        self.assertEqual(1, len(goals))
+        # Metadata is carried on the authority decision / workspace scope for llm steps.
+        decision = goals[0].get("authority_decision") or {}
+        self.assertEqual("llm", decision.get("capability"))
+        ctx = goals[0].get("workspace_context") or {}
+        self.assertEqual("res-3", ctx.get("entity_id"))
 
 
 if __name__ == "__main__":

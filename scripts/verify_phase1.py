@@ -10,9 +10,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from ai_command_center.application import create_application
-from ai_command_center.core.event_bus import WildcardSubscriptionError
-from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.application import create_application  # noqa: E402
+from ai_command_center.core.event_bus import WildcardSubscriptionError  # noqa: E402
+from ai_command_center.ui.design_system import theme_v2 as T  # noqa: E402
 
 
 def main() -> int:
@@ -74,16 +74,17 @@ def main() -> int:
         except WildcardSubscriptionError:
             pass
 
-        app.bus.subscribe("command.routed", tap)
+        app.bus.subscribe("execution.authority.decision", tap)
         app.bus.publish(
             "ui.command",
             {"text": "hello phase 3"},
             source="verify_phase1",
         )
-        routed = app.state_store.snapshot
-        if routed.last_command_intent != "chat":
+        decided = app.state_store.snapshot
+        if decided.last_command_intent != "llm":
             failures.append(
-                f"command.routed expected chat intent, got {routed.last_command_intent!r}"
+                "execution.authority.decision expected llm capability, "
+                f"got {decided.last_command_intent!r}"
             )
 
         app.shutdown()
@@ -96,7 +97,7 @@ def main() -> int:
                 print(f"  - {item}")
             return 1
 
-        print("PASS: event bus, app state, settings.snapshot, command router, service manager")
+        print("PASS: event bus, app state, settings.snapshot, execution authority, service manager")
         print(f"  events seen: {sorted(set(received_topics))}")
         return 0
     except Exception as exc:  # noqa: BLE001

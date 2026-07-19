@@ -26,17 +26,12 @@ def main() -> int:
     failures: list[str] = []
 
     from ai_command_center.core.event_bus import EventBus
+    from ai_command_center.core.events.topics import LLM_STEP_REQUEST
     from ai_command_center.services.command_router_service import (
         CommandRouterService,
         INTENT_NAVIGATE,
         INTENT_SHELL,
     )
-
-    bus = EventBus(debug_mode=True)
-    payloads: list[dict] = []
-    bus.subscribe("command.routed", lambda e: payloads.append(dict(e.payload)))
-    router = CommandRouterService(bus)
-    router.load()
 
     cases = (
         ("settings", INTENT_NAVIGATE, "settings"),
@@ -45,22 +40,14 @@ def main() -> int:
         ("go chat", INTENT_NAVIGATE, "chat"),
     )
     for text, expected_intent, expected_arg_fragment in cases:
-        payloads.clear()
-        bus.publish("ui.command", {"text": text}, source="test")
-        if not payloads:
-            failures.append(f"no route for {text!r}")
-            continue
-        got = payloads[0]
-        if got.get("intent") != expected_intent:
-            failures.append(f"{text!r}: intent {got.get('intent')} != {expected_intent}")
-        args = got.get("args") or {}
+        got_intent, args = CommandRouterService.classify(text)
+        if got_intent != expected_intent:
+            failures.append(f"{text!r}: intent {got_intent} != {expected_intent}")
         blob = str(args).lower()
         if expected_arg_fragment.lower() not in blob:
             failures.append(f"{text!r}: args missing {expected_arg_fragment!r} ({args})")
 
-    router.unload()
-
-    # Clipboard guard in chat handler (command.routed path)
+    # Clipboard guard in chat handler through the llm capability path.
     import tempfile
     from ai_command_center.core.context_manager import ContextManager
     from ai_command_center.db.connection import connect, init_database
@@ -84,13 +71,16 @@ def main() -> int:
         for svc in (settings, session, ollama, handler):
             svc.load()
         bus2.publish(
-            "command.routed",
+            LLM_STEP_REQUEST,
             {
-                "intent": "chat",
-                "status": "pending",
+                "request_id": "clip-empty",
+                "run_id": "run-clip",
+                "step_id": "step-1",
+                "capability": "llm",
                 "args": {"prompt": "Summarize this clipboard", "clipboard": ""},
+                "prompt": "Summarize this clipboard",
             },
-            source="command_router",
+            source="execution_orchestrator",
         )
         time.sleep(0.1)
         if not errors:
@@ -118,9 +108,11 @@ def main() -> int:
     if not help_py.is_file():
         failures.append("capability_help.py missing")
 
-    app_py = (PROJECT_ROOT / "ai_command_center" / "ui" / "app.py").read_text(encoding="utf-8")
-    if "_on_command_routed_navigate" not in app_py:
-        failures.append("app missing navigate handler for go settings")
+    event_coordinator_py = (
+        PROJECT_ROOT / "ai_command_center" / "ui" / "shell" / "event_coordinator.py"
+    ).read_text(encoding="utf-8")
+    if "_on_ui_navigate" not in event_coordinator_py:
+        failures.append("shell event coordinator missing UI_NAVIGATE handler")
 
     ollama_py = (
         PROJECT_ROOT / "ai_command_center" / "services" / "ollama_http_service.py"
