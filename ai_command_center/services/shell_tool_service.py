@@ -1,24 +1,25 @@
-"""Bridges command.routed shell intent to tool.invoke (Phase 4B)."""
+"""Shell capability registration — no longer a COMMAND_ROUTED racer.
+
+Shell execution is owned exclusively by ExecutionOrchestrator → TOOL_INVOKE →
+ToolExecutorService (tool=\"shell\"). This service tracks workspace scope for
+diagnostics only and does not publish TOOL_INVOKE from COMMAND_ROUTED
+(closes the OrchestrationService/_orchestrate_shell double-execution defect).
+"""
 
 from __future__ import annotations
 
-import uuid
 from typing import Callable
 
-from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
-    TOOL_INVOKE,
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
 )
 from ai_command_center.services.base import BaseService
-from ai_command_center.core.events.intents import INTENT_SHELL
 
 
 class ShellToolService(BaseService):
-    """Maps `>` commands to one-shot shell tool invocation."""
+    """Workspace-aware shell capability metadata holder (no direct execution path)."""
 
     name = "shell_tool"
 
@@ -28,9 +29,6 @@ class ShellToolService(BaseService):
         self._active_workspace_id: str = ""
 
     def _on_load(self) -> None:
-        self._unsubscribers.append(
-            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
-        )
         self._unsubscribers.append(
             self._bus.subscribe(WORKSPACE_ACTIVE, self._on_workspace_active)
         )
@@ -51,33 +49,6 @@ class ShellToolService(BaseService):
         if not cleared or cleared == self._active_workspace_id:
             self._active_workspace_id = ""
 
-    def _workspace_context_from_routed(self, event: Event) -> dict[str, str]:
-        payload = event.payload
-        workspace_id = str(payload.get("workspace_id", "")).strip() or self._active_workspace_id
-        return build_workspace_context(
-            workspace_id=workspace_id,
-            entity_id=payload.get("workspace_entity_id"),
-            entity_type=payload.get("workspace_entity_type"),
-        )
-
-    def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
-            return
-        if event.payload.get("intent") != INTENT_SHELL:
-            return
-        args = event.payload.get("args") or {}
-        command = str(args.get("command", "")).strip()
-        if not command:
-            return
-        self._bus.publish(
-            TOOL_INVOKE,
-            {
-                "contract_version": TOOL_CONTRACT_VERSION,
-                "invoke_id": uuid.uuid4().hex,
-                "tool": "shell",
-                "args": {"command": command},
-                "actor_type": "user",
-                "workspace_context": self._workspace_context_from_routed(event),
-            },
-            source=self.name,
-        )
+    @property
+    def active_workspace_id(self) -> str:
+        return self._active_workspace_id

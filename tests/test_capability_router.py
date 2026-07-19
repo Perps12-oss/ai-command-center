@@ -1,15 +1,13 @@
-"""Tests for RuntimeCapabilityRouterService (Agent Runtime Interface Phase 1)."""
+"""Tests for RuntimeCapabilityRouterService (Agent Runtime Interface Phase 1).
+
+COMMAND_ROUTED racing was removed — router is a classifier/settings helper.
+External dispatch is owned by ExecutionOrchestrator via CAPABILITY_RUNTIME_REQUEST.
+"""
 
 from __future__ import annotations
 
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_SHELL
-from ai_command_center.core.events.topics import (
-    CAPABILITY_CLASSIFIED,
-    CAPABILITY_DISPATCH,
-    CAPABILITY_FALLBACK,
-    COMMAND_ROUTED,
-)
+from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT
 from ai_command_center.domain.runtime_capability import CapabilityKind
 from ai_command_center.runtime.provider_registry import build_default_runtime_registry
 from ai_command_center.services.runtime_capability_router_service import RuntimeCapabilityRouterService
@@ -28,86 +26,25 @@ def test_classify_prefix_and_hints() -> None:
     assert RuntimeCapabilityRouterService.classify("hello there") == CapabilityKind.CHAT
 
 
-def test_chat_routed_emits_capability_events() -> None:
+def test_resolve_provider_defaults_native_for_chat() -> None:
     bus = EventBus()
     router = _start_router(bus)
-    classified: list[dict] = []
-    dispatched: list[dict] = []
-    bus.subscribe(CAPABILITY_CLASSIFIED, lambda e: classified.append(dict(e.payload)))
-    bus.subscribe(CAPABILITY_DISPATCH, lambda e: dispatched.append(dict(e.payload)))
     try:
-        bus.publish(
-            COMMAND_ROUTED,
-            {
-                "intent": INTENT_CHAT,
-                "args": {"prompt": "hello"},
-                "request_id": "req-chat-1",
-            },
-            source="command_router",
-        )
-        assert len(classified) == 1
-        assert classified[0]["kind"] == CapabilityKind.CHAT.value
-        assert classified[0]["provider_id"] == "native"
-        assert len(dispatched) == 1
-        assert dispatched[0]["fallback_provider_id"] == "native"
+        assert router.resolve_provider(CapabilityKind.CHAT) == "native"
+        assert router.resolve_provider(CapabilityKind.PLANNING) == "qwenpaw"
     finally:
         router.stop()
 
 
-def test_planning_routes_to_qwenpaw_and_falls_back_when_unavailable() -> None:
+def test_settings_snapshot_updates_provider_map() -> None:
     bus = EventBus()
     router = _start_router(bus)
-    classified: list[dict] = []
-    fallbacks: list[dict] = []
-    bus.subscribe(CAPABILITY_CLASSIFIED, lambda e: classified.append(dict(e.payload)))
-    bus.subscribe(CAPABILITY_FALLBACK, lambda e: fallbacks.append(dict(e.payload)))
     try:
         bus.publish(
-            COMMAND_ROUTED,
-            {
-                "intent": INTENT_CHAT,
-                "args": {"prompt": "plan my week"},
-                "request_id": "req-plan-1",
-            },
-            source="command_router",
-        )
-        assert len(classified) == 1
-        assert classified[0]["kind"] == CapabilityKind.PLANNING.value
-        assert classified[0]["provider_id"] == "qwenpaw"
-        assert len(fallbacks) == 1
-        assert fallbacks[0]["fallback_provider_id"] == "native"
-        assert "sidecar" in fallbacks[0]["reason"].lower()
-    finally:
-        router.stop()
-
-
-def test_non_chat_intent_ignored() -> None:
-    bus = EventBus()
-    router = _start_router(bus)
-    classified: list[dict] = []
-    bus.subscribe(CAPABILITY_CLASSIFIED, lambda e: classified.append(dict(e.payload)))
-    try:
-        bus.publish(
-            COMMAND_ROUTED,
-            {"intent": INTENT_SHELL, "args": {"command": "echo hi"}},
-            source="command_router",
-        )
-        assert classified == []
-    finally:
-        router.stop()
-
-
-def test_wrong_source_ignored() -> None:
-    bus = EventBus()
-    router = _start_router(bus)
-    classified: list[dict] = []
-    bus.subscribe(CAPABILITY_CLASSIFIED, lambda e: classified.append(dict(e.payload)))
-    try:
-        bus.publish(
-            COMMAND_ROUTED,
-            {"intent": INTENT_CHAT, "args": {"prompt": "hello"}},
+            SETTINGS_SNAPSHOT,
+            {"capability_provider_planning": "native"},
             source="test",
         )
-        assert classified == []
+        assert router.resolve_provider(CapabilityKind.PLANNING) == "native"
     finally:
         router.stop()

@@ -261,6 +261,10 @@ EXTERNAL_CAPABILITY_REGISTERED = "external.capability.registered"
 EXTERNAL_CAPABILITY_CATALOG_UPDATED = "external.capability.catalog_updated"
 EXTERNAL_PROVIDER_DISCOVERED = "external.provider.discovered"
 
+# Execution authority (runtime-first intake for typed UI_COMMAND)
+EXECUTION_AUTHORITY_DECISION = "execution.authority.decision"
+LLM_STEP_REQUEST = "llm.step.request"
+
 # Truth-bound orchestration (deterministic intents, receipts, truth boundary)
 ORCHESTRATION_INTENT_CLASSIFIED = "orchestration.intent.classified"
 ORCHESTRATION_ROUTING_COMPLETED = "orchestration.routing.completed"
@@ -577,6 +581,8 @@ __all__ = [
     "EXTERNAL_CAPABILITY_REGISTERED",
     "EXTERNAL_CAPABILITY_CATALOG_UPDATED",
     "EXTERNAL_PROVIDER_DISCOVERED",
+    "EXECUTION_AUTHORITY_DECISION",
+    "LLM_STEP_REQUEST",
     "ORCHESTRATION_INTENT_CLASSIFIED",
     "ORCHESTRATION_ROUTING_COMPLETED",
     "ORCHESTRATION_PROVIDER_SELECTED",

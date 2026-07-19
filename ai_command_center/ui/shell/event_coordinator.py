@@ -56,7 +56,9 @@ class EventCoordinatorMixin:
         )
 
     def _on_command_routed_navigate(self, event: Event) -> None:
-        if event.source != "command_router":
+        from ai_command_center.core.routing_authority import is_routing_authority
+
+        if not is_routing_authority(event.source):
             return
         if event.payload.get("intent") != "navigate":
             return

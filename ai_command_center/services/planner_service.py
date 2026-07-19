@@ -59,6 +59,45 @@ def build_deterministic_plan(goal: str, specs: list[dict[str, Any]]) -> Executio
     if not goal_text:
         return ExecutionPlan(goal="", steps=())
 
+    launch_match = re.match(
+        r"^\s*(?:open|launch|start)\s+(\w+)\s*$",
+        goal_text,
+        re.IGNORECASE,
+    )
+    if launch_match:
+        app = launch_match.group(1).lower()
+        if app == "calc":
+            app = "calculator"
+        return ExecutionPlan(
+            goal=goal_text,
+            steps=(
+                PlanStep(
+                    step_id="step-1",
+                    capability="launch_application",
+                    args={"application": app},
+                    require_approval=False,
+                ),
+            ),
+        )
+
+    if goal_text.startswith(">") or re.match(
+        r"^\s*(echo |dir\b|cd |ls |pwd\b|whoami\b)",
+        goal_text,
+        re.IGNORECASE,
+    ):
+        command = goal_text[1:].strip() if goal_text.startswith(">") else goal_text
+        return ExecutionPlan(
+            goal=goal_text,
+            steps=(
+                PlanStep(
+                    step_id="step-1",
+                    capability="shell",
+                    args={"command": command},
+                    require_approval=False,
+                ),
+            ),
+        )
+
     if _NOTE_GOAL.search(goal_text) and _NOTE_ACTION.search(goal_text):
         title_match = re.search(
             r"(?:called|named|titled)\s+[\"']?([^\"']+)[\"']?",

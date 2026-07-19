@@ -1,8 +1,8 @@
-﻿"""Routes chat intents through ContextManager before LLM dispatch (Phase 3A).
+﻿"""Routes llm capability steps through ContextManager before LLM dispatch.
 
-Context assembly is delegated to ``CapabilityContextAssembler`` (shared with
-``RuntimeCapabilityRouterService`` for external invoke). See that module for the sync
-bus cascade contract.
+ChatHandlerService is a capability handler only. It must not own user requests
+from COMMAND_ROUTED — ExecutionAuthority + ExecutionOrchestrator invoke it via
+LLM_STEP_REQUEST when a PlanStep has capability=\"llm\"/\"chat\".
 """
 
 from __future__ import annotations
@@ -12,8 +12,6 @@ import uuid
 from collections.abc import Callable
 
 from ai_command_center.core.capability_context_assembler import CapabilityContextAssembler
-from ai_command_center.core.capability_external_registry import is_externally_handled
-from ai_command_center.orchestration.orchestration_registry import is_orchestration_handled
 from ai_command_center.core.clipboard_intent import (
     empty_clipboard_message,
     wants_clipboard,
@@ -22,26 +20,30 @@ from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     APP_WARNING,
+    CAPABILITY_COMPLETE,
+    CAPABILITY_ERROR,
+    CHAT_COMPLETE,
     CHAT_ERROR,
-    COMMAND_ROUTED,
     CONTEXT_COMPLETE,
     CONTEXT_OVER_BUDGET,
     CONTEXT_SNAPSHOT_CREATED,
     CONTEXT_TRIMMED,
     LLM_REQUEST,
+    LLM_STEP_REQUEST,
     SESSION_UPDATE_REQUEST,
     SETTINGS_SNAPSHOT,
 )
 from ai_command_center.platform.model_registry import model_warning
 from ai_command_center.services.base import BaseService
-from ai_command_center.core.events.intents import INTENT_CHAT
 
 logger = logging.getLogger(__name__)
+
+_LLM_CAPABILITIES = frozenset({"llm", "chat"})
 
 
 class ChatHandlerService(BaseService):
     """
-    Handles command.routed intents for chat.
+    Handles llm/chat PlanSteps only.
 
     Every AI request MUST pass through ContextManager.build_context() first.
     """
@@ -69,15 +71,27 @@ class ChatHandlerService(BaseService):
             obsidian=obsidian,
         )
         self._unsubscribers: list[Callable[[], None]] = []
+        self._pending_steps: dict[str, dict[str, str]] = {}
 
     def _on_load(self) -> None:
-        self._unsubscribers.append(self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed))
-        self._unsubscribers.append(self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot))
+        self._unsubscribers.append(
+            self._bus.subscribe(LLM_STEP_REQUEST, self._on_llm_step_request)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(CHAT_COMPLETE, self._on_chat_complete)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(CHAT_ERROR, self._on_chat_error)
+        )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
+        self._pending_steps.clear()
 
     def _on_settings_snapshot(self, event: Event) -> None:
         self._default_model = str(
@@ -87,15 +101,20 @@ class ChatHandlerService(BaseService):
         self._assembler._default_model = self._default_model
         self._assembler._default_provider = self._provider
 
-    def _on_command_routed(self, event: Event) -> None:
-        if event.payload.get("intent") != INTENT_CHAT:
-            return
-        if event.source != "command_router":
+    def _on_llm_step_request(self, event: Event) -> None:
+        capability = str(event.payload.get("capability", "llm")).strip().lower()
+        if capability and capability not in _LLM_CAPABILITIES:
             return
 
         args = event.payload.get("args") or {}
-        query = str(args.get("prompt", "")).strip()
+        query = str(
+            args.get("prompt") or event.payload.get("prompt") or ""
+        ).strip()
         if not query:
+            self._fail_step(
+                event,
+                "empty prompt for llm capability step",
+            )
             return
 
         clipboard = args.get("clipboard")
@@ -110,32 +129,31 @@ class ChatHandlerService(BaseService):
                 {"message": empty_clipboard_message()},
                 source=self.name,
             )
+            self._fail_step(event, empty_clipboard_message())
             return
 
         request_id = str(event.payload.get("request_id") or "").strip() or uuid.uuid4().hex
-        if is_orchestration_handled(request_id):
-            logger.info(
-                "chat.deferred_orchestration request_id=%s",
-                request_id,
-            )
-            return
-        if is_externally_handled(request_id):
-            logger.info(
-                "chat.deferred_external request_id=%s provider=non-native",
-                request_id,
-            )
-            # Full auto-fallback after a failed external invoke (post sidecar error)
-            # is deferred: sidecar publishes CHAT_ERROR and clears the external mark,
-            # but this handler does not re-run. Pre-invoke fallback uses CAPABILITY_FALLBACK
-            # without marking external, so native assembly proceeds on the same bus turn.
-            return
+        run_id = str(event.payload.get("run_id", "")).strip()
+        step_id = str(event.payload.get("step_id", "")).strip()
+        if run_id and step_id:
+            self._pending_steps[request_id] = {
+                "run_id": run_id,
+                "step_id": step_id,
+            }
 
-        logger.info("chat.request_started request_id=%s query_len=%d", request_id, len(query))
+        logger.info(
+            "chat.llm_step_started request_id=%s run_id=%s step_id=%s query_len=%d",
+            request_id,
+            run_id,
+            step_id,
+            len(query),
+        )
 
+        event_payload = dict(event.payload.get("command_payload") or event.payload)
         assembled = self._assembler.assemble_for_command(
             request_id=request_id,
             query=query,
-            event_payload=dict(event.payload),
+            event_payload=event_payload,
             args=dict(args),
             source=self.name,
             include_model_resolve=True,
@@ -199,6 +217,7 @@ class ChatHandlerService(BaseService):
                 {"message": "Empty prompt after context assembly"},
                 source=self.name,
             )
+            self._fail_step(event, "Empty prompt after context assembly")
             return
 
         warning = model_warning(model)
@@ -208,18 +227,6 @@ class ChatHandlerService(BaseService):
                 {"message": warning, "model": model},
                 source=self.name,
             )
-
-        self._bus.publish(
-            COMMAND_ROUTED,
-            {
-                **event.payload,
-                "status": "processing",
-                "request_id": request_id,
-                "context_sources": list(bundle.sources),
-                "token_estimate": bundle.token_estimate,
-            },
-            source=self.name,
-        )
 
         self._bus.publish(
             SESSION_UPDATE_REQUEST,
@@ -239,6 +246,67 @@ class ChatHandlerService(BaseService):
                 "model": model,
                 "provider": provider,
                 "bundle": bundle,
+                "run_id": run_id,
+                "step_id": step_id,
+                "capability": "llm",
+            },
+            source=self.name,
+        )
+
+    def _on_chat_complete(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id", "")).strip()
+        pending = self._pending_steps.pop(request_id, None)
+        if pending is None:
+            return
+        # Skip orchestration-styled completions that are not llm capability steps.
+        if event.payload.get("orchestration") and not event.payload.get("capability"):
+            self._pending_steps[request_id] = pending
+            return
+        self._bus.publish(
+            CAPABILITY_COMPLETE,
+            {
+                "request_id": request_id,
+                "run_id": pending["run_id"],
+                "step_id": pending["step_id"],
+                "output": str(event.payload.get("text", "")),
+                "capability": "llm",
+            },
+            source=self.name,
+        )
+
+    def _on_chat_error(self, event: Event) -> None:
+        request_id = str(event.payload.get("request_id", "")).strip()
+        pending = self._pending_steps.pop(request_id, None)
+        if pending is None:
+            return
+        self._bus.publish(
+            CAPABILITY_ERROR,
+            {
+                "request_id": request_id,
+                "run_id": pending["run_id"],
+                "step_id": pending["step_id"],
+                "message": str(event.payload.get("message") or "llm step failed"),
+                "capability": "llm",
+            },
+            source=self.name,
+        )
+
+    def _fail_step(self, event: Event, message: str) -> None:
+        run_id = str(event.payload.get("run_id", "")).strip()
+        step_id = str(event.payload.get("step_id", "")).strip()
+        request_id = str(event.payload.get("request_id", "")).strip()
+        if request_id:
+            self._pending_steps.pop(request_id, None)
+        if not run_id or not step_id:
+            return
+        self._bus.publish(
+            CAPABILITY_ERROR,
+            {
+                "request_id": request_id,
+                "run_id": run_id,
+                "step_id": step_id,
+                "message": message,
+                "capability": "llm",
             },
             source=self.name,
         )

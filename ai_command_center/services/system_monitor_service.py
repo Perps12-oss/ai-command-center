@@ -71,7 +71,9 @@ class SystemMonitorService(BaseService):
             self._record_event("command", text[:80])
 
     def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
+        from ai_command_center.core.routing_authority import is_routing_authority
+
+        if not is_routing_authority(event.source):
             return
         intent = str(event.payload.get("intent", ""))
         self._command_count += 1

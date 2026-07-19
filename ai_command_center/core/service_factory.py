@@ -86,6 +86,7 @@ from ai_command_center.services.goal_scheduler_service import SingleGoalSchedule
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
 from ai_command_center.services.model_router_service import ModelRouterService
 from ai_command_center.providers.provider_registry import ProviderRegistry, build_default_registry
@@ -263,6 +264,7 @@ def build_services(
         chat_export,
         system_monitor,
         SettingsService(bus, settings_repo),
+        ExecutionAuthorityService(bus),
         CommandRouterService(bus),
         orchestration,
         runtime_provider_registry,

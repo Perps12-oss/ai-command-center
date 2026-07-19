@@ -147,7 +147,9 @@ class AgentRuntimeService(BaseService):
         return normalized in {"pipeline-demo", "pipeline demo", "agents pipeline demo"}
 
     def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
+        from ai_command_center.core.routing_authority import is_routing_authority
+
+        if not is_routing_authority(event.source):
             return
         if event.payload.get("intent") != INTENT_AGENT:
             return

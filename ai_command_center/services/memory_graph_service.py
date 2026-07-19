@@ -120,7 +120,9 @@ class MemoryGraphService(BaseService):
             )
 
     def _on_command_routed(self, event: Event) -> None:
-        if event.source != "command_router":
+        from ai_command_center.core.routing_authority import is_routing_authority
+
+        if not is_routing_authority(event.source):
             return
         intent = event.payload.get("intent")
         args = event.payload.get("args") or {}

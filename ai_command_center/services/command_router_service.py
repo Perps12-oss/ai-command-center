@@ -1,11 +1,14 @@
-"""Routes ui.command intents to typed command.routed events (Phase 3 handlers attach here)."""
+"""Pure command classifier library + optional legacy observer.
+
+Decision-making for typed UI_COMMAND is owned by ExecutionAuthorityService.
+This service no longer publishes COMMAND_ROUTED from UI_COMMAND; its ``classify``
+helper remains the shared prefix/keyword table used by the authority.
+"""
 
 from __future__ import annotations
 
-import uuid
 from typing import Callable
 
-from ai_command_center.core.contracts import COMMAND_ROUTED_VERSION
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.intents import (
     INTENT_AGENT,
@@ -18,10 +21,6 @@ from ai_command_center.core.events.intents import (
     INTENT_SHELL,
 )
 from ai_command_center.core.events.topics import (
-    COMMAND_DEFERRED,
-    COMMAND_ROUTED,
-    UI_COMMAND,
-    UI_WORKSPACE_REQUIRED,
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
 )
@@ -67,9 +66,10 @@ _SHELL_VERBS: tuple[str, ...] = (
 
 class CommandRouterService(BaseService):
     """
-    Intent detection + routing only.
+    Classifier library retained for shared prefix tables.
 
-    MUST NOT: plan, reason, orchestrate, or run multi-step agent loops.
+    MUST NOT: subscribe to UI_COMMAND for decision-making, plan, orchestrate,
+    or publish competing COMMAND_ROUTED fan-out. ExecutionAuthority owns intake.
     """
 
     name = "command_router"
@@ -80,7 +80,7 @@ class CommandRouterService(BaseService):
         self._active_workspace_id: str = ""
 
     def _on_load(self) -> None:
-        self._unsubscribers.append(self._bus.subscribe(UI_COMMAND, self._on_ui_command))
+        # Workspace tracking only — no UI_COMMAND decision subscription (INV-1).
         self._unsubscribers.append(
             self._bus.subscribe(WORKSPACE_ACTIVE, self._on_workspace_active)
         )
@@ -96,106 +96,14 @@ class CommandRouterService(BaseService):
         if not cleared or cleared == self._active_workspace_id:
             self._active_workspace_id = ""
 
-    def _resolve_active_workspace_id(self, event: Event) -> str:
-        payload_ws = str(event.payload.get("workspace_id", "")).strip()
-        return payload_ws or self._active_workspace_id
-
-    @staticmethod
-    def _requires_workspace(intent: str) -> bool:
-        return intent not in _WORKSPACE_OPTIONAL_INTENTS
-
-    def _workspace_scope(self, event: Event) -> dict[str, str]:
-        """Intent-agnostic workspace scope from ui.command payload."""
-        scope: dict[str, str] = {}
-        workspace_entity_id = str(event.payload.get("workspace_entity_id", "")).strip()
-        if workspace_entity_id:
-            scope["workspace_entity_id"] = workspace_entity_id
-            scope["workspace_entity_type"] = str(
-                event.payload.get("workspace_entity_type", "")
-            )
-            scope["workspace_entity_title"] = str(
-                event.payload.get("workspace_entity_title", "")
-            )
-            for key in (
-                "workspace_entity_description",
-                "workspace_entity_url",
-                "workspace_entity_path",
-            ):
-                value = str(event.payload.get(key, "")).strip()
-                if value:
-                    scope[key] = value
-        workspace_id = self._resolve_active_workspace_id(event)
-        if workspace_id:
-            scope["workspace_id"] = workspace_id
-        for key in (
-            "selected_entity_id",
-            "selected_entity_type",
-            "selected_entity_title",
-        ):
-            value = str(event.payload.get(key, "")).strip()
-            if value:
-                scope[key] = value
-        return scope
-
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
 
-    def _on_ui_command(self, event: Event) -> None:
-        text = str(event.payload.get("text", "")).strip()
-        if not text:
-            return
-        intent, args = self._classify(text)
-        active_workspace_id = self._resolve_active_workspace_id(event)
-        if self._requires_workspace(intent) and not active_workspace_id:
-            request_id = uuid.uuid4().hex
-            deferred_payload = {
-                "contract_version": COMMAND_ROUTED_VERSION,
-                "request_id": request_id,
-                "text": text,
-                "intent": intent,
-                "args": args,
-                "reason": "no_active_workspace",
-                "status": "deferred",
-            }
-            self._bus.publish(COMMAND_DEFERRED, deferred_payload, source=self.name)
-            self._bus.publish(
-                UI_WORKSPACE_REQUIRED,
-                {
-                    "reason": "no_active_workspace",
-                    "intent": intent,
-                    "text": text,
-                    "request_id": request_id,
-                },
-                source=self.name,
-            )
-            return
-        clipboard = event.payload.get("clipboard")
-        if clipboard and intent == INTENT_CHAT:
-            args = {**args, "clipboard": str(clipboard)}
-        scope = self._workspace_scope(event)
-        if scope:
-            entity_keys = {k: v for k, v in scope.items() if k.startswith("workspace_entity")}
-            if entity_keys:
-                args = {**args, **entity_keys}
-            if scope.get("workspace_id"):
-                args = {**args, "workspace_id": scope["workspace_id"]}
-        payload: dict[str, object] = {
-            "contract_version": COMMAND_ROUTED_VERSION,
-            "request_id": uuid.uuid4().hex,
-            "text": text,
-            "intent": intent,
-            "args": args,
-            "status": "pending",
-            "metadata": {"executing": False, "source_router": self.name},
-        }
-        if scope:
-            payload.update(scope)
-        self._bus.publish(COMMAND_ROUTED, payload, source=self.name)
-
     @staticmethod
-    def _classify(text: str) -> tuple[str, dict[str, str]]:
+    def classify(text: str) -> tuple[str, dict[str, str]]:
+        """Prefix/keyword classification table (no LLM, no execution)."""
         stripped = text.strip()
         lower = stripped.lower()
         if lower in _VIEW_ALIASES:
@@ -214,7 +122,11 @@ class CommandRouterService(BaseService):
             return INTENT_MEMORY_SELECT, {"query": text[7:].strip()}
         if lower.startswith("agent: spawn "):
             role = stripped[13:].strip()
-            return INTENT_AGENT, {"task": role or "demo", "spawn_role": role, "spawn_mode": "single"}
+            return INTENT_AGENT, {
+                "task": role or "demo",
+                "spawn_role": role,
+                "spawn_mode": "single",
+            }
         if lower.startswith("agents:"):
             body = stripped[7:].strip().lower()
             if body in {"", "demo", "multi", "multi-demo"}:
@@ -223,10 +135,23 @@ class CommandRouterService(BaseService):
                 return INTENT_AGENT, {"task": "pipeline-demo", "spawn_mode": "pipeline"}
             return INTENT_AGENT, {"task": body, "spawn_mode": "multi"}
         if lower.startswith("agent:"):
-            return INTENT_AGENT, {"task": text[6:].strip() or "demo", "spawn_mode": "single"}
-        if lower in {"agent demo", "supervised agent demo", "multi-agent demo", "agents demo"}:
+            return INTENT_AGENT, {
+                "task": text[6:].strip() or "demo",
+                "spawn_mode": "single",
+            }
+        if lower in {
+            "agent demo",
+            "supervised agent demo",
+            "multi-agent demo",
+            "agents demo",
+        }:
             return INTENT_AGENT, {"task": "demo", "spawn_mode": "single"}
         for verb in _SHELL_VERBS:
             if lower == verb.strip() or lower.startswith(verb):
                 return INTENT_SHELL, {"command": stripped}
+        # INTENT_CHAT here is a classifier label only — ExecutionAuthority maps it
+        # to an explicit llm PlanStep, never a direct LLM_REQUEST publish.
         return INTENT_CHAT, {"prompt": text}
+
+    # Back-compat alias for older call sites / tests.
+    _classify = classify
