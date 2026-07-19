@@ -13,10 +13,9 @@ from ai_command_center.core.contracts import (
     is_valid_workspace_context,
 )
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
     CHAT_HISTORY_LOADED,
-    COMMAND_ROUTED,
+    LLM_STEP_REQUEST,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
     MEMORY_REMEMBER,
@@ -32,6 +31,7 @@ from ai_command_center.core.events.topics import (
     UI_OPEN_CHAT,
     LLM_REQUEST,
 )
+from ai_command_center.orchestration.state_capability_tools import bind_state_capability_tools
 from ai_command_center.repositories.conversation_repository import (
     ConversationRepository,
     entity_conversation_id,
@@ -39,9 +39,14 @@ from ai_command_center.repositories.conversation_repository import (
 from ai_command_center.repositories.database_bootstrap_repository import (
     DatabaseBootstrapRepository,
 )
+from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.services.chat_handler_service import ChatHandlerService
-from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.memory_graph_service import MemoryGraphService
 from ai_command_center.services.session_service import SessionService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
@@ -146,17 +151,30 @@ class W2MemoryNamespaceTests(unittest.TestCase):
         self.assertEqual(1, len(ws_hits))
         self.assertEqual("scoped", ws_hits[0].label)
 
-    def test_command_router_forwards_workspace_id_to_memory_intent(self) -> None:
-        router = CommandRouterService(self.bus)
-        router.load()
+    def test_authority_runtime_forwards_workspace_id_to_memory_tool(self) -> None:
+        registry = ToolRegistry()
+        bind_state_capability_tools(registry, bus=self.bus, memory=self.service)
+        executor = ToolExecutorService(self.bus, registry)
+        scheduler = SingleGoalScheduler(self.bus, GoalRepository(self.conn))
+        orchestrator = ExecutionOrchestratorService(self.bus)
+        authority = ExecutionAuthorityService(self.bus)
+        executor.load()
+        scheduler.load()
+        orchestrator.load()
+        authority.load()
         stored: list[dict] = []
         self.bus.subscribe(MEMORY_STORED, lambda e: stored.append(dict(e.payload)))
-        self.bus.publish(
-            UI_COMMAND,
-            {"text": "remember: api | sk-test", "workspace_id": "ws-mem"},
-            source="tests",
-        )
-        router.unload()
+        try:
+            self.bus.publish(
+                UI_COMMAND,
+                {"text": "remember: api | sk-test", "workspace_id": "ws-mem"},
+                source="tests",
+            )
+        finally:
+            authority.unload()
+            orchestrator.unload()
+            scheduler.unload()
+            executor.unload()
         self.assertEqual(1, len(stored))
         rows = self.repo.search("api", workspace_id="ws-mem")
         self.assertEqual(1, len(rows))
@@ -303,15 +321,24 @@ class W2ChatHandlerSessionScopeTests(unittest.TestCase):
         handler = ChatHandlerService(bus, ContextManager(max_context_tokens=4096))
         handler.load()
         bus.publish(
-            COMMAND_ROUTED,
+            LLM_STEP_REQUEST,
             {
-                "intent": INTENT_CHAT,
+                "request_id": "req-w2",
+                "run_id": "run-w2",
+                "step_id": "step-1",
+                "capability": "llm",
                 "args": {"prompt": "hello"},
+                "prompt": "hello",
                 "workspace_entity_id": "card-99",
                 "workspace_entity_type": "card",
                 "workspace_entity_title": "Ninety-Nine",
+                "command_payload": {
+                    "workspace_entity_id": "card-99",
+                    "workspace_entity_type": "card",
+                    "workspace_entity_title": "Ninety-Nine",
+                },
             },
-            source="command_router",
+            source="execution_orchestrator",
         )
         handler.unload()
         self.assertEqual(1, len(session_requests))

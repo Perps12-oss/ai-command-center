@@ -1,6 +1,7 @@
 """Single Execution Authority — sole creator of executable work.
 
-Routes typed UI_COMMAND and workflow.start into ExecutionPlan → GOAL_SUBMIT_REQUEST.
+Every typed UI_COMMAND becomes an ExecutionPlan (no legacy command.routed fan-out).
+StateAuthority projects World Model context before planning/dispatch.
 Never publishes TOOL_INVOKE or LLM_REQUEST.
 """
 
@@ -12,7 +13,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from ai_command_center.core.contracts import COMMAND_ROUTED_VERSION, build_workspace_context
+from ai_command_center.core.contracts import COMMAND_DEFERRED_VERSION, build_workspace_context
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.intents import (
     INTENT_AGENT,
@@ -28,7 +29,6 @@ from ai_command_center.core.events.topics import (
     AGENT_EXECUTION_REQUEST,
     AGENT_SPAWN_REQUEST,
     COMMAND_DEFERRED,
-    COMMAND_ROUTED,
     EXECUTION_AUTHORITY_DECISION,
     GOAL_SUBMIT_REQUEST,
     UI_COMMAND,
@@ -40,14 +40,13 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.execution_decision import DecisionKind, ExecutionDecision
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
+from ai_command_center.domain.state_context import StateContext
 from ai_command_center.orchestration.intents.classifier import RuleBasedIntentClassifier
 from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
 from ai_command_center.services.base import BaseService
-from ai_command_center.services.command_router_service import (
-    CommandRouterService,
-    _WORKSPACE_OPTIONAL_INTENTS,
-)
+from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.services.state_authority_service import StateAuthorityService
 
 _logger = logging.getLogger(__name__)
 
@@ -56,15 +55,24 @@ _LAUNCH_RE = re.compile(
     re.IGNORECASE,
 )
 
-_LEGACY_INTENTS: frozenset[str] = frozenset(
-    {
-        INTENT_NAVIGATE,
-        INTENT_NOTE_SEARCH,
-        INTENT_NOTE_NEW,
-        INTENT_MEMORY_REMEMBER,
-        INTENT_MEMORY_SELECT,
-    }
+_GOAL_RE = re.compile(
+    r"^\s*(?:prepare(?:\s+for)?|plan(?:\s+for)?|get\s+ready\s+for|organize|set\s+up)\b",
+    re.IGNORECASE,
 )
+
+_MEMORY_RECALL_RE = re.compile(
+    r"^\s*(?:what\s+is\s+my|what's\s+my|whats\s+my|do\s+you\s+remember|"
+    r"recall\s+my|favourite|favorite)\b",
+    re.IGNORECASE,
+)
+
+_FIND_NOTE_RE = re.compile(
+    r"^\s*(?:find|search)\s+(?:notes?\s+)?(.+)$",
+    re.IGNORECASE,
+)
+
+# Capabilities that may proceed without an active workspace.
+_WORKSPACE_OPTIONAL_CAPABILITIES: frozenset[str] = frozenset({"navigate"})
 
 _ORCH_CAPABILITY: dict[OrchestrationIntent, str] = {
     OrchestrationIntent.LAUNCH_APPLICATION: "launch_application",
@@ -74,9 +82,17 @@ _ORCH_CAPABILITY: dict[OrchestrationIntent, str] = {
     OrchestrationIntent.CALENDAR_EVENT_CREATE: "calendar_event_create",
 }
 
+_PREFIX_CAPABILITY: dict[str, str] = {
+    INTENT_NAVIGATE: "navigate",
+    INTENT_NOTE_SEARCH: "notes.search",
+    INTENT_NOTE_NEW: "notes.create",
+    INTENT_MEMORY_REMEMBER: "memory.store",
+    INTENT_MEMORY_SELECT: "memory.query",
+}
+
 
 class ExecutionAuthorityService(BaseService):
-    """Owns intake. Emits GOAL_SUBMIT_REQUEST / COMMAND_ROUTED — never TOOL_INVOKE."""
+    """Owns intake. Emits GOAL_SUBMIT_REQUEST only — never COMMAND_ROUTED / TOOL_INVOKE."""
 
     name = "execution_authority"
 
@@ -86,10 +102,12 @@ class ExecutionAuthorityService(BaseService):
         *,
         classifier: RuleBasedIntentClassifier | None = None,
         agent_runtime: AgentRuntimeService | None = None,
+        state_authority: StateAuthorityService | None = None,
     ) -> None:
         super().__init__(bus)
         self._classifier = classifier or RuleBasedIntentClassifier()
         self._agent_runtime = agent_runtime
+        self._state_authority = state_authority
         self._unsubscribers: list[Callable[[], None]] = []
         self._active_workspace_id: str = ""
 
@@ -157,6 +175,11 @@ class ExecutionAuthorityService(BaseService):
                 scope[key] = value
         return scope
 
+    def _project_state(self, text: str, workspace_id: str) -> StateContext:
+        if self._state_authority is None:
+            return StateContext.empty(workspace_id=workspace_id, query_text=text)
+        return self._state_authority.project(text=text, workspace_id=workspace_id)
+
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
@@ -165,7 +188,8 @@ class ExecutionAuthorityService(BaseService):
         request_id = uuid.uuid4().hex
         scope = self._workspace_scope(event)
         clipboard = event.payload.get("clipboard")
-        decision = self.analyze(text, clipboard=clipboard)
+        state_context = self._project_state(text, scope.get("workspace_id", ""))
+        decision = self.analyze(text, clipboard=clipboard, state_context=state_context)
 
         self._bus.publish(
             EXECUTION_AUTHORITY_DECISION,
@@ -173,23 +197,16 @@ class ExecutionAuthorityService(BaseService):
                 "request_id": request_id,
                 **decision.to_payload(),
                 **scope,
+                "state_context": state_context.to_dict(),
             },
             source=self.name,
         )
 
-        if decision.kind is DecisionKind.LEGACY_ROUTE:
-            self._publish_legacy_routed(
-                request_id=request_id,
-                text=text,
-                intent=decision.legacy_intent,
-                args=dict(decision.args),
-                scope=scope,
-                event=event,
-            )
-            return
-
         active_workspace_id = self._resolve_active_workspace_id(event)
-        if not active_workspace_id:
+        if (
+            not active_workspace_id
+            and decision.capability not in _WORKSPACE_OPTIONAL_CAPABILITIES
+        ):
             if decision.capability == "shell":
                 deferred_intent = INTENT_SHELL
             elif decision.capability == "llm":
@@ -207,20 +224,49 @@ class ExecutionAuthorityService(BaseService):
                 text=text,
                 decision=decision,
                 scope=scope,
+                state_context=state_context,
+            )
+            return
+
+        if decision.capability == "goal":
+            # Free-text goals go through planner with World Model context.
+            self._submit_plan(
+                request_id=request_id,
+                text=text,
+                decision=decision,
+                plan=None,
+                scope=scope,
+                state_context=state_context,
+                skip_planner=False,
             )
             return
 
         plan = self._plan_for_decision(decision)
+        if decision.capability == "llm" and state_context.summary:
+            # Inject state into conversational args for ChatHandler.
+            args = dict(decision.args)
+            snippets = state_context.to_planner_snippets()
+            if snippets:
+                args["state_context_snippets"] = snippets
+                decision = ExecutionDecision(
+                    kind=decision.kind,
+                    text=decision.text,
+                    capability=decision.capability,
+                    args=args,
+                    reason=decision.reason,
+                    skip_planner=decision.skip_planner,
+                )
+                plan = self._plan_for_decision(decision)
         self._submit_plan(
             request_id=request_id,
             text=text,
             decision=decision,
             plan=plan,
             scope=scope,
+            state_context=state_context,
         )
 
     def _on_workflow_execution_request(self, event: Event) -> None:
-        """WORKFLOW_EXECUTION_REQUEST → ExecutionPlan → GOAL_SUBMIT_REQUEST."""
         run_id = str(event.payload.get("run_id") or uuid.uuid4().hex)
         raw_steps = list(event.payload.get("steps") or [])
         if not raw_steps:
@@ -233,6 +279,8 @@ class ExecutionAuthorityService(BaseService):
                 entity_id=event.payload.get("entity_id"),
                 entity_type=event.payload.get("entity_type"),
             )
+        ws = str(workspace_context.get("workspace_id") or "")
+        state_context = self._project_state(f"workflow:{workflow_id}", ws)
 
         plan_steps: list[PlanStep] = []
         for index, step in enumerate(raw_steps):
@@ -265,37 +313,25 @@ class ExecutionAuthorityService(BaseService):
             goal=f"workflow:{workflow_id or run_id}",
             steps=tuple(plan_steps),
         )
-        correlation = CorrelationContext.new(goal_id=run_id).to_payload()
-        correlation["correlation_id"] = run_id
-        payload: dict[str, Any] = {
-            "goal_id": run_id,
-            "title": plan.goal,
-            "description": "workflow",
-            "request_id": run_id,
-            "correlation": correlation,
-            "auto_approve": True,
-            "workspace_context": workspace_context,
-            "workspace_id": str(workspace_context.get("workspace_id") or ""),
-            "plan": plan.to_dict(),
-            "planner_mode": "synthetic",
-            "workflow_run_id": run_id,
-            "workflow_id": workflow_id,
-            "authority_decision": {
-                "kind": DecisionKind.ACTIONABLE.value,
-                "capability": "workflow",
-                "reason": "workflow_start",
-                "skip_planner": True,
-            },
-        }
-        _logger.info(
-            "execution_authority.workflow request_id=%s steps=%d",
-            run_id,
-            len(plan_steps),
+        decision = ExecutionDecision(
+            kind=DecisionKind.ACTIONABLE,
+            text=plan.goal,
+            capability="workflow",
+            reason="workflow_start",
+            skip_planner=True,
         )
-        self._bus.publish(GOAL_SUBMIT_REQUEST, payload, source=self.name)
+        self._submit_plan(
+            request_id=run_id,
+            text=plan.goal,
+            decision=decision,
+            plan=plan,
+            scope={"workspace_id": ws} if ws else {},
+            state_context=state_context,
+            workspace_context_override=workspace_context,
+            extra_payload={"workflow_run_id": run_id, "workflow_id": workflow_id},
+        )
 
     def _on_agent_execution_request(self, event: Event) -> None:
-        """Lifecycle handler handoff → ExecutionPlan → GOAL_SUBMIT (no TOOL_INVOKE)."""
         agent_id = str(event.payload.get("agent_id") or uuid.uuid4().hex)
         request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
         task = str(event.payload.get("task") or "")
@@ -310,31 +346,23 @@ class ExecutionAuthorityService(BaseService):
             request_id=request_id,
             spawn_role=spawn_role,
         )
-        workspace_context = build_workspace_context(
-            workspace_id=event.payload.get("workspace_id"),
-            entity_id=event.payload.get("workspace_entity_id"),
+        ws = str(event.payload.get("workspace_id") or "")
+        state_context = self._project_state(task or plan.goal, ws)
+        decision = ExecutionDecision(
+            kind=DecisionKind.ACTIONABLE,
+            text=plan.goal,
+            capability="agent.shell",
+            reason="agent_execution_request",
+            skip_planner=True,
         )
-        correlation = CorrelationContext.new(goal_id=request_id).to_payload()
-        correlation["correlation_id"] = request_id
-        payload: dict[str, Any] = {
-            "goal_id": request_id,
-            "title": plan.goal,
-            "description": "agent_execution_request",
-            "request_id": request_id,
-            "correlation": correlation,
-            "auto_approve": True,
-            "workspace_context": workspace_context,
-            "workspace_id": str(workspace_context.get("workspace_id") or ""),
-            "plan": plan.to_dict(),
-            "planner_mode": "synthetic",
-            "authority_decision": {
-                "kind": DecisionKind.ACTIONABLE.value,
-                "capability": "agent.shell",
-                "reason": "agent_execution_request",
-                "skip_planner": True,
-            },
-        }
-        self._bus.publish(GOAL_SUBMIT_REQUEST, payload, source=self.name)
+        self._submit_plan(
+            request_id=request_id,
+            text=plan.goal,
+            decision=decision,
+            plan=plan,
+            scope={"workspace_id": ws} if ws else {},
+            state_context=state_context,
+        )
 
     def _dispatch_agent(
         self,
@@ -343,6 +371,7 @@ class ExecutionAuthorityService(BaseService):
         text: str,
         decision: ExecutionDecision,
         scope: dict[str, str],
+        state_context: StateContext,
     ) -> None:
         args = dict(decision.args)
         plan, meta = AgentRuntimeService.build_execution_plan(
@@ -357,7 +386,7 @@ class ExecutionAuthorityService(BaseService):
 
         pipeline_id = str(meta.get("pipeline_id") or "")
         stages = list(meta.get("pipeline_stages") or [])
-        runtime = self._resolve_agent_runtime()
+        runtime = self._agent_runtime
         if pipeline_id and stages and runtime is not None:
             runtime.register_pipeline(
                 pipeline_id=pipeline_id,
@@ -380,13 +409,8 @@ class ExecutionAuthorityService(BaseService):
             decision=decision,
             plan=plan,
             scope=scope,
+            state_context=state_context,
         )
-
-    def _resolve_agent_runtime(self) -> AgentRuntimeService | None:
-        if self._agent_runtime is not None:
-            return self._agent_runtime
-        # Best-effort: find a started instance sharing this bus (tests / composition root).
-        return None
 
     def _submit_plan(
         self,
@@ -396,16 +420,25 @@ class ExecutionAuthorityService(BaseService):
         decision: ExecutionDecision,
         plan: ExecutionPlan | None,
         scope: dict[str, str],
+        state_context: StateContext,
+        skip_planner: bool | None = None,
+        workspace_context_override: dict[str, Any] | None = None,
+        extra_payload: dict[str, Any] | None = None,
     ) -> None:
+        use_synthetic = decision.skip_planner if skip_planner is None else skip_planner
         correlation = CorrelationContext.new(goal_id=request_id).to_payload()
         correlation["correlation_id"] = request_id
 
-        workspace_context = build_workspace_context(
-            workspace_id=scope.get("workspace_id"),
-            entity_id=scope.get("workspace_entity_id") or scope.get("selected_entity_id"),
-            entity_type=scope.get("workspace_entity_type")
-            or scope.get("selected_entity_type"),
-        )
+        if workspace_context_override is not None:
+            workspace_context = dict(workspace_context_override)
+        else:
+            workspace_context = build_workspace_context(
+                workspace_id=scope.get("workspace_id"),
+                entity_id=scope.get("workspace_entity_id")
+                or scope.get("selected_entity_id"),
+                entity_type=scope.get("workspace_entity_type")
+                or scope.get("selected_entity_type"),
+            )
 
         payload: dict[str, Any] = {
             "goal_id": request_id,
@@ -417,23 +450,32 @@ class ExecutionAuthorityService(BaseService):
             "workspace_context": workspace_context,
             "workspace_id": scope.get("workspace_id", ""),
             "authority_decision": decision.to_payload(),
+            "state_context": state_context.to_dict(),
         }
-        if plan is not None and decision.skip_planner:
+        if plan is not None and use_synthetic:
             payload["plan"] = plan.to_dict()
             payload["planner_mode"] = "synthetic"
+        elif not use_synthetic:
+            # Planner path — pass World Model snippets as workspace hints.
+            payload["workspace_snippets"] = state_context.to_planner_snippets()
+            payload["planner_mode"] = "state_aware"
+        if extra_payload:
+            payload.update(extra_payload)
 
         _logger.info(
-            "execution_authority.dispatch request_id=%s kind=%s capability=%s skip_planner=%s",
+            "execution_authority.dispatch request_id=%s kind=%s capability=%s "
+            "skip_planner=%s state_entities=%d",
             request_id,
             decision.kind.value,
             decision.capability,
-            decision.skip_planner,
+            use_synthetic,
+            len(state_context.entities),
         )
         self._bus.publish(GOAL_SUBMIT_REQUEST, payload, source=self.name)
 
     def _defer_no_workspace(self, request_id: str, text: str, intent: str) -> None:
         deferred_payload = {
-            "contract_version": COMMAND_ROUTED_VERSION,
+            "contract_version": COMMAND_DEFERRED_VERSION,
             "request_id": request_id,
             "text": text,
             "intent": intent,
@@ -453,50 +495,16 @@ class ExecutionAuthorityService(BaseService):
             source=self.name,
         )
 
-    def _publish_legacy_routed(
-        self,
-        *,
-        request_id: str,
-        text: str,
-        intent: str,
-        args: dict[str, Any],
-        scope: dict[str, str],
-        event: Event,
-    ) -> None:
-        active_workspace_id = self._resolve_active_workspace_id(event)
-        if intent not in _WORKSPACE_OPTIONAL_INTENTS and not active_workspace_id:
-            self._defer_no_workspace(request_id, text, intent)
-            return
-
-        merged_args = dict(args)
-        if scope:
-            entity_keys = {k: v for k, v in scope.items() if k.startswith("workspace_entity")}
-            if entity_keys:
-                merged_args = {**merged_args, **entity_keys}
-            if scope.get("workspace_id"):
-                merged_args = {**merged_args, "workspace_id": scope["workspace_id"]}
-
-        payload: dict[str, object] = {
-            "contract_version": COMMAND_ROUTED_VERSION,
-            "request_id": request_id,
-            "text": text,
-            "intent": intent,
-            "args": merged_args,
-            "status": "pending",
-            "metadata": {"executing": False, "source_router": self.name},
-        }
-        if scope:
-            payload.update(scope)
-        self._bus.publish(COMMAND_ROUTED, payload, source=self.name)
-
     def analyze(
         self,
         text: str,
         *,
         clipboard: object | None = None,
+        state_context: StateContext | None = None,
     ) -> ExecutionDecision:
-        """Tri-state (+ legacy) classification. Never defaults to chat-as-sink."""
+        """Classify into ACTIONABLE / CONVERSATIONAL / AMBIGUOUS. No legacy routes."""
         stripped = text.strip()
+        ctx = state_context or StateContext.empty(query_text=stripped)
         prefix_intent, prefix_args = CommandRouterService.classify(stripped)
 
         if prefix_intent == INTENT_AGENT:
@@ -514,13 +522,25 @@ class ExecutionAuthorityService(BaseService):
                 skip_planner=True,
             )
 
-        if prefix_intent in _LEGACY_INTENTS:
+        # Former legacy prefixes → first-class capabilities.
+        if prefix_intent in _PREFIX_CAPABILITY:
+            capability = _PREFIX_CAPABILITY[prefix_intent]
+            args = dict(prefix_args)
+            if capability == "notes.create":
+                args.setdefault("body", args.get("body") or stripped)
+            if capability == "notes.search":
+                args.setdefault("query", args.get("query") or stripped)
+            if capability == "memory.store":
+                args.setdefault("body", args.get("body") or stripped)
+            if capability == "memory.query":
+                args.setdefault("query", args.get("query") or stripped)
             return ExecutionDecision(
-                kind=DecisionKind.LEGACY_ROUTE,
+                kind=DecisionKind.ACTIONABLE,
                 text=stripped,
-                legacy_intent=prefix_intent,
-                args=dict(prefix_args),
-                reason="legacy_capability_handler",
+                capability=capability,
+                args=args,
+                reason="state_capability",
+                skip_planner=True,
             )
 
         if prefix_intent == INTENT_SHELL:
@@ -544,6 +564,41 @@ class ExecutionAuthorityService(BaseService):
                 capability="launch_application",
                 args={"application": app},
                 reason="launch_application",
+                skip_planner=True,
+            )
+
+        # Goal phrasing → planner with state context.
+        if _GOAL_RE.match(stripped):
+            return ExecutionDecision(
+                kind=DecisionKind.ACTIONABLE,
+                text=stripped,
+                capability="goal",
+                args={"goal": stripped},
+                reason="goal_phrasing",
+                skip_planner=False,
+            )
+
+        # Memory recall from natural language — prefer stored state over LLM.
+        if _MEMORY_RECALL_RE.match(stripped) or any(
+            m.get("label", "").lower() in stripped.lower() for m in ctx.memories
+        ):
+            return ExecutionDecision(
+                kind=DecisionKind.ACTIONABLE,
+                text=stripped,
+                capability="memory.query",
+                args={"query": stripped},
+                reason="memory_recall",
+                skip_planner=True,
+            )
+
+        find_match = _FIND_NOTE_RE.match(stripped)
+        if find_match:
+            return ExecutionDecision(
+                kind=DecisionKind.ACTIONABLE,
+                text=stripped,
+                capability="notes.search",
+                args={"query": find_match.group(1).strip()},
+                reason="note_search_phrasing",
                 skip_planner=True,
             )
 
@@ -594,11 +649,14 @@ class ExecutionAuthorityService(BaseService):
 
     @staticmethod
     def _plan_for_decision(decision: ExecutionDecision) -> ExecutionPlan | None:
-        if not decision.capability:
+        if not decision.capability or decision.capability in {"goal"}:
             return None
-        if decision.capability.startswith("agent"):
+        if decision.capability.startswith("agent") and decision.capability not in {
+            "agent.shell",
+        }:
             # Expanded by _dispatch_agent.
-            return None
+            if decision.capability in {"agent.run", "agent.multi", "agent.pipeline"}:
+                return None
         return ExecutionPlan(
             goal=decision.text,
             steps=(

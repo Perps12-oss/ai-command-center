@@ -1,4 +1,4 @@
-"""Tests for QwenPaw sidecar bridge after runtime-first demotion of COMMAND_ROUTED racing."""
+"""Tests for QwenPaw sidecar bridge after runtime-first intake migration."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from ai_command_center.core.capability_external_registry import (
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     CAPABILITY_RUNTIME_REQUEST,
-    COMMAND_ROUTED,
     LLM_REQUEST,
     LLM_STEP_REQUEST,
     SETTINGS_SNAPSHOT,
@@ -42,8 +41,8 @@ def test_planning_prefix_classifies_to_qwenpaw() -> None:
         router.stop()
 
 
-def test_command_routed_no_longer_dispatches_external_runtime() -> None:
-    """RuntimeCapabilityRouter must not race on COMMAND_ROUTED (INV ownership)."""
+def test_runtime_router_classification_is_side_effect_free() -> None:
+    """RuntimeCapabilityRouter classifies but does not dispatch runtime requests."""
     bus = EventBus()
     health = QwenPawSidecarHealthState()
     health.update(enabled=True, reachable=True, detail="ready")
@@ -54,22 +53,14 @@ def test_command_routed_no_longer_dispatches_external_runtime() -> None:
     bus.subscribe(CAPABILITY_RUNTIME_REQUEST, lambda e: runtime_requests.append(dict(e.payload)))
     router.start()
     try:
-        bus.publish(
-            COMMAND_ROUTED,
-            {
-                "intent": "chat",
-                "request_id": "req-plan-ready",
-                "args": {"prompt": "/plan schedule standup"},
-            },
-            source="command_router",
-        )
+        assert RuntimeCapabilityRouterService.classify("/plan schedule standup") is CapabilityKind.PLANNING
         assert runtime_requests == []
     finally:
         router.stop()
 
 
-def test_chat_handler_ignores_command_routed() -> None:
-    """ChatHandler is llm-capability only — COMMAND_ROUTED must not emit LLM_REQUEST."""
+def test_chat_handler_ignores_non_llm_step_runtime_request() -> None:
+    """ChatHandler is llm-capability only."""
     bus = EventBus()
     chat = ChatHandlerService(bus, ContextManager())
     llm_requests: list[dict] = []
@@ -77,13 +68,13 @@ def test_chat_handler_ignores_command_routed() -> None:
     chat.start()
     try:
         bus.publish(
-            COMMAND_ROUTED,
+            CAPABILITY_RUNTIME_REQUEST,
             {
-                "intent": "chat",
                 "request_id": "req-defer-1",
+                "capability": "external.plan",
                 "args": {"prompt": "/plan my week"},
             },
-            source="command_router",
+            source="execution_orchestrator",
         )
         assert llm_requests == []
     finally:

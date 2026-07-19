@@ -57,7 +57,6 @@ def main() -> int:
 
         from ai_command_center.core.event_bus import EventBus
         from ai_command_center.repositories.settings_repository import SettingsRepository
-        from ai_command_center.services.command_router_service import CommandRouterService
         from ai_command_center.services.telemetry_service import TelemetryService
         from ai_command_center.services.settings_service import SettingsService
 
@@ -65,8 +64,7 @@ def main() -> int:
         repo = TelemetryRepository(db)
         telemetry = TelemetryService(bus, repo)
         settings = SettingsService(bus, SettingsRepository(db))
-        router = CommandRouterService(bus)
-        for svc in (telemetry, settings, router):
+        for svc in (telemetry, settings):
             svc.load()
 
         app = create_application(debug_mode=True)
@@ -83,14 +81,14 @@ def main() -> int:
         bus2.publish("ui.palette_open", {}, source="ui")
         bus2.publish("ui.command", {"text": "hello"}, source="ui")
         bus2.publish(
-            "command.routed",
+            "execution.authority.decision",
             {
-                "intent": "chat",
-                "status": "pending",
                 "text": "hello",
+                "kind": "conversational",
+                "capability": "llm",
                 "args": {"prompt": "hello"},
             },
-            source="command_router",
+            source="execution_authority",
         )
         bus2.publish(
             "context.snapshot_created",

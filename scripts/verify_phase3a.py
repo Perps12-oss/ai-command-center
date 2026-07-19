@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import inspect
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -93,9 +93,13 @@ def main() -> int:
     # --- End-to-end: ui.command -> chat.complete (stub) ---
     from ai_command_center.core.context_manager import ContextManager
     from ai_command_center.core.event_bus import EventBus
+    from ai_command_center.repositories.goal_repository import GoalRepository
     from ai_command_center.services.chat_handler_service import ChatHandlerService
-    from ai_command_center.services.command_router_service import CommandRouterService
-    from ai_command_center.services.ollama_service import StubOllamaService
+    from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+    from ai_command_center.services.execution_orchestrator_service import (
+        ExecutionOrchestratorService,
+    )
+    from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 
     bus = EventBus(debug_mode=True)
     events: list[str] = []
@@ -107,14 +111,21 @@ def main() -> int:
 
     bus.subscribe_all(tap)
 
-    router = CommandRouterService(bus)
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    scheduler = SingleGoalScheduler(bus, GoalRepository(conn))
+    orchestrator = ExecutionOrchestratorService(bus)
+    authority = ExecutionAuthorityService(bus)
     ollama = StubOllamaService(bus)
     handler = ChatHandlerService(bus, ContextManager())
-    router.load()
+    scheduler.load()
+    orchestrator.load()
+    authority.load()
     ollama.load()
     handler.load()
 
     bus.publish("settings.snapshot", {"default_model": "llama3.2:3b"}, source="test")
+    bus.publish("workspace.active", {"workspace_id": "phase3a"}, source="test")
     bus.publish("ui.command", {"text": "Hello from gate test"}, source="test")
 
     if "llm.request" not in events:
@@ -129,10 +140,6 @@ def main() -> int:
 
     # Cancellation path
     events.clear()
-    slow = StubOllamaService(bus)
-    slow.load()
-    handler2 = ChatHandlerService(bus, ContextManager())
-    handler2.load()
 
     class SlowStub(StubOllamaService):
         def stream_chat(self, bundle, *, model, request_id=None):
@@ -149,16 +156,19 @@ def main() -> int:
     slow2.load()
     handler3 = ChatHandlerService(bus, ContextManager())
     handler3.load()
-    bus.publish("ui.command", {"text": "cancel me"}, source="test")
+    bus.publish("ui.command", {"text": "cancel me", "workspace_id": "phase3a"}, source="test")
     if "chat.cancelled" not in events and "chat.complete" not in events:
         # SlowStub cancels immediately — either cancelled or complete is fine for 3A
         pass
 
-    router.unload()
+    authority.unload()
+    orchestrator.unload()
+    scheduler.unload()
     ollama.unload()
     handler.unload()
     slow2.unload()
     handler3.unload()
+    conn.close()
 
     if failures:
         print("FAIL:")
@@ -168,7 +178,7 @@ def main() -> int:
 
     print("PASS: Phase 3A — interface + routing + ContextManager gate")
     print(f"  services: {sorted(names)}")
-    print(f"  e2e events: command.routed -> chat.started -> chat.complete")
+    print("  e2e events: ui.command -> llm.step.request -> chat.complete")
     return 0
 
 

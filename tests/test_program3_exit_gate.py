@@ -12,7 +12,6 @@ from unittest.mock import MagicMock
 
 from ai_command_center.application import create_application
 from ai_command_center.core.app_state import AppStateStore
-from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.entity.entity import ENTITY_TYPE_CARD, ENTITY_TYPE_WORKSPACE
 from ai_command_center.core.event_bus import (
     EVENT_WORKSPACE_ACTIVATED,
@@ -22,7 +21,7 @@ from ai_command_center.core.event_bus import (
     EventBus,
 )
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
+    EXECUTION_AUTHORITY_DECISION,
     MEMORY_STORED,
     TIMELINE_RECORD_REQUEST,
     TOOL_INVOKE,
@@ -159,7 +158,7 @@ def _compute_structural_wii(rows: list[dict]) -> float:
         ).strip()
         scoped = bool(ws or ent)
 
-        if event == COMMAND_ROUTED:
+        if event == EXECUTION_AUTHORITY_DECISION:
             cmd_total += 1
             if scoped:
                 cmd_scoped += 1
@@ -388,18 +387,18 @@ class ExitGateIntegrationTests(unittest.TestCase):
                 msg=f"structural WII {structural}",
             )
 
-            routed = [
+            decisions = [
                 r.payload_dict()
                 for r in rows
-                if r.event_type == COMMAND_ROUTED
+                if r.event_type == EXECUTION_AUTHORITY_DECISION
             ]
-            self.assertTrue(routed)
-            scoped_routed = sum(
+            self.assertTrue(decisions)
+            scoped_decisions = sum(
                 1
-                for p in routed
+                for p in decisions
                 if str(p.get("workspace_id", "")).strip()
             )
-            self.assertGreaterEqual(scoped_routed / len(routed), 0.6)
+            self.assertGreaterEqual(scoped_decisions / len(decisions), 0.6)
 
             mem_rows = db.execute("SELECT workspace_id FROM memory_nodes").fetchall()
             self.assertTrue(mem_rows)

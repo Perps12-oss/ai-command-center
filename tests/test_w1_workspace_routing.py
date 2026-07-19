@@ -9,9 +9,8 @@ from uuid import uuid4
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_NAVIGATE
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
+    EXECUTION_AUTHORITY_DECISION,
     GOAL_SUBMIT_REQUEST,
     LLM_STEP_REQUEST,
     LLM_REQUEST,
@@ -25,7 +24,6 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_ACTIVE,
 )
 from ai_command_center.services.chat_handler_service import ChatHandlerService
-from ai_command_center.services.command_router_service import CommandRouterService
 from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.ui.controller import UIController
 
@@ -35,13 +33,10 @@ class W1CommandRouterScopeTests(unittest.TestCase):
         bus = EventBus()
         authority = ExecutionAuthorityService(bus)
         authority.load()
-        routed: list[dict] = []
-
-        def capture(event) -> None:
-            if event.topic == COMMAND_ROUTED and event.source == "execution_authority":
-                routed.append(dict(event.payload))
-
-        bus.subscribe(COMMAND_ROUTED, capture)
+        decisions: list[dict] = []
+        goals: list[dict] = []
+        bus.subscribe(EXECUTION_AUTHORITY_DECISION, lambda e: decisions.append(dict(e.payload)))
+        bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
         bus.publish(
             UI_COMMAND,
             {
@@ -53,14 +48,16 @@ class W1CommandRouterScopeTests(unittest.TestCase):
             source="tests",
         )
         authority.unload()
-        self.assertEqual(1, len(routed))
-        payload = routed[0]
-        self.assertEqual(INTENT_NAVIGATE, payload.get("intent"))
-        self.assertEqual("card-1", payload.get("workspace_entity_id"))
-        self.assertEqual("card", payload.get("workspace_entity_type"))
-        self.assertEqual("Roadmap", payload.get("workspace_entity_title"))
-        args = payload.get("args") or {}
-        self.assertEqual("card-1", args.get("workspace_entity_id"))
+        self.assertEqual(1, len(decisions))
+        self.assertEqual(1, len(goals))
+        self.assertEqual("navigate", decisions[0].get("capability"))
+        payload = goals[0]
+        self.assertEqual("navigate", payload["plan"]["steps"][0]["capability"])
+        self.assertEqual("card-1", payload["workspace_context"].get("entity_id"))
+        self.assertEqual("card", payload["workspace_context"].get("entity_type"))
+        self.assertEqual("card-1", decisions[0].get("workspace_entity_id"))
+        self.assertEqual("card", decisions[0].get("workspace_entity_type"))
+        self.assertEqual("Roadmap", decisions[0].get("workspace_entity_title"))
 
     def test_chat_intent_scope_on_goal_submit(self) -> None:
         bus = EventBus()

@@ -13,13 +13,11 @@ from ai_command_center.core.entity.entity_bus_handlers import register_entity_bu
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_NAVIGATE, INTENT_SHELL
+from ai_command_center.core.events.intents import INTENT_CHAT, INTENT_SHELL
 from ai_command_center.core.events.topics import (
     COMMAND_DEFERRED,
-    COMMAND_ROUTED,
     GOAL_SUBMIT_REQUEST,
     SERVICE_READY,
-    TELEMETRY_EVENT,
     UI_COMMAND,
     UI_WORKSPACE_REQUIRED,
     WORKSPACE_ACTIVE,
@@ -52,16 +50,9 @@ class Phase6aSoftGateTests(unittest.TestCase):
         self.bus = EventBus()
         self.authority = ExecutionAuthorityService(self.bus)
         self.authority.load()
-        self.routed: list[dict] = []
         self.goals: list[dict] = []
         self.deferred: list[dict] = []
         self.workspace_required: list[dict] = []
-        self.bus.subscribe(
-            COMMAND_ROUTED,
-            lambda e: self.routed.append(dict(e.payload))
-            if e.source == "execution_authority"
-            else None,
-        )
         self.bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: self.goals.append(dict(e.payload)))
         self.bus.subscribe(COMMAND_DEFERRED, lambda e: self.deferred.append(dict(e.payload)))
         self.bus.subscribe(
@@ -73,7 +64,6 @@ class Phase6aSoftGateTests(unittest.TestCase):
 
     def test_chat_deferred_without_active_workspace(self) -> None:
         self.bus.publish(UI_COMMAND, {"text": "hello"}, source="tests")
-        self.assertEqual([], self.routed)
         self.assertEqual([], self.goals)
         self.assertEqual(1, len(self.deferred))
         self.assertEqual(1, len(self.workspace_required))
@@ -82,15 +72,14 @@ class Phase6aSoftGateTests(unittest.TestCase):
 
     def test_shell_deferred_without_active_workspace(self) -> None:
         self.bus.publish(UI_COMMAND, {"text": "> echo hi"}, source="tests")
-        self.assertEqual([], self.routed)
         self.assertEqual([], self.goals)
         self.assertEqual(INTENT_SHELL, self.deferred[0].get("intent"))
 
     def test_navigate_allowed_without_active_workspace(self) -> None:
         self.bus.publish(UI_COMMAND, {"text": "go settings"}, source="tests")
-        self.assertEqual(1, len(self.routed))
         self.assertEqual([], self.deferred)
-        self.assertEqual(INTENT_NAVIGATE, self.routed[0].get("intent"))
+        self.assertEqual(1, len(self.goals))
+        self.assertEqual("navigate", self.goals[0]["plan"]["steps"][0]["capability"])
 
     def test_goal_submit_includes_workspace_id_when_active(self) -> None:
         ws_id = uuid4().hex

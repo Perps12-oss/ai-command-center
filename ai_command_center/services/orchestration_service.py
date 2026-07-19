@@ -186,43 +186,41 @@ class OrchestrationService(BaseService):
         )
 
         correlation = CorrelationContext.from_payload(payload).with_action(run_id or request_id)
-        mutation_id = uuid.uuid4().hex
-        node_id = f"execution_run:{run_id or request_id}"
-        self._bus.publish(
-            RUNTIME_ACTION_REQUEST,
-            {
-                "action_id": run_id or request_id,
-                "tier": SecurityTier.WRITE.value,
-                "auto_approve": True,
-                "summary": f"Record execution run {run_id or request_id}",
-                "mutation": {
-                    "id": mutation_id,
-                    "type": MutationType.CREATE_NODE.value,
+        for node in _world_model_nodes_for_run(
+            request_id=request_id,
+            run_id=run_id,
+            goal=goal,
+            primary_capability=primary_capability,
+            success=success,
+            receipt_id=receipt.receipt_id,
+            plan=plan if isinstance(plan, dict) else {},
+            step_outputs=step_outputs,
+        ):
+            mutation_id = uuid.uuid4().hex
+            self._bus.publish(
+                RUNTIME_ACTION_REQUEST,
+                {
+                    "action_id": run_id or request_id,
+                    "tier": SecurityTier.WRITE.value,
+                    "auto_approve": True,
+                    "summary": f"Record {node['type']} {node['id']}",
+                    "mutation": {
+                        "id": mutation_id,
+                        "type": MutationType.CREATE_NODE.value,
+                        "correlation": correlation.to_payload(),
+                        "payload": {"node": node},
+                    },
                     "correlation": correlation.to_payload(),
-                    "payload": {
-                        "node": {
-                            "id": node_id,
-                            "type": "execution_run",
-                            "attributes": {
-                                "request_id": request_id,
-                                "run_id": run_id,
-                                "goal": goal,
-                                "capability": primary_capability,
-                                "success": success,
-                                "receipt_id": receipt.receipt_id,
-                            },
-                        }
+                    "output": {
+                        "request_id": request_id,
+                        "run_id": run_id,
+                        "receipt_id": receipt.receipt_id,
+                        "node_id": node["id"],
+                        "node_type": node["type"],
                     },
                 },
-                "correlation": correlation.to_payload(),
-                "output": {
-                    "request_id": request_id,
-                    "run_id": run_id,
-                    "receipt_id": receipt.receipt_id,
-                },
-            },
-            source=self.name,
-        )
+                source=self.name,
+            )
 
         self._bus.publish(
             CHAT_STARTED,
@@ -307,3 +305,132 @@ def _compose_response_text(
     if success:
         return "Done."
     return f"I could not complete that action: {error or 'execution failed'}"
+
+
+def _world_model_nodes_for_run(
+    *,
+    request_id: str,
+    run_id: str,
+    goal: str,
+    primary_capability: str,
+    success: bool,
+    receipt_id: str,
+    plan: dict,
+    step_outputs: list[object],
+) -> list[dict]:
+    """Build World Model nodes: always an execution_run, plus domain entities."""
+    nodes: list[dict] = [
+        {
+            "id": f"execution_run:{run_id or request_id}",
+            "type": "execution_run",
+            "attributes": {
+                "request_id": request_id,
+                "run_id": run_id,
+                "goal": goal,
+                "capability": primary_capability,
+                "success": success,
+                "receipt_id": receipt_id,
+            },
+        }
+    ]
+    if not success:
+        return nodes
+
+    steps = list(plan.get("steps") or [])
+    step0 = steps[0] if steps and isinstance(steps[0], dict) else {}
+    args = dict(step0.get("args") or {}) if isinstance(step0, dict) else {}
+    first_output = ""
+    for item in step_outputs:
+        if isinstance(item, dict) and str(item.get("output") or "").strip():
+            first_output = str(item.get("output") or "").strip()
+            break
+
+    cap = (primary_capability or str(step0.get("capability") or "")).strip()
+    if cap == "notes.create":
+        path = ""
+        if first_output.lower().startswith("created note "):
+            path = first_output[len("created note ") :].strip()
+        path = path or str(args.get("path") or args.get("body") or goal)[:120]
+        nodes.append(
+            {
+                "id": f"note:{path or request_id}",
+                "type": "note",
+                "attributes": {
+                    "title": path or goal,
+                    "path": path,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
+        )
+    elif cap == "notes.search":
+        query = str(args.get("query") or goal)
+        nodes.append(
+            {
+                "id": f"note_search:{request_id}",
+                "type": "note",
+                "attributes": {
+                    "title": f"search:{query}",
+                    "query": query,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
+        )
+    elif cap == "memory.store":
+        body = str(args.get("body") or goal)
+        label = body.split("|", 1)[0].strip() if "|" in body else body.split(" ", 1)[0]
+        nodes.append(
+            {
+                "id": f"memory:{label or request_id}",
+                "type": "memory",
+                "attributes": {
+                    "label": label,
+                    "content": body,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
+        )
+    elif cap == "memory.query":
+        query = str(args.get("query") or goal)
+        nodes.append(
+            {
+                "id": f"memory_query:{request_id}",
+                "type": "memory",
+                "attributes": {
+                    "label": f"query:{query}",
+                    "query": query,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
+        )
+    elif cap == "launch_application":
+        app = str(args.get("application") or goal).strip().lower()
+        if app:
+            nodes.append(
+                {
+                    "id": f"application:{app}",
+                    "type": "application",
+                    "attributes": {
+                        "name": app,
+                        "receipt_id": receipt_id,
+                        "request_id": request_id,
+                    },
+                }
+            )
+    elif cap == "navigate":
+        view = str(args.get("view") or "home").strip().lower()
+        nodes.append(
+            {
+                "id": f"navigate:{view}:{request_id}",
+                "type": "workspace",
+                "attributes": {
+                    "view": view,
+                    "receipt_id": receipt_id,
+                    "request_id": request_id,
+                },
+            }
+        )
+    return nodes

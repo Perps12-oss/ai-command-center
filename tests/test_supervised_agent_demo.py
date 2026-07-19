@@ -5,7 +5,6 @@ from __future__ import annotations
 import sqlite3
 
 from ai_command_center.core.app_state import AppStateStore
-from ai_command_center.core.contracts import COMMAND_ROUTED_VERSION
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.intents import INTENT_AGENT
 from ai_command_center.core.events.topics import (
@@ -13,7 +12,7 @@ from ai_command_center.core.events.topics import (
     AGENT_SPAWN_REQUEST,
     AGENT_TASK_COMPLETE,
     AGENT_TERMINATED,
-    COMMAND_ROUTED,
+    GOAL_SUBMIT_REQUEST,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
     TOOL_INVOKE,
@@ -240,17 +239,17 @@ def test_command_router_classifies_agent_intent() -> None:
     assert args["task"] == "inspect vault"
 
 
-def test_execution_authority_routes_agent_without_legacy_command_routed() -> None:
+def test_execution_authority_routes_agent_through_goal_submit() -> None:
     bus = EventBus()
     permission = _wire_permission(bus)
     _auto_approve_interactive(bus)
     _wire_execution_stack(bus, permission)
-    routed: list[dict] = []
-    bus.subscribe(COMMAND_ROUTED, lambda e: routed.append(dict(e.payload)))
+    goals: list[dict] = []
+    bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
     bus.publish(
         UI_COMMAND,
         {"text": "agent: demo", "workspace_id": "ws-demo"},
         source="ui",
     )
-    assert not any(r.get("intent") == INTENT_AGENT for r in routed)
-    assert COMMAND_ROUTED_VERSION  # contract still imported for legacy navigate paths
+    assert goals
+    assert goals[0]["authority_decision"]["capability"] == "agent.run"

@@ -7,7 +7,6 @@ import sqlite3
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
     EXECUTION_AUTHORITY_DECISION,
     EXECUTION_RUN_COMPLETE,
     EXECUTION_RUN_FAILED,
@@ -21,10 +20,12 @@ from ai_command_center.core.events.topics import (
     RUNTIME_WORLD_MODEL_APPLY_COMPLETED,
     TOOL_INVOKE,
     UI_COMMAND,
+    UI_NAVIGATE,
 )
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.domain.kernel_state import KernelState
+from ai_command_center.orchestration.state_capability_tools import bind_state_capability_tools
 from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.repositories.world_model_repository import SQLiteWorldModelRepository
 from ai_command_center.services.brain_kernel_service import BrainKernelService
@@ -42,6 +43,44 @@ from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
 
+class _FakeNotes:
+    def __init__(self) -> None:
+        self.created: list[str] = []
+
+    def create_note(self, body: str) -> tuple[bool, str, str]:
+        self.created.append(body)
+        path = f"Inbox/Note-{len(self.created)}.md"
+        return True, f"created note {path}", path
+
+    def search_notes(self, query: str) -> tuple[bool, str, list[dict[str, str]]]:
+        return True, "found 1 notes", [{"title": "Note", "snippet": query}]
+
+
+class _FakeMemory:
+    def __init__(self) -> None:
+        self.stored: list[dict[str, str]] = []
+
+    def store_memory(
+        self,
+        body: str,
+        *,
+        workspace_id: str = "",
+        entity_id: str = "",
+    ) -> tuple[bool, str, dict]:
+        item = {"id": "mem-1", "body": body, "workspace_id": workspace_id, "entity_id": entity_id}
+        self.stored.append(item)
+        return True, "stored memory mem-1", item
+
+    def query_memory(
+        self,
+        query: str,
+        *,
+        workspace_id: str = "",
+        entity_id: str = "",
+    ) -> tuple[bool, str, list[dict]]:
+        return True, "found memory", [{"label": "mem", "content": query}]
+
+
 def _conn() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
@@ -50,6 +89,8 @@ def _conn() -> sqlite3.Connection:
 
 def _wire_runtime(bus: EventBus) -> dict:
     registry = ToolRegistry()
+    notes = _FakeNotes()
+    memory = _FakeMemory()
     registry.register_tool(
         ToolSpec(
             name="launch_application",
@@ -79,6 +120,7 @@ def _wire_runtime(bus: EventBus) -> dict:
             ),
         )
     )
+    bind_state_capability_tools(registry, bus=bus, notes=notes, memory=memory)
     tool_executor = ToolExecutorService(bus, registry)
     tool_executor.start()
 
@@ -106,6 +148,8 @@ def _wire_runtime(bus: EventBus) -> dict:
         "authority": authority,
         "chat": chat,
         "registry": registry,
+        "notes": notes,
+        "memory": memory,
     }
 
 
@@ -121,7 +165,7 @@ def test_inv1_only_execution_authority_decides_ui_command() -> None:
     bus.subscribe(EXECUTION_AUTHORITY_DECISION, lambda e: decisions.append(dict(e.payload)))
     bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
 
-    # CommandRouter must not publish GOAL_SUBMIT or COMMAND_ROUTED from UI_COMMAND.
+    # CommandRouter is classification-only; ExecutionAuthority owns UI_COMMAND intake.
     bus.publish(UI_COMMAND, {"text": "open calculator", "workspace_id": "ws-1"}, source="ui")
     assert len(decisions) == 1
     assert len(goals) == 1
@@ -194,7 +238,7 @@ def test_inv5_shell_single_execution_path() -> None:
     assert len(shell_invokes) == 1
     assert shell_invokes[0]["args"]["command"] == "echo hi"
     assert shell_invokes[0]["source"] if False else True  # payload has no source
-    # Evidence: ShellToolService no longer publishes TOOL_INVOKE from COMMAND_ROUTED.
+    # Evidence: ExecutionOrchestrator is the only shell TOOL_INVOKE publisher.
 
 
 def test_inv6_kernel_supervises_typed_command() -> None:
@@ -235,12 +279,18 @@ def test_open_chrome_fails_with_receipt_not_llm() -> None:
     assert receipts[0]["success"] is False
 
 
-def test_navigate_still_publishes_command_routed() -> None:
+def test_navigate_submits_plan_not_command_routed() -> None:
     bus = EventBus()
     _wire_runtime(bus)
-    routed: list[dict] = []
-    bus.subscribe(COMMAND_ROUTED, lambda e: routed.append(dict(e.payload)))
+    goals: list[dict] = []
+    invokes: list[dict] = []
+    navigation: list[dict] = []
+    bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: goals.append(dict(e.payload)))
+    bus.subscribe(TOOL_INVOKE, lambda e: invokes.append(dict(e.payload)))
+    bus.subscribe(UI_NAVIGATE, lambda e: navigation.append(dict(e.payload)))
 
     bus.publish(UI_COMMAND, {"text": "settings"}, source="ui")
-    assert routed
-    assert routed[0]["intent"] == "navigate"
+    assert goals
+    assert goals[0]["plan"]["steps"][0]["capability"] == "navigate"
+    assert any(item.get("tool") == "navigate" for item in invokes)
+    assert navigation == [{"view": "settings"}]

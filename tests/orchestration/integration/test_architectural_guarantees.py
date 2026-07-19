@@ -216,7 +216,7 @@ def test_truth_boundary_blocks_unverified_email_sent_in_pipeline(bus: EventBus) 
 
 
 def test_unhandled_chat_becomes_explicit_llm_capability_step(bus: EventBus) -> None:
-    """Conversational text is planned as llm capability — never a COMMAND_ROUTED fall-through."""
+    """Conversational text is planned as an explicit llm capability step."""
     orchestration, chat, authority = _start(bus)
     llm_requests: list[dict] = []
     step_requests: list[dict] = []

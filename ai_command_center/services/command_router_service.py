@@ -17,7 +17,6 @@ from ai_command_center.core.events.intents import (
     INTENT_MEMORY_SELECT,
     INTENT_NAVIGATE,
     INTENT_NOTE_NEW,
-    INTENT_NOTE_SEARCH,
     INTENT_SHELL,
 )
 from ai_command_center.core.events.topics import (
@@ -111,7 +110,7 @@ class CommandRouterService(BaseService):
         if text.startswith(">"):
             return INTENT_SHELL, {"command": text[1:].strip()}
         if lower.startswith("note:"):
-            return INTENT_NOTE_SEARCH, {"query": text[5:].strip()}
+            return INTENT_NOTE_NEW, {"body": text[5:].strip()}
         if lower.startswith("new note:"):
             return INTENT_NOTE_NEW, {"body": text[9:].strip()}
         if lower.startswith("go "):

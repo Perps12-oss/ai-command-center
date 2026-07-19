@@ -13,8 +13,8 @@ from ai_command_center.core.events.topics import (
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
-    COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    EXECUTION_AUTHORITY_DECISION,
     UI_CHAT_NEW_SESSION,
     UI_OPEN_CHAT,
 )
@@ -60,16 +60,17 @@ def _is_pending_chat_user_text(text: str) -> bool:
     return True
 
 
-def _reduce_command_routed(state: Any, event: Event) -> Any:
-    if event.topic != COMMAND_ROUTED:
+def _reduce_authority_decision(state: Any, event: Event) -> Any:
+    if event.topic != EXECUTION_AUTHORITY_DECISION:
         return state
     text = str(event.payload.get("text", ""))
     pending = text if _is_pending_chat_user_text(text) else ""
     args = event.payload.get("args") or {}
     workspace_id = str(event.payload.get("workspace_id") or args.get("workspace_id", "")).strip()
+    capability = str(event.payload.get("capability", "")).strip()
     updates: dict[str, object] = {
         "last_command": text,
-        "last_command_intent": str(event.payload.get("intent", "")),
+        "last_command_intent": capability,
         "chat_pending_user_text": pending,
         "last_event_topic": event.topic,
         "last_event_source": event.source,
@@ -287,7 +288,7 @@ def _reduce_ui_chat_new_session(state: Any, event: Event) -> Any:
 
 
 CHAT_REDUCERS = (
-    _reduce_command_routed,
+    _reduce_authority_decision,
     _reduce_chat_started,
     _reduce_chat_chunk,
     _reduce_chat_complete,

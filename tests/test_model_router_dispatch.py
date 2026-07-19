@@ -7,7 +7,7 @@ from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
+    LLM_STEP_REQUEST,
     LLM_REQUEST,
     MODEL_SELECTED,
     MEMORY_LOOKUP_REQUEST,
@@ -193,12 +193,17 @@ def test_chat_handler_uses_model_router_before_llm_dispatch() -> None:
             source="test",
         )
         bus.publish(
-            COMMAND_ROUTED,
+            LLM_STEP_REQUEST,
             {
-                "intent": INTENT_CHAT,
+                "request_id": "req-router",
+                "run_id": "run-router",
+                "step_id": "step-1",
+                "capability": "llm",
                 "args": {"prompt": "hello through the router"},
+                "prompt": "hello through the router",
+                "command_payload": {"intent": INTENT_CHAT},
             },
-            source="command_router",
+            source="execution_orchestrator",
         )
 
         assert len(resolve_requests) == 1

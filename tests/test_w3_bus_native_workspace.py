@@ -18,14 +18,13 @@ from ai_command_center.core.entity.entity_bus_handlers import register_entity_bu
 from ai_command_center.core.entity.entity_repository import EntityRepository
 from ai_command_center.core.entity.entity_service import EntityService
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
     ENTITY_CONTEXT_REQUEST,
     ENTITY_CONTEXT_RESULT,
     ENTITY_CREATE_REQUEST,
     ENTITY_CREATE_RESULT,
     ENTITY_CREATED,
+    LLM_STEP_REQUEST,
     LLM_REQUEST,
     SEARCH_RESULTS,
     UI_CREATE_CARD,
@@ -282,13 +281,19 @@ class W3ChatEntityContextTests(unittest.TestCase):
             description="Entity graph context",
         )
         self.bus.publish(
-            COMMAND_ROUTED,
+            LLM_STEP_REQUEST,
             {
-                "intent": INTENT_CHAT,
+                "request_id": "req-w3",
+                "run_id": "run-w3",
+                "step_id": "step-1",
+                "capability": "llm",
                 "args": {"prompt": "hello from scoped chat"},
+                "prompt": "hello from scoped chat",
+                "workspace_context": {"entity_id": str(card.id), "entity_type": ENTITY_TYPE_CARD},
                 "workspace_entity_id": str(card.id),
+                "command_payload": {"workspace_entity_id": str(card.id)},
             },
-            source="command_router",
+            source="execution_orchestrator",
         )
         self.assertEqual(1, len(self.llm_requests))
         bundle = self.llm_requests[0]["bundle"]

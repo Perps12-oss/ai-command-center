@@ -212,6 +212,14 @@ class SingleGoalScheduler(BaseService):
             options["workspace_context"] = dict(workspace_context)
         if payload.get("workspace_id"):
             options["workspace_id"] = str(payload.get("workspace_id"))
+        snippets = payload.get("workspace_snippets")
+        if isinstance(snippets, list):
+            options["workspace_snippets"] = [str(s) for s in snippets if str(s).strip()]
+        state_context = payload.get("state_context")
+        if isinstance(state_context, dict):
+            options["state_context"] = dict(state_context)
+        if payload.get("planner_mode"):
+            options["planner_mode"] = str(payload.get("planner_mode"))
         self._run_options[goal_id] = options
         self.submit_goal(goal)
 
@@ -264,6 +272,14 @@ class SingleGoalScheduler(BaseService):
                 payload["entity_id"] = workspace_context["entity_id"]
             if workspace_context.get("entity_type"):
                 payload["entity_type"] = workspace_context["entity_type"]
+        snippets = options.get("workspace_snippets")
+        if isinstance(snippets, list) and snippets:
+            payload["workspace_snippets"] = list(snippets)
+        state_context = options.get("state_context")
+        if isinstance(state_context, dict):
+            payload["state_context"] = dict(state_context)
+        if options.get("planner_mode"):
+            payload["planner_mode"] = options["planner_mode"]
         self._bus.publish(PLAN_REQUEST, payload, source=self.name)
 
     def _on_plan_generated(self, event: Event) -> None:

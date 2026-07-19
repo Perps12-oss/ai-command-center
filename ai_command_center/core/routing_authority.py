@@ -1,8 +1,8 @@
-"""Routing authority source helpers for COMMAND_ROUTED consumers.
+"""Routing authority source helpers for decision-event consumers.
 
 ExecutionAuthorityService is the sole decision-maker for UI_COMMAND.
-Legacy capability handlers (notes, memory, navigate, agents) still consume
-COMMAND_ROUTED when the authority publishes it for those intents.
+Navigate and other state capabilities execute via ExecutionPlan tools
+(UI_NAVIGATE / TOOL_INVOKE), not COMMAND_ROUTED fan-out.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from __future__ import annotations
 ROUTING_AUTHORITY_SOURCES: frozenset[str] = frozenset(
     {
         "execution_authority",
-        "command_router",  # retained for tests / migration compatibility
     }
 )
 

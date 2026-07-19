@@ -6,7 +6,6 @@ from typing import Callable
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
     MEMORY_CLEAR_SELECTION,
     MEMORY_CLEARED,
     MEMORY_DELETE_REQUEST,
@@ -22,7 +21,6 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.repositories.memory_repository import MemoryRepository
 from ai_command_center.services.base import BaseService
-from ai_command_center.core.events.intents import INTENT_MEMORY_REMEMBER, INTENT_MEMORY_SELECT
 
 
 class MemoryGraphService(BaseService):
@@ -45,9 +43,7 @@ class MemoryGraphService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(MEMORY_CLEAR_SELECTION, self._on_clear)
         )
-        self._unsubscribers.append(
-            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed)
-        )
+        # Memory executes via memory.store / memory.query tools (no COMMAND_ROUTED).
         self._unsubscribers.append(
             self._bus.subscribe(MEMORY_LOOKUP_REQUEST, self._on_lookup_request)
         )
@@ -119,101 +115,89 @@ class MemoryGraphService(BaseService):
                 source=self.name,
             )
 
-    def _on_command_routed(self, event: Event) -> None:
-        from ai_command_center.core.routing_authority import is_routing_authority
-
-        if not is_routing_authority(event.source):
-            return
-        intent = event.payload.get("intent")
-        args = event.payload.get("args") or {}
-        merged = {**args, **event.payload}
-        workspace_id, entity_id, global_search = self._resolve_memory_scope(merged)
-        if intent == INTENT_MEMORY_REMEMBER:
-            self._handle_remember_command(
-                str(args.get("body", "")),
-                workspace_id=workspace_id,
-                entity_id=entity_id,
-                global_search=global_search,
-            )
-        elif intent == INTENT_MEMORY_SELECT:
-            self._handle_select_command(
-                str(args.get("query", "")),
-                workspace_id=workspace_id,
-                entity_id=entity_id,
-                global_search=global_search,
-            )
-
-    def _handle_remember_command(
+    def store_memory(
         self,
         body: str,
         *,
         workspace_id: str = "",
         entity_id: str = "",
-        global_search: bool = False,
-    ) -> None:
+    ) -> tuple[bool, str, dict]:
+        """Capability API used by memory.store tool."""
         if not body:
-            self._bus.publish(
-                MEMORY_ERROR,
-                {"message": "remember: requires label | content (example: remember: api-key | sk-...)"},
-                source=self.name,
-            )
-            return
+            return False, "remember: requires label | content", {}
         if "|" in body:
             label, content = (part.strip() for part in body.split("|", 1))
         else:
             label, _, content = body.partition(" ")
+            label, content = label.strip(), content.strip()
         if not label or not content:
-            self._bus.publish(
-                MEMORY_ERROR,
-                {"message": "remember: use 'label | content' or 'label content...'"},
-                source=self.name,
-            )
-            return
-        payload: dict[str, object] = {
+            return False, "remember: use 'label | content' or 'label content...'", {}
+        ws = workspace_id or self._active_workspace_id
+        node_id = self._repo.remember(
+            label=label,
+            content=content,
+            kind="entity",
+            tier="mid",
+            related_to=None,
+            relation="relates_to",
+            workspace_id=ws,
+            entity_id=entity_id,
+        )
+        meta = {
+            "id": node_id,
             "label": label,
             "content": content,
-            "workspace_id": workspace_id,
+            "workspace_id": ws,
             "entity_id": entity_id,
         }
-        if global_search:
-            payload["global_search"] = True
-        self._on_remember(
-            Event(
-                topic=MEMORY_REMEMBER,
-                payload=payload,
-                source=self.name,
-            )
-        )
+        self._bus.publish(MEMORY_STORED, meta, source=self.name)
+        return True, f"stored memory {label}", meta
 
-    def _handle_select_command(
+    def query_memory(
         self,
         query: str,
         *,
         workspace_id: str = "",
         entity_id: str = "",
-        global_search: bool = False,
-    ) -> None:
+    ) -> tuple[bool, str, list[dict]]:
+        """Capability API used by memory.query tool."""
         if not query:
-            self._bus.publish(
-                MEMORY_ERROR,
-                {"message": "memory: requires a search query"},
-                source=self.name,
-            )
-            return
-        payload: dict[str, object] = {
-            "query": query,
-            "workspace_id": workspace_id,
-            "entity_id": entity_id,
-        }
-        if global_search:
-            payload["global_search"] = True
-        self._on_select(
-            Event(
-                topic=MEMORY_SELECT,
-                payload=payload,
-                source=self.name,
-            )
+            return False, "memory: requires a search query", []
+        ws = workspace_id or self._active_workspace_id
+        nodes = self._search_nodes(
+            query,
+            workspace_id=ws,
+            entity_id=entity_id,
+            global_search=not bool(ws),
         )
+        hits = [
+            {"id": n.id, "label": n.label, "content": n.content}
+            for n in nodes[:10]
+        ]
+        snippets = [f"[memory:{h['label']}]\n{h['content']}" for h in hits[:3]]
+        self._selected_snippets = snippets
+        self._bus.publish(
+            MEMORY_SELECTED,
+            {"query": query, "results": hits, "snippets": snippets},
+            source=self.name,
+        )
+        return True, f"found {len(hits)} memories", hits
+
+    def lookup_for_state(self, query: str, *, workspace_id: str = "") -> list[dict]:
+        """StateAuthority memory projection helper (read-only; no bus side-effects)."""
+        if not query.strip():
+            return []
+        ws = workspace_id or self._active_workspace_id
+        nodes = self._search_nodes(
+            query,
+            workspace_id=ws,
+            entity_id="",
+            global_search=not bool(ws),
+        )
+        return [
+            {"id": n.id, "label": n.label, "content": n.content}
+            for n in nodes[:10]
+        ]
 
     def _search_nodes(
         self,

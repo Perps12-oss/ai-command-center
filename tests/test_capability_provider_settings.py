@@ -7,10 +7,7 @@ import unittest
 from pathlib import Path
 
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.intents import INTENT_CHAT
 from ai_command_center.core.events.topics import (
-    CAPABILITY_CLASSIFIED,
-    COMMAND_ROUTED,
     SETTINGS_SNAPSHOT,
 )
 from ai_command_center.db.connection import connect, init_database
@@ -58,8 +55,6 @@ def test_migration_v3_advances_to_v6_with_defaults() -> None:
 def test_router_respects_user_provider_map() -> None:
     bus = EventBus()
     router = RuntimeCapabilityRouterService(bus)
-    classified: list[dict] = []
-    bus.subscribe(CAPABILITY_CLASSIFIED, lambda e: classified.append(dict(e.payload)))
     router.start()
     try:
         bus.publish(
@@ -70,18 +65,8 @@ def test_router_respects_user_provider_map() -> None:
             },
             source="settings",
         )
-        bus.publish(
-            COMMAND_ROUTED,
-            {
-                "intent": INTENT_CHAT,
-                "args": {"prompt": "plan my week"},
-                "request_id": "req-user-map",
-            },
-            source="command_router",
-        )
-        assert len(classified) == 1
-        assert classified[0]["kind"] == CapabilityKind.PLANNING.value
-        assert classified[0]["provider_id"] == "native"
+        assert RuntimeCapabilityRouterService.classify("plan my week") == CapabilityKind.PLANNING
+        assert router.resolve_provider(CapabilityKind.PLANNING) == "native"
     finally:
         router.stop()
 

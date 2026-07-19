@@ -187,6 +187,14 @@ class CapabilityContextAssembler:
                     str(n) for n in self._obsidian.get_context_notes() if str(n).strip()
                 )
 
+            # State Authority snippets (know-before-decide) injected by ExecutionAuthority.
+            state_snippets_raw = args.get("state_context_snippets")
+            state_snippets: list[str] = []
+            if isinstance(state_snippets_raw, list):
+                state_snippets = [
+                    str(n) for n in state_snippets_raw if str(n).strip()
+                ]
+
             session_scope = self.session_scope_from_payload(event_payload, args)
             session_scope = self.merge_selected_entity_scope(
                 event_payload, args, session_scope
@@ -243,6 +251,8 @@ class CapabilityContextAssembler:
             workspace_snippets = [
                 str(n) for n in pending.get("workspace_snippets", []) if str(n).strip()
             ]
+            if state_snippets:
+                workspace_snippets = state_snippets + workspace_snippets
             entity_snippets = [
                 str(n) for n in pending.get("entity_snippets", []) if str(n).strip()
             ]

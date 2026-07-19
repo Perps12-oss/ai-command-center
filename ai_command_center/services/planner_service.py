@@ -292,12 +292,32 @@ class PlannerService(BaseService):
 
         try:
             workspace_snippets: list[str] = []
-            if workspace_id:
-                workspace_snippets = self._fetch_workspace_snippets(
-                    request_id,
-                    workspace_id=workspace_id,
-                    entity_id=entity_id,
+            injected = event.payload.get("workspace_snippets")
+            if isinstance(injected, list):
+                workspace_snippets.extend(
+                    str(item) for item in injected if str(item).strip()
                 )
+            state_context = event.payload.get("state_context")
+            if isinstance(state_context, dict):
+                summary = str(state_context.get("summary") or "").strip()
+                if summary and summary not in workspace_snippets:
+                    workspace_snippets.insert(0, f"[world_model]\n{summary}")
+            if workspace_id:
+                workspace_snippets.extend(
+                    self._fetch_workspace_snippets(
+                        request_id,
+                        workspace_id=workspace_id,
+                        entity_id=entity_id,
+                    )
+                )
+            # Deduplicate while preserving order.
+            seen: set[str] = set()
+            deduped: list[str] = []
+            for snippet in workspace_snippets:
+                if snippet not in seen:
+                    seen.add(snippet)
+                    deduped.append(snippet)
+            workspace_snippets = deduped
 
             specs = self._fetch_capability_specs(request_id, entity_types)
 

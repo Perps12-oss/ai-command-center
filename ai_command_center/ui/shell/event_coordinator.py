@@ -9,7 +9,6 @@ from ai_command_center.core.events.topics import (
     CHAT_EXPORT_ERROR,
     CHAT_EXPORT_RESULT,
     COMMAND_HISTORY,
-    COMMAND_ROUTED,
     MEMORY_ERROR,
     MEMORY_SELECTED,
     MEMORY_STORED,
@@ -31,6 +30,7 @@ from ai_command_center.core.events.topics import (
     TIMELINE_UNDO_RESULT,
     TOOL_ERROR,
     TOOL_RESULT,
+    UI_NAVIGATE,
 )
 from ai_command_center.ui.shell.view_manager import VIEW_IDS
 from ai_command_center.ui.views.plugins_view import PluginsView
@@ -52,17 +52,11 @@ class EventCoordinatorMixin:
 
     def _wire_navigation_events(self) -> None:
         self._bus_unsubs.append(
-            self._bus.subscribe(COMMAND_ROUTED, self._on_command_routed_navigate)
+            self._bus.subscribe(UI_NAVIGATE, self._on_ui_navigate)
         )
 
-    def _on_command_routed_navigate(self, event: Event) -> None:
-        from ai_command_center.core.routing_authority import is_routing_authority
-
-        if not is_routing_authority(event.source):
-            return
-        if event.payload.get("intent") != "navigate":
-            return
-        view = str((event.payload.get("args") or {}).get("view", "home")).lower()
+    def _on_ui_navigate(self, event: Event) -> None:
+        view = str(event.payload.get("view", "home")).lower()
         if view not in VIEW_IDS:
             view = "home"
 

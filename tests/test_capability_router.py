@@ -1,7 +1,7 @@
 """Tests for RuntimeCapabilityRouterService (Agent Runtime Interface Phase 1).
 
-COMMAND_ROUTED racing was removed — router is a classifier/settings helper.
-External dispatch is owned by ExecutionOrchestrator via CAPABILITY_RUNTIME_REQUEST.
+The router is a classifier/settings helper. External dispatch is owned by
+ExecutionOrchestrator via CAPABILITY_RUNTIME_REQUEST.
 """
 
 from __future__ import annotations

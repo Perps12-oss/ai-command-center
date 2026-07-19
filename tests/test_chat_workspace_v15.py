@@ -9,8 +9,8 @@ from ai_command_center.core.events.topics import (
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
-    COMMAND_ROUTED,
     CONTEXT_SNAPSHOT_CREATED,
+    EXECUTION_AUTHORITY_DECISION,
     GOAL_SUBMIT_REQUEST,
     UI_CHAT_NEW_SESSION,
     UI_COMMAND,
@@ -122,13 +122,25 @@ class ChatWorkspaceV15StateTests(unittest.TestCase):
         bus = EventBus()
         store = AppStateStore(bus)
 
-        bus.publish(COMMAND_ROUTED, {"text": "What is Python?"}, source="command_router")
+        bus.publish(
+            EXECUTION_AUTHORITY_DECISION,
+            {"text": "What is Python?", "capability": "llm"},
+            source="execution_authority",
+        )
         self.assertEqual("What is Python?", store.snapshot.chat_pending_user_text)
 
-        bus.publish(COMMAND_ROUTED, {"text": "note: daily log"}, source="command_router")
+        bus.publish(
+            EXECUTION_AUTHORITY_DECISION,
+            {"text": "note: daily log", "capability": "notes.create"},
+            source="execution_authority",
+        )
         self.assertEqual("", store.snapshot.chat_pending_user_text)
 
-        bus.publish(COMMAND_ROUTED, {"text": "Explain async"}, source="command_router")
+        bus.publish(
+            EXECUTION_AUTHORITY_DECISION,
+            {"text": "Explain async", "capability": "llm"},
+            source="execution_authority",
+        )
         bus.publish(CHAT_STARTED, {"request_id": "r6"}, source="tests")
         snap = store.snapshot
         self.assertEqual("", snap.chat_pending_user_text)

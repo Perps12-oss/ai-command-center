@@ -13,7 +13,6 @@ class DecisionKind(str, Enum):
     ACTIONABLE = "actionable"
     CONVERSATIONAL = "conversational"
     AMBIGUOUS = "ambiguous"
-    LEGACY_ROUTE = "legacy_route"
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +23,6 @@ class ExecutionDecision:
     text: str
     capability: str = ""
     args: dict[str, Any] = field(default_factory=dict)
-    legacy_intent: str = ""
     reason: str = ""
     skip_planner: bool = False
 
@@ -34,7 +32,6 @@ class ExecutionDecision:
             "text": self.text,
             "capability": self.capability,
             "args": dict(self.args),
-            "legacy_intent": self.legacy_intent,
             "reason": self.reason,
             "skip_planner": self.skip_planner,
         }

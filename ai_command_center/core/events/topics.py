@@ -61,7 +61,6 @@ APP_PHASE = "app.phase"
 APP_ERROR = "app.error"
 APP_WARNING = "app.warning"
 BUS_HANDLER_ERROR = "bus.handler_error"
-COMMAND_ROUTED = "command.routed"
 COMMAND_DEFERRED = "command.deferred"
 UI_COMMAND = "ui.command"
 UI_WORKSPACE_REQUIRED = "ui.workspace.required"
@@ -386,6 +385,11 @@ WORLD_MODEL_MUTATION_APPLIED = "world_model.mutation.applied"
 WORLD_MODEL_EXPLORER_OPEN = "world_model.explorer.open"
 WORLD_MODEL_DEPENDENCY_INSPECT = "world_model.dependency.inspect"
 
+# State Authority — pre-decision World Model projection
+STATE_CONTEXT_BUILT = "state.context.built"
+STATE_CONTEXT_REQUEST = "state.context.request"
+STATE_CONTEXT_RESULT = "state.context.result"
+
 # Cross-Workspace Federation (Phase 10 — P4)
 FEDERATION_WORKSPACE_REGISTERED = "federation.workspace.registered"
 FEDERATION_WORKSPACE_UNREGISTERED = "federation.workspace.unregistered"
@@ -424,7 +428,6 @@ __all__ = [
     "APP_ERROR",
     "APP_WARNING",
     "BUS_HANDLER_ERROR",
-    "COMMAND_ROUTED",
     "COMMAND_DEFERRED",
     "UI_COMMAND",
     "UI_WORKSPACE_REQUIRED",
@@ -665,6 +668,9 @@ __all__ = [
     "WORLD_MODEL_MUTATION_APPLIED",
     "WORLD_MODEL_EXPLORER_OPEN",
     "WORLD_MODEL_DEPENDENCY_INSPECT",
+    "STATE_CONTEXT_BUILT",
+    "STATE_CONTEXT_REQUEST",
+    "STATE_CONTEXT_RESULT",
     "FEDERATION_WORKSPACE_REGISTERED",
     "FEDERATION_WORKSPACE_UNREGISTERED",
     "FEDERATION_QUERY_REQUEST",

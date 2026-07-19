@@ -7,7 +7,7 @@ from pathlib import Path
 from ai_command_center.core.app_state import AppStateStore, _is_pending_chat_user_text
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
-    COMMAND_ROUTED,
+    EXECUTION_AUTHORITY_DECISION,
     PERMISSION_CHECK_REQUEST,
     PERMISSION_CHECK_RESULT,
 )
@@ -21,10 +21,14 @@ def test_agent_command_not_pending_chat_user_text() -> None:
     assert _is_pending_chat_user_text("hello world") is True
 
 
-def test_command_routed_agent_command_clears_pending_user_text() -> None:
+def test_authority_agent_decision_clears_pending_user_text() -> None:
     bus = EventBus()
     store = AppStateStore(bus)
-    bus.publish(COMMAND_ROUTED, {"text": "agent: demo", "intent": "agent"}, source="test")
+    bus.publish(
+        EXECUTION_AUTHORITY_DECISION,
+        {"text": "agent: demo", "capability": "agent.run"},
+        source="execution_authority",
+    )
     assert store.snapshot.chat_pending_user_text == ""
     store.close()
 
