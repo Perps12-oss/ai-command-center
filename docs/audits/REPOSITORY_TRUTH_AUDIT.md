@@ -1,23 +1,30 @@
 # Repository Truth Audit — All Branches
 
-**Date:** 2026-07-18  
-**Baseline:** `origin/main` @ `d0bb2ed` (includes GraphCanvas #78)  
+**Date:** 2026-07-18 (superseded for Phase 11 asset inventory)  
+**Baseline (historical):** `origin/main` @ `d0bb2ed` (includes GraphCanvas #78)  
 **Governance:** `docs/governance/PHASE_COMPLETION_RULE.md`
+
+> **SUPERSEDED for “what exists on main”:** see  
+> [`docs/audits/REPOSITORY_TRUTH_CANON.md`](REPOSITORY_TRUTH_CANON.md)  
+> (`origin/main` @ `e128a72`, includes #76–#80).  
+> Root `REPOSITORY_TRUTH_AUDIT.md` on `phase-11a-command-center` @ `8ba0522` is **non-canonical** (wrong baseline).
 
 ---
 
 ## Main missing Phase 11 deliverables (before integration)
 
-| Feature / audit | On main? |
-|-----------------|----------|
-| 11A–11D workspaces | Yes |
-| BaseGraphCanvas / PrimAudit | Yes (#78) |
-| 11E Approval Center panels | **No** |
-| 11F Goal Dashboard panels | **No** |
-| Article 18 `surface_state` | **No** |
-| `GOAL_AMBER` / `WORLD_TEAL` in UI Constitution | **No** |
-| PHASE_11_REMEDIATION_AUDIT / PLACEHOLDER_AUDIT | **No** |
-| Verify PHASE_11F | **No** |
+> Historical snapshot at `d0bb2ed`. After `#79` (`811e847`), 11E/11F panels and related audits are on `main`. Use the Canon for current inventory.
+
+| Feature / audit | On main @ `d0bb2ed`? | On main @ `e128a72`? |
+|-----------------|----------|----------------------|
+| 11A–11D workspaces | Yes | Yes |
+| BaseGraphCanvas / PrimAudit | Yes (#78) | Yes |
+| 11E Approval Center panels | **No** | **Yes** (#79) |
+| 11F Goal Dashboard panels | **No** | **Yes** (#79) |
+| Article 18 `surface_state` | **No** | **Yes** (#79) |
+| `GOAL_AMBER` / `WORLD_TEAL` in UI Constitution | **No** | **Yes** (#79) |
+| PHASE_11_REMEDIATION_AUDIT / PLACEHOLDER_AUDIT | **No** | See Canon / Phase 11 final audit |
+| Verify PHASE_11F | **No** | See Canon / Phase 11 final audit |
 
 ---
 
