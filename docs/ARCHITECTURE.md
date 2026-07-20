@@ -247,26 +247,24 @@ Tray icon remains fallback if global hook registration fails.
 
 ---
 
-## Command routing
+## Command routing (State Authority)
 
 ```text
-UI → ui.command → CommandRouterService → command.routed → Phase 3 handlers
+UI → ui.command → StateAuthority.project → ExecutionAuthority
+  → ExecutionPlan → Goal/Planner → ExecutionOrchestrator
+  → Receipt → Truth → State Delta → World Model Apply
 ```
 
-### `command.routed` payload
+`command.routed` is **historical only** (removed from the Python runtime).
+Do not add new producers or decision consumers for that topic.
 
-```json
-{
-  "text": "user input",
-  "intent": "chat | shell | note_search | note_new | navigate",
-  "args": {},
-  "status": "pending"
-}
-```
+Canonical topics: `state.context.built`, `execution.authority.decision`,
+`goal.submit.request`, `plan.request` / `plan.generated`, `execution.run.*`,
+`orchestration.receipt`, `runtime.action.request`.
 
-Phase 3 services subscribe to `command.routed` by intent (Ollama chat, Obsidian, etc.).
+AppState projection: `last_command`, service health, and World Model snapshots via EventBus reducers.
 
-AppState projection: `last_command`, `last_command_intent` updated via reducer.
+See [plans/PHASE_12_STATE_INTELLIGENCE_PLAN.md](plans/PHASE_12_STATE_INTELLIGENCE_PLAN.md).
 
 ---
 
@@ -291,24 +289,29 @@ Phase 4D adds `conversation_summary` compression and `graph_snippets` opt-in.
 
 ## Phase 4 event flows
 
-### Tool execution (4B)
+### Tool execution (4B / State Authority)
 
 ```text
-command.routed (shell) → ShellToolService → tool.invoke → ToolExecutorService → tool.result
+ui.command → ExecutionAuthority → ExecutionPlan(shell|capability)
+  → ExecutionOrchestrator → tool.invoke → ToolExecutorService → tool.result
 ```
 
 ### Model routing (4F)
 
 ```text
-command.routed (chat) → ChatHandler → ModelRouterService.resolve() → model.selected → OllamaHttpService
+ui.command → ExecutionAuthority(capability=llm) → ChatHandler
+  → ModelRouterService.resolve() → model.selected → OllamaHttpService
 ```
 
-### Memory graph (4E)
+### Memory graph (4E / write-through)
 
 ```text
-memory.remember → MemoryGraphService → memory.stored
-memory.select → MemoryGraphService → memory.selected → ContextManager (opt-in)
+UI memory form → ui.command (remember: …) → Authority → memory.store
+  → MemoryGraphService.store_memory → memory.stored → State Delta → World Model
+memory.select / memory.query → MemoryGraphService → memory.selected → ContextManager (opt-in)
 ```
+
+`memory.remember` is not a UI write path (internal/tests only; UI source rejected).
 
 ### Telemetry (5C+)
 

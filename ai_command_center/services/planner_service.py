@@ -107,7 +107,7 @@ def build_deterministic_plan(goal: str, specs: list[dict[str, Any]]) -> Executio
         title = title_match.group(1).strip() if title_match else goal_text[:120]
         capability, require_approval = _pick_capability(
             specs,
-            preferred=("create_note", "note.create"),
+            preferred=("notes.create", "create_note", "note.create"),
         )
         if capability:
             return ExecutionPlan(
@@ -116,7 +116,7 @@ def build_deterministic_plan(goal: str, specs: list[dict[str, Any]]) -> Executio
                     PlanStep(
                         step_id="step-1",
                         capability=capability,
-                        args={"title": title},
+                        args={"title": title, "body": title},
                         require_approval=require_approval,
                     ),
                 ),
@@ -125,7 +125,7 @@ def build_deterministic_plan(goal: str, specs: list[dict[str, Any]]) -> Executio
     if _TASK_GOAL.search(goal_text):
         capability, require_approval = _pick_capability(
             specs,
-            preferred=("create_task", "create_entity", "create_note"),
+            preferred=("tasks.create", "notes.create", "create_task", "create_note"),
         )
         if capability:
             return ExecutionPlan(
@@ -134,26 +134,49 @@ def build_deterministic_plan(goal: str, specs: list[dict[str, Any]]) -> Executio
                     PlanStep(
                         step_id="step-1",
                         capability=capability,
-                        args={"title": goal_text[:120]},
+                        args={"title": goal_text[:120], "body": goal_text[:120]},
                         require_approval=require_approval,
                     ),
                 ),
             )
 
+    # Free-text goals: prefer concrete tools when present, then OS ops / llm.
     capability, require_approval = _pick_capability(
         specs,
-        preferred=("search_files", "create_note"),
+        preferred=(
+            "search_files",
+            "notes.search",
+            "memory.query",
+            "notes.create",
+            "goals.plan",
+            "reasoning.plan",
+            "llm.chat",
+            "llm.generate",
+        ),
+        fallback="llm.chat",
     )
+    if not capability:
+        # Absolute fallback so planners never report "no capabilities available"
+        # when the Workspace OS registry is present.
+        by_name = _spec_lookup(specs)
+        for name in ("llm.chat", "llm.generate"):
+            if name in by_name:
+                capability = name
+                require_approval = bool(by_name[name].get("requires_approval", False))
+                break
     if not capability:
         return ExecutionPlan(goal=goal_text, steps=())
 
+    args: dict[str, Any] = {"query": goal_text, "prompt": goal_text, "goal": goal_text}
+    if capability.startswith("llm."):
+        args = {"prompt": goal_text}
     return ExecutionPlan(
         goal=goal_text,
         steps=(
             PlanStep(
                 step_id="step-1",
                 capability=capability,
-                args={"query": goal_text},
+                args=args,
                 require_approval=require_approval,
             ),
         ),
@@ -189,9 +212,16 @@ class PlannerService(BaseService):
 
     name = "planner"
 
-    def __init__(self, bus, *, context_manager: ContextManager) -> None:
+    def __init__(
+        self,
+        bus,
+        *,
+        context_manager: ContextManager,
+        capability_selector: Any | None = None,
+    ) -> None:
         super().__init__(bus)
         self._context_manager = context_manager
+        self._capability_selector = capability_selector
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -236,6 +266,9 @@ class PlannerService(BaseService):
         self,
         request_id: str,
         entity_types: list[str],
+        *,
+        goal: str = "",
+        state_context: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         specs: list[dict[str, Any]] = []
 
@@ -246,13 +279,42 @@ class PlannerService(BaseService):
 
         unsub = self._bus.subscribe(CAPABILITY_CATALOG_RESULT, on_result)
         try:
+            payload: dict[str, Any] = {
+                "request_id": request_id,
+                "entity_types": entity_types,
+                "goal": goal,
+            }
+            if state_context:
+                payload["state_context"] = state_context
             self._bus.publish(
                 CAPABILITY_CATALOG_REQUEST,
-                {"request_id": request_id, "entity_types": entity_types},
+                payload,
                 source=self.name,
             )
         finally:
             unsub()
+
+        # Local selector fallback if catalog empty (tests / wiring races).
+        if not specs and self._capability_selector is not None:
+            from ai_command_center.domain.state_context import StateContext
+
+            ctx = None
+            if isinstance(state_context, dict):
+                ctx = StateContext(
+                    workspace_id=str(state_context.get("workspace_id") or ""),
+                    entities=tuple(state_context.get("entities") or ()),
+                    relationships=tuple(state_context.get("relationships") or ()),
+                    memories=tuple(state_context.get("memories") or ()),
+                    goals=tuple(state_context.get("goals") or ()),
+                    summary=str(state_context.get("summary") or ""),
+                    query_text=str(state_context.get("query_text") or goal),
+                )
+            specs = list(
+                self._capability_selector.to_prompt_specs(
+                    goal=goal,
+                    state_context=ctx,
+                )
+            )
         return specs
 
     def _on_plan_request(self, event: Event) -> None:
@@ -319,7 +381,12 @@ class PlannerService(BaseService):
                     deduped.append(snippet)
             workspace_snippets = deduped
 
-            specs = self._fetch_capability_specs(request_id, entity_types)
+            specs = self._fetch_capability_specs(
+                request_id,
+                entity_types,
+                goal=goal,
+                state_context=state_context if isinstance(state_context, dict) else None,
+            )
 
             bundle = self._context_manager.build_context(
                 goal,

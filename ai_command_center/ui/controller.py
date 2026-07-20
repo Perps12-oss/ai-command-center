@@ -19,7 +19,6 @@ from ai_command_center.core.events.topics import (
     ENTITY_CREATE_REQUEST,
     GOAL_SUBMIT_REQUEST,
     MEMORY_DELETE_REQUEST,
-    MEMORY_REMEMBER,
     NOTE_SELECT,
     OVERLAY_ANCHOR,
     OVERLAY_HIDE,
@@ -385,14 +384,14 @@ class UIController:
         *,
         workspace_scope: dict[str, str] | None = None,
     ) -> None:
-        payload = {"label": label, "content": content}
+        """Route memory form writes through Execution Authority (no MEMORY_REMEMBER bypass)."""
+        text = f"remember: {label.strip()} | {content.strip()}"
+        payload: dict[str, str] = {"text": text}
         if workspace_scope:
-            payload.update(workspace_scope)
-        self._bus.publish(
-            MEMORY_REMEMBER,
-            payload,
-            source="ui",
-        )
+            for key, value in workspace_scope.items():
+                if value:
+                    payload[str(key)] = str(value)
+        self._bus.publish(UI_COMMAND, payload, source="ui")
 
     def publish_launch_resource(self, payload: dict[str, object]) -> None:
         self._bus.publish(UI_LAUNCH_RESOURCE, payload, source="ui")

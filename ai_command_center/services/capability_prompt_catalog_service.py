@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from ai_command_center.capabilities.registry import CapabilityRegistry
+from ai_command_center.capabilities.selector import CapabilitySelector
 from ai_command_center.core.ai.capability_registry_service import (
     AICapabilityRegistryService,
 )
@@ -21,6 +23,7 @@ from ai_command_center.domain.capability_lifecycle import CapabilityRecord
 from ai_command_center.domain.capability_prompt_spec import CapabilityPromptSpec
 from ai_command_center.domain.external_capability_manifest import ExternalCapabilityManifest
 from ai_command_center.domain.execution_plan import RiskTier, capability_risk_for
+from ai_command_center.domain.state_context import StateContext
 from ai_command_center.services.base import BaseService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
@@ -46,18 +49,56 @@ class CapabilityPromptCatalogService(BaseService):
         *,
         tool_registry: ToolRegistry,
         ai_capability_registry: AICapabilityRegistryService | None = None,
+        capability_registry: CapabilityRegistry | None = None,
+        capability_selector: CapabilitySelector | None = None,
     ) -> None:
         super().__init__(bus)
         self._tool_registry = tool_registry
         self._ai_registry = ai_capability_registry
+        self._capability_registry = capability_registry or CapabilityRegistry()
+        self._capability_selector = capability_selector or CapabilitySelector(
+            self._capability_registry
+        )
         self._lifecycle_records: dict[str, CapabilityRecord] = {}
         self._external_manifests: dict[str, ExternalCapabilityManifest] = {}
         self._unsubscribers: list[Callable[[], None]] = []
 
-    def get_available_prompt_specs(self, entity_types: list[str]) -> list[dict[str, Any]]:
-        """Return planner-facing specs; handlers are never included."""
+    def get_available_prompt_specs(
+        self,
+        entity_types: list[str],
+        *,
+        goal: str = "",
+        state_context: StateContext | None = None,
+        use_selector: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Return planner-facing specs; handlers are never included.
+
+        When ``goal`` / ``state_context`` is provided, CapabilitySelector ranks
+        Workspace OS capabilities first, then registered tools/external manifests
+        are merged so providers are not dropped.
+        """
         specs: list[CapabilityPromptSpec] = []
         seen: set[str] = set()
+
+        if use_selector and (goal or state_context is not None):
+            for item in self._capability_selector.to_prompt_specs(
+                goal=goal,
+                state_context=state_context,
+            ):
+                name = str(item.get("name") or "")
+                if not name or name in seen:
+                    continue
+                specs.append(
+                    CapabilityPromptSpec(
+                        name=name,
+                        description=str(item.get("description") or name),
+                        risk=str(item.get("risk") or "low"),
+                        requires_approval=bool(item.get("requires_approval", False)),
+                        parameters={"type": "object", "properties": {}},
+                        source="workspace_os",
+                    )
+                )
+                seen.add(name)
 
         for tool_name in self._tool_registry.list_tools():
             if tool_name in seen:
@@ -212,7 +253,28 @@ class CapabilityPromptCatalogService(BaseService):
     def _on_catalog_request(self, event: Event) -> None:
         entity_types_raw = event.payload.get("entity_types") or []
         entity_types = [str(item) for item in entity_types_raw if str(item).strip()]
-        specs = self.get_available_prompt_specs(entity_types)
+        goal = str(event.payload.get("goal") or "")
+        raw_ctx = event.payload.get("state_context")
+        state_context = None
+        if isinstance(raw_ctx, dict):
+            state_context = StateContext(
+                workspace_id=str(raw_ctx.get("workspace_id") or ""),
+                entities=tuple(raw_ctx.get("entities") or ()),
+                relationships=tuple(raw_ctx.get("relationships") or ()),
+                memories=tuple(raw_ctx.get("memories") or ()),
+                goals=tuple(raw_ctx.get("goals") or ()),
+                summary=str(raw_ctx.get("summary") or ""),
+                query_text=str(raw_ctx.get("query_text") or goal),
+            )
+        specs = self.get_available_prompt_specs(
+            entity_types,
+            goal=goal,
+            state_context=state_context,
+            use_selector=bool(goal or state_context is not None),
+        )
+        # Guarantee non-empty catalog for free-text goals.
+        if not specs:
+            specs = self._capability_selector.to_prompt_specs(goal=goal or "chat")
         self._bus.publish(
             CAPABILITY_CATALOG_RESULT,
             {

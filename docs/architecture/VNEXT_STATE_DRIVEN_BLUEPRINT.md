@@ -312,28 +312,30 @@ sequenceDiagram
     participant User
     participant UI
     participant Bus as EventBus
-    participant WM as EntityBusHandlers
+    participant SA as StateAuthority
+    participant EA as ExecutionAuthority
     participant Planner as PlannerService
-    participant Exec as WorkflowEngine
-    participant AppState
+    participant Orch as ExecutionOrchestrator
+    participant WM as WorldModel
 
-    User->>UI: chat message
-    UI->>Bus: ui.command / command.routed
-    Bus->>WM: workspace.context.request
-    WM->>Bus: workspace.context.result
-    Note over WM: context_compiler dense snapshot
-    Bus->>Planner: plan.request
+    User->>UI: chat or form action
+    UI->>Bus: ui.command
+    Bus->>SA: project StateContext
+    SA->>Bus: state.context.built
+    Note over SA: World Model + Intent Registry
+    Bus->>EA: analyze and decide
+    EA->>Bus: execution.authority.decision
+    EA->>Bus: goal.submit.request / plan
+    Bus->>Planner: plan.request plus State Projection
     Planner->>Bus: plan.generated
-    Bus->>AppState: execution plan projection
-    AppState->>UI: Execution View checklist
-    Bus->>Exec: execution.run
-    Exec->>Bus: tool.invoke
-    Exec->>Bus: entity.update
-    Bus->>AppState: workspace refresh
-    AppState->>UI: Workspace + Chat update
+    Bus->>Orch: execution.run.request
+    Orch->>Bus: tool.invoke
+    Orch->>Bus: orchestration.receipt
+    Bus->>WM: runtime.action.request apply via StateDelta
 ```
 
-**Milestone 1 (this branch):** Steps through workspace context injection are live. Planner (Phase C) and execution gates (Phase D MVP) are implemented on the bus.
+**Current spine:** State Authority → Authority → Plan → Run → Receipt → Truth → State Delta → World Model.
+`command.routed` is historical only. See [PHASE_12_STATE_INTELLIGENCE_PLAN.md](../plans/PHASE_12_STATE_INTELLIGENCE_PLAN.md).
 
 ---
 

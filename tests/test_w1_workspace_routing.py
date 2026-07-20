@@ -14,7 +14,6 @@ from ai_command_center.core.events.topics import (
     GOAL_SUBMIT_REQUEST,
     LLM_STEP_REQUEST,
     LLM_REQUEST,
-    MEMORY_REMEMBER,
     MODEL_RESOLVE_REQUEST,
     MODEL_RESOLVE_RESULT,
     SESSION_HISTORY_REQUEST,
@@ -214,7 +213,7 @@ class W1UIControllerScopeTests(unittest.TestCase):
         bus = EventBus()
         store = AppStateStore(bus)
         captured: list[dict] = []
-        bus.subscribe(MEMORY_REMEMBER, lambda e: captured.append(dict(e.payload)))
+        bus.subscribe(UI_COMMAND, lambda e: captured.append(dict(e.payload)))
         controller = UIController(bus, store, MagicMock())
 
         bus.publish(
@@ -231,6 +230,7 @@ class W1UIControllerScopeTests(unittest.TestCase):
         self.assertEqual(1, len(captured))
         self.assertEqual("ws-7", captured[0].get("workspace_id"))
         self.assertEqual("ws-7", captured[0].get("workspace_entity_id"))
+        self.assertIn("remember:", captured[0].get("text", ""))
 
     def test_active_workspace_scope_without_open_chat_entity(self) -> None:
         bus = EventBus()

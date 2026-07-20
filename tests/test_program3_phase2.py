@@ -25,7 +25,8 @@ from ai_command_center.core.event_bus import (
     EventBus,
 )
 from ai_command_center.core.events.topics import (
-    MEMORY_REMEMBER,
+    MEMORY_STORED,
+    UI_COMMAND,
     UI_OPEN_CHAT,
     UI_SELECT_ENTITY,
     WORKSPACE_ACTIVATED,
@@ -39,8 +40,17 @@ from ai_command_center.core.relationship.relationship_repository import (
 )
 from ai_command_center.core.workspace.workspace_service import WorkspaceService
 from ai_command_center.db.connection import connect, init_database
+from ai_command_center.orchestration.state_capability_tools import bind_state_capability_tools
+from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.repositories.memory_repository import MemoryRepository
+from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.services.execution_orchestrator_service import (
+    ExecutionOrchestratorService,
+)
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.memory_graph_service import MemoryGraphService
+from ai_command_center.services.tool_executor_service import ToolExecutorService
+from ai_command_center.tools.tool_registry import ToolRegistry
 from ai_command_center.ui.controller import UIController
 
 
@@ -185,17 +195,37 @@ class Phase2OpenChatScopeTests(unittest.TestCase):
                 source="tests",
             )
 
+            registry = ToolRegistry()
+            bind_state_capability_tools(registry, bus=bus, memory=mem_svc)
+            executor = ToolExecutorService(bus, registry)
+            scheduler = SingleGoalScheduler(bus, GoalRepository(db))
+            orchestrator = ExecutionOrchestratorService(bus)
+            authority = ExecutionAuthorityService(bus)
+            executor.load()
+            scheduler.load()
+            orchestrator.load()
+            authority.load()
+
+            commands: list[dict] = []
             stored: list[dict] = []
-            bus.subscribe(MEMORY_REMEMBER, lambda e: stored.append(dict(e.payload)))
+            bus.subscribe(UI_COMMAND, lambda e: commands.append(dict(e.payload)))
+            bus.subscribe(MEMORY_STORED, lambda e: stored.append(dict(e.payload)))
             scope = controller.current_workspace_scope()
             controller.publish_memory_remember(
                 "fact",
                 "scoped from card chat",
                 workspace_scope=scope,
             )
+            authority.unload()
+            orchestrator.unload()
+            scheduler.unload()
+            executor.unload()
             mem_svc.unload()
 
             self.assertEqual(ws_id, scope.get("workspace_id"))
+            self.assertEqual(1, len(commands))
+            self.assertIn("remember:", commands[0].get("text", ""))
+            self.assertEqual(ws_id, commands[0].get("workspace_id"))
             self.assertEqual(1, len(stored))
             self.assertEqual(ws_id, stored[0].get("workspace_id"))
             nodes = mem_repo.search("scoped", workspace_id=ws_id)

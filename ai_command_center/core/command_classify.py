@@ -46,6 +46,18 @@ _SHELL_VERBS: tuple[str, ...] = (
 )
 
 
+def _navigate_view(token: str) -> str | None:
+    view = token.strip().lower().replace("-", "_").replace(" ", "_")
+    if view in _VIEW_ALIASES:
+        return _VIEW_ALIASES[view]
+    # Accept common aliases (dashboard → home).
+    aliases = {"dashboard": "home", "main": "home", "commandcenter": "command_center"}
+    mapped = aliases.get(view)
+    if mapped in _VIEW_ALIASES:
+        return mapped
+    return None
+
+
 def classify_command(text: str) -> tuple[str, dict[str, str]]:
     """Prefix/keyword classification table (no LLM, no execution)."""
     stripped = text.strip()
@@ -59,9 +71,18 @@ def classify_command(text: str) -> tuple[str, dict[str, str]]:
     if lower.startswith("new note:"):
         return INTENT_NOTE_NEW, {"body": text[9:].strip()}
     if lower.startswith("go "):
-        return INTENT_NAVIGATE, {"view": text[3:].strip().lower()}
+        view = _navigate_view(text[3:]) or text[3:].strip().lower()
+        return INTENT_NAVIGATE, {"view": view}
+    if lower.startswith("navigate "):
+        view = _navigate_view(text[9:]) or text[9:].strip().lower()
+        return INTENT_NAVIGATE, {"view": view}
     if lower.startswith("remember:"):
         return INTENT_MEMORY_REMEMBER, {"body": text[9:].strip()}
+    # Natural language remember: "remember my preferred editor is VS Code"
+    if lower.startswith("remember ") or lower.startswith("remember\t"):
+        body = stripped[8:].strip()
+        if body:
+            return INTENT_MEMORY_REMEMBER, {"body": body}
     if lower.startswith("memory:"):
         return INTENT_MEMORY_SELECT, {"query": text[7:].strip()}
     if lower.startswith("agent: spawn "):

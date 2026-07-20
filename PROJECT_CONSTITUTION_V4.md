@@ -262,6 +262,20 @@ Capability providers must integrate through the Agent Runtime Interface (`docs/a
 
 **Integration gate:** Before any external runtime (QwenPaw, OpenHands, CrewAI, hosted platforms) is wired into production paths, `AGENT_RUNTIME_INTERFACE.md` and its domain contracts must be current. A stable ARI turns future providers into adapters; an ad hoc integration creates architectural debt.
 
+### Invariant 14 — CAP-001 Capability Contract
+
+All user-visible actions must be represented as a `CapabilityDefinition`.
+
+ExecutionPlans may only contain Capability IDs.
+
+Planners must never reference implementation details (shell commands, provider names, APIs, databases, subprocesses).
+
+ExecutionOrchestrator is solely responsible for resolving Capability IDs into executable handlers.
+
+Capabilities are the canonical contract between State Authority, Planner, Execution Engine, World Model, and UI.
+
+Execution outcomes use `ExecutionResultType`: `SUCCESS`, `FAILED`, `PARTIAL`, `NO_OP`.
+
 ---
 
 # ARTICLE IV
@@ -639,6 +653,51 @@ The following are now constitutional:
 ## Verification
 
 All 29 existing tests passed after refactoring with no behavioral change. This work is classified as a Refactor per Article I.
+
+---
+
+# ARTICLE XVIII
+
+# STATE AUTHORITY
+
+The LLM shall never infer authoritative state.
+
+All state used for planning must originate from:
+
+- World Model
+- Verified providers
+- Execution receipts
+- Truth validation outputs
+- In-flight execution intent (active runs, pending plans, scheduled goals)
+
+If state is unknown:
+
+The system must query reality (World Model + Intent Registry + providers).
+
+The system must not guess.
+
+Canonical reverse path for typed commands:
+
+```text
+StateContext → Authority → Plan → Run → Receipt → Truth → State Delta → World Model
+```
+
+---
+
+# ARTICLE XIX
+
+# WRITE-THROUGH STATE
+
+No component may mutate the World Model directly.
+
+All mutations must originate from:
+
+```text
+Execution → Receipt → Truth Validation → State Delta → World Model Apply
+```
+
+UI forms, buttons, agents, and workflows must enter Execution Authority.
+No user-originated state mutation may bypass StateContext → Authority → Plan → Run → Receipt → Mutation.
 
 ---
 

@@ -1,13 +1,12 @@
 """State Authority — World Model / workspace reality projection before decisions.
 
-Builds StateContext from World Model (+ optional memory/goal signals) so
-ExecutionAuthority and Planner can decide from known state, not text alone.
+Builds StateContext from WorldModelQueryService (+ Intent + ContextProjection)
+so ExecutionAuthority and Planner can decide from known state, not text alone.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 from collections.abc import Callable
 from typing import Any
 
@@ -20,10 +19,10 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.domain.state_context import StateContext
 from ai_command_center.services.base import BaseService
+from ai_command_center.core.state_intelligence.context_projection_service import ContextProjectionService
+from ai_command_center.core.state_intelligence.world_model_query_service import WorldModelQueryService
 
 _logger = logging.getLogger(__name__)
-
-_TOKEN_RE = re.compile(r"[a-z0-9_]{3,}", re.IGNORECASE)
 
 
 class StateAuthorityService(BaseService):
@@ -38,11 +37,15 @@ class StateAuthorityService(BaseService):
         *,
         memory_lookup: Callable[..., list[dict[str, Any]]] | None = None,
         goal_lookup: Callable[..., list[dict[str, Any]]] | None = None,
+        query_service: WorldModelQueryService | None = None,
+        projection_service: ContextProjectionService | None = None,
     ) -> None:
         super().__init__(bus)
         self._world_model = world_model
         self._memory_lookup = memory_lookup
         self._goal_lookup = goal_lookup
+        self._query_service = query_service
+        self._projection_service = projection_service
         self._unsubscribers: list[Callable[[], None]] = []
         self._active_workspace_id: str = ""
 
@@ -75,13 +78,45 @@ class StateAuthorityService(BaseService):
         text: str = "",
         workspace_id: str = "",
     ) -> StateContext:
-        """Query World Model (+ optional stores) and return decision context."""
+        """Query World Model (+ Intent) and return budgeted decision context."""
         ws = (workspace_id or self._active_workspace_id).strip()
-        tokens = set(_TOKEN_RE.findall(text.lower()))
+
+        if self._query_service is not None:
+            raw = self._query_service.project_state(text=text, workspace_id=ws)
+            if self._projection_service is not None:
+                context = self._projection_service.project(
+                    text=text,
+                    workspace_id=ws,
+                    state_context=raw,
+                )
+            else:
+                context = raw
+        else:
+            context = self._legacy_project(text=text, workspace_id=ws)
+
+        self._bus.publish(
+            STATE_CONTEXT_BUILT,
+            context.to_dict(),
+            source=self.name,
+        )
+        _logger.info(
+            "state_authority.project workspace=%s entities=%d memories=%d goals=%d",
+            ws,
+            len(context.entities),
+            len(context.memories),
+            len(context.goals),
+        )
+        return context
+
+    def _legacy_project(self, *, text: str, workspace_id: str) -> StateContext:
+        """Fallback when query service is not wired (tests)."""
+        import re
+
+        token_re = re.compile(r"[a-z0-9_]{3,}", re.IGNORECASE)
+        tokens = set(token_re.findall(text.lower()))
         entities: list[dict[str, Any]] = []
         relationships: list[dict[str, Any]] = []
 
-        # Prefer live cache; recover lightly if empty (restart path).
         cached = self._world_model.iter_cached_nodes()
         if not cached:
             self._world_model.recover(replay_limit=500)
@@ -96,7 +131,6 @@ class StateAuthorityService(BaseService):
             )
             blob = f"{node.type} {label} {node.attributes}".lower()
             if tokens and not any(tok in blob for tok in tokens):
-                # Keep domain-typed nodes always so reconstruction stays available.
                 if node.type not in {
                     "note",
                     "memory",
@@ -128,14 +162,16 @@ class StateAuthorityService(BaseService):
         memories: list[dict[str, Any]] = []
         if self._memory_lookup is not None and text.strip():
             try:
-                memories = list(self._memory_lookup(text.strip(), workspace_id=ws) or [])
-            except Exception as exc:  # noqa: BLE001 — projection must not fail intake
+                memories = list(
+                    self._memory_lookup(text.strip(), workspace_id=workspace_id) or []
+                )
+            except Exception as exc:  # noqa: BLE001
                 _logger.warning("state_authority.memory_lookup_failed: %s", exc)
 
         goals: list[dict[str, Any]] = []
         if self._goal_lookup is not None:
             try:
-                goals = list(self._goal_lookup(workspace_id=ws) or [])
+                goals = list(self._goal_lookup(workspace_id=workspace_id) or [])
             except Exception as exc:  # noqa: BLE001
                 _logger.warning("state_authority.goal_lookup_failed: %s", exc)
 
@@ -152,11 +188,11 @@ class StateAuthorityService(BaseService):
                 f"{len(goals)} goals: "
                 + ", ".join(str(g.get("title", "")) for g in goals[:4])
             )
-        if ws:
-            summary_parts.append(f"active_workspace={ws}")
+        if workspace_id:
+            summary_parts.append(f"active_workspace={workspace_id}")
 
-        context = StateContext(
-            workspace_id=ws,
+        return StateContext(
+            workspace_id=workspace_id,
             entities=tuple(entities[:40]),
             relationships=tuple(relationships[:80]),
             memories=tuple(memories[:10]),
@@ -164,16 +200,3 @@ class StateAuthorityService(BaseService):
             summary="; ".join(summary_parts),
             query_text=text.strip(),
         )
-        self._bus.publish(
-            STATE_CONTEXT_BUILT,
-            context.to_dict(),
-            source=self.name,
-        )
-        _logger.info(
-            "state_authority.project workspace=%s entities=%d memories=%d goals=%d",
-            ws,
-            len(context.entities),
-            len(context.memories),
-            len(context.goals),
-        )
-        return context

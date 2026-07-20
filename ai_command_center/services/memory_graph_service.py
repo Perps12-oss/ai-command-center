@@ -127,6 +127,14 @@ class MemoryGraphService(BaseService):
             return False, "remember: requires label | content", {}
         if "|" in body:
             label, content = (part.strip() for part in body.split("|", 1))
+        elif " is " in body.lower():
+            # NL: "my preferred editor is VS Code"
+            idx = body.lower().index(" is ")
+            label = body[:idx].strip()
+            content = body[idx + 4 :].strip()
+            if label.lower().startswith("my "):
+                label = label[3:].strip()
+            label = label.replace(" ", "_") or "memory"
         else:
             label, _, content = body.partition(" ")
             label, content = label.strip(), content.strip()
@@ -239,6 +247,19 @@ class MemoryGraphService(BaseService):
         )
 
     def _on_remember(self, event: Event) -> None:
+        # UI writes must enter via UI_COMMAND → Authority → memory.store.
+        if str(getattr(event, "source", "") or "") == "ui":
+            self._bus.publish(
+                MEMORY_ERROR,
+                {
+                    "message": (
+                        "memory.remember is not a UI write path; "
+                        "use UI_COMMAND / memory.store"
+                    )
+                },
+                source=self.name,
+            )
+            return
         label = str(event.payload.get("label", "")).strip()
         content = str(event.payload.get("content", "")).strip()
         if not label or not content:

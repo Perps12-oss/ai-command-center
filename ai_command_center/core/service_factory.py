@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ai_command_center.core.action.action_registry import ActionRegistry
+from ai_command_center.capabilities.registry import CapabilityRegistry
+from ai_command_center.capabilities.selector import CapabilitySelector
 from ai_command_center.core.ai.capability_registry_service import (
     AICapabilityRegistryService,
 )
@@ -86,13 +88,20 @@ from ai_command_center.services.goal_scheduler_service import SingleGoalSchedule
 from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
+from ai_command_center.core.state_intelligence.context_projection_service import ContextProjectionService
+from ai_command_center.core.state_intelligence.episodic_reflection_service import EpisodicReflectionService
 from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.core.state_intelligence.execution_intent_registry import ExecutionIntentRegistry
+from ai_command_center.core.state_intelligence.idempotency_service import IdempotencyService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
 from ai_command_center.services.model_router_service import ModelRouterService
 from ai_command_center.providers.provider_registry import ProviderRegistry, build_default_registry
 from ai_command_center.orchestration.state_capability_tools import bind_state_capability_tools
 from ai_command_center.services.obsidian_service import ObsidianService
+from ai_command_center.core.state_intelligence.projection_budget_manager import ProjectionBudgetManager
 from ai_command_center.services.state_authority_service import StateAuthorityService
+from ai_command_center.core.state_intelligence.state_delta_engine import StateDeltaEngine
+from ai_command_center.core.state_intelligence.world_model_query_service import WorldModelQueryService
 from ai_command_center.services.ollama_http_service import OllamaHttpService
 from ai_command_center.services.openai_http_service import OpenAIHttpService
 from ai_command_center.services.observer_service import ObserverService
@@ -190,10 +199,14 @@ def build_services(
         otel_endpoint=settings_snapshot.otel_endpoint,
     )
     capability_lifecycle = CapabilityLifecycleManager(bus)
+    workspace_capability_registry = CapabilityRegistry()
+    capability_selector = CapabilitySelector(workspace_capability_registry)
     capability_prompt_catalog = CapabilityPromptCatalogService(
         bus,
         tool_registry=shared_tool_registry,
         ai_capability_registry=ai_capability_registry_service,
+        capability_registry=workspace_capability_registry,
+        capability_selector=capability_selector,
     )
     brain_runtime = BrainRuntimeService(bus, world_model)
     brain_kernel = BrainKernelService(bus, world_model)
@@ -203,8 +216,18 @@ def build_services(
         bus,
         filesystem_roots=_observer_roots_from_settings(settings_snapshot),
     )
-    planner = PlannerService(bus, context_manager=context_manager)
+    planner = PlannerService(
+        bus,
+        context_manager=context_manager,
+        capability_selector=capability_selector,
+    )
     execution_orchestrator = ExecutionOrchestratorService(bus)
+    execution_intent_registry = ExecutionIntentRegistry(bus)
+    state_delta_engine = StateDeltaEngine(bus)
+    episodic_reflection = EpisodicReflectionService(
+        bus,
+        state_delta=state_delta_engine,
+    )
     external_capability_bridge = ExternalCapabilityBridgeService(bus)
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
     execution_event_repo = ExecutionEventRepository(db)
@@ -259,16 +282,36 @@ def build_services(
             )
         return out
 
+    world_model_query = WorldModelQueryService(
+        bus,
+        world_model,
+        intent_registry=execution_intent_registry,
+        memory_lookup=memory_graph.lookup_for_state,
+        goal_lookup=_goal_lookup,
+    )
+    context_projection = ContextProjectionService(
+        bus,
+        world_model_query,
+        budget_manager=ProjectionBudgetManager(),
+    )
+    idempotency = IdempotencyService(
+        bus,
+        query_service=world_model_query,
+        intent_registry=execution_intent_registry,
+    )
     state_authority = StateAuthorityService(
         bus,
         world_model,
         memory_lookup=memory_graph.lookup_for_state,
         goal_lookup=_goal_lookup,
+        query_service=world_model_query,
+        projection_service=context_projection,
     )
     execution_authority = ExecutionAuthorityService(
         bus,
         agent_runtime=agent_runtime,
         state_authority=state_authority,
+        idempotency=idempotency,
     )
     bind_state_capability_tools(
         shared_tool_registry,
@@ -288,6 +331,12 @@ def build_services(
         capability_prompt_catalog,
         planner,
         execution_orchestrator,
+        execution_intent_registry,
+        world_model_query,
+        context_projection,
+        idempotency,
+        state_delta_engine,
+        episodic_reflection,
         external_capability_bridge,
         execution_run,
         execution_query,

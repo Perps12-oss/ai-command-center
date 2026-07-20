@@ -97,11 +97,13 @@ class ExecutionAuthorityService(BaseService):
         classifier: RuleBasedIntentClassifier | None = None,
         agent_runtime: AgentRuntimeService | None = None,
         state_authority: Any | None = None,
+        idempotency: Any | None = None,
     ) -> None:
         super().__init__(bus)
         self._classifier = classifier or RuleBasedIntentClassifier()
         self._agent_runtime = agent_runtime
         self._state_authority = state_authority
+        self._idempotency = idempotency
         self._unsubscribers: list[Callable[[], None]] = []
         self._active_workspace_id: str = ""
 
@@ -234,6 +236,36 @@ class ExecutionAuthorityService(BaseService):
                 skip_planner=False,
             )
             return
+
+        # Idempotency: NO_OP when WM + Intent already satisfy the request.
+        if self._idempotency is not None and decision.capability not in {
+            "goal",
+            "llm",
+        }:
+            no_op_plan = self._idempotency.maybe_no_op_plan(
+                text=text,
+                capability=decision.capability or "",
+                state_context=state_context,
+                workspace_id=scope.get("workspace_id", ""),
+            )
+            if no_op_plan is not None:
+                decision = ExecutionDecision(
+                    kind=DecisionKind.ACTIONABLE,
+                    text=text,
+                    capability="system.noop",
+                    args={"status": "SUCCESS_CACHED"},
+                    reason="idempotent_no_op",
+                    skip_planner=True,
+                )
+                self._submit_plan(
+                    request_id=request_id,
+                    text=text,
+                    decision=decision,
+                    plan=no_op_plan,
+                    scope=scope,
+                    state_context=state_context,
+                )
+                return
 
         plan = self._plan_for_decision(decision)
         if decision.capability == "llm" and state_context.summary:

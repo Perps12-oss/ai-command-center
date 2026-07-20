@@ -240,10 +240,10 @@ def _summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
 def main() -> int:
     probes = [
         "note: project alpha starts monday",
-        "remember: preferred_editor | VS Code",  # canonical prefix form of "remember my preferred editor..."
-        "remember my preferred editor is VS Code",  # natural-language probe (may classify as llm/memory)
-        "navigate dashboard",  # natural language — may not match go/alias
-        "go dashboard",  # canonical navigate (dashboard may alias to home)
+        "remember: preferred_editor | VS Code",  # canonical prefix
+        "remember my preferred editor is VS Code",  # NL → memory.store (Phase 12A)
+        "navigate dashboard",  # NL → navigate (dashboard aliases to home)
+        "go dashboard",  # canonical navigate
         "open chrome",
         "what is recursion",
         "prepare for tomorrow's customer meeting",
@@ -302,6 +302,46 @@ def main() -> int:
                 u()
             results[label].append({"text": text, **_summarize(captured)})
 
+    # Memory UI form path — must enter UI_COMMAND → Authority (no MEMORY_REMEMBER).
+    from unittest.mock import MagicMock
+
+    from ai_command_center.core.app_state import AppStateStore
+    from ai_command_center.ui.controller import UIController
+
+    bus = EventBus()
+    _wire(bus)
+    bus.publish(WORKSPACE_ACTIVE, {"workspace_id": "ws-audit", "title": "Audit"}, source="audit")
+    store = AppStateStore(bus)
+    controller = UIController(bus, store, MagicMock())
+    form_captured: list[dict[str, Any]] = []
+
+    def _form_cap(event) -> None:
+        if event.topic in WATCH or event.topic == UI_COMMAND:
+            form_captured.append(
+                {
+                    "topic": event.topic,
+                    "source": event.source,
+                    "payload": dict(event.payload),
+                }
+            )
+
+    form_unsubs = [bus.subscribe(t, _form_cap) for t in (*WATCH, UI_COMMAND)]
+    controller.publish_memory_remember(
+        "form_editor",
+        "VS Code",
+        workspace_scope={"workspace_id": "ws-audit"},
+    )
+    for u in form_unsubs:
+        u()
+    results["memory_ui_form"] = {
+        "text": "UI form → remember: form_editor | VS Code",
+        **_summarize(form_captured),
+        "ui_command_emitted": any(e["topic"] == UI_COMMAND for e in form_captured),
+        "memory_remember_emitted": any(
+            e["topic"] == "memory.remember" for e in form_captured
+        ),
+    }
+
     out_path = Path("/tmp/state_authority_verification_audit.json")
     out_path.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
     print(out_path)
@@ -315,6 +355,14 @@ def main() -> int:
         print("RECEIPT:", item.get("receipt"))
         print("TRUTH:", item.get("truth_validation"))
         print("MUTATIONS:", item.get("world_model_mutations"))
+    print("---")
+    print("MEMORY_UI_FORM:", results["memory_ui_form"].get("authority_decision"))
+    print(
+        "FORM_UI_COMMAND:",
+        results["memory_ui_form"].get("ui_command_emitted"),
+        "MEMORY_REMEMBER:",
+        results["memory_ui_form"].get("memory_remember_emitted"),
+    )
     return 0
 
 

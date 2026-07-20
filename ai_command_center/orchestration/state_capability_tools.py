@@ -107,11 +107,36 @@ def bind_state_capability_tools(
         bus.publish(UI_NAVIGATE, {"view": view}, source="state_capability_tools")
         return ToolResult(success=True, output=f"navigated:{view}")
 
+    def system_noop(args: dict[str, Any]) -> ToolResult:
+        reason = str(args.get("reason") or "SUCCESS_CACHED")
+        return ToolResult(success=True, output=f"NO_OP:{reason}")
+
     for spec in (
         ToolSpec(name="notes.create", description="Create a vault note", handler=notes_create),
         ToolSpec(name="notes.search", description="Search vault notes", handler=notes_search),
         ToolSpec(name="memory.store", description="Store a memory item", handler=memory_store),
         ToolSpec(name="memory.query", description="Query stored memories", handler=memory_query),
         ToolSpec(name="navigate", description="Navigate to a UI view", handler=navigate),
+        ToolSpec(
+            name="system.noop",
+            description="Idempotent no-op (state already holds)",
+            handler=system_noop,
+        ),
+        ToolSpec(
+            name="llm.chat",
+            description="Conversational LLM response",
+            handler=lambda args: ToolResult(
+                success=True,
+                output=str(args.get("prompt") or args.get("text") or ""),
+            ),
+        ),
+        ToolSpec(
+            name="llm.generate",
+            description="Generate text from a prompt",
+            handler=lambda args: ToolResult(
+                success=True,
+                output=str(args.get("prompt") or args.get("text") or ""),
+            ),
+        ),
     ):
         _register(spec)

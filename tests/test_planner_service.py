@@ -92,7 +92,7 @@ def test_planner_service_bus_round_trip() -> None:
     assert payload["planner_mode"] == "deterministic"
     plan = ExecutionPlan.from_dict(payload["plan"])
     assert plan.steps
-    assert plan.steps[0].capability == "create_note"
+    assert plan.steps[0].capability in {"create_note", "notes.create"}
 
     assert app_state.snapshot.planner_last_plan.get("goal") == "Add a new note for milk"
 
