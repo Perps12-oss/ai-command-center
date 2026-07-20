@@ -1,10 +1,11 @@
 # Phase 5: Async EventBus Policy Implementation
 
-**Status:** IN PROGRESS  
+**Status:** PARTIAL (code-verified 2026-07-20 — not COMPLETE)  
 **Priority:** HIGH  
 **Estimated Effort:** 2-3 weeks  
 **Dependencies:** Phase 1-4 complete ✅  
-**Authority:** `ASYNC_EVENTBUS_POLICY.md`, `PROJECT_CONSTITUTION_V4.md`
+**Authority:** `ASYNC_EVENTBUS_POLICY.md`, `PROJECT_CONSTITUTION_V4.md`  
+**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — keep in `docs/plans/` until exit criteria met on `main`
 
 ---
 

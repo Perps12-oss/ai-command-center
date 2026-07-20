@@ -1,10 +1,11 @@
 # Phase 6: External Capability Bridge
 
-**Status:** IN PROGRESS  
+**Status:** PARTIAL (code-verified 2026-07-20 — bridge exists; MCP scan exit incomplete)  
 **Priority:** HIGH  
 **Estimated Effort:** 2-3 weeks  
 **Dependencies:** Phase 4 Phase E scaffold ✅  
-**Authority:** `AGENT_RUNTIME_INTERFACE.md`, `PROJECT_CONSTITUTION_V4.md`
+**Authority:** `AGENT_RUNTIME_INTERFACE.md`, `PROJECT_CONSTITUTION_V4.md`  
+**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`
 
 ---
 

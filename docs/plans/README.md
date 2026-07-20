@@ -1,6 +1,11 @@
 # Phase Plans Index
 
-This directory contains detailed implementation plans for each phase of the AI Command Center roadmap.
+This directory contains **active or incomplete** implementation plans only.  
+Completed / superseded / stale plans live in `docs/archive/`.
+
+**Hygiene:** `docs/governance/DOC_HYGIENE.md`  
+**Latest code verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`  
+**Inventory SoT:** `docs/audits/REPOSITORY_TRUTH_CANON.md`
 
 ---
 
@@ -16,85 +21,66 @@ This directory contains detailed implementation plans for each phase of the AI C
 
 | Document | Description |
 |----------|-------------|
-| `PHASE_7_8_9_10_QA.md` | **CRITICAL** — 5 key questions and detailed answers about Phases 7-10 |
+| `PHASE_7_8_9_10_QA.md` | Design Q&A for Phases 7–10 (keep while phases incomplete) |
+| `IMPLEMENTATION_ORDER.md` | Ordering recommendation only — not a completion record |
 
 ---
 
-## Phase Plans
+## Phase Plans (code-verified 2026-07-20)
 
-| Phase | Document | Status | Priority |
-|-------|----------|--------|----------|
-| 5 | `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | IN PROGRESS | HIGH |
-| 6 | `PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | IN PROGRESS | HIGH |
-| 7 | `PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md` | Superseded | — |
-| **8** | `PHASE_8_OPERATOR_KERNEL_PLAN.md` | **PLANNED** | **HIGH** |
-| **9** | `PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | **PLANNED** | **HIGH** |
-| **10** | `PHASE_10_WORLD_MODEL_PLAN.md` | **FUTURE** | **MEDIUM** |
-| 11 | `PHASE_9_CROSS_PLATFORM_PLAN.md` | FUTURE | LOW |
+Statuses below are from **repository code on `origin/main`**, not from legacy plan headers.
+
+| Phase | Document | Code status | Archive? |
+|-------|----------|-------------|----------|
+| 5 | `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | **PARTIAL** | No — keep active |
+| 6 | `PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | **PARTIAL** | No — keep active |
+| 7 | ~~`PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md`~~ | NOT_COMPLETE / abandoned layout | **Archived SUPERSEDED** → [`../archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md`](../archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md) |
+| 8 | `PHASE_8_OPERATOR_KERNEL_PLAN.md` | **PARTIAL** (not live intake) | No — keep active |
+| 8b | `PHASE_8_KNOWLEDGE_FEDERATION_PLAN.md` | **NOT_COMPLETE** | No — keep active |
+| 9 | `PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | **PARTIAL** | No — keep active |
+| 10 | `PHASE_10_WORLD_MODEL_PLAN.md` | **PARTIAL** | No — keep active |
+| 11 platform | `PHASE_9_CROSS_PLATFORM_PLAN.md` | **NOT_COMPLETE** (stubs) | No — keep active |
+
+### Removed from active plans (do not plan from)
+
+| Document | Archive class | Path |
+|----------|---------------|------|
+| Remaining Implementation Plan (2026-07-12) | STALE | [`../archive/REMAINING_IMPLEMENTATION_PLAN_2026-07-12_STALE.md`](../archive/REMAINING_IMPLEMENTATION_PLAN_2026-07-12_STALE.md) |
+
+**No Phase 5–10 plan was archived as COMPLETE** — code verification found zero COMPLETE_ON_MAIN plans.
 
 ---
 
-## Phase Dependencies
+## Naming warning
+
+| Label | Meaning |
+|-------|---------|
+| Phase 11 (this folder / master roadmap) | Cross-platform macOS/Linux — **incomplete** |
+| Phase 11 frontend | `docs/PHASE_11_FRONTEND_IMPLEMENTATION.md` — UI 11A–11F largely on `main` |
+
+Do not treat frontend Phase 11 completeness as cross-platform Phase 11 completeness.
+
+---
+
+## Phase Dependencies (informational)
 
 ```
-Phase 7 ──► Phase 8 ──► Phase 9 ──► Phase 10
-   │           │           │           │
-   ▼           ▼           ▼           ▼
-Operational  Operator   Goals &    World Model
-Intelligence Kernel    Multi-Agent
-
-Phase 5 ──► All phases (Async EventBus required)
+Phase 5 ──► later phases (Async EventBus policy)
+Phase 6 ──► external capability aggregation
+Phase 8 ──► Operator Kernel (PARTIAL on main)
+Phase 9 ──► Goals (PARTIAL) + Multi-Agent wiring gaps
+Phase 10 ─► World Model core (PARTIAL; predictive/undo not in factory)
 ```
 
 ---
 
-## Quick Reference
+## Archive gate (reminder)
 
-### In Progress
+Before marking any plan COMPLETE and moving it to `docs/archive/`:
 
-**Phase 5 — Async EventBus**
-- Implement non-blocking dispatch for heavy handlers
-- Target: 95th percentile < 50ms latency
-- Design: `ASYNC_EVENTBUS_POLICY.md`
-
-**Phase 6 — External Capability Bridge**
-- Aggregate MCP and external capabilities
-- Integrate with planner capability catalog
-- Design: `AGENT_RUNTIME_INTERFACE.md`
-
-### Planned (Phases 8-10)
-
-**Phase 8 — Operator Kernel & Model Independence**
-- Model-agnostic operator platform
-- Core: "Behavior belongs to ACC, Reasoning belongs to LLM"
-- Key: `PHASE_8_OPERATOR_KERNEL_PLAN.md`
-
-**Phase 9 — Goals & Multi-Agent Coordination**
-- Goal-driven workspace OS
-- Core: "Commands are temporary, Goals persist"
-- Key: `PHASE_9_GOALS_MULTI_AGENT_PLAN.md`
-
-**Phase 10 — World Model & Reasoning**
-- Entity-driven reasoning
-- Core: "ACC reasons from entities, not conversation"
-- Key: `PHASE_10_WORLD_MODEL_PLAN.md`
-
-### Future
-
-**Phase 11 — Cross-Platform**
-- macOS and Linux support
-- Platform abstraction layer
-
----
-
-## Contributing
-
-When updating phase plans:
-
-1. Update status in the phase document header
-2. Update the index table
-3. Update the master roadmap
-4. Run verification gates before marking complete
+1. Verify against `origin/main` code (not a feature branch).
+2. Record evidence in `docs/audits/`.
+3. Follow `docs/governance/DOC_HYGIENE.md`.
 
 ---
 
@@ -103,3 +89,4 @@ When updating phase plans:
 | Date | Change |
 |------|--------|
 | 2026-07-11 | Initial index created |
+| 2026-07-20 | Code-verified statuses; archive Phase 7 SUPERSEDED + Remaining STALE; zero COMPLETE archives |
