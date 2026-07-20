@@ -696,6 +696,8 @@ If any phase introduces regressions:
 | `AGENTS.md` | Layer ownership rules |
 | `docs/ARCHITECTURE.md` | Runtime architecture |
 | `docs/architecture/WORKSPACE_VISION.md` | Product north star |
+| `docs/plans/PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md` | **Active** — truth + wiring reconciliation (blocks feature expansion) |
+| `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` | Exists / Wired / Tested matrix |
 | `docs/plans/PHASE_5_ASYNC_EVENTBUS_PLAN.md` | Phase 5 (PARTIAL — keep active) |
 | `docs/plans/PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | Phase 6 (PARTIAL — keep active) |
 | `docs/archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md` | Phase 7 (archived SUPERSEDED) |

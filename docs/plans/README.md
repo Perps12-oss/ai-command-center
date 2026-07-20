@@ -5,7 +5,18 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 **Hygiene:** `docs/governance/DOC_HYGIENE.md`  
 **Latest code verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`  
-**Inventory SoT:** `docs/audits/REPOSITORY_TRUTH_CANON.md`
+**Inventory SoT:** `docs/audits/REPOSITORY_TRUTH_CANON.md`  
+**Truth matrix:** `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md`
+
+---
+
+## Active milestone (do this next)
+
+| Milestone | Document | Blocks |
+|-----------|----------|--------|
+| **PHASE 0R — Repository Truth Reconciliation** | [`PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`](PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md) | Phase B UI expansion; Phase 8–10 **feature** work until Exists+Wired+Tested alignment |
+
+Goal: make `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 
 ---
 

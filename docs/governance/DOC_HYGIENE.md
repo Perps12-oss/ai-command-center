@@ -93,5 +93,7 @@ When archiving:
 ## Related
 
 - `docs/governance/PHASE_COMPLETION_RULE.md` — main is the only truth for phase completion  
+- `docs/plans/PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md` — active reconciliation milestone  
 - `docs/audits/REPOSITORY_TRUTH_CANON.md` — inventory SoT  
+- `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` — Exists / Wired / Tested  
 - `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — latest code verification of Phase 5–10 plans  
