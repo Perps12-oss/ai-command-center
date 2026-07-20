@@ -1,10 +1,11 @@
 # Phase 9: Goals, Planning & Multi-Agent Coordination
 
-**Status:** PLANNED  
+**Status:** PARTIAL (code-verified 2026-07-20 — GoalEngine wired; AgentCoordinator not in factory)  
 **Priority:** HIGH  
 **Estimated Effort:** 8-10 weeks  
-**Dependencies:** Phase 8 (Operator Kernel) ✅  
-**Authority:** `PROJECT_CONSTITUTION_V4.md`, `AGENTS.md`
+**Dependencies:** Phase 8 Operator Kernel (PARTIAL)  
+**Authority:** `PROJECT_CONSTITUTION_V4.md`, `AGENTS.md`  
+**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`
 
 ---
 

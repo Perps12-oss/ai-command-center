@@ -1,10 +1,11 @@
 # Phase 9: Cross-Platform Expansion
 
-**Status:** FUTURE  
+**Status:** NOT_COMPLETE (code-verified 2026-07-20 — hotkey/tray stubs remain)  
 **Priority:** LOW  
 **Estimated Effort:** 8-12 weeks  
 **Dependencies:** Phase 5 (Async EventBus)  
-**Authority:** `PLATFORM_STRATEGY.md`, `PROJECT_CONSTITUTION_V4.md`
+**Authority:** `PLATFORM_STRATEGY.md`, `PROJECT_CONSTITUTION_V4.md`  
+**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — do not confuse with frontend Phase 11
 
 ---
 
