@@ -696,13 +696,15 @@ If any phase introduces regressions:
 | `AGENTS.md` | Layer ownership rules |
 | `docs/ARCHITECTURE.md` | Runtime architecture |
 | `docs/architecture/WORKSPACE_VISION.md` | Product north star |
-| `docs/plans/PHASE_5_ASYNC_EVENTBUS_PLAN.md` | Phase 5 implementation |
-| `docs/plans/PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | Phase 6 implementation |
-| `docs/plans/PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md` | Phase 7 (superseded) |
-| `docs/plans/PHASE_8_OPERATOR_KERNEL_PLAN.md` | Phase 8 implementation |
-| `docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | Phase 9 implementation |
-| `docs/plans/PHASE_10_WORLD_MODEL_PLAN.md` | Phase 10 implementation |
-| `docs/plans/PHASE_11_CROSS_PLATFORM_PLAN.md` | Phase 11 implementation |
+| `docs/plans/PHASE_5_ASYNC_EVENTBUS_PLAN.md` | Phase 5 (PARTIAL — keep active) |
+| `docs/plans/PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | Phase 6 (PARTIAL — keep active) |
+| `docs/archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md` | Phase 7 (archived SUPERSEDED) |
+| `docs/plans/PHASE_8_OPERATOR_KERNEL_PLAN.md` | Phase 8 (PARTIAL — keep active) |
+| `docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | Phase 9 (PARTIAL — keep active) |
+| `docs/plans/PHASE_10_WORLD_MODEL_PLAN.md` | Phase 10 (PARTIAL — keep active) |
+| `docs/plans/PHASE_9_CROSS_PLATFORM_PLAN.md` | Cross-platform / roadmap Phase 11 (NOT_COMPLETE) |
+| `docs/governance/DOC_HYGIENE.md` | Active vs archive doc rules |
+| `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` | Code verification before archive |
 
 ### Active Governance
 

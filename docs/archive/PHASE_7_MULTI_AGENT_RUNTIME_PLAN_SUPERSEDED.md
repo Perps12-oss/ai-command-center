@@ -1,3 +1,10 @@
+Status: ARCHIVED
+Archive-class: SUPERSEDED
+Superseded-by: ai_command_center/services/agent_runtime_service.py + orchestration/agents/* (different design)
+Main-sha: e128a72
+Verified-by: docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md
+Do-not-plan-from: true
+
 # Phase 7: Multi-Agent Runtime
 
 **Status:** GATED  

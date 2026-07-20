@@ -1,3 +1,10 @@
+Status: ARCHIVED
+Archive-class: STALE
+Superseded-by: docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md + docs/audits/REPOSITORY_TRUTH_CANON.md
+Main-sha: e128a72
+Verified-by: docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md
+Do-not-plan-from: true
+
 # Remaining Implementation Plan
 
 **Generated:** 2026-07-12  
