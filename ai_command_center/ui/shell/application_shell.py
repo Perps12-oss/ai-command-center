@@ -83,7 +83,7 @@ class ApplicationShellMixin:
         commands.extend(
             [
                 ("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace")),
-                ("⌂  Home", "Dashboard and quick actions", lambda: self._navigate("home")),
+                ("◈  Command Center", "Dashboard and quick actions", lambda: self._navigate("command_center")),
                 ("💬  Chat", "Generic chat (no entity attach)", lambda: self._navigate("chat", clear_chat_entity=True)),
                 ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
                 ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),

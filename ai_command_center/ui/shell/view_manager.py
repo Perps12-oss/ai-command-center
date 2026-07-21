@@ -7,13 +7,12 @@ from collections.abc import Callable
 import customtkinter as ctk
 
 from ai_command_center.domain.inspectable import InspectableRef
-from ai_command_center.ui.views.chat_view import ChatView
+from ai_command_center.ui.views.chat.chat_view import ChatView
 from ai_command_center.ui.views.agents_view import AgentsView
 from ai_command_center.ui.views.approvals_view import ApprovalsView
 from ai_command_center.ui.views.command_center_view import CommandCenterView
 from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
-from ai_command_center.ui.views.home_view import HomeView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.plugins_view import PluginsView
@@ -37,7 +36,6 @@ ViewFactory = Callable[[], object]
 VIEW_IDS: tuple[str, ...] = (
     "workspace",
     "command_center",
-    "home",
     "chat",
     "executions",
     "timeline",
@@ -73,10 +71,6 @@ class ViewManagerMixin:
             on_open_chat=self._on_open_chat_from_workspace,
             on_command=self._on_command,
             ws_controller=ws_controller,
-        )
-        self._view_registry["home"] = lambda: HomeView(
-            self._content,
-            on_command=self._on_command,
         )
         self._view_registry["command_center"] = lambda: CommandCenterView(
             self._content,
@@ -203,9 +197,8 @@ class ViewManagerMixin:
                 )
         return self._views[view_id]
 
-    def _home_view(self) -> HomeView | None:
-        v = self._views.get("home")
-        return v if isinstance(v, HomeView) else None
+    def _home_view(self) -> None:
+        return None
 
     def _system_view(self) -> SystemView | None:
         v = self._views.get("system")
@@ -259,8 +252,10 @@ class ViewManagerMixin:
         return "workspace"
 
     def _show_view(self, view_id: str) -> None:
+        if view_id == "home":
+            view_id = "command_center"
         if view_id not in VIEW_IDS:
-            view_id = "home"
+            view_id = "command_center"
         prev_id = self._current_view
         if prev_id and prev_id in self._views:
             prev = self._views[prev_id]

@@ -17,7 +17,7 @@ _VIEW_ALIASES: dict[str, str] = {
     "chat": "chat",
     "notes": "notes",
     "plugins": "plugins",
-    "home": "home",
+    "home": "command_center",
     "workspace": "workspace",
     "system": "system",
     "memory": "memory",
