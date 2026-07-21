@@ -5,7 +5,23 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 **Hygiene:** `docs/governance/DOC_HYGIENE.md`  
 **Latest code verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`  
-**Inventory SoT:** `docs/audits/REPOSITORY_TRUTH_CANON.md`
+**Inventory SoT:** `docs/audits/REPOSITORY_TRUTH_CANON.md`  
+**Truth matrix:** `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md`
+
+---
+
+## Active milestone (do this next)
+
+| Milestone | Document | Blocks |
+|-----------|----------|--------|
+| **PHASE R1 — Runtime Reconciliation** | [`PHASE_R1_RUNTIME_RECONCILIATION.md`](PHASE_R1_RUNTIME_RECONCILIATION.md) | All feature work until authority + composition aligned |
+| (superseded) PHASE 0R | [`PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`](PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md) | — |
+
+**Priority order:** Runtime authority → Composition → State → UI → Features.
+
+**Decision gate before coding:** `docs/audits/RUNTIME_AUTHORITY_MAP.md` — ✅ **Answer A (ADR-006)**. Next: `STATE_AUTHORITY_CONTRACT.md`.
+
+Goal: make `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 
 ---
 
