@@ -32,7 +32,7 @@ def main() -> int:
             failures.append(f"app.py must subscribe to {needle}")
 
     chat_src = (
-        PROJECT_ROOT / "ai_command_center" / "ui" / "views" / "chat_view.py"
+        PROJECT_ROOT / "ai_command_center" / "ui" / "views" / "chat" / "chat_view.py"
     ).read_text(encoding="utf-8")
     if "show_tool_output" not in chat_src:
         failures.append("ChatView missing show_tool_output")
