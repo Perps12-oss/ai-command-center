@@ -31,6 +31,32 @@ Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
 
 ---
 
+## Composition root registry (`service_factory.py`)
+
+Registered = constructed in factory and started with other services.
+
+| Component | Exists | Registered | Live EventBus role |
+|-----------|:------:|:----------:|-------------------|
+| ExecutionAuthorityService | ✅ | ✅ | **Intake** — `UI_COMMAND` |
+| StateAuthorityService | ✅ | ✅ | State projection before plan |
+| SingleGoalScheduler | ✅ | ✅ | Goal queue → `EXECUTION_RUN_REQUEST` |
+| PlannerService | ✅ | ✅ | `PLAN_REQUEST` when not synthetic |
+| ExecutionOrchestratorService | ✅ | ✅ | Step execution |
+| ChatHandlerService | ✅ | ✅ | `LLM_STEP_REQUEST` handler |
+| RuntimeCapabilityRouterService | ✅ | ✅ | Classifier / provider map (not intake) |
+| OrchestrationService | ✅ | ✅ | Completion observer / receipts |
+| AgentRuntimeService | ✅ | ✅ | Agent plans / pipeline |
+| GoalEngine | ✅ | ✅ | Goal persistence engine |
+| OperatorKernel | ✅ | ❌ | — |
+| PlanningEngine | ✅ | ❌ | — |
+| AgentCoordinator | ✅ | ❌ | — |
+| PredictiveEngine | ✅ | ❌ | — |
+| UndoReplay | ✅ | ❌ | — |
+
+See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
+
+---
+
 ## Critical pattern (OperatorKernel)
 
 Expected authority path:

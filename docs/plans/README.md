@@ -14,7 +14,12 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 | Milestone | Document | Blocks |
 |-----------|----------|--------|
-| **PHASE 0R — Repository Truth Reconciliation** | [`PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`](PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md) | Phase B UI expansion; Phase 8–10 **feature** work until Exists+Wired+Tested alignment |
+| **PHASE R1 — Runtime Reconciliation** | [`PHASE_R1_RUNTIME_RECONCILIATION.md`](PHASE_R1_RUNTIME_RECONCILIATION.md) | All feature work until authority + composition aligned |
+| (superseded) PHASE 0R | [`PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`](PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md) | — |
+
+**Priority order:** Runtime authority → Composition → State → UI → Features.
+
+**Decision gate before coding:** `docs/audits/RUNTIME_AUTHORITY_MAP.md` — ExecutionAuthority path (live) vs OperatorKernel path (paper).
 
 Goal: make `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 

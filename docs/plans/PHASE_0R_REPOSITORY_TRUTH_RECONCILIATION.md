@@ -1,9 +1,10 @@
 # PHASE 0R — Repository Truth Reconciliation
 
-**Status:** ACTIVE (next milestone — blocks Phase B UI and Phase 8–10 feature expansion)  
-**Owner:** Repository Guardian (Cursor / Tom) verifies; Devin implements wiring gaps only when tasked  
-**Baseline:** `origin/main`  
-**Authority:** `PROJECT_CONSTITUTION_V4.md`, `docs/governance/DOC_HYGIENE.md`, `docs/governance/PHASE_COMPLETION_RULE.md`, `docs/audits/REPOSITORY_TRUTH_CANON.md`
+> **Superseded by [`PHASE_R1_RUNTIME_RECONCILIATION.md`](PHASE_R1_RUNTIME_RECONCILIATION.md)** — same goal (make `main` truthful), with strict priority order and runtime authority decision gate.  
+> Keep this file as historical pointer only.
+
+**Status:** SUPERSEDED → see PHASE R1  
+**Date:** 2026-07-20
 
 ---
 
