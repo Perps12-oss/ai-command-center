@@ -342,6 +342,7 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.graph.base_graph_canvas",
     "ai_command_center.ui.components.graph",
     "ai_command_center.ui.components.graph_canvas",
+    "ai_command_center.ui.views.home_view",
     "ai_command_center.ui.views.command_center_view",
     "ai_command_center.ui.views.world_model.knowledge_graph_panel",
     "ai_command_center.ui.views.world_model.entity_explorer_panel",
