@@ -19,7 +19,7 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 **Priority order:** Runtime authority → Composition → State → UI → Features.
 
-**Decision gate before coding:** `docs/audits/RUNTIME_AUTHORITY_MAP.md` — ✅ **Answer A (ADR-006)**. Next: `STATE_AUTHORITY_CONTRACT.md`.
+**Decision gate before coding:** ADR-006 ✅ ExecutionAuthority canonical. Next: State Authority contract (parallel); UI: **Devin** per [`docs/agents/DEVIN_UI_HANDOVER.md`](../agents/DEVIN_UI_HANDOVER.md).
 
 Goal: make `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 
@@ -37,6 +37,9 @@ Goal: make `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition
 
 | Document | Description |
 |----------|-------------|
+| `../architecture/UI_IMPLEMENTATION_ROADMAP_PHASE_B_EVOLUTION.md` | **Phase B UI slices (Devin)** — PR-UI-E00…E13 |
+| `../agents/DEVIN_UI_HANDOVER.md` | Devin builder workflow (stop → audit → continue) |
+| `../agents/CURSOR_AUDIT_GATE.md` | Cursor/Tom audit checklist per PR |
 | `PHASE_7_8_9_10_QA.md` | Design Q&A for Phases 7–10 (keep while phases incomplete) |
 | `IMPLEMENTATION_ORDER.md` | Ordering recommendation only — not a completion record |
 
