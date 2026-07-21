@@ -47,9 +47,9 @@ Registered = constructed in factory and started with other services.
 | OrchestrationService | ✅ | ✅ | Completion observer / receipts |
 | AgentRuntimeService | ✅ | ✅ | Agent plans / pipeline |
 | GoalEngine | ✅ | ✅ | Goal persistence engine |
-| OperatorKernel | ✅ | ❌ | — |
-| PlanningEngine | ✅ | ❌ | — |
-| AgentCoordinator | ✅ | ❌ | — |
+| OperatorKernel | ✅ | ❌ | — | **Non-canonical** (ADR-006) — research/tests only |
+| PlanningEngine | ✅ | ❌ | — | Non-canonical until ADR supersedes 006 |
+| AgentCoordinator | ✅ | ❌ | — | Non-canonical until wired + ADR |
 | PredictiveEngine | ✅ | ❌ | — |
 | UndoReplay | ✅ | ❌ | — |
 

@@ -111,23 +111,24 @@ Both goal engines coexist. R1 must decide whether they converge or divide respon
 
 ## Decision gate (must answer before Priority 1 coding)
 
-### Primary
+### Primary — **RESOLVED 2026-07-21 (Answer A)**
 
-> **Is the canonical authority path A (ExecutionAuthority chain) or B (OperatorKernel chain)?**
+> **Canonical authority path: ExecutionAuthority chain (A).**  
+> Recorded in `docs/architecture/adr/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`.
 
-| Option | Implication |
-|--------|-------------|
-| **Adopt A as canonical** | OperatorKernel becomes internal library, adapter layer, or **retired**; docs/plans updated |
-| **Migrate to B** | ExecutionAuthority intake delegates to OperatorKernel; large migration; must not leave dual intake |
-| **Hybrid (explicit)** | Document which request classes use which kernel; forbidden: silent bypass |
+| Option | Outcome |
+|--------|---------|
+| **A — ExecutionAuthority canonical** | ✅ **ACCEPTED** — evolve, do not replace |
+| **B — OperatorKernel migration** | ❌ Rejected as authority path |
+| **Hybrid without ADR** | ❌ Forbidden |
 
-### Secondary (only after primary)
+**OperatorKernel** is non-canonical until a future ADR supersedes ADR-006 with factory wiring + superiority proof.
 
-1. Is `PlanningEngine` mandatory for all requests or goal-oriented only?  
-   - Live: `PlannerService` on `PLAN_REQUEST`; synthetic plans skip it.  
-2. Does `AgentCoordinator` sit under OperatorKernel or beside `AgentRuntimeService`?  
-   - Live: `AgentRuntimeService` is wired; `AgentCoordinator` is not.  
-3. What is the single execution graph diagram in `docs/ARCHITECTURE.md`?
+### Secondary (active — Priority 3)
+
+1. Evolve **State Authority contract** — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`  
+2. Mandatory state consumption before Planner (not chat-first planning)  
+3. Eliminate shadow SoT outside State Authority  
 
 ---
 

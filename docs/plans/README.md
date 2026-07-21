@@ -19,7 +19,7 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 **Priority order:** Runtime authority → Composition → State → UI → Features.
 
-**Decision gate before coding:** `docs/audits/RUNTIME_AUTHORITY_MAP.md` — ExecutionAuthority path (live) vs OperatorKernel path (paper).
+**Decision gate before coding:** `docs/audits/RUNTIME_AUTHORITY_MAP.md` — ✅ **Answer A (ADR-006)**. Next: `STATE_AUTHORITY_CONTRACT.md`.
 
 Goal: make `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 

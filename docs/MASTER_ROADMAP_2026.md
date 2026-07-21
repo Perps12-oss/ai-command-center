@@ -697,7 +697,8 @@ If any phase introduces regressions:
 | `docs/ARCHITECTURE.md` | Runtime architecture |
 | `docs/architecture/WORKSPACE_VISION.md` | Product north star |
 | `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` | **Active** — runtime reconciliation (strict priority order) |
-| `docs/audits/RUNTIME_AUTHORITY_MAP.md` | Live vs paper execution paths |
+| `docs/architecture/adr/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md` | **Accepted** — ExecutionAuthority canonical |
+| `docs/architecture/STATE_AUTHORITY_CONTRACT.md` | **Active** — next architectural work |
 | `docs/plans/PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md` | Superseded by R1 |
 | `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` | Exists / Wired / Tested matrix |
 | `docs/plans/PHASE_5_ASYNC_EVENTBUS_PLAN.md` | Phase 5 (PARTIAL — keep active) |

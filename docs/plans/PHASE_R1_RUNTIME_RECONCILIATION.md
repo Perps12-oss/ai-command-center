@@ -42,21 +42,27 @@ OperatorKernel → PlanningEngine → AgentCoordinator → RuntimeCapabilityRout
 
 ### Decision gate (human + Guardian sign-off **before coding**)
 
-| # | Question |
-|---|----------|
-| 1 | Is **OperatorKernel** the intended runtime authority, or is **ExecutionAuthority** already canonical? |
-| 2 | Is **PlanningEngine** mandatory for all requests or goal-oriented only? (Live: `PlannerService` + synthetic skip.) |
-| 3 | Does **AgentCoordinator** sit under OperatorKernel or beside **AgentRuntimeService**? |
-| 4 | What is the **single** canonical execution graph in architecture docs? |
+| # | Question | Status |
+|---|----------|--------|
+| 1 | Is **OperatorKernel** the intended runtime authority, or is **ExecutionAuthority** canonical? | ✅ **ExecutionAuthority** — ADR-006 |
+| 2 | Is **PlanningEngine** mandatory for all requests or goal-oriented only? | Deferred — live: `PlannerService` + synthetic skip |
+| 3 | Does **AgentCoordinator** sit under OperatorKernel or beside **AgentRuntimeService**? | Deferred — neither wired; `AgentRuntimeService` is live |
+| 4 | What is the **single** canonical execution graph? | Pending `ARCHITECTURE.md` update |
 
-**Forbidden without decision:** wiring OperatorKernel into factory while ExecutionAuthority remains intake.
+**Forbidden:** wiring OperatorKernel into factory while ExecutionAuthority remains intake (ADR-006).
 
 ### R1.1 exit criteria
 
-- [ ] Authority decision recorded (Adopt A / Migrate to B / Explicit hybrid)  
+- [x] Authority decision recorded — **ADR-006 (Answer A)**  
 - [ ] `docs/ARCHITECTURE.md` shows one canonical execution graph  
-- [ ] Retired or demoted components listed (no shadow intake)  
-- [ ] Tom audit: no dual authority path  
+- [ ] OperatorKernel demoted in plans (research only)  
+- [ ] Tom audit: no dual authority path in new PRs  
+
+### R1.1 — **GATE PASSED** (2026-07-21)
+
+Next architectural battle: **Runtime Authority vs State Authority** — not ExecutionAuthority vs OperatorKernel.
+
+See `docs/architecture/STATE_AUTHORITY_CONTRACT.md`.
 
 ---
 
@@ -97,13 +103,18 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 
 ## Priority 3 — Event & State Unification
 
+**Active next workstream** after ADR-006 (authority decided).
+
 Subsystems: Goals, Agents, Executions, World Model, Timeline, Approvals.
 
 Target model:
 
 ```text
-Workspace State → World Model → EventBus → AppState → UI projections
+Workspace State → State Authority (contract) → Context Projection → Planner
+       → Execution (ExecutionAuthority) → State Mutation → AppState → UI
 ```
+
+**Primary artifact:** `docs/architecture/STATE_AUTHORITY_CONTRACT.md`
 
 ### R1.3 questions
 
