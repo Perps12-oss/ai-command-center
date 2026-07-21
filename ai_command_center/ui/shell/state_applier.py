@@ -126,17 +126,6 @@ class StateApplierMixin:
         except ValueError:
             pass
 
-        home = self._home_view()
-        if home and current_view == "home":
-            home.update_stats(
-                messages=self._msg_count,
-                memories=self._memory_count,
-                notes=self._note_count,
-            )
-            if snap.system_snapshot.ollama_online:
-                home.update_ollama(True, snap.settings.default_model)
-            else:
-                home.update_ollama(False)
 
         chat = self._chat_view()
         # In-view cosmetic projections only when chat is visible.
@@ -501,32 +490,3 @@ class StateApplierMixin:
             )
             artifacts.apply_state(artifact_catalog)
 
-        home = self._home_view()
-        if home:
-            if snap.chat_history_count:
-                home.update_stats(
-                    messages=snap.chat_history_count,
-                    memories=self._memory_count,
-                    notes=self._note_count,
-                )
-            active_exec = sum(
-                1 for r in snap.execution_runs
-                if str(getattr(r, "source", "")) == "orchestration"
-            )
-            provider_health = "healthy" if snap.provider_health_map else ""
-            artifact_catalog = (
-                snap.model_artifact.recent_artifacts
-                if getattr(snap, "model_artifact", None) is not None
-                else snap.recent_artifacts
-            )
-            artifact_count = len(artifact_catalog) or len(
-                getattr(snap.execution_context, "artifacts", ())
-            )
-            pending = 1 if snap.pending_permission_check else 0
-            if hasattr(home, "update_execution_summary"):
-                home.update_execution_summary(
-                    active_count=active_exec,
-                    provider_health=provider_health,
-                    artifact_count=artifact_count,
-                    pending_approvals=pending,
-                )

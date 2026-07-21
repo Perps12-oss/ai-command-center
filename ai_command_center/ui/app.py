@@ -39,7 +39,7 @@ class CommandPaletteApp(
     ) -> None:
         super().__init__()
         self._workspace_os_enabled = workspace_os_enabled
-        self._default_view = "command_center" if workspace_os_enabled else "home"
+        self._default_view = "command_center"
         self._bus = bus
         self._controller = UIController(bus, state_store, self._queue_state_refresh)
         self._ui_queue = UIQueue(self)

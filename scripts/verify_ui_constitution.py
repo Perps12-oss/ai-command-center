@@ -100,7 +100,7 @@ STATUS_TOKEN_CONSUMERS: tuple[Path, ...] = (
     UI_ROOT / "views" / "dependency_inspector_view.py",
     UI_ROOT / "views" / "chat" / "chat_header.py",
     UI_ROOT / "views" / "chat" / "tool_execution_card.py",
-    UI_ROOT / "views" / "chat" / "inspector" / "inspector_provider_tab.py",
+    UI_ROOT / "components" / "inspector" / "tabs" / "inspector_provider_tab.py",
     UI_ROOT / "views" / "providers" / "provider_live_monitor.py",
 )
 
@@ -292,7 +292,7 @@ def _check_route_reachability(v: Violation) -> None:
     """Ensure sidebar routes and command aliases cover the registered views."""
     view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
     sidebar = _read(UI_ROOT / "components" / "sidebar.py")
-    router = _read(REPO / "ai_command_center" / "services" / "command_router_service.py")
+    router = _read(REPO / "ai_command_center" / "core" / "command_classify.py")
 
     view_ids_match = re.search(r"VIEW_IDS\s*\:\s*tuple\[str,\s*\.\.\.\]\s*=\s*\((.*?)\)", view_manager, re.S)
     if not view_ids_match:

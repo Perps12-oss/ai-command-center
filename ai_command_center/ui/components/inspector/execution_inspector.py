@@ -15,16 +15,16 @@ from ai_command_center.ui.components.inspector.base_inspector import BaseInspect
 from ai_command_center.ui.components.inspector.collapsible_section import CollapsibleSection
 from ai_command_center.ui.components.execution_timeline_list import ExecutionTimelineList
 from ai_command_center.ui.design_system import theme_v2 as T
-from ai_command_center.ui.views.chat.inspector.inspector_artifacts_tab import (
+from ai_command_center.ui.components.inspector.tabs.inspector_artifacts_tab import (
     InspectorArtifactsTab,
 )
-from ai_command_center.ui.views.chat.inspector.inspector_metrics_tab import (
+from ai_command_center.ui.components.inspector.tabs.inspector_metrics_tab import (
     InspectorMetricsTab,
 )
-from ai_command_center.ui.views.chat.inspector.inspector_provider_tab import (
+from ai_command_center.ui.components.inspector.tabs.inspector_provider_tab import (
     InspectorProviderTab,
 )
-from ai_command_center.ui.views.chat.inspector.inspector_trace_tab import (
+from ai_command_center.ui.components.inspector.tabs.inspector_trace_tab import (
     InspectorTraceTab,
 )
 

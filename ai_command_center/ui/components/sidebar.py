@@ -6,37 +6,43 @@ import customtkinter as ctk
 
 from ai_command_center.ui.design_system import theme_v2 as T
 
-NAV_ITEMS: tuple[tuple[str, str], ...] = (
-    ("workspace", "Workspace"),
-    ("command_center", "Command Center"),
-    ("home", "Home"),
-    ("chat", "Chat"),
-    ("executions", "Execution Center"),
-    ("timeline", "Timeline"),
-    ("workflow", "Workflow"),
-    ("automation", "Automation"),
-    ("world_explorer", "World Model"),
-    ("relationships", "Relationships"),
-    ("dependencies", "Dependencies"),
-    ("providers", "Providers"),
-    ("capabilities", "Capabilities"),
-    ("artifacts", "Artifacts"),
-    ("notes", "Notes"),
-    ("memory", "Memory"),
-    ("system", "System"),
-    ("plugins", "Plugins"),
-    ("settings", "Settings"),
-    ("goals", "Goal Dashboard"),
-    ("agents", "Agent Monitor"),
-    ("approvals", "Approval Center"),
+NAV_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    ("Workspaces", (
+        ("workspace", "Workspace"),
+        ("command_center", "Command Center"),
+    )),
+    ("Ops", (
+        ("chat", "Chat"),
+        ("executions", "Execution Center"),
+        ("goals", "Goal Dashboard"),
+        ("agents", "Agent Monitor"),
+        ("approvals", "Approval Center"),
+    )),
+    ("Monitor", (
+        ("timeline", "Timeline"),
+        ("workflow", "Workflow"),
+        ("automation", "Automation"),
+        ("world_explorer", "World Model"),
+    )),
+    ("Library", (
+        ("relationships", "Relationships"),
+        ("dependencies", "Dependencies"),
+        ("providers", "Providers"),
+        ("capabilities", "Capabilities"),
+        ("artifacts", "Artifacts"),
+        ("notes", "Notes"),
+        ("memory", "Memory"),
+        ("system", "System"),
+        ("plugins", "Plugins"),
+    )),
+    ("Settings", (
+        ("settings", "Settings"),
+    )),
 )
 
-# Feature-flagged nav items — registered dynamically if feature is enabled
-FEATURE_NAV_ITEMS: dict[str, tuple[str, str]] = {
-    "capabilities": ("capabilities", "Capabilities"),
-    "providers":    ("providers",    "Providers"),
-    "artifacts":    ("artifacts",    "Artifacts"),
-}
+NAV_ITEMS: tuple[tuple[str, str], ...] = tuple(
+    item for _, items in NAV_GROUPS for item in items
+)
 
 
 class Sidebar(ctk.CTkFrame):
@@ -52,7 +58,7 @@ class Sidebar(ctk.CTkFrame):
         self.pack_propagate(False)
         self._rows: dict[str, ctk.CTkFrame] = {}
         self._buttons: dict[str, ctk.CTkButton] = {}
-        self._active = "home"
+        self._active = "command_center"
 
         ctk.CTkLabel(
             self,
@@ -61,26 +67,34 @@ class Sidebar(ctk.CTkFrame):
             text_color=T.TEXT_SECONDARY,
         ).pack(anchor="w", padx=T.PAD, pady=(T.PAD, 8))
 
-        for view_id, label in NAV_ITEMS:
-            row = ctk.CTkFrame(self, fg_color="transparent", height=40)
-            row.pack(fill="x", padx=8, pady=2)
-            row.pack_propagate(False)
-
-            btn = ctk.CTkButton(
-                row,
-                text=label,
+        for group_name, items in NAV_GROUPS:
+            ctk.CTkLabel(
+                self,
+                text=group_name.upper(),
+                font=T.FONT_ROLE,
+                text_color=T.TEXT_MUTED,
                 anchor="w",
-                font=T.FONT_BODY,
-                fg_color="transparent",
-                text_color=T.TEXT_SECONDARY,
-                hover_color=T.LIGHT_GLASS,
-                height=36,
-                corner_radius=T.CORNER_RADIUS,
-                command=lambda v=view_id: self._select(v, on_navigate),
-            )
-            btn.pack(fill="both", expand=True, padx=4)
-            self._rows[view_id] = row
-            self._buttons[view_id] = btn
+            ).pack(fill="x", padx=T.PAD + 2, pady=(8, 4))
+            for view_id, label in items:
+                row = ctk.CTkFrame(self, fg_color="transparent", height=40)
+                row.pack(fill="x", padx=8, pady=2)
+                row.pack_propagate(False)
+
+                btn = ctk.CTkButton(
+                    row,
+                    text=label,
+                    anchor="w",
+                    font=T.FONT_BODY,
+                    fg_color="transparent",
+                    text_color=T.TEXT_SECONDARY,
+                    hover_color=T.LIGHT_GLASS,
+                    height=36,
+                    corner_radius=T.CORNER_RADIUS,
+                    command=lambda v=view_id: self._select(v, on_navigate),
+                )
+                btn.pack(fill="both", expand=True, padx=4)
+                self._rows[view_id] = row
+                self._buttons[view_id] = btn
 
         user = ctk.CTkFrame(
             self,

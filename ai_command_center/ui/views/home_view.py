@@ -1,4 +1,4 @@
-"""Home dashboard — live status, activity feed, quick stats, quick actions."""
+"""Home dashboard — superseded by CommandCenterView; retained for widget reuse."""
 from __future__ import annotations
 
 import datetime

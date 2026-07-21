@@ -14,6 +14,7 @@ from ai_command_center.ui.design_system.status_tokens import (
     goal_state_color,
     status_color,
 )
+from ai_command_center.ui.views.home_view import _ActionCard, _QUICK_ACTIONS
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
     article18_loading,
@@ -122,6 +123,25 @@ class CommandCenterView(ctk.CTkFrame):
             card = _OpsCard(ops, title, color, command=lambda k=key: self._on_card_click(k))
             card.grid(row=0, column=col, padx=(0 if col == 0 else 8, 0), pady=0, sticky="nsew")
             self._ops_cards[key] = card
+
+        # Quick Actions (ported from HomeView)
+        quick = GlassCard(self, fg_color=T.BG_PANEL, border_color=T.GLASS_BORDER)
+        quick.pack(fill="x", padx=T.PAD, pady=(8, 8))
+        ctk.CTkLabel(
+            quick,
+            text="QUICK ACTIONS",
+            font=T.FONT_ROLE,
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(T.PAD, 8))
+        grid = ctk.CTkFrame(quick, fg_color="transparent")
+        grid.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+        grid.columnconfigure((0, 1, 2), weight=1, uniform="qcol")
+        for i, (title, hint, color_key, command_text) in enumerate(_QUICK_ACTIONS):
+            cmd = (lambda t=command_text: self._on_command(t)) if self._on_command else None
+            _ActionCard(grid, title, hint, color_key, command=cmd).grid(
+                row=i // 3, column=i % 3, sticky="nsew", padx=4, pady=4
+            )
 
         # System Awareness
         self._system = GlassCard(self, fg_color=T.BG_PANEL, border_color=T.GLASS_BORDER)
