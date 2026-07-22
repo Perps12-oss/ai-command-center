@@ -33,6 +33,9 @@ from ai_command_center.core.events.topics import (
     UI_INSPECT_SELECT,
     UI_CONTEXT_CLEAR,
     UI_CONTEXT_SELECT,
+    UI_MEMORY_CLEAR,
+    UI_MEMORY_SEARCH,
+    UI_MEMORY_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -512,6 +515,26 @@ class UIController:
             {"id": memory_id},
             source="ui",
         )
+
+    def publish_memory_select(
+        self,
+        memory_id: str,
+        *,
+        label: str = "",
+        workspace_id: str = "",
+    ) -> None:
+        payload: dict[str, object] = {"memory_id": memory_id}
+        if label:
+            payload["label"] = label
+        if workspace_id:
+            payload["workspace_id"] = workspace_id
+        self._bus.publish(UI_MEMORY_SELECT, payload, source="ui")
+
+    def publish_memory_clear(self) -> None:
+        self._bus.publish(UI_MEMORY_CLEAR, {}, source="ui")
+
+    def publish_memory_search(self, query: str) -> None:
+        self._bus.publish(UI_MEMORY_SEARCH, {"query": query}, source="ui")
 
     def publish_chat_export(self, history: list[dict]) -> None:
         self._bus.publish(

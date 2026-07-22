@@ -84,6 +84,11 @@ UI_INSPECT_NAVIGATE = "ui.inspect.navigate"
 UI_CONTEXT_SELECT = "ui.context.select"
 UI_CONTEXT_CLEAR = "ui.context.clear"
 
+# Memory workspace intents (PR-UI-E05)
+UI_MEMORY_SELECT = "ui.memory.select"
+UI_MEMORY_CLEAR = "ui.memory.clear"
+UI_MEMORY_SEARCH = "ui.memory.search"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -450,6 +455,11 @@ __all__ = [
     "UI_INSPECT_SELECT",
     "UI_INSPECT_CLEAR",
     "UI_INSPECT_NAVIGATE",
+    "UI_CONTEXT_SELECT",
+    "UI_CONTEXT_CLEAR",
+    "UI_MEMORY_SELECT",
+    "UI_MEMORY_CLEAR",
+    "UI_MEMORY_SEARCH",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",

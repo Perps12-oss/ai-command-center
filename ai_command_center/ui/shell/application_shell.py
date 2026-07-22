@@ -203,6 +203,16 @@ class ApplicationShellMixin:
             workspace_scope=self._controller.current_workspace_scope(),
         )
 
+    def _on_memory_select(self, item: dict) -> None:
+        memory_id = str(item.get("id") or item.get("node_id") or "").strip()
+        if not memory_id:
+            return
+        self._controller.publish_memory_select(
+            memory_id,
+            label=str(item.get("label") or item.get("text") or ""),
+            workspace_id=str(item.get("workspace_id") or ""),
+        )
+
     def _on_command(self, text: str, *, workspace_entity: dict[str, str] | None = None) -> None:
         lower = text.strip().lower()
         if lower in ("?", "help"):
