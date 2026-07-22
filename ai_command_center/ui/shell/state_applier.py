@@ -74,6 +74,8 @@ class StateApplierMixin:
             openai_configured=openai_configured,
         )
         self._top.update_top_bar(snap)
+        if hasattr(self, "_context_bar") and self._context_bar is not None:
+            self._context_bar.update(snap)
 
         command_center = self._command_center_view()
         if command_center and hasattr(command_center, "apply_state") and current_view == "command_center":

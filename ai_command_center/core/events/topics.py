@@ -78,6 +78,10 @@ UI_INSPECT_SELECT = "ui.inspect.select"
 UI_INSPECT_CLEAR = "ui.inspect.clear"
 UI_INSPECT_NAVIGATE = "ui.inspect.navigate"
 
+# Global Context Bar topics (PR-UI-E02)
+UI_CONTEXT_SELECT = "ui.context.select"
+UI_CONTEXT_CLEAR = "ui.context.clear"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
