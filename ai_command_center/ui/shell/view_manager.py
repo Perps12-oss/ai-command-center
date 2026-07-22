@@ -15,6 +15,7 @@ from ai_command_center.ui.views.command_center_view import CommandCenterView
 from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
 from ai_command_center.ui.views.evidence_view import EvidenceView
+from ai_command_center.ui.views.operations_view import OperationsView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.plugins_view import PluginsView
@@ -42,6 +43,7 @@ VIEW_IDS: tuple[str, ...] = (
     "chat",
     "executions",
     "evidence",
+    "operations",
     "goals",
     "agents",
     "approvals",
@@ -156,6 +158,13 @@ class ViewManagerMixin:
             on_inspect_select=self._on_chat_inspect_select,
             on_navigate=self._navigate,
         )
+        self._view_registry["operations"] = lambda: OperationsView(
+            self._content,
+            on_select_operation=self._on_operation_select,
+            on_scrub=self._on_operation_scrub,
+            on_inspect_select=self._on_chat_inspect_select,
+            on_navigate=self._navigate,
+        )
         self._view_registry["timeline"] = lambda: ExecutionTimelineView(
             self._content,
             on_inspect_select=self._on_chat_inspect_select,
@@ -259,6 +268,10 @@ class ViewManagerMixin:
     def _evidence_view(self) -> EvidenceView | None:
         v = self._views.get("evidence")
         return v if isinstance(v, EvidenceView) else None
+
+    def _operations_view(self) -> OperationsView | None:
+        v = self._views.get("operations")
+        return v if isinstance(v, OperationsView) else None
 
     def _on_world_model_create_entity(self) -> None:
         """Hero New Entity → ENTITY_CREATE_REQUEST via UIController."""
@@ -533,6 +546,61 @@ class ViewManagerMixin:
             rid,
             label=str(payload["claim"]),
             payload=payload,
+        )
+
+    def _on_operation_select(self, correlation_id: str) -> None:
+        """Mission Control operation click → UI_OPERATION_SELECT + inspect."""
+        cid = str(correlation_id).strip()
+        if not cid:
+            return
+        self._controller.publish_operation_select(cid)
+        snap = self._controller.snapshot()
+        op = next(
+            (o for o in snap.operation_library_index if o.correlation_id == cid),
+            snap.active_operation,
+        )
+        payload: dict[str, object] = {"correlation_id": cid, "name": cid}
+        if op is not None and op.correlation_id == cid:
+            payload.update(
+                {
+                    "name": op.goal_title or cid,
+                    "status": op.goal_status,
+                    "goal_title": op.goal_title,
+                    "goal_id": op.goal_id,
+                }
+            )
+        self._controller.publish_inspect_select(
+            "operation",
+            cid,
+            label=str(payload.get("name") or cid),
+            payload=payload,
+        )
+
+    def _on_operation_scrub(self, index: int, step: dict[str, object]) -> None:
+        """Timeline scrub → UI_OPERATION_SCRUB + execution timeline scrub + inspect."""
+        snap = self._controller.snapshot()
+        request_id = str(
+            step.get("correlation_id")
+            or snap.execution_scrubber.request_id
+            or snap.orchestration_run.request_id
+            or ""
+        )
+        self._controller.publish_operation_scrub(index, request_id=request_id)
+        if request_id:
+            self._controller.publish_execution_timeline_scrub(request_id, index)
+        label = str(step.get("name") or f"step {index}")
+        self._controller.publish_inspect_select(
+            "execution_event",
+            str(step.get("event_id") or step.get("entry_id") or f"scrub-{index}"),
+            label=label,
+            payload={
+                "event_type": str(step.get("kind") or "timeline"),
+                "status": str(step.get("status") or ""),
+                "detail": label,
+                "summary": label,
+                "index": index,
+                "request_id": request_id,
+            },
         )
 
     def _on_execution_timeline_scrub(self, request_id: str, index: int) -> None:

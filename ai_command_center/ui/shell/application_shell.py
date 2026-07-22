@@ -104,6 +104,7 @@ class ApplicationShellMixin:
             PaletteCommand("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory"), section="Navigation"),
             PaletteCommand("◈  World Model", "Browse World Model knowledge graph", lambda: self._navigate("world_explorer"), section="Navigation"),
             PaletteCommand("📎  Evidence", "Claims, truth validation, receipts, and traces", lambda: self._navigate("evidence"), section="Navigation"),
+            PaletteCommand("🎛  Operations", "Mission Control pipeline stages and timeline scrubber", lambda: self._navigate("operations"), section="Navigation"),
             PaletteCommand("⟷  Relationships", "Visualize node edges and dependencies", lambda: self._navigate("relationships"), section="Navigation"),
             PaletteCommand("🔍  Dependencies", "Mutation log, goals, and dependency inspector", lambda: self._navigate("dependencies"), section="Navigation"),
             PaletteCommand("⚙  System", "System monitor", lambda: self._navigate("system"), section="Navigation"),

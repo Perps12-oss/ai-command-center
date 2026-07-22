@@ -48,6 +48,9 @@ from ai_command_center.core.events.topics import (
     UI_AGENT_SELECT,
     UI_EVIDENCE_OPEN,
     UI_EVIDENCE_SELECT,
+    UI_OPERATION_OPEN,
+    UI_OPERATION_SCRUB,
+    UI_OPERATION_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -664,6 +667,23 @@ class UIController:
 
     def publish_evidence_open(self) -> None:
         self._bus.publish(UI_EVIDENCE_OPEN, {"view": "evidence"}, source="ui")
+
+    def publish_operation_select(self, correlation_id: str) -> None:
+        self._bus.publish(
+            UI_OPERATION_SELECT,
+            {"correlation_id": str(correlation_id)},
+            source="ui",
+        )
+
+    def publish_operation_scrub(self, index: int, *, request_id: str = "") -> None:
+        self._bus.publish(
+            UI_OPERATION_SCRUB,
+            {"index": int(index), "request_id": str(request_id)},
+            source="ui",
+        )
+
+    def publish_operation_open(self) -> None:
+        self._bus.publish(UI_OPERATION_OPEN, {"view": "operations"}, source="ui")
 
     def publish_entity_create_request(
         self,

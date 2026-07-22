@@ -390,6 +390,7 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.views.world_explorer_view",
     "ai_command_center.ui.views.relationship_view",
     "ai_command_center.ui.components.timeline_renderer",
+    "ai_command_center.ui.components.docks",
     "ai_command_center.ui.components.execution_timeline_scrubber",
     "ai_command_center.ui.components.docks.execution_timeline_dock",
     "ai_command_center.ui.views.execution_center.execution_list_panel",
@@ -405,6 +406,11 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.evidence",
     "ai_command_center.ui.components.inspector.evidence_inspector",
     "ai_command_center.ui.views.evidence_view",
+    "ai_command_center.ui.components.operations.pipeline_stage",
+    "ai_command_center.ui.components.operations.operation_card",
+    "ai_command_center.ui.components.operations",
+    "ai_command_center.ui.components.inspector.operation_inspector",
+    "ai_command_center.ui.views.operations_view",
     "ai_command_center.ui.views.agent_monitor.active_agents_panel",
     "ai_command_center.ui.views.agent_monitor.agent_state_panel",
     "ai_command_center.ui.views.agent_monitor.pipeline_progress_panel",
@@ -467,6 +473,8 @@ def _patch_and_import():
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
         from ai_command_center.ui.views.executions_view import ExecutionsView
         from ai_command_center.ui.views.evidence_view import EvidenceView
+        from ai_command_center.ui.views.operations_view import OperationsView
+        from ai_command_center.ui.components.operations import OperationCard, PipelineStageStrip
         from ai_command_center.ui.components.evidence import ClaimCard, ReceiptChain, TruthBadge
         from ai_command_center.ui.views.agents_view import AgentsView
         from ai_command_center.ui.components.agent import AgentCard, PipelineStage, RunTimeline
@@ -504,6 +512,9 @@ def _patch_and_import():
         WorldExplorerView,
         ExecutionsView,
         EvidenceView,
+        OperationsView,
+        OperationCard,
+        PipelineStageStrip,
         ClaimCard,
         TruthBadge,
         ReceiptChain,
@@ -539,6 +550,9 @@ def _patch_and_import():
     WorldExplorerView,
     ExecutionsView,
     EvidenceView,
+    OperationsView,
+    OperationCard,
+    PipelineStageStrip,
     ClaimCard,
     TruthBadge,
     ReceiptChain,
