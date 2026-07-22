@@ -15,8 +15,16 @@ from ai_command_center.domain.brain_state_snapshot import (
     PlanSnapshot,
     PlanStepSnapshot,
 )
+from ai_command_center.core.state.inspector_state import resolve_inspect_navigate_view
 from ai_command_center.ui.controller import UIController
-from tests.ui.fake_ui import GoalDetail, GoalTree, GoalView, SuccessCriteriaCard, TaskRow
+from tests.ui.fake_ui import (
+    GoalDetail,
+    GoalTree,
+    GoalView,
+    InspectorHost,
+    SuccessCriteriaCard,
+    TaskRow,
+)
 
 
 def _snap() -> AppState:
@@ -67,7 +75,14 @@ def test_goal_workspace_projects_tree_tasks_criteria():
 
     view._select_task("s2")
     assert tasks == [("g1", "s2")]
-    assert getattr(inspected[-1], "kind") == "plan_step"
+    assert getattr(inspected[-1], "kind") == "task"
+    assert resolve_inspect_navigate_view("task") == "goals"
+
+    host = InspectorHost(None)
+    host.show(inspected[-1])
+    assert host._current_ref is not None
+    assert host._current_ref.kind == "task"
+    assert "Tasks" in host._title.cget("text") or host._title.cget("text")
 
 
 def test_goal_tree_and_criteria_components():

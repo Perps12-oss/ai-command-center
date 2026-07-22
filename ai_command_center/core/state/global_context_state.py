@@ -29,9 +29,29 @@ class GlobalContextSnapshot:
     entity_id: str = ""
     entity_type: str = ""
     entity_title: str = ""
+    active_goal_id: str = ""
+    active_goal_title: str = ""
     sources: tuple[str, ...] = ()
     token_estimate: int = 0
     revision: int = 0
+
+
+def resolve_active_goal(brain_state: Any) -> tuple[str, str]:
+    """Return (goal_id, title) for the first active brain goal, else first goal."""
+    goals = list(getattr(brain_state, "recent_goals", ()) or ())
+    for goal in goals:
+        if str(getattr(goal, "status", "")).lower() == "active":
+            return (
+                str(getattr(goal, "goal_id", "") or ""),
+                str(getattr(goal, "text", "") or getattr(goal, "title", "") or ""),
+            )
+    if goals:
+        goal = goals[0]
+        return (
+            str(getattr(goal, "goal_id", "") or ""),
+            str(getattr(goal, "text", "") or getattr(goal, "title", "") or ""),
+        )
+    return ("", "")
 
 
 def _coerce_sources(raw: Any) -> tuple[str, ...]:
@@ -121,3 +141,10 @@ def reduce_global_context_state(state: Any, event: Event) -> Any:
         return replace(state, global_context=new)
 
     return state
+
+
+__all__ = [
+    "GlobalContextSnapshot",
+    "reduce_global_context_state",
+    "resolve_active_goal",
+]

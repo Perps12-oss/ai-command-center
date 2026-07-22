@@ -10,7 +10,9 @@ from ai_command_center.core.events.topics import UI_CONTEXT_CLEAR, UI_CONTEXT_SE
 from ai_command_center.core.state.global_context_state import (
     GlobalContextSnapshot,
     reduce_global_context_state,
+    resolve_active_goal,
 )
+from ai_command_center.domain.brain_state_snapshot import BrainStateSnapshot, GoalSnapshot
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.ui.controller import UIController
 from tests.ui.fake_ui import GlobalContextBar
@@ -41,9 +43,15 @@ def test_context_bar_shows_workspace_entity_and_sources(context_bar):
             token_estimate=2048,
         ),
         settings=SettingsSnapshot(default_model="gpt-4", provider="openai"),
+        brain_state=BrainStateSnapshot(
+            recent_goals=(
+                GoalSnapshot(goal_id="g1", text="Ship Phase B", status="active"),
+            ),
+        ),
     )
     context_bar.update(snap)
 
+    assert "Ship Phase B" in context_bar._goal_label.cget("text")
     assert "Test Workspace" in context_bar._scope_label.cget("text")
     assert "Selected Card" in context_bar._scope_label.cget("text")
     assert "note-1" in context_bar._sources_label.cget("text")
@@ -52,11 +60,22 @@ def test_context_bar_shows_workspace_entity_and_sources(context_bar):
     assert "gpt-4" in context_bar._model_label.cget("text")
 
 
+def test_resolve_active_goal_prefers_active_status():
+    brain = BrainStateSnapshot(
+        recent_goals=(
+            GoalSnapshot(goal_id="g0", text="Queued", status="queued"),
+            GoalSnapshot(goal_id="g1", text="Active One", status="active"),
+        ),
+    )
+    assert resolve_active_goal(brain) == ("g1", "Active One")
+
+
 def test_context_bar_empty_state(context_bar):
     """When no context is active the bar shows informative empty state."""
     snap = _make_state()
     context_bar.update(snap)
 
+    assert "No active goal" in context_bar._goal_label.cget("text")
     assert "No active workspace" in context_bar._scope_label.cget("text")
     assert "No context sources" in context_bar._sources_label.cget("text")
     assert context_bar._tokens_label.cget("text") == ""

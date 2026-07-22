@@ -287,3 +287,11 @@ AppState Compliance:           PASS
 **Package judgment:** Phase B UI evolution **substantially achieved** the approved plan on `main` with correct architecture and primitive reuse. It is **not** yet a clean program COMPLIANT close-out: fix E07 task inspector + E02 active goal, backfill early Tom artifacts, refresh truth matrix — then re-score for COMPLIANT / program COMPLETE.
 
 **Would a senior engineer approve production merge of the package as-is?** Yes for continued product use (already merged). **Would Tom approve declaring Phase B UI program COMPLETE?** Not until CONDITIONS above are cleared.
+
+---
+
+## Addendum — CONDITIONS cleared (2026-07-22)
+
+See `docs/audits/TOM_AUDIT_PHASE_B_CONDITIONS_CLEARED.md`.
+
+Re-score after remediation: **93 / COMPLIANT**; program gate **PASS**.

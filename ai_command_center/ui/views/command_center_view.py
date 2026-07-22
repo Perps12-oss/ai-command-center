@@ -14,7 +14,7 @@ from ai_command_center.ui.design_system.status_tokens import (
     goal_state_color,
     status_color,
 )
-from ai_command_center.ui.views.home_view import _ActionCard, _QUICK_ACTIONS
+from ai_command_center.ui.components.quick_action_card import ActionCard, QUICK_ACTIONS
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
     article18_loading,
@@ -137,9 +137,9 @@ class CommandCenterView(ctk.CTkFrame):
         grid = ctk.CTkFrame(quick, fg_color="transparent")
         grid.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
         grid.columnconfigure((0, 1, 2), weight=1, uniform="qcol")
-        for i, (title, hint, color_key, command_text) in enumerate(_QUICK_ACTIONS):
+        for i, (title, hint, color_key, command_text) in enumerate(QUICK_ACTIONS):
             cmd = (lambda t=command_text: self._on_command(t)) if self._on_command else None
-            _ActionCard(grid, title, hint, color_key, command=cmd).grid(
+            ActionCard(grid, title, hint, color_key, command=cmd).grid(
                 row=i // 3, column=i % 3, sticky="nsew", padx=4, pady=4
             )
 

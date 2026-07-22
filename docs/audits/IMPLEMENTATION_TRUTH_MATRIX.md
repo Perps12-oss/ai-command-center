@@ -1,9 +1,9 @@
 # Implementation Truth Matrix
 
-**Milestone:** PHASE 0R — Repository Truth Reconciliation  
-**Baseline:** `origin/main` @ `e128a72` (verified 2026-07-20)  
+**Milestone:** PHASE 0R — Repository Truth Reconciliation (+ Phase B UI refresh)  
+**Baseline:** `origin/main` @ `e128a72` (0R verified 2026-07-20); Phase B UI rows verified @ `8f5c9b8`+  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
-**Plan:** `docs/plans/PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`
+**Plan:** `docs/plans/PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`; UI plan `docs/architecture/UI_IMPLEMENTATION_ROADMAP_PHASE_B_EVOLUTION.md`
 
 ---
 
@@ -28,6 +28,27 @@
 | Platform tray / notifications | ⚠️ stubs | ❌ | ❌ | ❌ | **MISSING/STUB** | `NotImplementedError` in `platform/platform_service.py` |
 
 Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
+
+### Phase B UI evolution (PR-UI-E00–E13) — verified 2026-07-22
+
+| Capability | Exists | Wired (shell) | Tested | Live path? | Status | Evidence |
+|------------|:------:|:-------------:|:------:|:----------:|--------|----------|
+| Command Center default | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `ui/app.py`; E00 |
+| Universal Inspector kinds | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `inspector_host.py`; E01 |
+| Global Context Bar (+ active goal) | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `global_context_bar.py`; E02 + CONDITIONS |
+| OS Palette providers | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `palette_provider.py`; E03 |
+| Navigation groups | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `sidebar.py` `NAV_GROUPS`; E04 |
+| Memory Workspace | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `memory_view.py`; E05 |
+| Brain Inspector | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `brain_view.py`; E06 |
+| Goal Workspace | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `goal_view.py` + `task` inspect; E07 |
+| World Model Explorer | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `world_explorer_view.py`; E08 |
+| Agent Operations | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `agents_view.py`; E09 |
+| Evidence Workspace | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `evidence_view.py` ← `orchestration_run`; E10 |
+| Mission Control Operations | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `operations_view.py`; E11 |
+| Graph Workspace | ✅ | ✅ | ✅ | ✅ UI | **WIRED** | `graph_workspace_view.py`; E12 |
+| Insights Placeholder | ✅ | ✅ | ✅ | ✅ UI | **WIRED** (stub) | `insights_view.py` + `insights_state`; E13 |
+
+Package Tom: `docs/audits/TOM_AUDIT_PHASE_B_UI_PACKAGE_E00_E13.md`
 
 ---
 

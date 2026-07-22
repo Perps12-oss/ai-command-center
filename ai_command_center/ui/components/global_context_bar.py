@@ -7,12 +7,13 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppState
+from ai_command_center.core.state.global_context_state import resolve_active_goal
 from ai_command_center.providers.defaults import provider_display_name
 from ai_command_center.ui.design_system import theme_v2 as T
 
 
 class GlobalContextBar(ctk.CTkFrame):
-    """Displays active workspace/entity, context sources, token budget, and model.
+    """Displays active goal, workspace/entity, sources, token budget, and model.
 
     The bar is a read-only projection of :class:`AppState`; it never holds
     authoritative state and only publishes user intent through callbacks.
@@ -46,6 +47,14 @@ class GlobalContextBar(ctk.CTkFrame):
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
         ).pack(side="left", padx=(0, 8))
+
+        self._goal_label = ctk.CTkLabel(
+            left,
+            text="No active goal",
+            font=T.FONT_SMALL,
+            text_color=T.GOAL_AMBER,
+        )
+        self._goal_label.pack(side="left", padx=(0, 12))
 
         self._scope_label = ctk.CTkLabel(
             left,
@@ -97,6 +106,17 @@ class GlobalContextBar(ctk.CTkFrame):
         """Project the current AppState into the bar."""
         ctx = snap.global_context
         settings = snap.settings
+
+        goal_id, goal_title = resolve_active_goal(getattr(snap, "brain_state", None))
+        if not goal_title:
+            goal_title = ctx.active_goal_title
+            goal_id = goal_id or ctx.active_goal_id
+        if goal_title:
+            self._goal_label.configure(text=f"Goal: {goal_title}")
+        elif goal_id:
+            self._goal_label.configure(text=f"Goal: {goal_id}")
+        else:
+            self._goal_label.configure(text="No active goal")
 
         scope_parts: list[str] = []
         if ctx.workspace_title:
