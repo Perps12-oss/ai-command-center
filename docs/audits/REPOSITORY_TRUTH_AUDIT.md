@@ -34,10 +34,11 @@
 |--------|---------------------------|---------|-------------|--------|
 | `cursor/cloud-agent-1784344178346-8nt9j` | 11E, 11F, Art.18, constitution tokens, remediation/placeholder audits, Verify11F | **no** | **no** | **merge** (via `phase-11-final-integration`) |
 | `cursor/primitive-reuse-graph-canvas-f0ab` | none missing from main (content in #78 squash) | content yes / tip commits no | tip **yes** | delete after confirming #78 |
-| `phase-11a-command-center` | no Phase-11 orphans vs main (early tip) | no (PR #75 OPEN) | **yes** | close PR #75; **delete** |
+| `phase-11a-command-center` | no Phase-11 orphans vs main (early tip) | no (PR #75) | **yes** | **close #75; delete branch** (`scripts/pr_hygiene_phase_b.sh`) |
 | `phase13-execution-inspector` | no Phase-11 orphans | no | mostly | review then delete |
 | `feature/timeline-undo-handlers` | no Phase-11 orphans | content via #74 | tip stale | review then delete |
-| `cursor/timeline-undo-p1-6c6b` | no Phase-11 orphans | no (PR #66 OPEN) | **yes** | close #66; delete |
+| `cursor/timeline-undo-p1-6c6b` | no Phase-11 orphans | content via #74 | **yes** | **close #66** (branch often already gone) |
+| `cursor/phase-12-state-intelligence-0fbc` | Phase 12 WIP | no (PR #81) | park | **close #81**; keep branch until Phase 12 restart |
 | `cursor/plugin-catalog-entities-6c6b` | no Phase-11 orphans | no | **yes** (stale) | review then delete |
 | `cursor/reasoning-loop-pr1-4-b0b8` | no Phase-11 orphans | no | **yes** (stale) | review then delete |
 | `feat/program4-slice4-context-plugin-entities` | no Phase-11 orphans | no | **yes** (stale) | review then delete |
