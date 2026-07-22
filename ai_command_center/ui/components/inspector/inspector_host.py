@@ -18,6 +18,7 @@ from ai_command_center.ui.components.inspector.goal_inspector import GoalInspect
 from ai_command_center.ui.components.inspector.memory_inspector import MemoryInspector
 from ai_command_center.ui.components.inspector.message_inspector import MessageInspector
 from ai_command_center.ui.components.inspector.note_inspector import NoteInspector
+from ai_command_center.ui.components.inspector.operation_inspector import OperationInspector
 from ai_command_center.ui.components.inspector.provider_inspector import ProviderInspector
 from ai_command_center.ui.components.inspector.task_inspector import TaskInspector
 from ai_command_center.ui.components.inspector.world_node_inspector import WorldNodeInspector
@@ -112,6 +113,7 @@ class InspectorHost(ctk.CTkFrame):
         self.register("world_node", WorldNodeInspector(self._body))
         self.register("execution_event", ExecutionEventInspector(self._body))
         self.register("evidence", EvidenceInspector(self._body))
+        self.register("operation", OperationInspector(self._body))
 
     def set_default(self, widget: ctk.CTkBaseClass) -> None:
         self._default_widget = widget

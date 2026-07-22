@@ -28,6 +28,7 @@ _INSPECT_NAVIGATE_VIEWS: dict[str, str] = {
     "world_node": "world_explorer",
     "execution_event": "executions",
     "evidence": "evidence",
+    "operation": "operations",
 }
 
 
