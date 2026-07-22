@@ -117,6 +117,8 @@ from ai_command_center.core.events.topics import (
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
     UI_SELECT_ENTITY,
+    UI_CONTEXT_SELECT,
+    UI_CONTEXT_CLEAR,
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
     WORKFLOW_COMPLETED,
@@ -166,6 +168,10 @@ from ai_command_center.core.state.execution_state import (
 from ai_command_center.core.state.execution_timeline_state import (
     ExecutionTimelineState,
     reduce_execution_timeline_state,
+)
+from ai_command_center.core.state.global_context_state import (
+    GlobalContextSnapshot,
+    reduce_global_context_state,
 )
 from ai_command_center.core.state.inspector_state import (
     InspectorState,
@@ -308,6 +314,8 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     UI_INSPECT_CLEAR,
     UI_INSPECT_NAVIGATE,
     UI_SELECT_ENTITY,
+    UI_CONTEXT_SELECT,
+    UI_CONTEXT_CLEAR,
     EXECUTION_EVENT_APPENDED,
     EXECUTION_EVENTS_LOADED,
     EXECUTION_RUNS_LOADED,
@@ -620,6 +628,7 @@ class AppState:
     )
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
+    global_context: GlobalContextSnapshot = field(default_factory=GlobalContextSnapshot)
     inspector: InspectorState = field(default_factory=InspectorState)
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
@@ -3520,6 +3529,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_chat_error,
     _reduce_chat_history_loaded,
     _reduce_context_snapshot,
+    reduce_global_context_state,
     _reduce_error,
     _reduce_phase,
     _reduce_system_snapshot,

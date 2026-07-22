@@ -15,6 +15,7 @@ from ai_command_center.core.event_bus import Event
 from ai_command_center.ui.capability_help import show_capability_help
 from ai_command_center.ui.components.command_box import CommandBox
 from ai_command_center.ui.components.command_history_drawer import CommandHistoryDrawer
+from ai_command_center.ui.components.global_context_bar import GlobalContextBar
 from ai_command_center.ui.components.sidebar import Sidebar
 from ai_command_center.ui.components.top_bar import TopBar
 from ai_command_center.ui.design_system.command import CommandPalette
@@ -35,6 +36,9 @@ class ApplicationShellMixin:
             on_navigate=self._navigate,
         )
         self._top.pack(fill="x", side="top")
+
+        self._context_bar = GlobalContextBar(self)
+        self._context_bar.pack(fill="x", side="top")
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
