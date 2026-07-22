@@ -30,6 +30,8 @@ from ai_command_center.core.events.topics import (
     UI_INSPECT_CLEAR,
     UI_INSPECT_NAVIGATE,
     UI_INSPECT_SELECT,
+    UI_CONTEXT_CLEAR,
+    UI_CONTEXT_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -237,6 +239,26 @@ class UIController:
             payload,
             source="ui",
         )
+
+    def publish_context_select(
+        self,
+        entity_id: str,
+        *,
+        entity_type: str = "",
+        title: str = "",
+        workspace_id: str = "",
+    ) -> None:
+        payload: dict[str, object] = {"entity_id": entity_id}
+        if entity_type:
+            payload["entity_type"] = entity_type
+        if title:
+            payload["title"] = title
+        if workspace_id:
+            payload["workspace_id"] = workspace_id
+        self._bus.publish(UI_CONTEXT_SELECT, payload, source="ui")
+
+    def publish_context_clear(self) -> None:
+        self._bus.publish(UI_CONTEXT_CLEAR, {}, source="ui")
 
     def publish_artifact_action(self, artifact_id: str, action: str) -> None:
         self._bus.publish(

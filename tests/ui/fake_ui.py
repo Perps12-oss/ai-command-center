@@ -332,6 +332,7 @@ def _build_fake_tkinter() -> types.ModuleType:
 # under the fake so projection tests do not inherit a prior real-Tk import.
 _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.glass_card",
+    "ai_command_center.ui.components.global_context_bar",
     "ai_command_center.ui.components.status_pill",
     "ai_command_center.ui.components.top_bar",
     # Inspector primitives (must reload under fake customtkinter)
@@ -418,6 +419,7 @@ def _patch_and_import():
     try:
         from ai_command_center.ui.views.command_center_view import CommandCenterView
         from ai_command_center.ui.components.top_bar import TopBar
+        from ai_command_center.ui.components.global_context_bar import GlobalContextBar
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
         from ai_command_center.ui.views.executions_view import ExecutionsView
         from ai_command_center.ui.views.agents_view import AgentsView
@@ -440,6 +442,7 @@ def _patch_and_import():
     return (
         CommandCenterView,
         TopBar,
+        GlobalContextBar,
         WorldExplorerView,
         ExecutionsView,
         AgentsView,
@@ -452,6 +455,7 @@ def _patch_and_import():
 (
     CommandCenterView,
     TopBar,
+    GlobalContextBar,
     WorldExplorerView,
     ExecutionsView,
     AgentsView,
