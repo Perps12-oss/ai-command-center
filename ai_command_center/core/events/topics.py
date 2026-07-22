@@ -116,6 +116,12 @@ UI_OPERATION_SELECT = "ui.operation.select"
 UI_OPERATION_SCRUB = "ui.operation.scrub"
 UI_OPERATION_OPEN = "ui.operation.open"
 
+# Relationship Graph Workspace intents (PR-UI-E12)
+UI_GRAPH_SELECT = "ui.graph.select"
+UI_GRAPH_FILTER = "ui.graph.filter"
+UI_GRAPH_OPEN = "ui.graph.open"
+UI_GRAPH_NAVIGATE = "ui.graph.navigate"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -502,6 +508,10 @@ __all__ = [
     "UI_OPERATION_SELECT",
     "UI_OPERATION_SCRUB",
     "UI_OPERATION_OPEN",
+    "UI_GRAPH_SELECT",
+    "UI_GRAPH_FILTER",
+    "UI_GRAPH_OPEN",
+    "UI_GRAPH_NAVIGATE",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",

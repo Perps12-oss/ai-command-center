@@ -51,6 +51,10 @@ from ai_command_center.core.events.topics import (
     UI_OPERATION_OPEN,
     UI_OPERATION_SCRUB,
     UI_OPERATION_SELECT,
+    UI_GRAPH_FILTER,
+    UI_GRAPH_NAVIGATE,
+    UI_GRAPH_OPEN,
+    UI_GRAPH_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -684,6 +688,38 @@ class UIController:
 
     def publish_operation_open(self) -> None:
         self._bus.publish(UI_OPERATION_OPEN, {"view": "operations"}, source="ui")
+
+    def publish_graph_select(self, node_id: str) -> None:
+        self._bus.publish(UI_GRAPH_SELECT, {"node_id": str(node_id)}, source="ui")
+
+    def publish_graph_filter(
+        self,
+        *,
+        search: str = "",
+        type_filter: str = "all",
+        status_filter: str = "all",
+        sort_key: str = "name",
+    ) -> None:
+        self._bus.publish(
+            UI_GRAPH_FILTER,
+            {
+                "search": search,
+                "type_filter": type_filter,
+                "status_filter": status_filter,
+                "sort_key": sort_key,
+            },
+            source="ui",
+        )
+
+    def publish_graph_open(self) -> None:
+        self._bus.publish(UI_GRAPH_OPEN, {"view": "graph_workspace"}, source="ui")
+
+    def publish_graph_navigate(self, node_id: str, *, view: str = "world_explorer") -> None:
+        self._bus.publish(
+            UI_GRAPH_NAVIGATE,
+            {"node_id": str(node_id), "view": str(view)},
+            source="ui",
+        )
 
     def publish_entity_create_request(
         self,

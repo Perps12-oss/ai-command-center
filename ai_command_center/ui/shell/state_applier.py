@@ -105,6 +105,14 @@ class StateApplierMixin:
         ):
             world_explorer.apply_state(snap)
 
+        graph_workspace = self._graph_workspace_view()
+        if (
+            graph_workspace
+            and hasattr(graph_workspace, "apply_state")
+            and current_view == "graph_workspace"
+        ):
+            graph_workspace.apply_state(snap)
+
         evidence = self._evidence_view()
         if evidence and hasattr(evidence, "apply_state") and current_view == "evidence":
             evidence.apply_state(snap)
