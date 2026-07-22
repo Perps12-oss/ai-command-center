@@ -410,6 +410,65 @@ def _check_world_model_workspace(v: Violation) -> None:
             v.add(f"{path.relative_to(REPO)} does not use WORLD_TEAL token")
 
 
+def _check_graph_workspace(v: Violation) -> None:
+    """Verify PR-UI-E12 Relationship Graph Workspace contracts."""
+    shell = UI_ROOT / "views" / "graph_workspace_view.py"
+    if not shell.exists():
+        v.add("Missing Graph Workspace file: ui/views/graph_workspace_view.py")
+        return
+    text = _read(shell)
+    for label, symbol in (
+        ("KnowledgeGraphPanel", "KnowledgeGraphPanel"),
+        ("SelectionInspectorPanel", "SelectionInspectorPanel"),
+        ("NodeFiltersBar", "NodeFiltersBar"),
+        ("apply_state", "def apply_state"),
+        ("world_model projection", "world_model"),
+    ):
+        if symbol not in text:
+            v.add(f"Graph Workspace missing {label} ({symbol})")
+    if "from ai_command_center.core.state.world_model_state" in text:
+        v.add("graph_workspace_view.py must not import WorldModelState")
+    if "add_listener" in text:
+        v.add("graph_workspace_view.py must not subscribe to mutable state listeners")
+
+    renderer = UI_ROOT / "components" / "world_model" / "graph_renderer.py"
+    if not renderer.exists():
+        v.add("Missing graph_renderer.py")
+    else:
+        rtext = _read(renderer)
+        if "filtered_graph" not in rtext or "graph_metrics" not in rtext:
+            v.add("graph_renderer.py missing filtered_graph / graph_metrics")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["graph_workspace"]' not in view_manager:
+        v.add("view_manager missing graph_workspace factory")
+    factory_block = re.search(
+        r'self\._view_registry\["graph_workspace"\]\s*=\s*lambda:.*?GraphWorkspaceView\((.*?)\)',
+        view_manager,
+        re.S,
+    )
+    if factory_block and "state=" in factory_block.group(1):
+        v.add("GraphWorkspaceView factory must not inject WorldModelState")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "graph_workspace"' not in state_applier:
+        v.add("state_applier does not drive graph_workspace via apply_state")
+
+    controller = _read(UI_ROOT / "controller.py")
+    for method in (
+        "publish_graph_select",
+        "publish_graph_filter",
+        "publish_graph_open",
+        "publish_graph_navigate",
+    ):
+        if method not in controller:
+            v.add(f"UIController missing {method}")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("graph_workspace", "Graph Workspace")' not in sidebar:
+        v.add("Sidebar label for graph_workspace is not 'Graph Workspace'")
+
+
 def _check_execution_center_workspace(v: Violation) -> None:
     """Verify Phase 11C / Article 13 Execution Center workspace contracts."""
     for path in PHASE_11C_FILES:
@@ -727,6 +786,7 @@ def main() -> int:
     _check_route_reachability(v)
     _check_theme_tokens(v)
     _check_world_model_workspace(v)
+    _check_graph_workspace(v)
     _check_execution_center_workspace(v)
     _check_agent_monitor_workspace(v)
     _check_approval_center_workspace(v)

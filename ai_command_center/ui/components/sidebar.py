@@ -27,6 +27,7 @@ NAV_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ("workflow", "Workflow"),
         ("automation", "Automation"),
         ("world_explorer", "World Model"),
+        ("graph_workspace", "Graph Workspace"),
     )),
     ("Library", (
         ("relationships", "Relationships"),
