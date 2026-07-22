@@ -56,9 +56,9 @@ class EventCoordinatorMixin:
         )
 
     def _on_ui_navigate(self, event: Event) -> None:
-        view = str(event.payload.get("view", "home")).lower()
+        view = str(event.payload.get("view", "command_center")).lower()
         if view not in VIEW_IDS:
-            view = "home"
+            view = "command_center"
 
         def update() -> None:
             self._navigate(view, clear_chat_entity=(view == "chat"))
@@ -117,9 +117,6 @@ class EventCoordinatorMixin:
                 kind="success",
                 action=("View", lambda: self._navigate("notes")),
             )
-            home = self._home_view()
-            if home:
-                home.update_vault(indexing=False, files=files, ms=ms)
             self._queue_state_refresh()
 
         self._ui_queue.enqueue(update)
@@ -162,9 +159,6 @@ class EventCoordinatorMixin:
                 kind="success",
                 action=("View", lambda: self._navigate("memory")),
             )
-            home = self._home_view()
-            if home:
-                home.update_memory(self._memory_count)
 
         self._ui_queue.enqueue(update)
 
@@ -336,38 +330,13 @@ class EventCoordinatorMixin:
         self._ui_queue.enqueue(update)
 
     def _on_ollama_status(self, event: Event) -> None:
-        online = bool(event.payload.get("online", False))
-        model = str(event.payload.get("model", ""))
-
-        def update() -> None:
-            home = self._home_view()
-            if home:
-                home.update_ollama(online, model)
-            self._queue_state_refresh()
-
-        self._ui_queue.enqueue(update)
+        self._ui_queue.enqueue(self._queue_state_refresh)
 
     def _on_system_events(self, event: Event) -> None:
-        text = str(event.payload.get("text", ""))
-        kind = str(event.payload.get("kind", "system"))
-
-        def update() -> None:
-            home = self._home_view()
-            if home:
-                home.add_activity(text, kind)
-
-        self._ui_queue.enqueue(update)
+        self._ui_queue.enqueue(lambda: None)
 
     def _on_command_history(self, event: Event) -> None:
-        payload = event.payload or {}
-
-        def update() -> None:
-            home = self._home_view()
-            if home:
-                home.apply_command_history(payload)
-            self._queue_state_refresh()
-
-        self._ui_queue.enqueue(update)
+        self._ui_queue.enqueue(self._queue_state_refresh)
 
     def _on_service_state_changed(self, event: Event) -> None:
         service = str(event.payload.get("service", ""))

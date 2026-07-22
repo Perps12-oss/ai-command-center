@@ -340,6 +340,8 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.design_system.palette_provider",
     "ai_command_center.ui.design_system.command",
     "ai_command_center.ui.components.top_bar",
+    "ai_command_center.ui.components.nav_group",
+    "ai_command_center.ui.components.sidebar",
     # Inspector primitives (must reload under fake customtkinter)
     "ai_command_center.ui.components.inspector.base_inspector",
     "ai_command_center.ui.components.inspector.payload_inspector",
@@ -425,6 +427,8 @@ def _patch_and_import():
         from ai_command_center.ui.views.command_center_view import CommandCenterView
         from ai_command_center.ui.components.top_bar import TopBar
         from ai_command_center.ui.components.global_context_bar import GlobalContextBar
+        from ai_command_center.ui.components.nav_group import NavGroup
+        from ai_command_center.ui.components.sidebar import Sidebar, NAV_GROUPS
         from ai_command_center.ui.design_system.palette_provider import PaletteProvider
         from ai_command_center.ui.design_system.command import OSPalette
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
@@ -450,6 +454,9 @@ def _patch_and_import():
         CommandCenterView,
         TopBar,
         GlobalContextBar,
+        NavGroup,
+        Sidebar,
+        NAV_GROUPS,
         PaletteProvider,
         OSPalette,
         WorldExplorerView,
@@ -465,6 +472,9 @@ def _patch_and_import():
     CommandCenterView,
     TopBar,
     GlobalContextBar,
+    NavGroup,
+    Sidebar,
+    NAV_GROUPS,
     PaletteProvider,
     OSPalette,
     WorldExplorerView,
