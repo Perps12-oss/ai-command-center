@@ -10,6 +10,7 @@ from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.views.chat.chat_view import ChatView
 from ai_command_center.ui.views.agents_view import AgentsView
 from ai_command_center.ui.views.approvals_view import ApprovalsView
+from ai_command_center.ui.views.brain_view import BrainView
 from ai_command_center.ui.views.command_center_view import CommandCenterView
 from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
@@ -36,6 +37,7 @@ ViewFactory = Callable[[], object]
 VIEW_IDS: tuple[str, ...] = (
     "command_center",
     "workspace",
+    "brain",
     "chat",
     "executions",
     "goals",
@@ -75,6 +77,12 @@ class ViewManagerMixin:
         self._view_registry["command_center"] = lambda: CommandCenterView(
             self._content,
             on_command=self._on_command,
+            on_navigate=self._navigate,
+        )
+        self._view_registry["brain"] = lambda: BrainView(
+            self._content,
+            on_select_goal=self._on_brain_goal_select,
+            on_inspect_select=self._on_chat_inspect_select,
             on_navigate=self._navigate,
         )
         self._view_registry["goals"] = lambda: GoalView(
@@ -226,6 +234,10 @@ class ViewManagerMixin:
     def _command_center_view(self) -> CommandCenterView | None:
         v = self._views.get("command_center")
         return v if isinstance(v, CommandCenterView) else None
+
+    def _brain_view(self) -> BrainView | None:
+        v = self._views.get("brain")
+        return v if isinstance(v, BrainView) else None
 
     def _world_explorer_view(self) -> WorldExplorerView | None:
         v = self._views.get("world_explorer")
@@ -382,6 +394,14 @@ class ViewManagerMixin:
             label=gid,
             payload={"goal_id": gid},
         )
+
+    def _on_brain_goal_select(self, goal_id: str) -> None:
+        """Brain workspace goal click → UI_BRAIN_SELECT + inspect."""
+        gid = str(goal_id).strip()
+        if not gid:
+            return
+        self._controller.publish_brain_select(gid)
+        self._on_goal_select(gid)
 
     def _on_goal_new(self, title: str, priority: int = 0) -> None:
         """Publish GOAL_SUBMIT_REQUEST for Hero New Goal (never lifecycle facts)."""

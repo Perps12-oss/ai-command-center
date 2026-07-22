@@ -11,6 +11,7 @@ NAV_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("Workspaces", (
         ("command_center", "Command Center"),
         ("workspace", "Workspace"),
+        ("brain", "Brain Inspector"),
     )),
     ("Ops", (
         ("chat", "Chat"),
