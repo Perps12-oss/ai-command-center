@@ -1,11 +1,12 @@
-# Devin UI Implementation Handover
+# Phase B UI Implementation Handover
 
-**Status:** ACTIVE  
-**Date:** 2026-07-21  
-**Audience:** Devin (builder — UI / frontend)  
-**Auditor:** Cursor + Tom (Repository Guardian)  
+**Status:** ACTIVE (roles updated 2026-07-22)  
+**Date:** 2026-07-21 (original); **role change:** 2026-07-22  
+**Audience:** Cursor (sole coder + Tom auditor)  
 **Baseline:** `origin/main` only — never `phase-11a-command-center`  
 **Governance on main:** PR #83–#84 merged (Canon, DOC_HYGIENE, ADR-006, R1, State Authority contract)
+
+> **Devin retired (2026-07-22).** Cursor is the sole implementer **and** Tom auditor for Phase B UI. Historical Devin stop-gate wording below still describes the *process* (one slice → audit → merge → next); substitute Cursor for Devin as builder. Last Devin slice: E04 (#94). See `docs/agents/E04_NAVIGATION_SHELL.md` and `docs/audits/TOM_AUDIT_PR_UI_E04.md`.
 
 ---
 
@@ -13,11 +14,11 @@
 
 | Role | Owner | Must |
 |------|-------|------|
-| **Builder** | Devin | Implements one scoped PR at a time from the evolution roadmap |
-| **Auditor** | Cursor (Tom) | Evidence audit before next PR starts |
+| **Builder** | **Cursor** | Implements one scoped PR at a time from the evolution roadmap |
+| **Auditor** | **Cursor (Tom)** | Evidence audit before next slice starts; write audit under `docs/audits/` |
 | **Merge authority** | You | Merge only after Tom **PASS** or **PASS WITH CONDITIONS** (conditions fixed) |
 
-**Cursor does not implement UI.** Devin does not self-certify architecture compliance.
+**Separation of duty still applies:** do not treat implementation as self-certified — produce a Tom audit artifact with evidence before declaring a slice PASS and starting the next.
 
 ---
 
