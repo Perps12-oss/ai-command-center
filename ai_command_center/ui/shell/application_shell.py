@@ -98,6 +98,7 @@ class ApplicationShellMixin:
         static_commands = [
             PaletteCommand("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace"), section="Navigation"),
             PaletteCommand("◈  Command Center", "Dashboard and quick actions", lambda: self._navigate("command_center"), section="Navigation"),
+            PaletteCommand("🧠  Brain Inspector", "Kernel, goals, observations, actions, plan", lambda: self._navigate("brain"), section="Navigation"),
             PaletteCommand("💬  Chat", "Generic chat (no entity attach)", lambda: self._navigate("chat", clear_chat_entity=True), section="Navigation"),
             PaletteCommand("📝  Notes", "Search vault notes", lambda: self._navigate("notes"), section="Navigation"),
             PaletteCommand("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory"), section="Navigation"),

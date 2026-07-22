@@ -89,6 +89,10 @@ UI_MEMORY_SELECT = "ui.memory.select"
 UI_MEMORY_CLEAR = "ui.memory.clear"
 UI_MEMORY_SEARCH = "ui.memory.search"
 
+# Brain Inspector intents (PR-UI-E06)
+UI_BRAIN_SELECT = "ui.brain.select"
+UI_BRAIN_OPEN = "ui.brain.open"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -460,6 +464,8 @@ __all__ = [
     "UI_MEMORY_SELECT",
     "UI_MEMORY_CLEAR",
     "UI_MEMORY_SEARCH",
+    "UI_BRAIN_SELECT",
+    "UI_BRAIN_OPEN",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",
