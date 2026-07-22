@@ -113,6 +113,10 @@ class StateApplierMixin:
         ):
             graph_workspace.apply_state(snap)
 
+        insights = self._insights_view()
+        if insights and hasattr(insights, "apply_state") and current_view == "insights":
+            insights.apply_state(snap)
+
         evidence = self._evidence_view()
         if evidence and hasattr(evidence, "apply_state") and current_view == "evidence":
             evidence.apply_state(snap)

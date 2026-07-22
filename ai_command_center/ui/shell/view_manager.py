@@ -31,6 +31,7 @@ from ai_command_center.ui.views.relationship_view import RelationshipView
 from ai_command_center.ui.views.workflow_graph_view import WorkflowGraphView
 from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
 from ai_command_center.ui.views.graph_workspace_view import GraphWorkspaceView
+from ai_command_center.ui.views.insights_view import InsightsView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 from ai_command_center.core.state.world_model_state import WorldModelState
@@ -53,6 +54,7 @@ VIEW_IDS: tuple[str, ...] = (
     "automation",
     "world_explorer",
     "graph_workspace",
+    "insights",
     "relationships",
     "dependencies",
     "providers",
@@ -211,6 +213,11 @@ class ViewManagerMixin:
             on_inspect_select=self._on_chat_inspect_select,
             on_navigate=self._navigate,
         )
+        self._view_registry["insights"] = lambda: InsightsView(
+            self._content,
+            on_refresh=self._on_insights_refresh,
+            on_navigate=self._navigate,
+        )
         self._view_registry["relationships"] = lambda: RelationshipView(
             self._content,
             bus=self._bus,
@@ -278,6 +285,10 @@ class ViewManagerMixin:
     def _graph_workspace_view(self) -> GraphWorkspaceView | None:
         v = self._views.get("graph_workspace")
         return v if isinstance(v, GraphWorkspaceView) else None
+
+    def _insights_view(self) -> InsightsView | None:
+        v = self._views.get("insights")
+        return v if isinstance(v, InsightsView) else None
 
     def _evidence_view(self) -> EvidenceView | None:
         v = self._views.get("evidence")
@@ -349,6 +360,10 @@ class ViewManagerMixin:
             return
         self._controller.publish_graph_navigate(nid, view="world_explorer")
         self._navigate("world_explorer")
+
+    def _on_insights_refresh(self) -> None:
+        """Insights placeholder Refresh → UI_INSIGHTS_REFRESH."""
+        self._controller.publish_insights_refresh()
 
     def _workspace_os_routing_enabled(self) -> bool:
         return getattr(self, "_workspace_os_enabled", self._default_view == "workspace")
