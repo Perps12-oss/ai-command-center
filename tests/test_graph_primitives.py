@@ -74,8 +74,15 @@ def test_world_model_panel_has_no_local_canvas_engine() -> None:
     path = UI / "views" / "world_model" / "knowledge_graph_panel.py"
     source = path.read_text(encoding="utf-8")
     assert "BaseGraphCanvas" in source
+    assert "WorldGraphCanvas" in source
     assert "circular_layout" in source
     assert not _calls_canvas_primitives(path)
+
+    wrapper = UI / "components" / "world_model" / "world_graph_canvas.py"
+    assert wrapper.is_file()
+    wrap_src = wrapper.read_text(encoding="utf-8")
+    assert "class WorldGraphCanvas(BaseGraphCanvas)" in wrap_src
+    assert not _calls_canvas_primitives(wrapper)
 
 
 def test_relationship_view_has_no_private_graph_canvas() -> None:
