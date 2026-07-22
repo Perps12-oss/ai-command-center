@@ -103,6 +103,10 @@ UI_WORLD_SELECT = "ui.world.select"
 UI_WORLD_FILTER = "ui.world.filter"
 UI_WORLD_OPEN = "ui.world.open"
 
+# Agent Operations intents (PR-UI-E09)
+UI_AGENT_SELECT = "ui.agent.select"
+UI_AGENT_OPEN = "ui.agent.open"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -482,6 +486,8 @@ __all__ = [
     "UI_WORLD_SELECT",
     "UI_WORLD_FILTER",
     "UI_WORLD_OPEN",
+    "UI_AGENT_SELECT",
+    "UI_AGENT_OPEN",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",

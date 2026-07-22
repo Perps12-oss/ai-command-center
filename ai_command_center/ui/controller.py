@@ -44,6 +44,8 @@ from ai_command_center.core.events.topics import (
     UI_WORLD_FILTER,
     UI_WORLD_OPEN,
     UI_WORLD_SELECT,
+    UI_AGENT_OPEN,
+    UI_AGENT_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -644,6 +646,12 @@ class UIController:
 
     def publish_world_open(self) -> None:
         self._bus.publish(UI_WORLD_OPEN, {"view": "world_explorer"}, source="ui")
+
+    def publish_agent_select(self, agent_id: str) -> None:
+        self._bus.publish(UI_AGENT_SELECT, {"agent_id": str(agent_id)}, source="ui")
+
+    def publish_agent_open(self) -> None:
+        self._bus.publish(UI_AGENT_OPEN, {"view": "agents"}, source="ui")
 
     def publish_entity_create_request(
         self,
