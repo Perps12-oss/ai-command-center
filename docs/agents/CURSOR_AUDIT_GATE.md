@@ -1,15 +1,15 @@
-# Cursor Audit Gate — Devin PR Workflow
+# Cursor Audit Gate — Phase B UI Workflow
 
 **Status:** ACTIVE  
-**Audience:** Cursor / Tom (Repository Guardian)  
-**Trigger:** Every Devin UI PR (one evolution slice per PR)
+**Audience:** Cursor / Tom (Repository Guardian) — sole coder + auditor as of 2026-07-22  
+**Trigger:** Every Phase B UI PR (one evolution slice per PR)
 
 ---
 
 ## When to audit
 
-- Devin opens or updates a PR → **audit before next slice starts**
-- Devin must **STOP** after opening PR; no parallel slice work
+- After a slice PR is opened (or landed on `main` pending formal write-up) → **audit before next slice starts**
+- Do **not** stack the next evolution slice until Tom verdict is **PASS** (conditions fixed) and the audit report is on `main` when required by handover
 
 ---
 
