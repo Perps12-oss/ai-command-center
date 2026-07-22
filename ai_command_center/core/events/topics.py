@@ -107,6 +107,10 @@ UI_WORLD_OPEN = "ui.world.open"
 UI_AGENT_SELECT = "ui.agent.select"
 UI_AGENT_OPEN = "ui.agent.open"
 
+# Evidence Workspace intents (PR-UI-E10)
+UI_EVIDENCE_SELECT = "ui.evidence.select"
+UI_EVIDENCE_OPEN = "ui.evidence.open"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -488,6 +492,8 @@ __all__ = [
     "UI_WORLD_OPEN",
     "UI_AGENT_SELECT",
     "UI_AGENT_OPEN",
+    "UI_EVIDENCE_SELECT",
+    "UI_EVIDENCE_OPEN",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",
