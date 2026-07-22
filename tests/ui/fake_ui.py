@@ -418,6 +418,11 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.views.goal_dashboard.goal_progress_panel",
     "ai_command_center.ui.views.goal_dashboard.goal_history_panel",
     "ai_command_center.ui.views.goal_dashboard",
+    "ai_command_center.ui.components.goal.goal_tree",
+    "ai_command_center.ui.components.goal.task_row",
+    "ai_command_center.ui.components.goal.success_criteria_card",
+    "ai_command_center.ui.components.goal.goal_detail",
+    "ai_command_center.ui.components.goal",
     "ai_command_center.ui.views.goal_view",
 )
 
@@ -451,6 +456,12 @@ def _patch_and_import():
         from ai_command_center.ui.views.agents_view import AgentsView
         from ai_command_center.ui.views.approvals_view import ApprovalsView
         from ai_command_center.ui.views.goal_view import GoalView
+        from ai_command_center.ui.components.goal import (
+            GoalDetail,
+            GoalTree,
+            SuccessCriteriaCard,
+            TaskRow,
+        )
         from ai_command_center.ui.components.inspector.inspector_host import InspectorHost
     finally:
         # Drop fake-bound UI modules so later tests can import real Tk widgets.
@@ -486,6 +497,10 @@ def _patch_and_import():
         BrainView,
         GoalCard,
         PlanCard,
+        GoalTree,
+        TaskRow,
+        SuccessCriteriaCard,
+        GoalDetail,
     )
 
 
@@ -510,4 +525,8 @@ def _patch_and_import():
     BrainView,
     GoalCard,
     PlanCard,
+    GoalTree,
+    TaskRow,
+    SuccessCriteriaCard,
+    GoalDetail,
 ) = _patch_and_import()
