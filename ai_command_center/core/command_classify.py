@@ -22,6 +22,7 @@ _VIEW_ALIASES: dict[str, str] = {
     "system": "system",
     "memory": "memory",
     "command_center": "command_center",
+    "brain": "brain",
     "goals": "goals",
     "agents": "agents",
     "approvals": "approvals",

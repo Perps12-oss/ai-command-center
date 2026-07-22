@@ -345,6 +345,13 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.memory.memory_card",
     "ai_command_center.ui.components.memory.memory_detail",
     "ai_command_center.ui.views.memory_view",
+    "ai_command_center.ui.components.brain.cards",
+    "ai_command_center.ui.components.brain.goal_card",
+    "ai_command_center.ui.components.brain.observation_card",
+    "ai_command_center.ui.components.brain.action_card",
+    "ai_command_center.ui.components.brain.plan_card",
+    "ai_command_center.ui.components.brain",
+    "ai_command_center.ui.views.brain_view",
     # Inspector primitives (must reload under fake customtkinter)
     "ai_command_center.ui.components.inspector.base_inspector",
     "ai_command_center.ui.components.inspector.payload_inspector",
@@ -435,6 +442,8 @@ def _patch_and_import():
         from ai_command_center.ui.components.memory.memory_card import MemoryCard
         from ai_command_center.ui.components.memory.memory_detail import MemoryDetail
         from ai_command_center.ui.views.memory_view import MemoryView
+        from ai_command_center.ui.components.brain import GoalCard, PlanCard
+        from ai_command_center.ui.views.brain_view import BrainView
         from ai_command_center.ui.design_system.palette_provider import PaletteProvider
         from ai_command_center.ui.design_system.command import OSPalette
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
@@ -474,6 +483,9 @@ def _patch_and_import():
         MemoryView,
         MemoryCard,
         MemoryDetail,
+        BrainView,
+        GoalCard,
+        PlanCard,
     )
 
 
@@ -495,4 +507,7 @@ def _patch_and_import():
     MemoryView,
     MemoryCard,
     MemoryDetail,
+    BrainView,
+    GoalCard,
+    PlanCard,
 ) = _patch_and_import()
