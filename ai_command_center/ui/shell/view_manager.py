@@ -30,6 +30,7 @@ from ai_command_center.ui.views.dependency_inspector_view import DependencyInspe
 from ai_command_center.ui.views.relationship_view import RelationshipView
 from ai_command_center.ui.views.workflow_graph_view import WorkflowGraphView
 from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
+from ai_command_center.ui.views.graph_workspace_view import GraphWorkspaceView
 from ai_command_center.ui.views.workspace_view import WorkspaceView
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 from ai_command_center.core.state.world_model_state import WorldModelState
@@ -51,6 +52,7 @@ VIEW_IDS: tuple[str, ...] = (
     "workflow",
     "automation",
     "world_explorer",
+    "graph_workspace",
     "relationships",
     "dependencies",
     "providers",
@@ -201,6 +203,14 @@ class ViewManagerMixin:
             on_create_entity=self._on_world_model_create_entity,
             on_navigate=self._navigate,
         )
+        self._view_registry["graph_workspace"] = lambda: GraphWorkspaceView(
+            self._content,
+            on_select=self._on_graph_select,
+            on_filter_change=self._on_graph_filter_change,
+            on_activate=self._on_graph_activate,
+            on_inspect_select=self._on_chat_inspect_select,
+            on_navigate=self._navigate,
+        )
         self._view_registry["relationships"] = lambda: RelationshipView(
             self._content,
             bus=self._bus,
@@ -265,6 +275,10 @@ class ViewManagerMixin:
         v = self._views.get("world_explorer")
         return v if isinstance(v, WorldExplorerView) else None
 
+    def _graph_workspace_view(self) -> GraphWorkspaceView | None:
+        v = self._views.get("graph_workspace")
+        return v if isinstance(v, GraphWorkspaceView) else None
+
     def _evidence_view(self) -> EvidenceView | None:
         v = self._views.get("evidence")
         return v if isinstance(v, EvidenceView) else None
@@ -306,6 +320,35 @@ class ViewManagerMixin:
             status_filter=status_filter,
             sort_key=sort_key,
         )
+
+    def _on_graph_select(self, node_id: str) -> None:
+        """Graph Workspace node click → UI_GRAPH_SELECT + domain selection."""
+        nid = str(node_id).strip()
+        if not nid:
+            return
+        self._controller.publish_graph_select(nid)
+        self._controller.publish_world_model_node_selected(nid)
+
+    def _on_graph_filter_change(self, state: object) -> None:
+        """Graph Workspace filter bar → UI_GRAPH_FILTER (projection stays local)."""
+        search = str(getattr(state, "search", "") or "")
+        type_filter = str(getattr(state, "type_filter", "all") or "all")
+        status_filter = str(getattr(state, "status_filter", "all") or "all")
+        sort_key = str(getattr(state, "sort_key", "name") or "name")
+        self._controller.publish_graph_filter(
+            search=search,
+            type_filter=type_filter,
+            status_filter=status_filter,
+            sort_key=sort_key,
+        )
+
+    def _on_graph_activate(self, node_id: str) -> None:
+        """Double-click → UI_GRAPH_NAVIGATE + open World Explorer."""
+        nid = str(node_id).strip()
+        if not nid:
+            return
+        self._controller.publish_graph_navigate(nid, view="world_explorer")
+        self._navigate("world_explorer")
 
     def _workspace_os_routing_enabled(self) -> bool:
         return getattr(self, "_workspace_os_enabled", self._default_view == "workspace")

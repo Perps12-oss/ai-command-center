@@ -33,6 +33,9 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
         master: Any,
         *,
         on_select: Callable[[str], None] | None = None,
+        on_activate: Callable[[str], None] | None = None,
+        canvas_height: int = 240,
+        title: str = "Knowledge Graph",
     ) -> None:
         super().__init__(
             master,
@@ -42,6 +45,7 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
             corner_radius=T.CORNER_RADIUS,
         )
         self._on_select = on_select
+        self._on_activate = on_activate
         self._nodes: tuple[NodeSnapshot, ...] = ()
         self._edges: tuple[EdgeSnapshot, ...] = ()
         self._selected_id = ""
@@ -52,7 +56,7 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
         header.pack(fill="x", padx=T.PAD, pady=(10, 4))
         ctk.CTkLabel(
             header,
-            text="Knowledge Graph",
+            text=title,
             font=T.FONT_HEADER,
             text_color=T.WORLD_TEAL,
             anchor="w",
@@ -63,9 +67,10 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
             on_node_select=self._click,
         )
         self._surface.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self._surface.tk_canvas.configure(height=240)
+        self._surface.tk_canvas.configure(height=canvas_height)
         # Relayout when the shared surface resizes
         self._surface.tk_canvas.bind("<Configure>", lambda _e: self._project(), add="+")
+        self._surface.tk_canvas.bind("<Double-Button-1>", self._double_click, add="+")
 
     def apply_snapshot(
         self,
@@ -140,6 +145,14 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
     def _click(self, node_id: str) -> None:
         if self._on_select:
             self._on_select(node_id)
+
+    def _double_click(self, event: Any) -> None:
+        if self._on_activate is None:
+            return
+        canvas_x, canvas_y = self._surface._event_xy(event)
+        node = self._surface.hit_test_node(canvas_x, canvas_y)
+        if node is not None:
+            self._on_activate(node.node_id)
 
 
 __all__ = ["KnowledgeGraphPanel"]

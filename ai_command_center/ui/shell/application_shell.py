@@ -103,6 +103,7 @@ class ApplicationShellMixin:
             PaletteCommand("📝  Notes", "Search vault notes", lambda: self._navigate("notes"), section="Navigation"),
             PaletteCommand("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory"), section="Navigation"),
             PaletteCommand("◈  World Model", "Browse World Model knowledge graph", lambda: self._navigate("world_explorer"), section="Navigation"),
+            PaletteCommand("🕸  Graph Workspace", "Full relationship graph with filters and navigation", lambda: self._navigate("graph_workspace"), section="Navigation"),
             PaletteCommand("📎  Evidence", "Claims, truth validation, receipts, and traces", lambda: self._navigate("evidence"), section="Navigation"),
             PaletteCommand("🎛  Operations", "Mission Control pipeline stages and timeline scrubber", lambda: self._navigate("operations"), section="Navigation"),
             PaletteCommand("⟷  Relationships", "Visualize node edges and dependencies", lambda: self._navigate("relationships"), section="Navigation"),
