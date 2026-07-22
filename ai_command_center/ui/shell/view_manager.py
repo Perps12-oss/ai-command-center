@@ -89,6 +89,8 @@ class ViewManagerMixin:
             self._content,
             on_new_goal=self._on_goal_new,
             on_select=self._on_goal_select,
+            on_select_task=self._on_goal_task_select,
+            on_inspect_select=self._on_chat_inspect_select,
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
@@ -384,15 +386,30 @@ class ViewManagerMixin:
         )
 
     def _on_goal_select(self, goal_id: str) -> None:
-        """Focus a goal via existing inspect selection flow."""
+        """Goal Workspace / Brain focus → UI_GOAL_SELECT + inspect."""
         gid = str(goal_id).strip()
         if not gid:
             return
+        self._controller.publish_goal_select(gid)
         self._controller.publish_inspect_select(
             "goal",
             gid,
             label=gid,
             payload={"goal_id": gid},
+        )
+
+    def _on_goal_task_select(self, goal_id: str, task_id: str) -> None:
+        """Plan task click → UI_GOAL_TASK_SELECT + inspect."""
+        gid = str(goal_id).strip()
+        tid = str(task_id).strip()
+        if not tid:
+            return
+        self._controller.publish_goal_task_select(gid, tid)
+        self._controller.publish_inspect_select(
+            "plan_step",
+            tid,
+            label=tid,
+            payload={"goal_id": gid, "task_id": tid, "step_id": tid},
         )
 
     def _on_brain_goal_select(self, goal_id: str) -> None:

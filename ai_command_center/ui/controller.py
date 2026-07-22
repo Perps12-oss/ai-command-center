@@ -38,6 +38,9 @@ from ai_command_center.core.events.topics import (
     UI_MEMORY_SELECT,
     UI_BRAIN_OPEN,
     UI_BRAIN_SELECT,
+    UI_GOAL_OPEN,
+    UI_GOAL_SELECT,
+    UI_GOAL_TASK_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -543,6 +546,19 @@ class UIController:
 
     def publish_brain_open(self) -> None:
         self._bus.publish(UI_BRAIN_OPEN, {"view": "brain"}, source="ui")
+
+    def publish_goal_select(self, goal_id: str) -> None:
+        self._bus.publish(UI_GOAL_SELECT, {"goal_id": goal_id}, source="ui")
+
+    def publish_goal_task_select(self, goal_id: str, task_id: str) -> None:
+        self._bus.publish(
+            UI_GOAL_TASK_SELECT,
+            {"goal_id": goal_id, "task_id": task_id},
+            source="ui",
+        )
+
+    def publish_goal_open(self) -> None:
+        self._bus.publish(UI_GOAL_OPEN, {"view": "goals"}, source="ui")
 
     def publish_chat_export(self, history: list[dict]) -> None:
         self._bus.publish(
