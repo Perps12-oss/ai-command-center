@@ -399,6 +399,12 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.views.execution_center.truth_validation_panel",
     "ai_command_center.ui.views.execution_center",
     "ai_command_center.ui.views.executions_view",
+    "ai_command_center.ui.components.evidence.truth_badge",
+    "ai_command_center.ui.components.evidence.claim_card",
+    "ai_command_center.ui.components.evidence.receipt_chain",
+    "ai_command_center.ui.components.evidence",
+    "ai_command_center.ui.components.inspector.evidence_inspector",
+    "ai_command_center.ui.views.evidence_view",
     "ai_command_center.ui.views.agent_monitor.active_agents_panel",
     "ai_command_center.ui.views.agent_monitor.agent_state_panel",
     "ai_command_center.ui.views.agent_monitor.pipeline_progress_panel",
@@ -460,6 +466,8 @@ def _patch_and_import():
         from ai_command_center.ui.design_system.command import OSPalette
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
         from ai_command_center.ui.views.executions_view import ExecutionsView
+        from ai_command_center.ui.views.evidence_view import EvidenceView
+        from ai_command_center.ui.components.evidence import ClaimCard, ReceiptChain, TruthBadge
         from ai_command_center.ui.views.agents_view import AgentsView
         from ai_command_center.ui.components.agent import AgentCard, PipelineStage, RunTimeline
         from ai_command_center.ui.views.approvals_view import ApprovalsView
@@ -495,6 +503,10 @@ def _patch_and_import():
         OSPalette,
         WorldExplorerView,
         ExecutionsView,
+        EvidenceView,
+        ClaimCard,
+        TruthBadge,
+        ReceiptChain,
         AgentsView,
         AgentCard,
         PipelineStage,
@@ -526,6 +538,10 @@ def _patch_and_import():
     OSPalette,
     WorldExplorerView,
     ExecutionsView,
+    EvidenceView,
+    ClaimCard,
+    TruthBadge,
+    ReceiptChain,
     AgentsView,
     AgentCard,
     PipelineStage,

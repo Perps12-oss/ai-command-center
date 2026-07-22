@@ -16,6 +16,7 @@ NAV_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("Ops", (
         ("chat", "Chat"),
         ("executions", "Execution Center"),
+        ("evidence", "Evidence"),
         ("goals", "Goal Dashboard"),
         ("agents", "Agent Monitor"),
         ("approvals", "Approval Center"),

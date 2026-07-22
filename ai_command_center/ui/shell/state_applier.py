@@ -105,6 +105,10 @@ class StateApplierMixin:
         ):
             world_explorer.apply_state(snap)
 
+        evidence = self._evidence_view()
+        if evidence and hasattr(evidence, "apply_state") and current_view == "evidence":
+            evidence.apply_state(snap)
+
         executions = self._executions_view()
         if (
             executions

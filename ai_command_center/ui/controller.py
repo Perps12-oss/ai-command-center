@@ -46,6 +46,8 @@ from ai_command_center.core.events.topics import (
     UI_WORLD_SELECT,
     UI_AGENT_OPEN,
     UI_AGENT_SELECT,
+    UI_EVIDENCE_OPEN,
+    UI_EVIDENCE_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -652,6 +654,16 @@ class UIController:
 
     def publish_agent_open(self) -> None:
         self._bus.publish(UI_AGENT_OPEN, {"view": "agents"}, source="ui")
+
+    def publish_evidence_select(self, request_id: str) -> None:
+        self._bus.publish(
+            UI_EVIDENCE_SELECT,
+            {"request_id": str(request_id)},
+            source="ui",
+        )
+
+    def publish_evidence_open(self) -> None:
+        self._bus.publish(UI_EVIDENCE_OPEN, {"view": "evidence"}, source="ui")
 
     def publish_entity_create_request(
         self,

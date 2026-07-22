@@ -28,6 +28,7 @@ _VIEW_ALIASES: dict[str, str] = {
     "approvals": "approvals",
     "providers": "providers",
     "executions": "executions",
+    "evidence": "evidence",
     "automation": "automation",
     "capabilities": "capabilities",
     "artifacts": "artifacts",
