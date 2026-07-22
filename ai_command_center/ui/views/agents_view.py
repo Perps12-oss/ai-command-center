@@ -1,9 +1,10 @@
-"""Agent Monitor workspace — Article 14 operational surface (Phase 11D).
+"""Agent Operations Center — Article 14 Agent Monitor evolved for PR-UI-E09.
 
 Architecture contract:
 - Pure renderer. Reads AppState via apply_state(snapshot) only.
 - Uses AppState.agent_pipeline / AgentPipelineSnapshot exclusively.
 - Cancel publishes AGENT_CANCEL_REQUEST through callback (never direct runtime).
+- Selection intents flow through callbacks → UI_AGENT_* / inspect (shell).
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppState
 from ai_command_center.domain.agent_pipeline_snapshot import AgentPipelineSnapshot
+from ai_command_center.domain.inspectable import InspectableRef
+from ai_command_center.ui.components.agent import AgentCard, PipelineStage, RunTimeline
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.views.agent_monitor import (
@@ -30,10 +33,11 @@ from ai_command_center.ui.views.surface_state import (
     domain_error_from_snap,
     set_surface_state,
 )
+from ai_command_center.ui.widget_utils import clear_children
 
 
 class AgentsView(ctk.CTkFrame):
-    """Agent Monitor orchestration shell (Hero + five Article 14 panels)."""
+    """Agent Operations shell: cards + stage + timeline over Phase 11D panels."""
 
     def __init__(
         self,
@@ -41,6 +45,7 @@ class AgentsView(ctk.CTkFrame):
         *,
         on_select: Callable[[str], None] | None = None,
         on_cancel: Callable[[str, str], None] | None = None,
+        on_inspect_select: Callable[[InspectableRef], None] | None = None,
         on_navigate: Callable[[str], None] | None = None,
         on_command: Callable[[str], None] | None = None,
         **kwargs: Any,
@@ -48,6 +53,7 @@ class AgentsView(ctk.CTkFrame):
         super().__init__(master, fg_color=T.BG_DEEP, **kwargs)
         self._on_select = on_select or (lambda _aid: None)
         self._on_cancel = on_cancel or (lambda _aid, _reason: None)
+        self._on_inspect_select = on_inspect_select
         self._on_navigate = on_navigate
         self._on_command = on_command
         self._selected_agent_id = ""
@@ -64,7 +70,7 @@ class AgentsView(ctk.CTkFrame):
         top.pack(fill="x", padx=T.PAD, pady=(T.PAD, 0))
         ctk.CTkLabel(
             top,
-            text="Agent Monitor",
+            text="Agent Operations",
             font=T.FONT_TITLE,
             text_color=T.AGENT_PURPLE,
             anchor="w",
@@ -113,6 +119,39 @@ class AgentsView(ctk.CTkFrame):
         )
         self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
+        ops = ctk.CTkFrame(self, fg_color="transparent")
+        ops.pack(fill="both", expand=False, padx=T.PAD, pady=(0, 8))
+        ops.grid_columnconfigure(0, weight=2)
+        ops.grid_columnconfigure(1, weight=1)
+        ops.grid_columnconfigure(2, weight=3)
+        ops.grid_rowconfigure(0, weight=1)
+
+        cards_host = ctk.CTkFrame(
+            ops,
+            fg_color=T.BG_PANEL,
+            border_color=T.AGENT_PURPLE,
+            border_width=1,
+            corner_radius=T.CORNER_RADIUS,
+        )
+        cards_host.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        ctk.CTkLabel(
+            cards_host,
+            text="Active Runs",
+            font=T.FONT_HEADER,
+            text_color=T.AGENT_PURPLE,
+            anchor="w",
+        ).pack(fill="x", padx=T.PAD, pady=(10, 4))
+        self._cards_scroll = ctk.CTkScrollableFrame(
+            cards_host, fg_color=T.BG_DEEP, corner_radius=0, height=140
+        )
+        self._cards_scroll.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        self._stage = PipelineStage(ops)
+        self._stage.grid(row=0, column=1, sticky="nsew", padx=(0, 6))
+
+        self._timeline = RunTimeline(ops)
+        self._timeline.grid(row=0, column=2, sticky="nsew")
+
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
         body.grid_columnconfigure(0, weight=3)
@@ -138,7 +177,7 @@ class AgentsView(ctk.CTkFrame):
         self._history.grid(row=2, column=1, sticky="nsew")
 
     def apply_state(self, snapshot: AppState | Any | None) -> None:
-        """Project AppState.agent_pipeline into Hero + all panels."""
+        """Project AppState.agent_pipeline into Hero + ops + panels."""
         if snapshot is None:
             set_surface_state(
                 self._surface_state,
@@ -212,12 +251,38 @@ class AgentsView(ctk.CTkFrame):
 
         self._update_cancel_context(pipeline)
         selected = self._selected_agent_id or pipeline.active_run_id
+        self._render_cards(pipeline, selected)
+        self._stage.apply_snapshot(pipeline)
+        self._timeline.apply_snapshot(pipeline, selected_agent_id=selected)
 
         self._pipeline.apply_snapshot(pipeline)
         self._agents.apply_snapshot(pipeline, selected_agent_id=selected)
         self._state.apply_snapshot(pipeline, selected_agent_id=selected)
         self._tasks.apply_snapshot(pipeline, selected_agent_id=selected)
         self._history.apply_snapshot(pipeline)
+
+    def _render_cards(self, pipeline: AgentPipelineSnapshot, selected: str) -> None:
+        clear_children(self._cards_scroll)
+        runs = list(pipeline.active_runs) or list(pipeline.runs)[:6]
+        if not runs:
+            ctk.CTkLabel(
+                self._cards_scroll,
+                text="No agent runs projected yet.",
+                font=T.FONT_BODY,
+                text_color=T.TEXT_MUTED,
+                anchor="w",
+            ).pack(fill="x", padx=8, pady=12)
+            return
+        for run in runs[:12]:
+            AgentCard(
+                self._cards_scroll,
+                agent_id=run.agent_id,
+                role=run.spawn_role,
+                state=run.state,
+                task=run.task,
+                selected=bool(selected and run.agent_id == selected),
+                on_select=self._select,
+            ).pack(fill="x", pady=3)
 
     def _update_cancel_context(self, pipeline: AgentPipelineSnapshot) -> None:
         """Contextual cancel: Active Pipeline or Selected Agent Run only."""
@@ -259,8 +324,15 @@ class AgentsView(ctk.CTkFrame):
     def _select(self, agent_id: str) -> None:
         self._selected_agent_id = str(agent_id)
         self._on_select(self._selected_agent_id)
+        run = None
         if self._last_pipeline is not None:
+            run = self._last_pipeline.run_by_id(self._selected_agent_id)
             self._update_cancel_context(self._last_pipeline)
+            self._render_cards(self._last_pipeline, self._selected_agent_id)
+            self._stage.apply_snapshot(self._last_pipeline)
+            self._timeline.apply_snapshot(
+                self._last_pipeline, selected_agent_id=self._selected_agent_id
+            )
             self._agents.apply_snapshot(
                 self._last_pipeline, selected_agent_id=self._selected_agent_id
             )
@@ -269,6 +341,32 @@ class AgentsView(ctk.CTkFrame):
             )
             self._tasks.apply_snapshot(
                 self._last_pipeline, selected_agent_id=self._selected_agent_id
+            )
+        if self._on_inspect_select is not None:
+            payload = (
+                ("agent_id", self._selected_agent_id),
+                ("name", (run.spawn_role if run else "") or self._selected_agent_id),
+                ("role", run.spawn_role if run else ""),
+                ("status", run.state if run else ""),
+                ("task", run.task if run else ""),
+                ("error", run.error if run else ""),
+                ("steps", str(run.steps) if run else "0"),
+                (
+                    "pipeline_id",
+                    self._last_pipeline.pipeline_id if self._last_pipeline else "",
+                ),
+                (
+                    "pipeline_stage",
+                    self._last_pipeline.pipeline_stage if self._last_pipeline else "",
+                ),
+            )
+            self._on_inspect_select(
+                InspectableRef(
+                    kind="agent",
+                    ref_id=self._selected_agent_id,
+                    label=(run.spawn_role if run else "") or self._selected_agent_id,
+                    payload=payload,
+                )
             )
 
     def _on_hero_cancel(self) -> None:

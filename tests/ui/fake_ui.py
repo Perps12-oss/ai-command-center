@@ -405,6 +405,10 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.views.agent_monitor.task_assignment_panel",
     "ai_command_center.ui.views.agent_monitor.execution_history_panel",
     "ai_command_center.ui.views.agent_monitor",
+    "ai_command_center.ui.components.agent.agent_card",
+    "ai_command_center.ui.components.agent.pipeline_stage",
+    "ai_command_center.ui.components.agent.run_timeline",
+    "ai_command_center.ui.components.agent",
     "ai_command_center.ui.views.agents_view",
     "ai_command_center.ui.views.approval_center.risk_classification",
     "ai_command_center.ui.views.approval_center.pending_queue_panel",
@@ -457,6 +461,7 @@ def _patch_and_import():
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
         from ai_command_center.ui.views.executions_view import ExecutionsView
         from ai_command_center.ui.views.agents_view import AgentsView
+        from ai_command_center.ui.components.agent import AgentCard, PipelineStage, RunTimeline
         from ai_command_center.ui.views.approvals_view import ApprovalsView
         from ai_command_center.ui.views.goal_view import GoalView
         from ai_command_center.ui.components.goal import (
@@ -491,6 +496,9 @@ def _patch_and_import():
         WorldExplorerView,
         ExecutionsView,
         AgentsView,
+        AgentCard,
+        PipelineStage,
+        RunTimeline,
         ApprovalsView,
         GoalView,
         InspectorHost,
@@ -519,6 +527,9 @@ def _patch_and_import():
     WorldExplorerView,
     ExecutionsView,
     AgentsView,
+    AgentCard,
+    PipelineStage,
+    RunTimeline,
     ApprovalsView,
     GoalView,
     InspectorHost,
