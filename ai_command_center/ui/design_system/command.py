@@ -1,30 +1,26 @@
 """Command palette — Ctrl+K fuzzy-search overlay over all app commands."""
 from __future__ import annotations
 
-from typing import Callable
-
 import customtkinter as ctk
 
 from ai_command_center.ui.widget_utils import clear_children
-
+from ai_command_center.ui.design_system.palette_provider import PaletteCommand
 from ai_command_center.ui.design_system import theme_v2 as T
 
-Command = tuple[str, str, Callable[[], None]]
 
-
-class CommandPalette(ctk.CTkToplevel):
-    """Floating command palette.
+class OSPalette(ctk.CTkToplevel):
+    """Floating OS command palette with provider sections.
 
     Usage::
-        palette = CommandPalette(root)
-        palette.show(commands)   # list of (label, description, action)
+        palette = OSPalette(root)
+        palette.show(commands)   # list of PaletteCommand
     """
 
     def __init__(self, master) -> None:
         super().__init__(master)
         self._master_ref = master
-        self._commands: list[Command] = []
-        self._filtered: list[Command] = []
+        self._commands: list[PaletteCommand] = []
+        self._filtered: list[PaletteCommand] = []
         self._selected = 0
 
         self.withdraw()
@@ -90,7 +86,7 @@ class CommandPalette(ctk.CTkToplevel):
         self._entry.bind("<Escape>", lambda _: self.hide())
         self.bind("<FocusOut>", self._on_focus_out)
 
-    def show(self, commands: list[Command]) -> None:
+    def show(self, commands: list[PaletteCommand]) -> None:
         self._commands = commands
         self._selected = 0
         self._entry.delete(0, "end")
@@ -116,7 +112,7 @@ class CommandPalette(ctk.CTkToplevel):
         if q:
             self._filtered = [
                 c for c in self._commands
-                if q in c[0].lower() or q in c[1].lower()
+                if q in c.label.lower() or q in c.description.lower()
             ]
         else:
             self._filtered = list(self._commands)
@@ -135,7 +131,17 @@ class CommandPalette(ctk.CTkToplevel):
             ).pack(padx=16, pady=20)
             return
 
-        for i, (label, desc, _) in enumerate(self._filtered):
+        current_section = ""
+        for i, cmd in enumerate(self._filtered):
+            if cmd.section and cmd.section != current_section:
+                current_section = cmd.section
+                ctk.CTkLabel(
+                    self._list_frame,
+                    text=current_section,
+                    font=T.FONT_SMALL,
+                    text_color=T.TEXT_MUTED,
+                ).pack(anchor="w", padx=12, pady=(8, 2))
+
             is_sel = i == self._selected
             row = ctk.CTkFrame(
                 self._list_frame,
@@ -148,7 +154,7 @@ class CommandPalette(ctk.CTkToplevel):
 
             ctk.CTkLabel(
                 row,
-                text=label,
+                text=cmd.label,
                 font=T.FONT_BODY,
                 text_color=T.TEXT_PRIMARY if is_sel else T.TEXT_SECONDARY,
                 anchor="w",
@@ -156,15 +162,14 @@ class CommandPalette(ctk.CTkToplevel):
 
             ctk.CTkLabel(
                 row,
-                text=desc,
+                text=cmd.description,
                 font=T.FONT_SMALL,
                 text_color=T.TEXT_MUTED,
                 anchor="e",
             ).pack(side="right", padx=12, pady=4)
 
             idx = i
-            for widget in (row,):
-                widget.bind("<Button-1>", lambda e, i=idx: self._execute(i))
+            row.bind("<Button-1>", lambda e, i=idx: self._execute(i))
 
     def _on_key(self, event) -> None:
         if event.keysym not in ("Up", "Down", "Return", "Escape"):
@@ -184,11 +189,12 @@ class CommandPalette(ctk.CTkToplevel):
     def _execute(self, idx: int) -> None:
         if 0 <= idx < len(self._filtered):
             self.hide()
-            _, _, action = self._filtered[idx]
-            try:
-                action()
-            except Exception:
-                pass
+            action = self._filtered[idx].action
+            if action is not None:
+                try:
+                    action()
+                except Exception:
+                    pass
 
     def _on_focus_out(self, event) -> None:
         self.after(150, self._check_focus)
@@ -199,3 +205,7 @@ class CommandPalette(ctk.CTkToplevel):
                 self.hide()
         except Exception:
             pass
+
+
+# Backwards-compatible alias used by older imports/tests.
+CommandPalette = OSPalette

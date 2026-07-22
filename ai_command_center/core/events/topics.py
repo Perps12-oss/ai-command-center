@@ -67,6 +67,8 @@ UI_WORKSPACE_REQUIRED = "ui.workspace.required"
 UI_NAVIGATE = "ui.navigate"
 UI_PALETTE_OPEN = "ui.palette_open"
 UI_PALETTE_CLOSE = "ui.palette_close"
+UI_PALETTE_ACTION = "ui.palette.action"
+PALETTE_PROVIDER_REGISTER = "palette.provider.register"
 UI_CHAT_CANCEL = "ui.chat_cancel"
 UI_CHAT_NEW_SESSION = "ui.chat.new_session"
 OVERLAY_SHOW = "overlay.show"
@@ -438,6 +440,8 @@ __all__ = [
     "UI_NAVIGATE",
     "UI_PALETTE_OPEN",
     "UI_PALETTE_CLOSE",
+    "UI_PALETTE_ACTION",
+    "PALETTE_PROVIDER_REGISTER",
     "UI_CHAT_CANCEL",
     "UI_CHAT_NEW_SESSION",
     "OVERLAY_SHOW",

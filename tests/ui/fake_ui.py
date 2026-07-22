@@ -142,6 +142,7 @@ def _make_widget_class(name: str, button: bool = False, textbox: bool = False):
 def _build_fake_customtkinter() -> types.ModuleType:
     mod = types.ModuleType("customtkinter")
     mod.CTk = _make_widget_class("CTk")
+    mod.CTkToplevel = _make_widget_class("CTkToplevel")
     mod.CTkFrame = _make_widget_class("CTkFrame")
     mod.CTkLabel = _make_widget_class("CTkLabel")
     mod.CTkButton = _make_widget_class("CTkButton", button=True)
@@ -334,6 +335,10 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.glass_card",
     "ai_command_center.ui.components.global_context_bar",
     "ai_command_center.ui.components.status_pill",
+    "ai_command_center.ui.widget_utils",
+    "ai_command_center.ui.design_system.theme_v2",
+    "ai_command_center.ui.design_system.palette_provider",
+    "ai_command_center.ui.design_system.command",
     "ai_command_center.ui.components.top_bar",
     # Inspector primitives (must reload under fake customtkinter)
     "ai_command_center.ui.components.inspector.base_inspector",
@@ -420,6 +425,8 @@ def _patch_and_import():
         from ai_command_center.ui.views.command_center_view import CommandCenterView
         from ai_command_center.ui.components.top_bar import TopBar
         from ai_command_center.ui.components.global_context_bar import GlobalContextBar
+        from ai_command_center.ui.design_system.palette_provider import PaletteProvider
+        from ai_command_center.ui.design_system.command import OSPalette
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
         from ai_command_center.ui.views.executions_view import ExecutionsView
         from ai_command_center.ui.views.agents_view import AgentsView
@@ -443,6 +450,8 @@ def _patch_and_import():
         CommandCenterView,
         TopBar,
         GlobalContextBar,
+        PaletteProvider,
+        OSPalette,
         WorldExplorerView,
         ExecutionsView,
         AgentsView,
@@ -456,6 +465,8 @@ def _patch_and_import():
     CommandCenterView,
     TopBar,
     GlobalContextBar,
+    PaletteProvider,
+    OSPalette,
     WorldExplorerView,
     ExecutionsView,
     AgentsView,
