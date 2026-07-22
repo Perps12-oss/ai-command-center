@@ -131,7 +131,12 @@ Inventory SoT: [`REPOSITORY_TRUTH_CANON.md`](../audits/REPOSITORY_TRUTH_CANON.md
 
 Execute as governance PRs or with merge authority — Devin should not branch from these.
 
-**Automation:** merge authority runs `./scripts/pr_hygiene_phase_b.sh` (requires `gh` with PR close + push delete).
+**Automation:** merge authority runs hygiene script (requires `gh` with PR close + push delete):
+
+- Bash: `scripts/pr_hygiene_phase_b.sh`
+- PowerShell: `.\scripts\pr_hygiene_phase_b.ps1`
+
+(Landed on `main` in #90 @ `04ae100` — `git pull origin main` if the file is missing locally.)
 
 | Item | Status (2026-07-22) | Action |
 |------|---------------------|--------|
