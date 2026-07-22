@@ -390,6 +390,7 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.world_model",
     "ai_command_center.ui.views.world_explorer_view",
     "ai_command_center.ui.views.graph_workspace_view",
+    "ai_command_center.ui.views.insights_view",
     "ai_command_center.ui.views.relationship_view",
     "ai_command_center.ui.components.timeline_renderer",
     "ai_command_center.ui.components.docks",
@@ -474,6 +475,7 @@ def _patch_and_import():
         from ai_command_center.ui.design_system.command import OSPalette
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
         from ai_command_center.ui.views.graph_workspace_view import GraphWorkspaceView
+        from ai_command_center.ui.views.insights_view import InsightsView
         from ai_command_center.ui.views.executions_view import ExecutionsView
         from ai_command_center.ui.views.evidence_view import EvidenceView
         from ai_command_center.ui.views.operations_view import OperationsView
@@ -514,6 +516,7 @@ def _patch_and_import():
         OSPalette,
         WorldExplorerView,
         GraphWorkspaceView,
+        InsightsView,
         ExecutionsView,
         EvidenceView,
         OperationsView,
@@ -553,6 +556,7 @@ def _patch_and_import():
     OSPalette,
     WorldExplorerView,
     GraphWorkspaceView,
+    InsightsView,
     ExecutionsView,
     EvidenceView,
     OperationsView,
