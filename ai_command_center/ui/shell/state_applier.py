@@ -85,6 +85,10 @@ class StateApplierMixin:
         if goal and hasattr(goal, "apply_state") and current_view == "goals":
             goal.apply_state(snap)
 
+        brain = self._brain_view()
+        if brain and hasattr(brain, "apply_state") and current_view == "brain":
+            brain.apply_state(snap)
+
         agents = self._agents_view()
         if agents and hasattr(agents, "apply_state") and current_view == "agents":
             agents.apply_state(snap)
