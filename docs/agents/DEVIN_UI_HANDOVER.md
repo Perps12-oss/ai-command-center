@@ -131,15 +131,20 @@ Inventory SoT: [`REPOSITORY_TRUTH_CANON.md`](../audits/REPOSITORY_TRUTH_CANON.md
 
 Execute as governance PRs or with merge authority — Devin should not branch from these.
 
-| Item | Status | Action |
-|------|--------|--------|
-| PR #75 `phase-11a-command-center` | OPEN, superseded | **Close** — content on `main` via #76–#79 |
-| Branch `origin/phase-11a-command-center` | 13 ahead / 8 behind `main` | **Delete** after PR #75 closed |
-| PR #66 `cursor/timeline-undo-p1-6c6b` | OPEN | Triage — undo landed #74; likely **close** |
-| PR #81 `cursor/phase-12-state-intelligence-0fbc` | OPEN | **Separate program** — not Phase B UI; audit on its own |
-| `origin/cursor/state-authority-migration-6a56` | Merged via #80 | **Delete** remote branch |
-| `origin/cursor/runtime-first-execution-authority-6a56` | Stale | Review → **delete** if empty vs `main` |
-| `origin/feature/planner-evolution-phase-c0-constitution` | 56 behind | **Stale** — confirm with owner or delete |
+**Automation:** merge authority runs `./scripts/pr_hygiene_phase_b.sh` (requires `gh` with PR close + push delete).
+
+| Item | Status (2026-07-22) | Action |
+|------|---------------------|--------|
+| PR #75 `phase-11a-command-center` | OPEN → **close** | Superseded; content on `main` via #76–#79 |
+| Branch `origin/phase-11a-command-center` | exists | **Delete** after #75 closed (script) |
+| PR #66 `cursor/timeline-undo-p1-6c6b` | OPEN → **close** | Superseded by #74 on `main` |
+| PR #81 `cursor/phase-12-state-intelligence-0fbc` | OPEN → **close (park)** | Not Phase B; reopen from `main` when Phase 12 starts |
+| Branch `origin/cursor/phase-12-state-intelligence-0fbc` | exists | **Keep** until Phase 12 restart (`f285789`) |
+| `origin/cursor/state-authority-migration-6a56` | merged #80 | **Delete** remote branch (script) |
+| `origin/cursor/runtime-first-execution-authority-6a56` | stale | **Delete** (script) |
+| `origin/feature/planner-evolution-phase-c0-constitution` | stale | Owner confirm → delete |
+
+**Phase B UI on `main` (active queue):** #87 E00, #88 exit-gate SQLite, #89 E01 — merged @ `4e4d3d8`. Next: **PR-UI-E02** from `origin/main`.
 
 After each merge: `git fetch origin main` before new work.
 
