@@ -122,6 +122,11 @@ UI_GRAPH_FILTER = "ui.graph.filter"
 UI_GRAPH_OPEN = "ui.graph.open"
 UI_GRAPH_NAVIGATE = "ui.graph.navigate"
 
+# Insights Placeholder intents (PR-UI-E13)
+UI_INSIGHTS_OPEN = "ui.insights.open"
+UI_INSIGHTS_SELECT = "ui.insights.select"
+UI_INSIGHTS_REFRESH = "ui.insights.refresh"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -512,6 +517,9 @@ __all__ = [
     "UI_GRAPH_FILTER",
     "UI_GRAPH_OPEN",
     "UI_GRAPH_NAVIGATE",
+    "UI_INSIGHTS_OPEN",
+    "UI_INSIGHTS_SELECT",
+    "UI_INSIGHTS_REFRESH",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",

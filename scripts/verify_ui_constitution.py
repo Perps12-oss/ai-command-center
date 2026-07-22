@@ -469,6 +469,57 @@ def _check_graph_workspace(v: Violation) -> None:
         v.add("Sidebar label for graph_workspace is not 'Graph Workspace'")
 
 
+def _check_insights_placeholder(v: Violation) -> None:
+    """Verify PR-UI-E13 Insights Placeholder contracts."""
+    shell = UI_ROOT / "views" / "insights_view.py"
+    if not shell.exists():
+        v.add("Missing Insights view: ui/views/insights_view.py")
+        return
+    text = _read(shell)
+    for label, symbol in (
+        ("apply_state", "def apply_state"),
+        ("Article 18 empty", "article18_empty"),
+        ("insights_state", "insights_state"),
+    ):
+        if symbol not in text:
+            v.add(f"Insights view missing {label} ({symbol})")
+    if "No Data" in text and "article18" not in text.lower():
+        v.add("Insights view must not use bare No Data without Article 18 helpers")
+
+    state_mod = REPO / "ai_command_center" / "core" / "state" / "insights_state.py"
+    if not state_mod.exists():
+        v.add("Missing core/state/insights_state.py")
+    else:
+        stext = _read(state_mod)
+        if "InsightsSnapshot" not in stext or "reduce_insights_state" not in stext:
+            v.add("insights_state.py missing InsightsSnapshot / reduce_insights_state")
+
+    app_state = _read(REPO / "ai_command_center" / "core" / "app_state.py")
+    if "insights_state" not in app_state or "reduce_insights_state" not in app_state:
+        v.add("AppState missing insights_state wiring")
+
+    view_manager = _read(UI_ROOT / "shell" / "view_manager.py")
+    if 'self._view_registry["insights"]' not in view_manager:
+        v.add("view_manager missing insights factory")
+
+    state_applier = _read(UI_ROOT / "shell" / "state_applier.py")
+    if 'current_view == "insights"' not in state_applier:
+        v.add("state_applier does not drive insights via apply_state")
+
+    controller = _read(UI_ROOT / "controller.py")
+    for method in (
+        "publish_insights_open",
+        "publish_insights_select",
+        "publish_insights_refresh",
+    ):
+        if method not in controller:
+            v.add(f"UIController missing {method}")
+
+    sidebar = _read(UI_ROOT / "components" / "sidebar.py")
+    if '("insights", "Insights")' not in sidebar:
+        v.add("Sidebar label for insights is not 'Insights'")
+
+
 def _check_execution_center_workspace(v: Violation) -> None:
     """Verify Phase 11C / Article 13 Execution Center workspace contracts."""
     for path in PHASE_11C_FILES:
@@ -787,6 +838,7 @@ def main() -> int:
     _check_theme_tokens(v)
     _check_world_model_workspace(v)
     _check_graph_workspace(v)
+    _check_insights_placeholder(v)
     _check_execution_center_workspace(v)
     _check_agent_monitor_workspace(v)
     _check_approval_center_workspace(v)

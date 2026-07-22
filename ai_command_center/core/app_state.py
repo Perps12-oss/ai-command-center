@@ -173,6 +173,10 @@ from ai_command_center.core.state.global_context_state import (
     GlobalContextSnapshot,
     reduce_global_context_state,
 )
+from ai_command_center.core.state.insights_state import (
+    InsightsSnapshot,
+    reduce_insights_state,
+)
 from ai_command_center.core.state.inspector_state import (
     InspectorState,
     reduce_inspector_state,
@@ -629,6 +633,7 @@ class AppState:
     execution_context: ExecutionContext = field(default_factory=ExecutionContext)
     execution_scrubber: ExecutionScrubberState = field(default_factory=ExecutionScrubberState)
     global_context: GlobalContextSnapshot = field(default_factory=GlobalContextSnapshot)
+    insights_state: InsightsSnapshot = field(default_factory=InsightsSnapshot)
     inspector: InspectorState = field(default_factory=InspectorState)
     model_selection: ModelSelectionSnapshot = field(default_factory=ModelSelectionSnapshot)
     recent_tool_runs: tuple[ToolRunItem, ...] = ()
@@ -3530,6 +3535,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_chat_history_loaded,
     _reduce_context_snapshot,
     reduce_global_context_state,
+    reduce_insights_state,
     _reduce_error,
     _reduce_phase,
     _reduce_system_snapshot,

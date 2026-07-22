@@ -55,6 +55,9 @@ from ai_command_center.core.events.topics import (
     UI_GRAPH_NAVIGATE,
     UI_GRAPH_OPEN,
     UI_GRAPH_SELECT,
+    UI_INSIGHTS_OPEN,
+    UI_INSIGHTS_REFRESH,
+    UI_INSIGHTS_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -720,6 +723,19 @@ class UIController:
             {"node_id": str(node_id), "view": str(view)},
             source="ui",
         )
+
+    def publish_insights_open(self) -> None:
+        self._bus.publish(UI_INSIGHTS_OPEN, {"view": "insights"}, source="ui")
+
+    def publish_insights_select(self, insight_id: str) -> None:
+        self._bus.publish(
+            UI_INSIGHTS_SELECT,
+            {"insight_id": str(insight_id)},
+            source="ui",
+        )
+
+    def publish_insights_refresh(self) -> None:
+        self._bus.publish(UI_INSIGHTS_REFRESH, {"view": "insights"}, source="ui")
 
     def publish_entity_create_request(
         self,

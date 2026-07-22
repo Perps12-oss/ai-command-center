@@ -37,6 +37,7 @@ _VIEW_ALIASES: dict[str, str] = {
     "graph_workspace": "graph_workspace",
     "relationship graph": "graph_workspace",
     "knowledge graph": "graph_workspace",
+    "insights": "insights",
 }
 
 _SHELL_VERBS: tuple[str, ...] = (
