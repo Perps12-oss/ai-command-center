@@ -14,6 +14,7 @@ from ai_command_center.ui.views.brain_view import BrainView
 from ai_command_center.ui.views.command_center_view import CommandCenterView
 from ai_command_center.ui.views.goal_view import GoalView
 from ai_command_center.ui.views.executions_view import ExecutionsView
+from ai_command_center.ui.views.evidence_view import EvidenceView
 from ai_command_center.ui.views.memory_view import MemoryView
 from ai_command_center.ui.views.notes_view import NotesView
 from ai_command_center.ui.views.plugins_view import PluginsView
@@ -40,6 +41,7 @@ VIEW_IDS: tuple[str, ...] = (
     "brain",
     "chat",
     "executions",
+    "evidence",
     "goals",
     "agents",
     "approvals",
@@ -148,6 +150,12 @@ class ViewManagerMixin:
             on_scrub=self._on_execution_timeline_scrub,
             on_navigate=self._navigate,
         )
+        self._view_registry["evidence"] = lambda: EvidenceView(
+            self._content,
+            on_select=self._on_evidence_select,
+            on_inspect_select=self._on_chat_inspect_select,
+            on_navigate=self._navigate,
+        )
         self._view_registry["timeline"] = lambda: ExecutionTimelineView(
             self._content,
             on_inspect_select=self._on_chat_inspect_select,
@@ -247,6 +255,10 @@ class ViewManagerMixin:
     def _world_explorer_view(self) -> WorldExplorerView | None:
         v = self._views.get("world_explorer")
         return v if isinstance(v, WorldExplorerView) else None
+
+    def _evidence_view(self) -> EvidenceView | None:
+        v = self._views.get("evidence")
+        return v if isinstance(v, EvidenceView) else None
 
     def _on_world_model_create_entity(self) -> None:
         """Hero New Entity → ENTITY_CREATE_REQUEST via UIController."""
@@ -496,6 +508,32 @@ class ViewManagerMixin:
         """Open execution detail and request timeline projection."""
         self._navigate("executions")
         self._controller.publish_execution_query(request_id)
+
+    def _on_evidence_select(self, request_id: str) -> None:
+        """Evidence claim click → UI_EVIDENCE_SELECT + inspect."""
+        rid = str(request_id).strip()
+        if not rid:
+            return
+        self._controller.publish_evidence_select(rid)
+        snap = self._controller.snapshot()
+        orch = snap.orchestration_run
+        entry = orch
+        if orch.request_id != rid:
+            entry = next((e for e in orch.run_history if e.request_id == rid), orch)
+        payload: dict[str, object] = {
+            "request_id": rid,
+            "claim": str(getattr(entry, "query", "") or getattr(entry, "intent", "") or rid),
+            "truth": "valid" if getattr(entry, "truth_valid", False) else "failed",
+            "receipt_id": str(getattr(entry, "receipt_id", "") or ""),
+            "trace_id": str(getattr(entry, "trace_id", "") or ""),
+            "span_id": str(getattr(entry, "span_id", "") or ""),
+        }
+        self._controller.publish_inspect_select(
+            "evidence",
+            rid,
+            label=str(payload["claim"]),
+            payload=payload,
+        )
 
     def _on_execution_timeline_scrub(self, request_id: str, index: int) -> None:
         self._controller.publish_execution_timeline_scrub(request_id, index)
