@@ -109,6 +109,14 @@ class StateApplierMixin:
         if evidence and hasattr(evidence, "apply_state") and current_view == "evidence":
             evidence.apply_state(snap)
 
+        operations = self._operations_view()
+        if (
+            operations
+            and hasattr(operations, "apply_state")
+            and current_view == "operations"
+        ):
+            operations.apply_state(snap)
+
         executions = self._executions_view()
         if (
             executions
