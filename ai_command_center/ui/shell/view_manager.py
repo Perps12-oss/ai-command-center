@@ -119,6 +119,8 @@ class ViewManagerMixin:
             self._content,
             on_delete=self._on_memory_delete,
             on_add=self._on_memory_add,
+            on_select=self._on_memory_select,
+            on_inspect_select=self._on_chat_inspect_select,
         )
         self._view_registry["system"] = lambda: SystemView(self._content)
         self._view_registry["settings"] = lambda: SettingsView(
