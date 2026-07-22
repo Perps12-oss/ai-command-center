@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 try:
     import pyperclip
@@ -42,6 +43,8 @@ from ai_command_center.core.events.topics import (
     UI_ARTIFACT_ACTION,
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
+    UI_PALETTE_ACTION,
+    PALETTE_PROVIDER_REGISTER,
     UI_SELECT_WORKSPACE,
     EXECUTION_QUERY_REQUEST,
     UI_EXECUTION_TIMELINE_SCRUB,
@@ -73,11 +76,39 @@ class UIController:
         self._on_state = on_state
         self._unsub_state: Callable[[], None] | None = None
         self._unsub_state = self._state_store.subscribe(lambda _s: on_state())
+        self._palette_providers: list[Any] = []
 
     def close(self) -> None:
         if self._unsub_state is not None:
             self._unsub_state()
             self._unsub_state = None
+
+    def register_palette_provider(self, provider: Any) -> None:
+        """Register a palette provider and publish the registration event."""
+        self._palette_providers.append(provider)
+        self._palette_providers.sort(key=lambda p: getattr(p, "priority", 100))
+        self._bus.publish(
+            PALETTE_PROVIDER_REGISTER,
+            {"provider_name": str(getattr(provider, "name", "unknown"))},
+            source="ui",
+        )
+
+    def get_palette_commands(self, snap: Any) -> list[Any]:
+        """Aggregate commands from all registered palette providers."""
+        commands: list[Any] = []
+        for provider in self._palette_providers:
+            try:
+                commands.extend(provider.get_commands(snap))
+            except Exception:  # pragma: no cover - provider failure must not crash palette
+                pass
+        return commands
+
+    def publish_palette_action(self, command_id: str, payload: dict[str, Any] | None = None) -> None:
+        self._bus.publish(
+            UI_PALETTE_ACTION,
+            {"command_id": command_id, "payload": payload or {}},
+            source="ui",
+        )
 
     def snapshot(self):
         return self._state_store.snapshot
