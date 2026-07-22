@@ -150,7 +150,7 @@ def _build_fake_customtkinter() -> types.ModuleType:
     mod.CTkImage = lambda *args, **kwargs: _make_widget_class("CTkImage")()
     mod.CTkCanvas = _make_widget_class("CTkCanvas")
     mod.CTkScrollableFrame = _make_widget_class("CTkScrollableFrame")
-    mod.CTkEntry = _make_widget_class("CTkEntry")
+    mod.CTkEntry = _make_widget_class("CTkEntry", textbox=True)
     mod.CTkTextbox = _make_widget_class("CTkTextbox", textbox=True)
     mod.CTkOptionMenu = _make_widget_class("CTkOptionMenu")
     mod.CTkSwitch = _make_widget_class("CTkSwitch")
@@ -342,6 +342,9 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.top_bar",
     "ai_command_center.ui.components.nav_group",
     "ai_command_center.ui.components.sidebar",
+    "ai_command_center.ui.components.memory.memory_card",
+    "ai_command_center.ui.components.memory.memory_detail",
+    "ai_command_center.ui.views.memory_view",
     # Inspector primitives (must reload under fake customtkinter)
     "ai_command_center.ui.components.inspector.base_inspector",
     "ai_command_center.ui.components.inspector.payload_inspector",
@@ -429,6 +432,9 @@ def _patch_and_import():
         from ai_command_center.ui.components.global_context_bar import GlobalContextBar
         from ai_command_center.ui.components.nav_group import NavGroup
         from ai_command_center.ui.components.sidebar import Sidebar, NAV_GROUPS
+        from ai_command_center.ui.components.memory.memory_card import MemoryCard
+        from ai_command_center.ui.components.memory.memory_detail import MemoryDetail
+        from ai_command_center.ui.views.memory_view import MemoryView
         from ai_command_center.ui.design_system.palette_provider import PaletteProvider
         from ai_command_center.ui.design_system.command import OSPalette
         from ai_command_center.ui.views.world_explorer_view import WorldExplorerView
@@ -465,6 +471,9 @@ def _patch_and_import():
         ApprovalsView,
         GoalView,
         InspectorHost,
+        MemoryView,
+        MemoryCard,
+        MemoryDetail,
     )
 
 
@@ -483,4 +492,7 @@ def _patch_and_import():
     ApprovalsView,
     GoalView,
     InspectorHost,
+    MemoryView,
+    MemoryCard,
+    MemoryDetail,
 ) = _patch_and_import()
