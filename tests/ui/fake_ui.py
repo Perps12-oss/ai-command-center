@@ -334,6 +334,22 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.glass_card",
     "ai_command_center.ui.components.status_pill",
     "ai_command_center.ui.components.top_bar",
+    # Inspector primitives (must reload under fake customtkinter)
+    "ai_command_center.ui.components.inspector.base_inspector",
+    "ai_command_center.ui.components.inspector.payload_inspector",
+    "ai_command_center.ui.components.inspector.message_inspector",
+    "ai_command_center.ui.components.inspector.artifact_inspector",
+    "ai_command_center.ui.components.inspector.provider_inspector",
+    "ai_command_center.ui.components.inspector.decision_inspector",
+    "ai_command_center.ui.components.inspector.goal_inspector",
+    "ai_command_center.ui.components.inspector.task_inspector",
+    "ai_command_center.ui.components.inspector.memory_inspector",
+    "ai_command_center.ui.components.inspector.agent_inspector",
+    "ai_command_center.ui.components.inspector.note_inspector",
+    "ai_command_center.ui.components.inspector.world_node_inspector",
+    "ai_command_center.ui.components.inspector.execution_event_inspector",
+    "ai_command_center.ui.components.inspector.inspector_host",
+    "ai_command_center.ui.components.docks.inspector_dock",
     # Shared graph primitive package (must reload under fake tkinter)
     "ai_command_center.ui.components.graph.graph_node",
     "ai_command_center.ui.components.graph.graph_edge",
@@ -407,6 +423,7 @@ def _patch_and_import():
         from ai_command_center.ui.views.agents_view import AgentsView
         from ai_command_center.ui.views.approvals_view import ApprovalsView
         from ai_command_center.ui.views.goal_view import GoalView
+        from ai_command_center.ui.components.inspector.inspector_host import InspectorHost
     finally:
         # Drop fake-bound UI modules so later tests can import real Tk widgets.
         for name in _UI_MODULES_TO_RELOAD:
@@ -428,6 +445,7 @@ def _patch_and_import():
         AgentsView,
         ApprovalsView,
         GoalView,
+        InspectorHost,
     )
 
 
@@ -439,4 +457,5 @@ def _patch_and_import():
     AgentsView,
     ApprovalsView,
     GoalView,
+    InspectorHost,
 ) = _patch_and_import()

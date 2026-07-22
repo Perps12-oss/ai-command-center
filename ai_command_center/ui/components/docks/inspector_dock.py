@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import customtkinter as ctk
@@ -19,9 +20,15 @@ class InspectorDock(ctk.CTkFrame):
     surface shares the same inspector chrome without embedding raw hosts.
     """
 
-    def __init__(self, master: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        master: Any,
+        *,
+        on_navigate: Callable[[InspectableRef], None] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(master, fg_color=T.BG_PANEL, corner_radius=0, **kwargs)
-        self._host = InspectorHost(self)
+        self._host = InspectorHost(self, on_navigate=on_navigate)
         self._host.pack(fill="both", expand=True)
 
     @property

@@ -262,7 +262,10 @@ class ChatView(ctk.CTkFrame):
             on_inspect_navigate=self._on_inspect_navigate,
             on_artifact_action=self._on_artifact_action,
         )
-        self._inspector_dock = InspectorDock(self._workspace.right_host())
+        self._inspector_dock = InspectorDock(
+            self._workspace.right_host(),
+            on_navigate=self._on_inspect_navigate,
+        )
         self._inspector_dock.register("execution", self._execution_inspector)
         self._inspector_dock.set_default(self._execution_inspector)
         self._workspace.set_right(self._inspector_dock)

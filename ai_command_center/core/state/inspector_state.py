@@ -20,6 +20,13 @@ _INSPECT_NAVIGATE_VIEWS: dict[str, str] = {
     "provider": "providers",
     "execution": "executions",
     "decision": "chat",
+    "goal": "goals",
+    "task": "goals",
+    "memory": "memory",
+    "agent": "agents",
+    "note": "notes",
+    "world_node": "world_explorer",
+    "execution_event": "executions",
 }
 
 
