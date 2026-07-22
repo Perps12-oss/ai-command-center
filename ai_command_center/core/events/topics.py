@@ -93,6 +93,11 @@ UI_MEMORY_SEARCH = "ui.memory.search"
 UI_BRAIN_SELECT = "ui.brain.select"
 UI_BRAIN_OPEN = "ui.brain.open"
 
+# Goal Workspace intents (PR-UI-E07)
+UI_GOAL_SELECT = "ui.goal.select"
+UI_GOAL_TASK_SELECT = "ui.goal.task_select"
+UI_GOAL_OPEN = "ui.goal.open"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -466,6 +471,9 @@ __all__ = [
     "UI_MEMORY_SEARCH",
     "UI_BRAIN_SELECT",
     "UI_BRAIN_OPEN",
+    "UI_GOAL_SELECT",
+    "UI_GOAL_TASK_SELECT",
+    "UI_GOAL_OPEN",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",
