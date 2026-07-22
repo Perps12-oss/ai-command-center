@@ -111,6 +111,11 @@ UI_AGENT_OPEN = "ui.agent.open"
 UI_EVIDENCE_SELECT = "ui.evidence.select"
 UI_EVIDENCE_OPEN = "ui.evidence.open"
 
+# Mission Control Operations intents (PR-UI-E11)
+UI_OPERATION_SELECT = "ui.operation.select"
+UI_OPERATION_SCRUB = "ui.operation.scrub"
+UI_OPERATION_OPEN = "ui.operation.open"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -494,6 +499,9 @@ __all__ = [
     "UI_AGENT_OPEN",
     "UI_EVIDENCE_SELECT",
     "UI_EVIDENCE_OPEN",
+    "UI_OPERATION_SELECT",
+    "UI_OPERATION_SCRUB",
+    "UI_OPERATION_OPEN",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",

@@ -12,6 +12,7 @@ from tests.ui.fake_ui import (
     EvidenceView,
     ExecutionsView,
     GoalView,
+    OperationsView,
     WorldExplorerView,
 )
 
@@ -44,6 +45,7 @@ def test_all_phase11_shells_show_structured_loading_on_none() -> None:
         WorldExplorerView(None),
         ExecutionsView(None),
         EvidenceView(None),
+        OperationsView(None),
         AgentsView(None),
         ApprovalsView(None),
         GoalView(None),

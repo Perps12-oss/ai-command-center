@@ -28,6 +28,7 @@ _KINDS = [
     "world_node",
     "execution_event",
     "evidence",
+    "operation",
 ]
 
 
@@ -105,6 +106,7 @@ def test_navigate_button_disabled_when_empty():
         ("world_node", "world_explorer"),
         ("execution_event", "executions"),
         ("evidence", "evidence"),
+        ("operation", "operations"),
     ],
 )
 def test_resolve_inspect_navigate_view(kind, expected_view):
