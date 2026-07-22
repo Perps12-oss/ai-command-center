@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import customtkinter as ctk
@@ -13,18 +13,20 @@ from ai_command_center.domain.world_model_snapshot import (
     WorldModelSnapshot,
 )
 from ai_command_center.ui.components.graph import (
-    BaseGraphCanvas,
+    BaseGraphCanvas,  # noqa: F401 — ADR gate: panels must reuse shared graph package
     GraphEdgeVisual,
     GraphNodeVisual,
     circular_layout,
 )
+from ai_command_center.ui.components.world_model.world_graph_canvas import WorldGraphCanvas
 from ai_command_center.ui.design_system import theme_v2 as T
 
 
 class KnowledgeGraphPanel(ctk.CTkFrame):
-    """Renders world-model nodes/edges via the shared graph primitive."""
+    """Renders world-model nodes/edges via WorldGraphCanvas (BaseGraphCanvas)."""
 
     _NODE_R = 22.0
+    _SURFACE_TYPE = BaseGraphCanvas  # shared primitive identity for architecture gates
 
     def __init__(
         self,
@@ -43,6 +45,7 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
         self._nodes: tuple[NodeSnapshot, ...] = ()
         self._edges: tuple[EdgeSnapshot, ...] = ()
         self._selected_id = ""
+        self._visible_ids: set[str] | None = None
         self._projecting = False
 
         header = ctk.CTkFrame(self, fg_color="transparent")
@@ -55,31 +58,28 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
             anchor="w",
         ).pack(side="left")
 
-        self._surface = BaseGraphCanvas(
+        self._surface = WorldGraphCanvas(
             self,
             on_node_select=self._click,
-            enable_zoom=True,
-            enable_pan=True,
-            enable_multi_select=False,
-            enable_node_drag=False,
-            enable_selection_box=False,
-            show_scrollbars=False,
-            empty_message=(
-                "No entities in the World Model yet.\n"
-                "Entities appear when notes, goals, or workspace activity is indexed.\n"
-                "Next: click New Entity or open Goals/Chat to create linked work."
-            ),
-            canvas_bg=T.BG_DEEP,
         )
         self._surface.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self._surface.tk_canvas.configure(height=240)
         # Relayout when the shared surface resizes
         self._surface.tk_canvas.bind("<Configure>", lambda _e: self._project(), add="+")
 
-    def apply_snapshot(self, wm: WorldModelSnapshot) -> None:
+    def apply_snapshot(
+        self,
+        wm: WorldModelSnapshot,
+        *,
+        visible_nodes: Sequence[NodeSnapshot] | None = None,
+    ) -> None:
         self._nodes = wm.nodes
         self._edges = wm.edges
         self._selected_id = wm.selected_node_id
+        if visible_nodes is None:
+            self._visible_ids = None
+        else:
+            self._visible_ids = {n.node_id for n in visible_nodes}
         self._project()
 
     def _project(self) -> None:
@@ -89,12 +89,16 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
         try:
             width = max(int(self._surface.tk_canvas.winfo_width() or 400), 200)
             height = max(int(self._surface.tk_canvas.winfo_height() or 240), 160)
-            if not self._nodes:
+            nodes = list(self._nodes)
+            if self._visible_ids is not None:
+                nodes = [n for n in nodes if n.node_id in self._visible_ids]
+            if not nodes:
                 self._surface.set_scene([], [])
                 return
 
+            visible_ids = {n.node_id for n in nodes}
             positions = circular_layout(
-                [n.node_id for n in self._nodes],
+                [n.node_id for n in nodes],
                 width=float(width),
                 height=float(height),
                 node_radius=self._NODE_R,
@@ -114,7 +118,7 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
                     text_color=T.TEXT_PRIMARY,
                     font_size=8,
                 )
-                for node in self._nodes
+                for node in nodes
             ]
             edges = [
                 GraphEdgeVisual(
@@ -126,6 +130,7 @@ class KnowledgeGraphPanel(ctk.CTkFrame):
                     arrow="none",
                 )
                 for e in self._edges
+                if e.from_node_id in visible_ids and e.to_node_id in visible_ids
             ]
             selected = {self._selected_id} if self._selected_id else set()
             self._surface.set_scene(visuals, edges, selected_node_ids=selected)

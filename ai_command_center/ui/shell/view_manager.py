@@ -177,7 +177,9 @@ class ViewManagerMixin:
         )
         self._view_registry["world_explorer"] = lambda: WorldExplorerView(
             self._content,
-            on_select=self._controller.publish_world_model_node_selected,
+            on_select=self._on_world_node_select,
+            on_filter_change=self._on_world_filter_change,
+            on_inspect_select=self._on_chat_inspect_select,
             on_create_entity=self._on_world_model_create_entity,
             on_navigate=self._navigate,
         )
@@ -250,6 +252,33 @@ class ViewManagerMixin:
         self._controller.publish_entity_create_request(
             entity_type="note",
             title="New Entity",
+        )
+
+    def _on_world_node_select(self, node_id: str) -> None:
+        """World Explorer node click → UI_WORLD_SELECT + domain + inspect."""
+        nid = str(node_id).strip()
+        if not nid:
+            return
+        self._controller.publish_world_select(nid)
+        self._controller.publish_world_model_node_selected(nid)
+        self._controller.publish_inspect_select(
+            "world_node",
+            nid,
+            label=nid,
+            payload={"node_id": nid},
+        )
+
+    def _on_world_filter_change(self, state: object) -> None:
+        """Shared filter bar → UI_WORLD_FILTER intent (projection stays local)."""
+        search = str(getattr(state, "search", "") or "")
+        type_filter = str(getattr(state, "type_filter", "all") or "all")
+        status_filter = str(getattr(state, "status_filter", "all") or "all")
+        sort_key = str(getattr(state, "sort_key", "name") or "name")
+        self._controller.publish_world_filter(
+            search=search,
+            type_filter=type_filter,
+            status_filter=status_filter,
+            sort_key=sort_key,
         )
 
     def _workspace_os_routing_enabled(self) -> bool:

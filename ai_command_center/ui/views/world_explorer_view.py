@@ -1,9 +1,10 @@
-"""World Model workspace — Article 12 operational surface (Phase 11B).
+"""World Model Explorer workspace — Article 12 operational surface (Phase 11B / E08).
 
 Architecture contract:
 - Pure renderer. Reads AppState via apply_state(snapshot) only.
 - No mutable state listeners, repositories, or services.
-- Publishes intents through callbacks (WORLD_MODEL_NODE_SELECTED / ENTITY_CREATE_REQUEST).
+- Publishes intents through callbacks (UI_WORLD_* / WORLD_MODEL_NODE_SELECTED /
+  ENTITY_CREATE_REQUEST / inspect).
 """
 
 from __future__ import annotations
@@ -14,8 +15,14 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppState
+from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.domain.world_model_snapshot import WorldModelSnapshot
 from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.ui.components.world_model.node_filters import (
+    NodeFilterState,
+    NodeFiltersBar,
+    filter_nodes,
+)
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
@@ -33,20 +40,26 @@ from ai_command_center.ui.views.world_model import (
 
 
 class WorldExplorerView(ctk.CTkFrame):
-    """World Model workspace orchestration shell (Hero + five Article 12 panels)."""
+    """World Model Explorer shell: filters + graph + list + inspector panels."""
 
     def __init__(
         self,
         master: Any,
         *,
         on_select: Callable[[str], None] | None = None,
+        on_filter_change: Callable[[NodeFilterState], None] | None = None,
+        on_inspect_select: Callable[[InspectableRef], None] | None = None,
         on_create_entity: Callable[[], None] | None = None,
         on_navigate: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(master, fg_color=T.BG_DEEP)
         self._on_select = on_select
+        self._on_filter_change = on_filter_change
+        self._on_inspect_select = on_inspect_select
         self._on_create_entity = on_create_entity
         self._on_navigate = on_navigate
+        self._last_wm: WorldModelSnapshot | None = None
+        self._filter = NodeFilterState()
         self._build()
 
     def _build(self) -> None:
@@ -57,7 +70,7 @@ class WorldExplorerView(ctk.CTkFrame):
         hero_top.pack(fill="x", padx=T.PAD, pady=(T.PAD, 0))
         ctk.CTkLabel(
             hero_top,
-            text="World Model",
+            text="World Model Explorer",
             font=T.FONT_TITLE,
             text_color=T.WORLD_TEAL,
             anchor="w",
@@ -104,6 +117,9 @@ class WorldExplorerView(ctk.CTkFrame):
             wraplength=720,
         )
         self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+
+        self._filters = NodeFiltersBar(self, on_change=self._on_filters)
+        self._filters.pack(fill="x", padx=T.PAD, pady=(0, 8))
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=T.PAD, pady=(0, T.PAD))
@@ -156,6 +172,7 @@ class WorldExplorerView(ctk.CTkFrame):
                 snapshot,
                 topic_prefixes=("world_model.", "world."),
             )
+        self._last_wm = wm
         edge_count = len(wm.edges)
         entity_count = wm.node_count or len(wm.nodes)
         goals = len(wm.active_goals)
@@ -180,15 +197,44 @@ class WorldExplorerView(ctk.CTkFrame):
         else:
             set_surface_state(self._surface_state, kind="data")
 
-        self._graph.apply_snapshot(wm)
-        self._explorer.apply_snapshot(wm)
+        self._project_panels(wm)
+
+    def _project_panels(self, wm: WorldModelSnapshot) -> None:
+        visible = filter_nodes(wm.nodes, self._filter)
+        self._graph.apply_snapshot(wm, visible_nodes=visible)
+        self._explorer.apply_snapshot(wm, filter_state=self._filter)
         self._inspector.apply_snapshot(wm)
         self._relationships.apply_snapshot(wm)
         self._journal.apply_snapshot(wm)
 
+    def _on_filters(self, state: NodeFilterState) -> None:
+        self._filter = state
+        if self._on_filter_change is not None:
+            self._on_filter_change(state)
+        if self._last_wm is not None:
+            self._project_panels(self._last_wm)
+
     def _select(self, node_id: str) -> None:
+        nid = str(node_id)
         if self._on_select:
-            self._on_select(node_id)
+            self._on_select(nid)
+        label = nid
+        node_type = ""
+        if self._last_wm is not None:
+            for node in self._last_wm.nodes:
+                if node.node_id == nid:
+                    label = node.label or nid
+                    node_type = node.node_type
+                    break
+        if self._on_inspect_select is not None:
+            self._on_inspect_select(
+                InspectableRef(
+                    kind="world_node",
+                    ref_id=nid,
+                    label=label,
+                    payload=(("node_id", nid), ("node_type", node_type)),
+                )
+            )
 
     def _create_entity(self) -> None:
         if self._on_create_entity:
