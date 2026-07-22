@@ -98,6 +98,7 @@ class ViewManagerMixin:
             self._content,
             on_select=self._on_agent_select,
             on_cancel=self._on_agent_cancel,
+            on_inspect_select=self._on_chat_inspect_select,
             on_command=self._on_command,
             on_navigate=self._navigate,
         )
@@ -391,15 +392,32 @@ class ViewManagerMixin:
                 chat.focus_input()
 
     def _on_agent_select(self, agent_id: str) -> None:
-        """Existing inspect selection flow — AppState refresh re-projects panels."""
+        """Agent Operations select → UI_AGENT_SELECT + enriched inspect."""
         aid = str(agent_id).strip()
         if not aid:
             return
+        self._controller.publish_agent_select(aid)
+        snap = self._controller.snapshot()
+        run = snap.agent_pipeline.run_by_id(aid)
+        payload: dict[str, object] = {"agent_id": aid}
+        if run is not None:
+            payload.update(
+                {
+                    "name": run.spawn_role or aid,
+                    "role": run.spawn_role,
+                    "status": run.state,
+                    "task": run.task,
+                    "error": run.error,
+                    "steps": run.steps,
+                    "pipeline_id": snap.agent_pipeline.pipeline_id,
+                    "pipeline_stage": snap.agent_pipeline.pipeline_stage,
+                }
+            )
         self._controller.publish_inspect_select(
             "agent",
             aid,
-            label=aid,
-            payload={"agent_id": aid},
+            label=str(payload.get("name") or aid),
+            payload=payload,
         )
 
     def _on_approval_select(self, check_id: str) -> None:
