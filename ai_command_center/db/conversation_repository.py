@@ -9,6 +9,7 @@ from __future__ import annotations
 import sqlite3
 import time
 
+from ai_command_center.db.conn_sync import connection_lock
 from ai_command_center.domain.conversation import ConversationMessage
 
 DEFAULT_CONVERSATION_ID = "default"
@@ -33,22 +34,23 @@ class ConversationRepository:
         model: str = "",
         title: str = "Session",
     ) -> str:
-        row = self._conn.execute(
-            "SELECT id FROM conversations WHERE id = ?",
-            (conversation_id,),
-        ).fetchone()
-        if row is None:
-            self._conn.execute(
-                "INSERT INTO conversations (id, title, model, created_at) VALUES (?, ?, ?, ?)",
-                (conversation_id, title, model, time.time()),
-            )
-            self._conn.commit()
-        elif model:
-            self._conn.execute(
-                "UPDATE conversations SET model = ? WHERE id = ?",
-                (model, conversation_id),
-            )
-            self._conn.commit()
+        with connection_lock(self._conn):
+            row = self._conn.execute(
+                "SELECT id FROM conversations WHERE id = ?",
+                (conversation_id,),
+            ).fetchone()
+            if row is None:
+                self._conn.execute(
+                    "INSERT INTO conversations (id, title, model, created_at) VALUES (?, ?, ?, ?)",
+                    (conversation_id, title, model, time.time()),
+                )
+                self._conn.commit()
+            elif model:
+                self._conn.execute(
+                    "UPDATE conversations SET model = ? WHERE id = ?",
+                    (model, conversation_id),
+                )
+                self._conn.commit()
         return conversation_id
 
     def ensure_default(self, *, model: str = "") -> str:
@@ -62,30 +64,40 @@ class ConversationRepository:
         conversation_id: str | None = None,
     ) -> None:
         cid = conversation_id or DEFAULT_CONVERSATION_ID
-        self.ensure_conversation(cid)
-        self._conn.execute(
-            """
-            INSERT INTO messages (conversation_id, role, content, created_at)
-            VALUES (?, ?, ?, ?)
-            """,
-            (cid, role, content.strip(), time.time()),
-        )
-        self._conn.commit()
+        with connection_lock(self._conn):
+            row = self._conn.execute(
+                "SELECT id FROM conversations WHERE id = ?",
+                (cid,),
+            ).fetchone()
+            if row is None:
+                self._conn.execute(
+                    "INSERT INTO conversations (id, title, model, created_at) VALUES (?, ?, ?, ?)",
+                    (cid, "Session", "", time.time()),
+                )
+            self._conn.execute(
+                """
+                INSERT INTO messages (conversation_id, role, content, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (cid, role, content.strip(), time.time()),
+            )
+            self._conn.commit()
 
     def list_messages(
         self,
         conversation_id: str | None = None,
     ) -> list[ConversationMessage]:
         cid = conversation_id or DEFAULT_CONVERSATION_ID
-        rows = self._conn.execute(
-            """
-            SELECT role, content, created_at
-            FROM messages
-            WHERE conversation_id = ?
-            ORDER BY id ASC
-            """,
-            (cid,),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                """
+                SELECT role, content, created_at
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY id ASC
+                """,
+                (cid,),
+            ).fetchall()
         return [
             ConversationMessage(
                 role=str(r["role"]),
@@ -102,31 +114,42 @@ class ConversationRepository:
         conversation_id: str | None = None,
     ) -> list[tuple[str, str]]:
         cid = conversation_id or DEFAULT_CONVERSATION_ID
-        rows = self._conn.execute(
-            """
-            SELECT role, content
-            FROM messages
-            WHERE conversation_id = ?
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (cid, limit),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                """
+                SELECT role, content
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (cid, limit),
+            ).fetchall()
         return [(str(r["role"]), str(r["content"])) for r in reversed(rows)]
 
     def message_count(self, conversation_id: str | None = None) -> int:
         cid = conversation_id or DEFAULT_CONVERSATION_ID
-        row = self._conn.execute(
-            "SELECT COUNT(*) AS c FROM messages WHERE conversation_id = ?",
-            (cid,),
-        ).fetchone()
+        with connection_lock(self._conn):
+            row = self._conn.execute(
+                "SELECT COUNT(*) AS c FROM messages WHERE conversation_id = ?",
+                (cid,),
+            ).fetchone()
         return int(row["c"]) if row else 0
 
     def clear_messages(self, conversation_id: str) -> None:
         """Remove all messages for a conversation row (row itself is kept)."""
-        self.ensure_conversation(conversation_id)
-        self._conn.execute(
-            "DELETE FROM messages WHERE conversation_id = ?",
-            (conversation_id,),
-        )
-        self._conn.commit()
+        with connection_lock(self._conn):
+            row = self._conn.execute(
+                "SELECT id FROM conversations WHERE id = ?",
+                (conversation_id,),
+            ).fetchone()
+            if row is None:
+                self._conn.execute(
+                    "INSERT INTO conversations (id, title, model, created_at) VALUES (?, ?, ?, ?)",
+                    (conversation_id, "Session", "", time.time()),
+                )
+            self._conn.execute(
+                "DELETE FROM messages WHERE conversation_id = ?",
+                (conversation_id,),
+            )
+            self._conn.commit()

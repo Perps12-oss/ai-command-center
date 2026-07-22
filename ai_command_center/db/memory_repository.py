@@ -7,10 +7,11 @@
 from __future__ import annotations
 
 import sqlite3
-import threading
 import time
 import uuid
 from dataclasses import dataclass
+
+from ai_command_center.db.conn_sync import connection_lock
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +26,6 @@ class MemoryNode:
 class MemoryRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
-        self._lock = threading.Lock()
 
     def remember(
         self,
@@ -41,7 +41,7 @@ class MemoryRepository:
     ) -> str:
         node_id = uuid.uuid4().hex
         now = time.time()
-        with self._lock:
+        with connection_lock(self._conn):
             try:
                 self._remember_once(
                     node_id=node_id,
@@ -73,7 +73,6 @@ class MemoryRepository:
                 )
             self._conn.commit()
         return node_id
-
     def _remember_once(
         self,
         *,
@@ -191,13 +190,14 @@ class MemoryRepository:
         )
 
     def delete(self, node_id: str) -> bool:
-        cursor = self._conn.execute(
-            "DELETE FROM memory_nodes WHERE id = ?",
-            (node_id,),
-        )
-        self._conn.execute(
-            "DELETE FROM memory_edges WHERE source_id = ? OR target_id = ?",
-            (node_id, node_id),
-        )
-        self._conn.commit()
-        return cursor.rowcount > 0
+        with connection_lock(self._conn):
+            cursor = self._conn.execute(
+                "DELETE FROM memory_nodes WHERE id = ?",
+                (node_id,),
+            )
+            self._conn.execute(
+                "DELETE FROM memory_edges WHERE source_id = ? OR target_id = ?",
+                (node_id, node_id),
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0

@@ -64,6 +64,21 @@ def _drain_bus(bus: EventBus, timeout: float = 20.0) -> None:
         time.sleep(0.02)
     raise TimeoutError(f"EventBus dispatch queue not drained after {timeout}s")
 
+
+def _wait_for_memory_rows(
+    db: sqlite3.Connection,
+    *,
+    timeout: float = 5.0,
+) -> list:
+    """Poll until remember: persistence is visible (async ExecutionAuthority path)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        rows = db.execute("SELECT workspace_id FROM memory_nodes").fetchall()
+        if rows:
+            return list(rows)
+        time.sleep(0.05)
+    return list(db.execute("SELECT workspace_id FROM memory_nodes").fetchall())
+
 # Production ui.command publishers — must merge workspace scope (not bypass UIController helper).
 _UI_COMMAND_PUBLISH_ALLOWLIST = frozenset(
     {
@@ -402,7 +417,7 @@ class ExitGateIntegrationTests(unittest.TestCase):
             )
             self.assertGreaterEqual(scoped_decisions / len(decisions), 0.6)
 
-            mem_rows = db.execute("SELECT workspace_id FROM memory_nodes").fetchall()
+            mem_rows = _wait_for_memory_rows(db)
             self.assertTrue(mem_rows)
             scoped_mem = sum(1 for r in mem_rows if str(r[0] or "").strip())
             self.assertGreaterEqual(scoped_mem / len(mem_rows), 0.6)

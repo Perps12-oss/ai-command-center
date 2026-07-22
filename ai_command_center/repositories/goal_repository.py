@@ -6,6 +6,7 @@ import json
 import sqlite3
 from typing import Any
 
+from ai_command_center.db.conn_sync import connection_lock
 from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.goal import Goal, GoalStatus, Priority
 
@@ -18,51 +19,53 @@ class GoalRepository:
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
-        self._conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS goals (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                description TEXT NOT NULL DEFAULT '',
-                priority TEXT NOT NULL,
-                depends_on_json TEXT NOT NULL DEFAULT '[]',
-                status TEXT NOT NULL,
-                correlation_id TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
-            CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
-            CREATE INDEX IF NOT EXISTS idx_goals_correlation ON goals(correlation_id);
-            """
-        )
-        self._conn.commit()
+        with connection_lock(self._conn):
+            self._conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS goals (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
+                    priority TEXT NOT NULL,
+                    depends_on_json TEXT NOT NULL DEFAULT '[]',
+                    status TEXT NOT NULL,
+                    correlation_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
+                CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority);
+                CREATE INDEX IF NOT EXISTS idx_goals_correlation ON goals(correlation_id);
+                """
+            )
+            self._conn.commit()
 
     def save_goal(self, goal: Goal) -> None:
-        self._conn.execute(
-            """
-            INSERT INTO goals (
-                id, title, description, priority, depends_on_json, status, correlation_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                title = excluded.title,
-                description = excluded.description,
-                priority = excluded.priority,
-                depends_on_json = excluded.depends_on_json,
-                status = excluded.status,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (
-                goal.id,
-                goal.title,
-                goal.description,
-                goal.priority.value,
-                json.dumps(list(goal.depends_on)),
-                goal.status.value,
-                goal.correlation.correlation_id,
-            ),
-        )
-        self._conn.commit()
+        with connection_lock(self._conn):
+            self._conn.execute(
+                """
+                INSERT INTO goals (
+                    id, title, description, priority, depends_on_json, status, correlation_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title = excluded.title,
+                    description = excluded.description,
+                    priority = excluded.priority,
+                    depends_on_json = excluded.depends_on_json,
+                    status = excluded.status,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    goal.id,
+                    goal.title,
+                    goal.description,
+                    goal.priority.value,
+                    json.dumps(list(goal.depends_on)),
+                    goal.status.value,
+                    goal.correlation.correlation_id,
+                ),
+            )
+            self._conn.commit()
 
     def get_goal(self, goal_id: str) -> Goal | None:
         row = self._conn.execute("SELECT * FROM goals WHERE id = ?", (goal_id,)).fetchone()
@@ -94,15 +97,16 @@ class GoalRepository:
     def update_goal_status(
         self, goal_id: str, status: GoalStatus, correlation: CorrelationContext
     ) -> None:
-        self._conn.execute(
-            """
-            UPDATE goals
-            SET status = ?, correlation_id = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (status.value, correlation.correlation_id, goal_id),
-        )
-        self._conn.commit()
+        with connection_lock(self._conn):
+            self._conn.execute(
+                """
+                UPDATE goals
+                SET status = ?, correlation_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (status.value, correlation.correlation_id, goal_id),
+            )
+            self._conn.commit()
 
 
 def _row_to_goal(row: sqlite3.Row) -> Goal:
