@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from ai_command_center.ui.components.nav_group import NavGroup
 from ai_command_center.ui.design_system import theme_v2 as T
 
 NAV_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("Workspaces", (
-        ("workspace", "Workspace"),
         ("command_center", "Command Center"),
+        ("workspace", "Workspace"),
     )),
     ("Ops", (
         ("chat", "Chat"),
@@ -56,8 +57,10 @@ class Sidebar(ctk.CTkFrame):
             **kwargs,
         )
         self.pack_propagate(False)
+        self._on_navigate = on_navigate
         self._rows: dict[str, ctk.CTkFrame] = {}
         self._buttons: dict[str, ctk.CTkButton] = {}
+        self._groups: dict[str, NavGroup] = {}
         self._active = "command_center"
 
         ctk.CTkLabel(
@@ -68,33 +71,15 @@ class Sidebar(ctk.CTkFrame):
         ).pack(anchor="w", padx=T.PAD, pady=(T.PAD, 8))
 
         for group_name, items in NAV_GROUPS:
-            ctk.CTkLabel(
+            group = NavGroup(
                 self,
-                text=group_name.upper(),
-                font=T.FONT_ROLE,
-                text_color=T.TEXT_MUTED,
-                anchor="w",
-            ).pack(fill="x", padx=T.PAD + 2, pady=(8, 4))
-            for view_id, label in items:
-                row = ctk.CTkFrame(self, fg_color="transparent", height=40)
-                row.pack(fill="x", padx=8, pady=2)
-                row.pack_propagate(False)
-
-                btn = ctk.CTkButton(
-                    row,
-                    text=label,
-                    anchor="w",
-                    font=T.FONT_BODY,
-                    fg_color="transparent",
-                    text_color=T.TEXT_SECONDARY,
-                    hover_color=T.LIGHT_GLASS,
-                    height=36,
-                    corner_radius=T.CORNER_RADIUS,
-                    command=lambda v=view_id: self._select(v, on_navigate),
-                )
-                btn.pack(fill="both", expand=True, padx=4)
-                self._rows[view_id] = row
-                self._buttons[view_id] = btn
+                title=group_name,
+                items=items,
+                on_select=self._select,
+            )
+            group.pack(fill="x")
+            self._groups[group_name] = group
+            self._buttons.update(group.buttons)
 
         user = ctk.CTkFrame(
             self,
@@ -111,39 +96,34 @@ class Sidebar(ctk.CTkFrame):
             text_color=T.TEXT_MUTED,
         ).pack(anchor="w", padx=12, pady=10)
 
-        self._highlight()
+        self.set_active(self._active)
 
-    def _select(self, view_id: str, on_navigate) -> None:
+    def _select(self, view_id: str) -> None:
         self._active = view_id
-        self._highlight()
-        on_navigate(view_id)
-
-    def _highlight(self) -> None:
-        for vid, btn in self._buttons.items():
-            if vid == self._active:
-                btn.configure(
-                    fg_color=T.HERO_CYAN_DIM,
-                    text_color=T.HERO_CYAN,
-                    border_width=0,
-                )
-            else:
-                btn.configure(
-                    fg_color="transparent",
-                    text_color=T.TEXT_SECONDARY,
-                    border_width=0,
-                )
+        self.set_active(view_id)
+        self._on_navigate(view_id)
 
     def set_active(self, view_id: str) -> None:
         self._active = view_id
-        self._highlight()
+        for group in self._groups.values():
+            group.set_active(view_id)
+
+    def toggle_group(self, group_name: str) -> None:
+        group = self._groups.get(group_name)
+        if group is not None:
+            group.toggle()
+
+    def set_group_expanded(self, group_name: str, expanded: bool) -> None:
+        group = self._groups.get(group_name)
+        if group is not None:
+            group.set_expanded(expanded)
 
     def toggle_collapse(self) -> None:
         if self.winfo_width() > 60:
             self.configure(width=48)
-            for btn in self._buttons.values():
-                btn.configure(text="", width=28)
+            for group in self._groups.values():
+                group.set_compact(True)
         else:
             self.configure(width=T.SIDEBAR_WIDTH)
-            labels = dict(NAV_ITEMS)
-            for vid, btn in self._buttons.items():
-                btn.configure(text=labels.get(vid, vid), width=0)
+            for group in self._groups.values():
+                group.set_compact(False)

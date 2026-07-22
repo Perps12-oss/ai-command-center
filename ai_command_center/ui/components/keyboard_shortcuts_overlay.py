@@ -16,6 +16,11 @@ __all__ = ["KeyboardShortcutsOverlay", "ShortcutsOverlayManager", "SHORTCUTS"]
 
 # Define keyboard shortcuts
 SHORTCUTS = [
+    {"category": "Navigation", "shortcuts": [
+        {"keys": "Ctrl + K", "description": "Open OS command palette"},
+        {"keys": "Ctrl + H", "description": "Toggle command history drawer"},
+        {"keys": "?", "description": "Show keyboard shortcuts"},
+    ]},
     {"category": "Selection", "shortcuts": [
         {"keys": "Click", "description": "Select node/edge"},
         {"keys": "Ctrl + Click", "description": "Add to selection"},

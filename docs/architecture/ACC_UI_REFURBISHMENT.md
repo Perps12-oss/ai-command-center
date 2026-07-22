@@ -298,3 +298,17 @@ References: n8n (schedules), Activepieces (catalog), Trigger.dev (active runs).
 | Legacy execution data | `ReplayRunner` fallback; regression tests |
 | Import EventStoreDB/Temporal/Redux | Pattern references only |
 | CTk lacks native docking | `PanedWindow` + ratios |
+
+---
+
+## Navigation Shell
+
+The primary navigation is organized into collapsible groups in the sidebar:
+
+- **Workspaces** — Command Center (default) and Workspace OS canvas
+- **Ops** — Chat, Execution Center, Goal Dashboard, Agent Monitor, Approval Center
+- **Monitor** — Timeline, Workflow, Automation, World Model
+- **Library** — Relationships, Dependencies, Providers, Capabilities, Artifacts, Notes, Memory, System, Plugins
+- **Settings** — Settings
+
+Each group is implemented as a `NavGroup` component: a header button toggles the visibility of its items. `command_center` is the unconditional default view. The `KeyboardShortcutsOverlay` documents navigation shortcuts (`Ctrl+K`, `Ctrl+H`, `?`).

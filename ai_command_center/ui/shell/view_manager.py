@@ -34,10 +34,13 @@ from ai_command_center.core.state.world_model_state import WorldModelState
 ViewFactory = Callable[[], object]
 
 VIEW_IDS: tuple[str, ...] = (
-    "workspace",
     "command_center",
+    "workspace",
     "chat",
     "executions",
+    "goals",
+    "agents",
+    "approvals",
     "timeline",
     "workflow",
     "automation",
@@ -52,9 +55,6 @@ VIEW_IDS: tuple[str, ...] = (
     "system",
     "plugins",
     "settings",
-    "goals",
-    "agents",
-    "approvals",
 )
 
 
@@ -197,9 +197,6 @@ class ViewManagerMixin:
                 )
         return self._views[view_id]
 
-    def _home_view(self) -> None:
-        return None
-
     def _system_view(self) -> SystemView | None:
         v = self._views.get("system")
         return v if isinstance(v, SystemView) else None
@@ -252,8 +249,6 @@ class ViewManagerMixin:
         return "workspace"
 
     def _show_view(self, view_id: str) -> None:
-        if view_id == "home":
-            view_id = "command_center"
         if view_id not in VIEW_IDS:
             view_id = "command_center"
         prev_id = self._current_view
