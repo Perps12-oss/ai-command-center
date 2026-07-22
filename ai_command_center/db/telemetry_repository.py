@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import threading
 from datetime import datetime, timezone
 from typing import Any
 
+from ai_command_center.db.conn_sync import connection_lock
 from ai_command_center.domain.telemetry_event import TelemetryEvent
 
 
@@ -23,12 +23,11 @@ def _utc_iso(ts: float | None = None) -> str:
 class TelemetryRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
-        self._lock = threading.Lock()
 
     def insert(self, event: str, payload: dict[str, Any], *, timestamp: str | None = None) -> None:
         row_ts = timestamp or _utc_iso()
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        with self._lock:
+        with connection_lock(self._conn):
             self._conn.execute(
                 "INSERT INTO telemetry_events (event, timestamp, payload) VALUES (?, ?, ?)",
                 (event, row_ts, body),
@@ -36,7 +35,7 @@ class TelemetryRepository:
             self._conn.commit()
 
     def fetch_since(self, since_iso: str) -> list[TelemetryEvent]:
-        with self._lock:
+        with connection_lock(self._conn):
             rows = self._conn.execute(
                 """
                 SELECT event, timestamp, payload
@@ -53,7 +52,7 @@ class TelemetryRepository:
         return out
 
     def fetch_session(self, session_id: str) -> list[TelemetryEvent]:
-        with self._lock:
+        with connection_lock(self._conn):
             rows = self._conn.execute(
                 """
                 SELECT event, timestamp, payload
@@ -70,6 +69,6 @@ class TelemetryRepository:
         return out
 
     def count(self) -> int:
-        with self._lock:
+        with connection_lock(self._conn):
             row = self._conn.execute("SELECT COUNT(*) AS n FROM telemetry_events").fetchone()
         return int(row["n"]) if row else 0
