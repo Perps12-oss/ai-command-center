@@ -41,6 +41,9 @@ from ai_command_center.core.events.topics import (
     UI_GOAL_OPEN,
     UI_GOAL_SELECT,
     UI_GOAL_TASK_SELECT,
+    UI_WORLD_FILTER,
+    UI_WORLD_OPEN,
+    UI_WORLD_SELECT,
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
@@ -616,6 +619,31 @@ class UIController:
             {"node_id": str(node_id)},
             source="ui",
         )
+
+    def publish_world_select(self, node_id: str) -> None:
+        self._bus.publish(UI_WORLD_SELECT, {"node_id": str(node_id)}, source="ui")
+
+    def publish_world_filter(
+        self,
+        *,
+        search: str = "",
+        type_filter: str = "all",
+        status_filter: str = "all",
+        sort_key: str = "name",
+    ) -> None:
+        self._bus.publish(
+            UI_WORLD_FILTER,
+            {
+                "search": search,
+                "type_filter": type_filter,
+                "status_filter": status_filter,
+                "sort_key": sort_key,
+            },
+            source="ui",
+        )
+
+    def publish_world_open(self) -> None:
+        self._bus.publish(UI_WORLD_OPEN, {"view": "world_explorer"}, source="ui")
 
     def publish_entity_create_request(
         self,

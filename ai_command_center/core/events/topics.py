@@ -98,6 +98,11 @@ UI_GOAL_SELECT = "ui.goal.select"
 UI_GOAL_TASK_SELECT = "ui.goal.task_select"
 UI_GOAL_OPEN = "ui.goal.open"
 
+# World Model Explorer intents (PR-UI-E08)
+UI_WORLD_SELECT = "ui.world.select"
+UI_WORLD_FILTER = "ui.world.filter"
+UI_WORLD_OPEN = "ui.world.open"
+
 CHAT_STARTED = "chat.started"
 CHAT_CHUNK = "chat.chunk"
 CHAT_COMPLETE = "chat.complete"
@@ -474,6 +479,9 @@ __all__ = [
     "UI_GOAL_SELECT",
     "UI_GOAL_TASK_SELECT",
     "UI_GOAL_OPEN",
+    "UI_WORLD_SELECT",
+    "UI_WORLD_FILTER",
+    "UI_WORLD_OPEN",
     "CHAT_STARTED",
     "CHAT_CHUNK",
     "CHAT_COMPLETE",
