@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
 
 import customtkinter as ctk
 
@@ -18,7 +17,12 @@ from ai_command_center.ui.components.command_history_drawer import CommandHistor
 from ai_command_center.ui.components.global_context_bar import GlobalContextBar
 from ai_command_center.ui.components.sidebar import Sidebar
 from ai_command_center.ui.components.top_bar import TopBar
-from ai_command_center.ui.design_system.command import CommandPalette
+from ai_command_center.ui.design_system.command import OSPalette
+from ai_command_center.ui.design_system.palette_provider import (
+    PaletteCommand,
+    StaticPaletteProvider,
+    WorkspaceOSPaletteProvider,
+)
 from ai_command_center.ui.design_system.shortcut import ShortcutOverlay
 from ai_command_center.ui.design_system.toast import ToastManager
 from ai_command_center.ui.design_system import theme_manager
@@ -66,13 +70,15 @@ class ApplicationShellMixin:
         self._show_view(self._default_view)
 
         self._toast = ToastManager(self)
-        self._command_palette = CommandPalette(self)
+        self._command_palette = OSPalette(self)
         self._shortcut_overlay = ShortcutOverlay(self)
 
         self._history_drawer = CommandHistoryDrawer(
             body,
             on_rerun=self._on_command,
         )
+
+        self._register_palette_providers()
 
     def _setup_keybindings(self) -> None:
         self.bind("<Control-k>", lambda _: self._show_command_palette())
@@ -82,77 +88,49 @@ class ApplicationShellMixin:
         self.bind("?", self._maybe_show_shortcuts)
 
     def _show_command_palette(self) -> None:
-        commands: list[tuple[str, str, Callable[[], None]]] = []
-        commands.extend(self._workspace_os_palette_commands())
-        commands.extend(
-            [
-                ("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace")),
-                ("◈  Command Center", "Dashboard and quick actions", lambda: self._navigate("command_center")),
-                ("💬  Chat", "Generic chat (no entity attach)", lambda: self._navigate("chat", clear_chat_entity=True)),
-                ("📝  Notes", "Search vault notes", lambda: self._navigate("notes")),
-                ("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory")),
-                ("◈  World Model", "Browse World Model knowledge graph", lambda: self._navigate("world_explorer")),
-                ("⟷  Relationships", "Visualize node edges and dependencies", lambda: self._navigate("relationships")),
-                ("🔍  Dependencies", "Mutation log, goals, and dependency inspector", lambda: self._navigate("dependencies")),
-                ("⚙  System", "System monitor", lambda: self._navigate("system")),
-                ("🧩  Plugins", "Manage plugins", lambda: self._navigate("plugins")),
-                ("◈  Settings", "Open settings & themes", lambda: self._navigate("settings")),
-                ("⬇  Export Chat", "Save conversation to markdown", self._on_chat_export_request),
-                ("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate),
-                ("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse),
-                ("⏱  Command History", "Browse recent commands (Ctrl+H)", self._history_drawer.toggle),
-                ("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show),
-                (
-                    "🤖  Supervised Agent Demo",
-                    "Spawn a permission-gated agent run (visible in System view)",
-                    lambda: self._on_command("agent: demo"),
-                ),
-            ]
-        )
+        """Open the OS palette with all registered provider commands."""
+        snap = self._controller.snapshot()
+        commands = self._controller.get_palette_commands(snap)
         self._command_palette.show(commands)
 
-    def _workspace_os_palette_commands(self) -> list[tuple[str, str, Callable[[], None]]]:
-        """Build launchable Workspace OS entity commands from AppState."""
-        items: list[tuple[str, str, Callable[[], None]]] = []
-        for entity in self._controller.snapshot().workspace_os.entities:
-            meta = dict(entity.metadata)
-            resource_type = meta.get("resource_type")
-            value = meta.get("url") or meta.get("path") or meta.get("command") or ""
-            chat_payload = {
-                "entity_id": entity.entity_id,
-                "entity_type": entity.entity_type,
-                "title": entity.title or entity.entity_id,
-            }
-            if meta.get("description"):
-                chat_payload["description"] = str(meta["description"])
-            if meta.get("url"):
-                chat_payload["url"] = str(meta["url"])
-            elif meta.get("path"):
-                chat_payload["path"] = str(meta["path"])
-            elif meta.get("command"):
-                chat_payload["path"] = str(meta["command"])
-            chat_label = f"💬  Chat: {entity.title or entity.entity_id}"
-            chat_desc = f"Open chat attached to {entity.entity_type}"
-            items.append(
-                (
-                    chat_label,
-                    chat_desc,
-                    lambda p=chat_payload: self._on_open_chat_from_workspace(p),
-                )
+    def _register_palette_providers(self) -> None:
+        """Register static and Workspace OS palette providers once at layout build."""
+        static_commands = [
+            PaletteCommand("◈  Workspace", "Entity canvas — workspaces, cards, resources", lambda: self._navigate("workspace"), section="Navigation"),
+            PaletteCommand("◈  Command Center", "Dashboard and quick actions", lambda: self._navigate("command_center"), section="Navigation"),
+            PaletteCommand("💬  Chat", "Generic chat (no entity attach)", lambda: self._navigate("chat", clear_chat_entity=True), section="Navigation"),
+            PaletteCommand("📝  Notes", "Search vault notes", lambda: self._navigate("notes"), section="Navigation"),
+            PaletteCommand("🧠  Memory", "Browse stored memories", lambda: self._navigate("memory"), section="Navigation"),
+            PaletteCommand("◈  World Model", "Browse World Model knowledge graph", lambda: self._navigate("world_explorer"), section="Navigation"),
+            PaletteCommand("⟷  Relationships", "Visualize node edges and dependencies", lambda: self._navigate("relationships"), section="Navigation"),
+            PaletteCommand("🔍  Dependencies", "Mutation log, goals, and dependency inspector", lambda: self._navigate("dependencies"), section="Navigation"),
+            PaletteCommand("⚙  System", "System monitor", lambda: self._navigate("system"), section="Navigation"),
+            PaletteCommand("🧩  Plugins", "Manage plugins", lambda: self._navigate("plugins"), section="Navigation"),
+            PaletteCommand("◈  Settings", "Open settings & themes", lambda: self._navigate("settings"), section="Navigation"),
+            PaletteCommand("⬇  Export Chat", "Save conversation to markdown", self._on_chat_export_request, section="Actions"),
+            PaletteCommand("↺  Regenerate", "Re-run the last AI prompt", self._on_chat_regenerate, section="Actions"),
+            PaletteCommand("⟨  Toggle Sidebar", "Collapse or expand sidebar", self._sidebar.toggle_collapse, section="Actions"),
+            PaletteCommand("⏱  Command History", "Browse recent commands (Ctrl+H)", self._history_drawer.toggle, section="Actions"),
+            PaletteCommand("?  Shortcuts", "Show keyboard shortcut overlay", self._shortcut_overlay.show, section="Actions"),
+            PaletteCommand(
+                "🤖  Supervised Agent Demo",
+                "Spawn a permission-gated agent run (visible in System view)",
+                lambda: self._on_command("agent: demo"),
+                section="Actions",
+            ),
+        ]
+        self._controller.register_palette_provider(
+            StaticPaletteProvider(commands=static_commands, name="App", priority=0)
+        )
+        self._controller.register_palette_provider(
+            WorkspaceOSPaletteProvider(
+                get_entities=lambda s: s.workspace_os.entities,
+                on_open_chat=self._on_open_chat_from_workspace,
+                on_launch=self._controller.publish_launch_resource,
+                name="Workspace",
+                priority=50,
             )
-            if not resource_type or not value:
-                continue
-            label = f"🚀  {entity.title}"
-            desc = f"Workspace OS {entity.entity_type} ({resource_type})"
-            payload = {
-                "resource_id": entity.entity_id,
-                "resource_type": resource_type,
-                "value": value,
-            }
-            items.append(
-                (label, desc, lambda p=payload: self._controller.publish_launch_resource(p))
-            )
-        return items
+        )
 
     def _maybe_show_shortcuts(self, event) -> None:
         focused = self.focus_get()
