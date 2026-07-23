@@ -35,6 +35,10 @@ _DEFAULT_KEEP_ALIVE = "10m"
 _LOW_MEMORY_KEEP_ALIVE = "2m"
 _CONNECT_TIMEOUT_S = 5.0
 _REQUEST_TIMEOUT_S = 300.0
+# Health probes must fail fast — a hung /api/tags must not stall the asyncio
+# loop (and therefore chat) for the full request timeout.
+_HEALTH_CONNECT_TIMEOUT_S = 1.0
+_HEALTH_TOTAL_TIMEOUT_S = 2.0
 _LOCAL_ASSISTANT_SYSTEM = (
     "You are a local desktop command assistant. Answer directly using only the "
     "context provided. Do not tell the user to open a web browser, search Google, "
@@ -62,6 +66,7 @@ class OllamaHttpService(OllamaServiceBase):
         self._active_request_id: str | None = None
         self._active_future: asyncio.Future[Any] | None = None
         self._health_task: asyncio.Future[Any] | None = None
+        self._last_status_key: tuple[bool, str] | None = None
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -220,6 +225,10 @@ class OllamaHttpService(OllamaServiceBase):
         return False
 
     async def _health_check(self) -> None:
+        health_timeout = aiohttp.ClientTimeout(
+            total=_HEALTH_TOTAL_TIMEOUT_S,
+            connect=_HEALTH_CONNECT_TIMEOUT_S,
+        )
         while True:
             online = False
             detail = ""
@@ -227,7 +236,10 @@ class OllamaHttpService(OllamaServiceBase):
                 session = self._session
                 if session is None:
                     break
-                async with session.get(f"{self._base_url}/api/tags") as resp:
+                async with session.get(
+                    f"{self._base_url}/api/tags",
+                    timeout=health_timeout,
+                ) as resp:
                     online = resp.status == 200
                     if not online:
                         detail = f"HTTP {resp.status}"
@@ -240,11 +252,14 @@ class OllamaHttpService(OllamaServiceBase):
             except Exception as exc:
                 detail = str(exc)
 
-            self._bus.publish(
-                OLLAMA_STATUS,
-                {"online": online, "detail": detail, "url": self._base_url},
-                source=self.name,
-            )
+            status_key = (online, detail)
+            if status_key != self._last_status_key:
+                self._last_status_key = status_key
+                self._bus.publish(
+                    OLLAMA_STATUS,
+                    {"online": online, "detail": detail, "url": self._base_url},
+                    source=self.name,
+                )
             try:
                 await asyncio.sleep(30)
             except asyncio.CancelledError:

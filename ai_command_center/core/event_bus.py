@@ -408,14 +408,18 @@ class EventBus:
     def _invoke_single_handler(self, event: Event, handler: Subscriber) -> None:
         topic = event.topic
         budget_ms = get_time_budget_ms(topic)
+        handler_name = getattr(handler, "__qualname__", None) or getattr(
+            handler, "__name__", repr(handler)
+        )
         start = time.perf_counter()
         try:
             handler(event)
         except Exception as exc:
             logger.exception(
-                "EventBus handler failed for topic=%s source=%s",
+                "EventBus handler failed for topic=%s source=%s handler=%s",
                 topic,
                 event.source,
+                handler_name,
             )
             if topic != BUS_HANDLER_ERROR:
                 try:
@@ -424,6 +428,7 @@ class EventBus:
                         {
                             "topic": topic,
                             "source": event.source,
+                            "handler": str(handler_name),
                             "error": str(exc),
                             "traceback": traceback.format_exc(limit=5),
                         },
@@ -442,8 +447,10 @@ class EventBus:
                     else logger.debug
                 )
                 log(
-                    "EventBus handler exceeded budget topic=%s elapsed_ms=%.2f budget_ms=%d",
+                    "EventBus handler exceeded budget topic=%s handler=%s "
+                    "elapsed_ms=%.2f budget_ms=%d",
                     topic,
+                    handler_name,
                     elapsed_ms,
                     budget_ms,
                 )
@@ -458,7 +465,10 @@ class EventBus:
                             "metric_type": "eventbus.handler.duration_ms",
                             "value": round(elapsed_ms, 3),
                             "unit": "ms",
-                            "tags": {"topic": topic},
+                            "tags": {
+                                "topic": topic,
+                                "handler": str(handler_name),
+                            },
                         },
                         source="event_bus",
                     )

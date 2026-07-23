@@ -10,7 +10,8 @@ pytest-timeout>=2.2
 
 # Static / binary analysis used by pre-commit hooks and dedicated tests.
 bandit>=1.7.5
-ruff>=0.8
+# 0.16 changed default rule selection and fails this tree; keep the 0.15 gate.
+ruff>=0.8,<0.16
 pefile>=2023.2.7          # PE machine-type validation (ARM64 vs x64)
 pyyaml>=6.0
 

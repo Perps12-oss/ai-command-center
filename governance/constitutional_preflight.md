@@ -1,71 +1,64 @@
 # CONSTITUTIONAL PRE-FLIGHT
 
 Task Description:
-ACC Blueprint Resolutions — Phase 9: ServiceRegistrySnapshot AppState projection.
-Adds an immutable AppState.service_registry: ServiceRegistrySnapshot field that
-consolidates the flat services tuple with per-service lifecycle history and a
-health trend. Wires the four canonical service lifecycle topics that BaseService
-publishes (SERVICE_STARTED, SERVICE_READY, SERVICE_STOPPED, SERVICE_ERROR) but
-that AppStateStore was silently dropping because only SERVICE_STATE_CHANGED was
-in APP_STATE_TOPICS. The existing services tuple is preserved for backward
-compatibility. No new topics, services, or DB changes.
+Stop EventBus/UI freezes when background publishers (Ollama health,
+system monitor) invoke UIQueue.enqueue. `event_generate` was called from
+non-Tk threads, blocking handlers for seconds (ollama.status ~6s,
+system.snapshot ~865ms). Make UIQueue wake Tk only from the UI thread;
+shorten Ollama health HTTP timeouts; skip unchanged status publishes;
+include handler names in budget logs for actionable observability.
+No new topics, services, or schema changes.
 
 Files Reviewed:
 - PROJECT_CONSTITUTION_V4.md
 - AGENTS.md
 - docs/ARCHITECTURE.md
-- docs/ARCHITECTURE_ENFORCEMENT.md
-- docs/architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md
-- ai_command_center/services/base.py
-- ai_command_center/core/contracts.py
-- ai_command_center/core/events/topics.py
-- ai_command_center/core/app_state.py (AppState, APP_STATE_TOPICS, _reduce_service_state, _DEFAULT_REDUCERS)
-- ai_command_center/domain/service_state.py
-- ai_command_center/domain/permission_check_snapshot.py (pattern reference)
+- docs/architecture/ASYNC_EVENTBUS_POLICY.md
+- ai_command_center/ui/ui_queue.py
+- ai_command_center/ui/shell/event_coordinator.py
+- ai_command_center/services/ollama_http_service.py
+- ai_command_center/core/event_bus.py
+- ai_command_center/core/events/dispatch_policy.py
 - governance/constitutional_preflight.md
 
 Authorities Reviewed:
 - Level 1: PROJECT_CONSTITUTION_V4.md
 - Level 2: AGENTS.md, docs/ARCHITECTURE_ENFORCEMENT.md
-- Level 3: docs/ARCHITECTURE.md, ai_command_center/core/contracts.py, ai_command_center/core/events/topics.py
+- Level 3: docs/ARCHITECTURE.md, docs/architecture/ASYNC_EVENTBUS_POLICY.md
 
 Protected Assets Impacted:
-- AppState Projection System (Tier A) — 1 new field added; populated by pure reducer only
-- EventBus Topic Registry (Tier A) — four canonical service topics already registered; only AppState subscription wiring changes
-- Service Lifecycle Framework (Tier B) — consumer side only; no BaseService changes
+- EventBus (Tier A) — observability log fields only; dispatch semantics unchanged
+- UI shell — UIQueue wake path + lighter ollama.status UI projection
+- OllamaHttpService — health-check timeout / publish coalescing only
 
 Sources of Truth Impacted:
-- AppState source of truth: ai_command_center/core/app_state.py (new field, topic wiring, reducer)
-- New domain module: ai_command_center/domain/service_registry_snapshot.py
-- Service operational state remains authoritative in BaseService._state
+- None. AppState remains SoT; UI still projects via UIQueue on the Tk thread.
 
 Architectural Invariants Impacted:
 - Invariant 1: Ownership Flow preserved
-- Invariant 2: UI Isolation — no UI changes
-- Invariant 4: AppState Governance — new field populated by reducer only
-- Invariant 8: Topic Governance — only canonical, already-registered topics consumed
+- Invariant 2: UI Isolation — strengthens Tk main-thread affinity
+- ASYNC_EVENTBUS_POLICY UIQueue invariant: handlers may enqueue; only Tk thread mutates widgets
 
 Contracts Impacted:
-- APP_STATE_TOPICS subscription list in ai_command_center/core/app_state.py (adds four existing topics)
-- New ServiceRegistrySnapshot dataclass contract in ai_command_center/domain/
+- UIQueue.enqueue: thread-safe put; Tk wake only on UI thread (fallback poll drains)
+- OLLAMA_STATUS publish cadence: skip when online/detail unchanged
+- Budget warning log includes handler qualname
 
 Gate Impact Assessment:
-- Adds SERVICE_STARTED, SERVICE_READY, SERVICE_STOPPED, SERVICE_ERROR to APP_STATE_TOPICS
-  (all four already registered in topics.py)
-- No new topic definitions, no contract versions, no schema changes
-- Existing services tuple preserved unchanged
-- No gate removals or bypasses permitted
+- No gate removals
+- Adds/extends UIQueue + ollama health tests
+- Existing constitution / UCGS / pytest remain in force
 
 Historical Gates Impacted:
-- verify_constitution.py
-- scripts/arch_lint.py --baseline tests/arch_lint_baseline.json
-- python3 -m pytest (full suite)
+- python3 -m pytest
 - python3 -m ruff check ai_command_center
+- scripts/verify_constitution.py
+- tools/ucgs_runner.py + ucgs_ci_gate.py
 
 Regression Risk:
-Low. Additive wiring and new snapshot. The four lifecycle topics were previously
-published but not consumed by AppStateStore; wiring them cannot break existing
-consumers. Existing services field behavior is preserved.
+Medium-low. Background UI updates may wait up to the poll interval (≤50ms)
+instead of virtual-event wake; chat streaming already budgets for ~50ms
+UI_STREAM_INTERVAL_MS. Eliminates cross-thread Tk hangs.
 
 Constitutional Status:
 
