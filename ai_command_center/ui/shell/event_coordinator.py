@@ -341,7 +341,16 @@ class EventCoordinatorMixin:
         self._ui_queue.enqueue(update)
 
     def _on_ollama_status(self, event: Event) -> None:
-        self._ui_queue.enqueue(self._queue_state_refresh)
+        """Project connectivity only — avoid a full AppState shell refresh."""
+        online = bool(event.payload.get("online"))
+        if online == getattr(self, "_last_ollama_online", None):
+            return
+        self._last_ollama_online = online
+
+        def update() -> None:
+            self._top.set_ollama_online(online)
+
+        self._ui_queue.enqueue(update)
 
     def _on_system_events(self, event: Event) -> None:
         self._ui_queue.enqueue(lambda: None)
