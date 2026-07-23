@@ -90,7 +90,8 @@ def test_default_mode_ignores_async_queue_dispatch_mode() -> None:
     assert bus.async_adapters is False
 
 
-def test_observability_metric_on_budget_exceed(monkeypatch) -> None:
+def test_observability_metric_skipped_on_budget_exceed(monkeypatch) -> None:
+    """Budget storms must not nest-publish observability.metric (freeze amplifier)."""
     monkeypatch.setenv("EVENTBUS_ASYNC_ADAPTERS", "0")
     bus = EventBus(debug_mode=True)
     metrics: list[dict] = []
@@ -102,7 +103,26 @@ def test_observability_metric_on_budget_exceed(monkeypatch) -> None:
     def slow(_event) -> None:
         time.sleep(0.02)
 
-    bus.subscribe(CHAT_CHUNK, slow)
+    # UI_COMMAND sync-critical budget is 5ms — this exceeds it.
+    from ai_command_center.core.events.topics import UI_COMMAND
+
+    bus.subscribe(UI_COMMAND, slow)
+    bus.publish(UI_COMMAND, {"text": "x"}, source="test")
+    assert not any(
+        m.get("metric_type") == "eventbus.handler.duration_ms" for m in metrics
+    )
+    bus.shutdown()
+
+
+def test_observability_metric_on_fast_handler_in_debug(monkeypatch) -> None:
+    monkeypatch.setenv("EVENTBUS_ASYNC_ADAPTERS", "0")
+    bus = EventBus(debug_mode=True)
+    metrics: list[dict] = []
+    bus.subscribe(
+        EVENT_OBSERVABILITY_METRIC,
+        lambda e: metrics.append(dict(e.payload)),
+    )
+    bus.subscribe(CHAT_CHUNK, lambda _e: None)
     bus.publish(CHAT_CHUNK, {"seq": 0}, source="test")
     assert any(m.get("metric_type") == "eventbus.handler.duration_ms" for m in metrics)
     bus.shutdown()

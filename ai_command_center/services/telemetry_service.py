@@ -9,6 +9,9 @@ Derived metrics: telemetry_summary.py (offline only).
 
 from __future__ import annotations
 
+import logging
+import queue
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -42,9 +45,12 @@ from ai_command_center.core.events.topics import (
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
 )
+from ai_command_center.core.events.handler_dispatch import HandlerDispatchMode
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
 from ai_command_center.domain.telemetry_event import TelemetryEvent
 from ai_command_center.services.base import BaseService
+
+logger = logging.getLogger(__name__)
 
 _HANDLER_SLOW_MS = 5.0
 
@@ -77,6 +83,11 @@ _BUS_TOPICS = (
     CONTEXT_TRIMMED,
 )
 
+# UI_NAVIGATE / palette are SYNC_CRITICAL. EventBus ignores ASYNC_QUEUE for that
+# tier (and EVENTBUS_ASYNC_ADAPTERS defaults off), so SQLite must be offloaded in
+# this service — otherwise every sidebar click blocks the Tk thread on disk I/O.
+_DEFERRED_TOPICS = frozenset({UI_NAVIGATE, UI_PALETTE_OPEN, UI_PALETTE_CLOSE})
+
 
 class TelemetryService(BaseService):
     """Dumb camera: bus event → normalized TelemetryEvent → EventBus + SQLite."""
@@ -88,19 +99,54 @@ class TelemetryService(BaseService):
         self._repo = repo
         self._session_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self._unsubscribers: list[Callable[[], None]] = []
+        self._defer_queue: queue.SimpleQueue[Event | None] = queue.SimpleQueue()
+        self._defer_thread: threading.Thread | None = None
 
     @property
     def session_id(self) -> str:
         return self._session_id
 
     def _on_load(self) -> None:
+        self._defer_thread = threading.Thread(
+            target=self._defer_worker,
+            name="telemetry-defer",
+            daemon=True,
+        )
+        self._defer_thread.start()
         for topic in _BUS_TOPICS:
-            self._unsubscribers.append(self._bus.subscribe(topic, self._on_bus_event))
+            # Prefer async_queue when adapters are enabled; SYNC_CRITICAL still
+            # forces inline invocation — _on_bus_event offloads deferred topics.
+            mode = (
+                HandlerDispatchMode.ASYNC_QUEUE
+                if topic in _DEFERRED_TOPICS
+                else HandlerDispatchMode.SYNC
+            )
+            self._unsubscribers.append(
+                self._bus.subscribe(topic, self._on_bus_event, dispatch_mode=mode)
+            )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
+        self._defer_queue.put(None)
+        thread = self._defer_thread
+        self._defer_thread = None
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=2.0)
+
+    def _defer_worker(self) -> None:
+        while True:
+            event = self._defer_queue.get()
+            if event is None:
+                break
+            try:
+                self._process_bus_event(event, nest_publish=False)
+            except Exception:
+                logger.exception(
+                    "Deferred telemetry record failed topic=%s",
+                    getattr(event, "topic", "?"),
+                )
 
     def _record(self, event: str, payload: dict[str, Any], *, timestamp: float | None = None) -> None:
         body = {"session_id": self._session_id, **payload, **self._extract_scope(payload)}
@@ -128,13 +174,35 @@ class TelemetryService(BaseService):
         return scope
 
     def _on_bus_event(self, event: Event) -> None:
+        if event.topic in _DEFERRED_TOPICS:
+            # Must return immediately — publisher is often the Tk UI thread.
+            self._defer_queue.put(event)
+            return
         started = time.perf_counter()
+        self._process_bus_event(event, nest_publish=True)
+        handler_ms = (time.perf_counter() - started) * 1000.0
+        if handler_ms >= _HANDLER_SLOW_MS:
+            self._record(
+                "telemetry.handler_time",
+                {
+                    "topic": event.topic,
+                    "latency_ms": round(handler_ms, 2),
+                    "bus_source": event.source,
+                },
+                timestamp=event.timestamp,
+            )
+
+    def _process_bus_event(self, event: Event, *, nest_publish: bool) -> None:
         payload = {
             "bus_source": event.source,
             "bus_event_id": event.event_id,
             **dict(event.payload),
         }
         self._record(event.topic, payload, timestamp=event.timestamp)
+        # Nested TELEMETRY_EVENT from UI_NAVIGATE on the UI thread contributed to
+        # click freezes; SQLite append-only log is enough for navigate audit.
+        if not nest_publish:
+            return
         normalized = TelemetryEvent(
             event_type=event.topic,
             payload=tuple({**payload, **self._extract_scope(payload)}.items()),
@@ -150,14 +218,3 @@ class TelemetryService(BaseService):
             },
             source=self.name,
         )
-        handler_ms = (time.perf_counter() - started) * 1000.0
-        if handler_ms >= _HANDLER_SLOW_MS:
-            self._record(
-                "telemetry.handler_time",
-                {
-                    "topic": event.topic,
-                    "latency_ms": round(handler_ms, 2),
-                    "bus_source": event.source,
-                },
-                timestamp=event.timestamp,
-            )
