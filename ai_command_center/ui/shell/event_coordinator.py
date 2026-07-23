@@ -56,12 +56,23 @@ class EventCoordinatorMixin:
         )
 
     def _on_ui_navigate(self, event: Event) -> None:
+        # UI-originated navigations already applied the view via
+        # ViewManager._navigate (which publishes UI_NAVIGATE for telemetry /
+        # authority). Re-entering _navigate here republishes the same topic
+        # and starves the Tk main loop — freeze after every page change.
+        if event.source == "ui":
+            return
+
         view = str(event.payload.get("view", "command_center")).lower()
         if view not in VIEW_IDS:
             view = "command_center"
+        clear_chat = bool(event.payload.get("clear_chat_entity")) or view == "chat"
 
         def update() -> None:
-            self._navigate(view, clear_chat_entity=(view == "chat"))
+            if clear_chat:
+                self._controller.publish_clear_chat_entity()
+            # Apply only — do not call _navigate (would republish UI_NAVIGATE).
+            self._show_view(view)
 
         self._ui_queue.enqueue(update)
 
@@ -330,7 +341,16 @@ class EventCoordinatorMixin:
         self._ui_queue.enqueue(update)
 
     def _on_ollama_status(self, event: Event) -> None:
-        self._ui_queue.enqueue(self._queue_state_refresh)
+        """Project connectivity only — avoid a full AppState shell refresh."""
+        online = bool(event.payload.get("online"))
+        if online == getattr(self, "_last_ollama_online", None):
+            return
+        self._last_ollama_online = online
+
+        def update() -> None:
+            self._top.set_ollama_online(online)
+
+        self._ui_queue.enqueue(update)
 
     def _on_system_events(self, event: Event) -> None:
         self._ui_queue.enqueue(lambda: None)

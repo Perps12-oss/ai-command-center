@@ -34,6 +34,8 @@ from ai_command_center.services.base import BaseService
 _DEFAULT_BASE_URL = "https://api.openai.com/v1"
 _CONNECT_TIMEOUT_S = 10.0
 _REQUEST_TIMEOUT_S = 300.0
+_HEALTH_CONNECT_TIMEOUT_S = 1.0
+_HEALTH_TOTAL_TIMEOUT_S = 2.0
 _LOCAL_ASSISTANT_SYSTEM = (
     "You are a desktop command assistant. Answer directly using only the "
     "context provided. Do not tell the user to open a web browser or visit "
@@ -61,6 +63,7 @@ class OpenAIHttpService(BaseService):
         self._active_request_id: str | None = None
         self._active_future: asyncio.Future[Any] | None = None
         self._health_task: asyncio.Future[Any] | None = None
+        self._last_status_key: tuple[bool, bool, str] | None = None
         self._unsubscribers: list[Callable[[], None]] = []
 
     def _on_load(self) -> None:
@@ -204,6 +207,10 @@ class OpenAIHttpService(BaseService):
         return aiohttp.ClientSession(timeout=timeout)
 
     async def _health_check(self) -> None:
+        health_timeout = aiohttp.ClientTimeout(
+            total=_HEALTH_TOTAL_TIMEOUT_S,
+            connect=_HEALTH_CONNECT_TIMEOUT_S,
+        )
         while True:
             online = False
             detail = ""
@@ -218,6 +225,7 @@ class OpenAIHttpService(BaseService):
                     async with session.get(
                         f"{self._base_url}/models",
                         headers=self._auth_headers(),
+                        timeout=health_timeout,
                     ) as resp:
                         online = resp.status == 200
                         if not online:
@@ -231,16 +239,20 @@ class OpenAIHttpService(BaseService):
                 except Exception as exc:
                     detail = str(exc)
 
-            self._bus.publish(
-                OPENAI_STATUS,
-                {
-                    "online": online and configured,
-                    "configured": configured,
-                    "detail": detail,
-                    "url": self._base_url,
-                },
-                source=self.name,
-            )
+            status_online = online and configured
+            status_key = (status_online, configured, detail)
+            if status_key != self._last_status_key:
+                self._last_status_key = status_key
+                self._bus.publish(
+                    OPENAI_STATUS,
+                    {
+                        "online": status_online,
+                        "configured": configured,
+                        "detail": detail,
+                        "url": self._base_url,
+                    },
+                    source=self.name,
+                )
             try:
                 await asyncio.sleep(30)
             except asyncio.CancelledError:

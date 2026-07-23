@@ -225,8 +225,13 @@ class _Sparkline(ctk.CTkFrame):
         self._peak_lbl = ctk.CTkLabel(hdr, text="", font=T.FONT_SMALL, text_color=T.TEXT_MUTED, anchor="e")
         self._peak_lbl.pack(side="right")
 
-        self._canvas = ctk.CTkCanvas(self, height=self._H, bg=T.BG_DEEP, highlightthickness=0)
-        self._canvas.pack(fill="x", pady=(2, 0))
+        # Must not use self._canvas — that name shadows CTkFrame's internal
+        # drawing surface and freezes/errors on resize (same class of bug as
+        # GraphCanvas → _tk_canvas).
+        self._spark_canvas = ctk.CTkCanvas(
+            self, height=self._H, bg=T.BG_DEEP, highlightthickness=0
+        )
+        self._spark_canvas.pack(fill="x", pady=(2, 0))
 
     def push(self, value: float) -> None:
         self._history.append(max(0.0, min(100.0, value)))
@@ -238,7 +243,7 @@ class _Sparkline(ctk.CTkFrame):
     def _draw(self, no_color_updates: bool = False, **kwargs) -> None:
         if not hasattr(self, "_history"):
             return
-        c = self._canvas
+        c = self._spark_canvas
         c.delete("all")
         w = c.winfo_width() or 400
         h = self._H

@@ -79,6 +79,24 @@ def _wait_for_memory_rows(
         time.sleep(0.05)
     return list(db.execute("SELECT workspace_id FROM memory_nodes").fetchall())
 
+
+def _wait_for_authority_decisions(
+    repo: TelemetryRepository,
+    session_id: str,
+    *,
+    timeout: float = 8.0,
+) -> list:
+    """Poll telemetry until execution.authority.decision rows appear."""
+    deadline = time.monotonic() + timeout
+    rows = []
+    while time.monotonic() < deadline:
+        rows = repo.fetch_session(session_id)
+        decisions = [r for r in rows if r.event_type == EXECUTION_AUTHORITY_DECISION]
+        if decisions:
+            return list(rows)
+        time.sleep(0.05)
+    return list(repo.fetch_session(session_id))
+
 # Production ui.command publishers — must merge workspace scope (not bypass UIController helper).
 _UI_COMMAND_PUBLISH_ALLOWLIST = frozenset(
     {
@@ -384,7 +402,7 @@ class ExitGateIntegrationTests(unittest.TestCase):
                 bus.publish(UI_COMMAND, cmd, source="tests")
             _drain_bus(bus)
 
-            rows = repo.fetch_session(telemetry.session_id)
+            rows = _wait_for_authority_decisions(repo, telemetry.session_id)
             row_dicts = [
                 {
                     "event": row.event_type,
@@ -409,7 +427,10 @@ class ExitGateIntegrationTests(unittest.TestCase):
                 for r in rows
                 if r.event_type == EXECUTION_AUTHORITY_DECISION
             ]
-            self.assertTrue(decisions)
+            self.assertTrue(
+                decisions,
+                msg="expected execution.authority.decision telemetry after UI_COMMAND",
+            )
             scoped_decisions = sum(
                 1
                 for p in decisions
