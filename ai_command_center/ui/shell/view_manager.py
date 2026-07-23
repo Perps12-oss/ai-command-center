@@ -409,11 +409,29 @@ class ViewManagerMixin:
         self._navigate(view_id)
 
     def _navigate(self, view_id: str, *, clear_chat_entity: bool = False) -> None:
+        """Show a view and publish UI_NAVIGATE once — never re-enter.
+
+        Re-entrancy (bus handler → _navigate → publish → handler) previously
+        froze the shell after a couple of sidebar clicks. Same-view calls are
+        no-ops so chatter cannot storm the bus.
+        """
+        if getattr(self, "_navigate_reentrant", False):
+            return
         view_id = self._policy_resolve_view(view_id)
-        if view_id == "chat" and clear_chat_entity:
-            self._controller.publish_clear_chat_entity()
-        self._show_view(view_id)
-        self._controller.publish_navigate(view_id)
+        if (
+            view_id == getattr(self, "_current_view", None)
+            and view_id in getattr(self, "_views", {})
+            and not clear_chat_entity
+        ):
+            return
+        self._navigate_reentrant = True
+        try:
+            if view_id == "chat" and clear_chat_entity:
+                self._controller.publish_clear_chat_entity()
+            self._show_view(view_id)
+            self._controller.publish_navigate(view_id)
+        finally:
+            self._navigate_reentrant = False
 
     def _on_note_select(self, path: str, title: str) -> None:
         self._controller.publish_note_select(path)

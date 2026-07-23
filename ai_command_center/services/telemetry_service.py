@@ -42,6 +42,7 @@ from ai_command_center.core.events.topics import (
     UI_PALETTE_CLOSE,
     UI_PALETTE_OPEN,
 )
+from ai_command_center.core.events.handler_dispatch import HandlerDispatchMode
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
 from ai_command_center.domain.telemetry_event import TelemetryEvent
 from ai_command_center.services.base import BaseService
@@ -77,6 +78,11 @@ _BUS_TOPICS = (
     CONTEXT_TRIMMED,
 )
 
+# UI_NAVIGATE is SYNC_CRITICAL on the bus, but Telemetry's SQLite write must not
+# stall the UI thread. Prefer async_queue when EVENTBUS_ASYNC_ADAPTERS=1; when
+# adapters are off, still avoid nested TELEMETRY_EVENT publish for navigate.
+_ASYNC_PREFERRED_TOPICS = frozenset({UI_NAVIGATE, UI_PALETTE_OPEN, UI_PALETTE_CLOSE})
+
 
 class TelemetryService(BaseService):
     """Dumb camera: bus event → normalized TelemetryEvent → EventBus + SQLite."""
@@ -95,7 +101,14 @@ class TelemetryService(BaseService):
 
     def _on_load(self) -> None:
         for topic in _BUS_TOPICS:
-            self._unsubscribers.append(self._bus.subscribe(topic, self._on_bus_event))
+            mode = (
+                HandlerDispatchMode.ASYNC_QUEUE
+                if topic in _ASYNC_PREFERRED_TOPICS
+                else HandlerDispatchMode.SYNC
+            )
+            self._unsubscribers.append(
+                self._bus.subscribe(topic, self._on_bus_event, dispatch_mode=mode)
+            )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -135,23 +148,26 @@ class TelemetryService(BaseService):
             **dict(event.payload),
         }
         self._record(event.topic, payload, timestamp=event.timestamp)
-        normalized = TelemetryEvent(
-            event_type=event.topic,
-            payload=tuple({**payload, **self._extract_scope(payload)}.items()),
-            emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
-        )
-        self._bus.publish(
-            TELEMETRY_EVENT,
-            {
-                "event_type": normalized.event_type,
-                "payload": dict(normalized.payload),
-                "emitted_at": normalized.timestamp,
-                "session_id": self._session_id,
-            },
-            source=self.name,
-        )
+        # Nested TELEMETRY_EVENT from UI_NAVIGATE on the UI thread contributed to
+        # click freezes; SQLite append-only log is enough for navigate audit.
+        if event.topic not in _ASYNC_PREFERRED_TOPICS:
+            normalized = TelemetryEvent(
+                event_type=event.topic,
+                payload=tuple({**payload, **self._extract_scope(payload)}.items()),
+                emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
+            )
+            self._bus.publish(
+                TELEMETRY_EVENT,
+                {
+                    "event_type": normalized.event_type,
+                    "payload": dict(normalized.payload),
+                    "emitted_at": normalized.timestamp,
+                    "session_id": self._session_id,
+                },
+                source=self.name,
+            )
         handler_ms = (time.perf_counter() - started) * 1000.0
-        if handler_ms >= _HANDLER_SLOW_MS:
+        if handler_ms >= _HANDLER_SLOW_MS and event.topic not in _ASYNC_PREFERRED_TOPICS:
             self._record(
                 "telemetry.handler_time",
                 {

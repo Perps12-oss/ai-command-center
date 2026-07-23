@@ -454,9 +454,14 @@ class EventBus:
                     elapsed_ms,
                     budget_ms,
                 )
+            # Never nest-publish observability metrics from a budget exceedance.
+            # During ui.navigate storms that sync publish amplified load on the
+            # same thread (ObservabilityService + Telemetry) and made freezes worse.
+            # Debug mode may still emit metrics for non-exceedance samples only.
             if (
                 topic not in {EVENT_OBSERVABILITY_METRIC, BUS_HANDLER_ERROR}
-                and (self._debug_mode or elapsed_ms > budget_ms)
+                and self._debug_mode
+                and elapsed_ms <= budget_ms
             ):
                 try:
                     self.publish(
