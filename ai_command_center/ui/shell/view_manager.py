@@ -429,7 +429,18 @@ class ViewManagerMixin:
             if view_id == "chat" and clear_chat_entity:
                 self._controller.publish_clear_chat_entity()
             self._show_view(view_id)
-            self._controller.publish_navigate(view_id)
+            # Publish after the current Tk turn so SYNC_CRITICAL bus handlers
+            # never nest inside pack/on_show/_apply_state on the click stack.
+            target = view_id
+
+            def _publish_navigate() -> None:
+                self._controller.publish_navigate(target)
+
+            after = getattr(self, "after", None)
+            if callable(after):
+                after(0, _publish_navigate)
+            else:
+                _publish_navigate()
         finally:
             self._navigate_reentrant = False
 

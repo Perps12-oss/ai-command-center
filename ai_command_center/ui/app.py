@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import deque
 
 import customtkinter as ctk
@@ -18,7 +19,11 @@ from ai_command_center.ui.shell.state_applier import StateApplierMixin
 from ai_command_center.ui.shell.view_manager import VIEW_IDS, ViewManagerMixin
 from ai_command_center.ui.ui_queue import UIQueue
 
+logger = logging.getLogger(__name__)
+
 # Gate-visible topic literals for Phase 5A verification: tool.result, model.selected, memory.stored.
+# Bump when shipping UI freeze remediation so runtime logs prove the build.
+ACC_UI_FREEZE_FIX = "v3"
 
 
 class CommandPaletteApp(
@@ -88,6 +93,14 @@ class CommandPaletteApp(
             alpha=snap.settings.window_alpha,
         )
         self._visible = False
+        # WARNING so default console filters still show it — used to verify the
+        # running process includes navigate/Tcl/telemetry freeze fixes.
+        logger.warning(
+            "ACC_UI_RUNTIME freeze_fix=%s handler_budget_includes_name=1 "
+            "navigate_reentry_guard=1 uiqueue_threadsafe=1 "
+            "telemetry_navigate_deferred=1",
+            ACC_UI_FREEZE_FIX,
+        )
 
     def _wire_workspace_policy_events(self) -> None:
         """Route deferred commands back to workspace (Phase 6c consumer policy)."""

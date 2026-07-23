@@ -59,11 +59,28 @@ def test_same_view_navigate_is_noop() -> None:
 
 def test_navigate_publishes_once_even_if_bus_echoes() -> None:
     shell = _GuardShell()
+    # Headless shell has no Tk after(); publish runs inline (production uses after(0)).
     shell._navigate("memory")
     assert shell.show_calls == ["memory"]
     assert shell.publish_calls == ["memory"]
     # Echo with source=ui must not re-enter.
     assert shell.show_calls == ["memory"]
+
+
+def test_navigate_defers_publish_via_after_when_available() -> None:
+    shell = _GuardShell()
+    scheduled: list = []
+
+    def fake_after(_ms, callback):
+        scheduled.append(callback)
+
+    shell.after = fake_after  # type: ignore[attr-defined]
+    shell._navigate("memory")
+    assert shell.show_calls == ["memory"]
+    assert shell.publish_calls == []
+    assert len(scheduled) == 1
+    scheduled[0]()
+    assert shell.publish_calls == ["memory"]
 
 
 def test_reentrant_navigate_is_ignored() -> None:

@@ -9,6 +9,9 @@ Derived metrics: telemetry_summary.py (offline only).
 
 from __future__ import annotations
 
+import logging
+import queue
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -47,6 +50,8 @@ from ai_command_center.repositories.telemetry_repository import TelemetryReposit
 from ai_command_center.domain.telemetry_event import TelemetryEvent
 from ai_command_center.services.base import BaseService
 
+logger = logging.getLogger(__name__)
+
 _HANDLER_SLOW_MS = 5.0
 
 # Explicit topic subscriptions only — no wildcard taps in production.
@@ -78,10 +83,10 @@ _BUS_TOPICS = (
     CONTEXT_TRIMMED,
 )
 
-# UI_NAVIGATE is SYNC_CRITICAL on the bus, but Telemetry's SQLite write must not
-# stall the UI thread. Prefer async_queue when EVENTBUS_ASYNC_ADAPTERS=1; when
-# adapters are off, still avoid nested TELEMETRY_EVENT publish for navigate.
-_ASYNC_PREFERRED_TOPICS = frozenset({UI_NAVIGATE, UI_PALETTE_OPEN, UI_PALETTE_CLOSE})
+# UI_NAVIGATE / palette are SYNC_CRITICAL. EventBus ignores ASYNC_QUEUE for that
+# tier (and EVENTBUS_ASYNC_ADAPTERS defaults off), so SQLite must be offloaded in
+# this service — otherwise every sidebar click blocks the Tk thread on disk I/O.
+_DEFERRED_TOPICS = frozenset({UI_NAVIGATE, UI_PALETTE_OPEN, UI_PALETTE_CLOSE})
 
 
 class TelemetryService(BaseService):
@@ -94,16 +99,26 @@ class TelemetryService(BaseService):
         self._repo = repo
         self._session_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         self._unsubscribers: list[Callable[[], None]] = []
+        self._defer_queue: queue.SimpleQueue[Event | None] = queue.SimpleQueue()
+        self._defer_thread: threading.Thread | None = None
 
     @property
     def session_id(self) -> str:
         return self._session_id
 
     def _on_load(self) -> None:
+        self._defer_thread = threading.Thread(
+            target=self._defer_worker,
+            name="telemetry-defer",
+            daemon=True,
+        )
+        self._defer_thread.start()
         for topic in _BUS_TOPICS:
+            # Prefer async_queue when adapters are enabled; SYNC_CRITICAL still
+            # forces inline invocation — _on_bus_event offloads deferred topics.
             mode = (
                 HandlerDispatchMode.ASYNC_QUEUE
-                if topic in _ASYNC_PREFERRED_TOPICS
+                if topic in _DEFERRED_TOPICS
                 else HandlerDispatchMode.SYNC
             )
             self._unsubscribers.append(
@@ -114,6 +129,24 @@ class TelemetryService(BaseService):
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
+        self._defer_queue.put(None)
+        thread = self._defer_thread
+        self._defer_thread = None
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=2.0)
+
+    def _defer_worker(self) -> None:
+        while True:
+            event = self._defer_queue.get()
+            if event is None:
+                break
+            try:
+                self._process_bus_event(event, nest_publish=False)
+            except Exception:
+                logger.exception(
+                    "Deferred telemetry record failed topic=%s",
+                    getattr(event, "topic", "?"),
+                )
 
     def _record(self, event: str, payload: dict[str, Any], *, timestamp: float | None = None) -> None:
         body = {"session_id": self._session_id, **payload, **self._extract_scope(payload)}
@@ -141,33 +174,14 @@ class TelemetryService(BaseService):
         return scope
 
     def _on_bus_event(self, event: Event) -> None:
+        if event.topic in _DEFERRED_TOPICS:
+            # Must return immediately — publisher is often the Tk UI thread.
+            self._defer_queue.put(event)
+            return
         started = time.perf_counter()
-        payload = {
-            "bus_source": event.source,
-            "bus_event_id": event.event_id,
-            **dict(event.payload),
-        }
-        self._record(event.topic, payload, timestamp=event.timestamp)
-        # Nested TELEMETRY_EVENT from UI_NAVIGATE on the UI thread contributed to
-        # click freezes; SQLite append-only log is enough for navigate audit.
-        if event.topic not in _ASYNC_PREFERRED_TOPICS:
-            normalized = TelemetryEvent(
-                event_type=event.topic,
-                payload=tuple({**payload, **self._extract_scope(payload)}.items()),
-                emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
-            )
-            self._bus.publish(
-                TELEMETRY_EVENT,
-                {
-                    "event_type": normalized.event_type,
-                    "payload": dict(normalized.payload),
-                    "emitted_at": normalized.timestamp,
-                    "session_id": self._session_id,
-                },
-                source=self.name,
-            )
+        self._process_bus_event(event, nest_publish=True)
         handler_ms = (time.perf_counter() - started) * 1000.0
-        if handler_ms >= _HANDLER_SLOW_MS and event.topic not in _ASYNC_PREFERRED_TOPICS:
+        if handler_ms >= _HANDLER_SLOW_MS:
             self._record(
                 "telemetry.handler_time",
                 {
@@ -177,3 +191,30 @@ class TelemetryService(BaseService):
                 },
                 timestamp=event.timestamp,
             )
+
+    def _process_bus_event(self, event: Event, *, nest_publish: bool) -> None:
+        payload = {
+            "bus_source": event.source,
+            "bus_event_id": event.event_id,
+            **dict(event.payload),
+        }
+        self._record(event.topic, payload, timestamp=event.timestamp)
+        # Nested TELEMETRY_EVENT from UI_NAVIGATE on the UI thread contributed to
+        # click freezes; SQLite append-only log is enough for navigate audit.
+        if not nest_publish:
+            return
+        normalized = TelemetryEvent(
+            event_type=event.topic,
+            payload=tuple({**payload, **self._extract_scope(payload)}.items()),
+            emitted_at=datetime.fromtimestamp(event.timestamp, tz=timezone.utc),
+        )
+        self._bus.publish(
+            TELEMETRY_EVENT,
+            {
+                "event_type": normalized.event_type,
+                "payload": dict(normalized.payload),
+                "emitted_at": normalized.timestamp,
+                "session_id": self._session_id,
+            },
+            source=self.name,
+        )
