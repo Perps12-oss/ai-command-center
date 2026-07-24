@@ -125,12 +125,27 @@ class OpenAIHttpService(BaseService):
         asyncio.get_running_loop().stop()
 
     def _on_settings_snapshot(self, event: Event) -> None:
-        self._active_provider = str(event.payload.get("provider", "ollama")).strip() or "ollama"
+        provider = str(event.payload.get("provider", "ollama")).strip() or "ollama"
         base = str(event.payload.get("openai_base_url", self._base_url)).strip()
         if base:
-            self._base_url = base.rstrip("/")
+            base = base.rstrip("/")
         stored_key = str(event.payload.get("openai_api_key", ""))
-        self._api_key = resolve_openai_api_key(stored_key)
+        # Theme/hotkey/etc. snapshots must not re-enter keyring or rewrite locals.
+        if (
+            provider == self._active_provider
+            and (not base or base == self._base_url)
+            and stored_key == getattr(self, "_last_stored_api_key", object())
+        ):
+            return
+        self._active_provider = provider
+        if base:
+            self._base_url = base
+        if stored_key != getattr(self, "_last_stored_api_key", object()):
+            self._api_key = resolve_openai_api_key(stored_key)
+            self._last_stored_api_key = stored_key
+        elif not hasattr(self, "_last_stored_api_key"):
+            self._api_key = resolve_openai_api_key(stored_key)
+            self._last_stored_api_key = stored_key
 
     def _on_cancel_request(self, event: Event) -> None:
         rid = event.payload.get("request_id")

@@ -497,6 +497,12 @@ class EventBus:
             elapsed_ms = (time.perf_counter() - start) * 1000.0
             self._handler_duration_total_ms += elapsed_ms
             self._handler_duration_count += 1
+            try:
+                from ai_command_center.core.perf.metrics import get_perf_metrics
+
+                get_perf_metrics().record(f"eventbus.handler.{topic}", elapsed_ms)
+            except Exception:
+                pass
             if elapsed_ms > budget_ms:
                 log = (
                     logger.warning

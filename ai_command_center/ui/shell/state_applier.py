@@ -53,13 +53,70 @@ class StateApplierMixin:
             on_result=on_result,
         )
 
+    def _stream_fingerprint(self, snap) -> tuple:
+        """Non-stream fields that force a full shell projection."""
+        return (
+            int(getattr(snap, "settings_version", 0)),
+            str(snap.phase),
+            str(snap.chat_status),
+            str(snap.active_chat_request_id or ""),
+            str(snap.last_chat_request_id or ""),
+            int(getattr(snap.inspector, "revision", 0)),
+            int(getattr(snap.inspector, "navigate_revision", 0)),
+            int(getattr(snap, "chat_history_revision", 0)),
+            bool(snap.system_snapshot.ollama_online),
+            str(snap.settings.provider),
+            str(snap.settings.default_model),
+        )
+
+    def _try_apply_stream_only(self, snap) -> bool:
+        """Update only the live assistant stream — skip full shell rebuild."""
+        if not snap.chat_streaming:
+            return False
+        if snap.active_chat_request_id != getattr(self, "_last_started_request_id", None):
+            return False
+        fp = self._stream_fingerprint(snap)
+        if fp != getattr(self, "_last_stream_fingerprint", None):
+            return False
+        chat = self._chat_view()
+        if chat is None:
+            return False
+        buffer_len = len(snap.chat_stream_buffer)
+        if buffer_len > self._last_stream_buffer_len:
+            chat.append_chunk(snap.chat_stream_buffer[self._last_stream_buffer_len :])
+            self._last_stream_buffer_len = buffer_len
+        if hasattr(chat, "update_chat_execution_status"):
+            chat.update_chat_execution_status(
+                "streaming",
+                snap.settings.provider,
+                snap.settings.default_model,
+            )
+        return True
+
     def _apply_state(self) -> None:
         """Project the latest AppState into the shell. Re-enqueues if state changed while applying."""
+        import time
+
+        started = time.perf_counter()
         self._state_refresh_enqueued = False
         self._state_refresh_pending = False
 
         current_view = getattr(self, "_current_view", "")
         snap = self._controller.snapshot()
+        if self._try_apply_stream_only(snap):
+            try:
+                from ai_command_center.core.perf.metrics import get_perf_metrics
+
+                get_perf_metrics().record(
+                    "ui.apply_state.stream",
+                    (time.perf_counter() - started) * 1000.0,
+                )
+            except Exception:
+                pass
+            if self._state_refresh_pending:
+                self._queue_state_refresh()
+            return
+
         diag = getattr(snap, "execution_inspector", None)
         self._maybe_show_permission_dialog(snap)
         extra = dict(snap.system_snapshot.extra)
@@ -319,6 +376,16 @@ class StateApplierMixin:
         self._apply_workflow_graph(snap)
         self._apply_automation_workspace(snap)
 
+        self._last_stream_fingerprint = self._stream_fingerprint(snap)
+        try:
+            from ai_command_center.core.perf.metrics import get_perf_metrics
+
+            get_perf_metrics().record(
+                "ui.apply_state",
+                (time.perf_counter() - started) * 1000.0,
+            )
+        except Exception:
+            pass
         if self._state_refresh_pending:
             self._queue_state_refresh()
 

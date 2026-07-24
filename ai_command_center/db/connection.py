@@ -30,6 +30,13 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 5000")
+    # WAL: readers do not block writers; critical for UI-adjacent telemetry.
+    if str(path) not in {":memory:", "file::memory:?cache=shared"}:
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+            conn.execute("PRAGMA synchronous = NORMAL")
+        except sqlite3.Error:
+            pass
     # Eagerly register the shared lock used by repositories.
     connection_lock(conn)
     return conn

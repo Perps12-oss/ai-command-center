@@ -1,47 +1,30 @@
-# CONSTITUTIONAL PRE-FLIGHT
+# Constitutional Pre-Flight — Performance Architecture
 
-Task Description:
-Hard-stop residual navigate freezes after 2 sidebar clicks. User logs show
-dozens of ui.navigate budget hits then ollama.status ~17s — either an old
-binary without #106, or remaining re-entry / nested bus publish amplification.
-Add navigate reentrancy + same-view short-circuit; remove redundant
-ollama.status UI subscription (SYSTEM_SNAPSHOT already carries online);
-stop nested EVENT_OBSERVABILITY_METRIC publishes from budget exceedances
-(storm amplifier); keep Telemetry off the critical path for navigate.
+**Branch:** `cursor/perf-architecture-freeze-f2e9`  
+**Authority:** PROJECT_CONSTITUTION_V4.md
 
-Files Reviewed:
-- PROJECT_CONSTITUTION_V4.md
-- AGENTS.md
-- docs/architecture/ASYNC_EVENTBUS_POLICY.md
-- ai_command_center/ui/shell/view_manager.py
-- ai_command_center/ui/shell/event_coordinator.py
-- ai_command_center/core/event_bus.py
-- ai_command_center/services/telemetry_service.py
-- ai_command_center/services/system_monitor_service.py
+## Intent
 
-Authorities Reviewed:
-- Level 1: PROJECT_CONSTITUTION_V4.md
-- Level 2: AGENTS.md
-- Level 3: ASYNC_EVENTBUS_POLICY.md, topics.py
+Eliminate UI freezes and sync bottlenecks without changing user-visible behaviour or APIs.
 
-Protected Assets Impacted:
-- EventBus observability side-publish only (no topic contract change)
-- UI shell navigate apply path
-- Telemetry recording path for navigate (optional defer)
+## Invariants checked
 
-Sources of Truth Impacted:
-- None. ollama_online remains via SYSTEM_SNAPSHOT → AppState.
+| Invariant | Status |
+|---|---|
+| UI → AppState → EventBus → Services → Repositories → Storage | Preserved |
+| UI isolation (no direct storage/Ollama/tools) | Preserved; Performance Inspector reads AppState/EventBus metrics only |
+| No service-to-service calls | Preserved |
+| Host supremacy | N/A |
+| Contracts / topics | No topic removals; behaviour-preserving handlers |
 
-Architectural Invariants Impacted:
-- Invariant 1 / 2 preserved; strengthens Tk thread affinity
+## Behaviour preservation
 
-Contracts Impacted:
-- Behavioral: _navigate is non-reentrant and no-ops when already on view
-- Budget exceedance no longer sync-publishes EVENT_OBSERVABILITY_METRIC
+- Same EventBus topics and payloads
+- Same navigation outcomes (one click → one navigate → one render)
+- Same settings semantics (one logical change → one snapshot)
+- Telemetry still persisted (async batch)
+- Inspectors show the same data (dirty update, not full wipe when unchanged)
 
-Gate Impact Assessment:
-- No gate removals; add navigate reentrancy tests
+## Risk
 
-Constitutional Status:
-
-APPROVED
+Medium — AppState reducer indexing and identity-based dirty detection must not drop updates. Covered by existing AppState projection tests + new perf benchmarks.

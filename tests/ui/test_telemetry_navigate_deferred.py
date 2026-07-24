@@ -21,15 +21,15 @@ class _SlowRepo(TelemetryRepository):
         self._gate = gate
         self.inserts = 0
 
-    def insert(self, event: str, payload, *, timestamp: str | None = None) -> None:  # type: ignore[override]
+    def insert_many(self, rows) -> None:  # type: ignore[override]
         # Block until the test releases — sync path would freeze the publisher.
         self._gate.wait(timeout=2.0)
-        self.inserts += 1
-        return super().insert(event, payload, timestamp=timestamp)
+        self.inserts += len(rows)
+        return super().insert_many(rows)
 
 
 def test_ui_navigate_handler_returns_before_sqlite() -> None:
-    conn = sqlite3.connect(":memory:")
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     DatabaseBootstrapRepository().apply(conn)
     gate = threading.Event()

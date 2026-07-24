@@ -84,22 +84,29 @@ class SettingsService(BaseService):
         self.set(str(key), value)
 
     def set(self, key: str, value: Any) -> None:
+        # One logical change → one settings.snapshot (core publishes it).
+        # Do not call _publish_snapshot again — that previously doubled fan-out
+        # across 9 SYNC_CRITICAL subscribers (~190ms OpenAI handler).
         if key == "openai_api_key":
             value = store_openai_api_key(str(value))
         if key == "provider":
             provider = str(value).strip() or "ollama"
             model = default_model_for_provider(provider)
-            self._core_settings.set("provider", provider)
-            self._core_settings.set("default_model", model)
-            self._core_settings.set("summarize_model", model)
+            self._core_settings.set_many(
+                {
+                    "provider": provider,
+                    "default_model": model,
+                    "summarize_model": model,
+                },
+                publish=True,
+            )
         else:
-            self._core_settings.set(key, value)
+            self._core_settings.set(key, value, publish=True)
         self._bus.publish(
             SETTINGS_CHANGED,
             {"key": key, "value": value},
             source=self.name,
         )
-        self._publish_snapshot()
 
     def get_snapshot(self) -> SettingsSnapshot:
         return self._core_settings.get_snapshot()

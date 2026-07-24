@@ -96,20 +96,24 @@ class NavGroup(ctk.CTkFrame):
 
     def set_active(self, view_id: str) -> None:
         """Highlight the active view button; clear others."""
+        if view_id == self._active_id:
+            return
+        prev = self._active_id
         self._active_id = view_id
-        for vid, btn in self._buttons.items():
-            if vid == view_id:
-                btn.configure(
-                    fg_color=T.HERO_CYAN_DIM,
-                    text_color=T.HERO_CYAN,
-                    border_width=0,
-                )
-            else:
-                btn.configure(
-                    fg_color="transparent",
-                    text_color=T.TEXT_SECONDARY,
-                    border_width=0,
-                )
+        # Dirty update: only reconfigure previous + new active buttons.
+        if prev and prev in self._buttons:
+            self._buttons[prev].configure(
+                fg_color="transparent",
+                text_color=T.TEXT_SECONDARY,
+                border_width=0,
+            )
+        btn = self._buttons.get(view_id)
+        if btn is not None:
+            btn.configure(
+                fg_color=T.HERO_CYAN_DIM,
+                text_color=T.HERO_CYAN,
+                border_width=0,
+            )
 
     def set_compact(self, compact: bool) -> None:
         """Switch between full-label and icon-only (no text) sidebar mode."""

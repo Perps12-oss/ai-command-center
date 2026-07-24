@@ -25,12 +25,28 @@ class TelemetryRepository:
         self._conn = conn
 
     def insert(self, event: str, payload: dict[str, Any], *, timestamp: str | None = None) -> None:
-        row_ts = timestamp or _utc_iso()
-        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        self.insert_many([(event, payload, timestamp)])
+
+    def insert_many(
+        self,
+        rows: list[tuple[str, dict[str, Any], str | None]],
+    ) -> None:
+        """Batch-insert telemetry rows with a single commit."""
+        if not rows:
+            return
+        prepared: list[tuple[str, str, str]] = []
+        for event, payload, timestamp in rows:
+            prepared.append(
+                (
+                    event,
+                    timestamp or _utc_iso(),
+                    json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                )
+            )
         with connection_lock(self._conn):
-            self._conn.execute(
+            self._conn.executemany(
                 "INSERT INTO telemetry_events (event, timestamp, payload) VALUES (?, ?, ?)",
-                (event, row_ts, body),
+                prepared,
             )
             self._conn.commit()
 
