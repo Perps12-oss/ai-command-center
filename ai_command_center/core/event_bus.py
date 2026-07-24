@@ -38,6 +38,7 @@ from ai_command_center.core.events.handler_dispatch import (
 from ai_command_center.core.events.topics import (
     BUS_HANDLER_ERROR,
     TELEMETRY_EVENT,
+    UI_NAVIGATE,
     WORKSPACE_ACTIVATED,
     WORKSPACE_CREATED,
     WORKSPACE_DEACTIVATED,
@@ -153,6 +154,13 @@ class EventBus:
         self._handler_duration_count = 0
         self._topic_publish_counts: dict[str, int] = defaultdict(int)
         self._topic_counts_lock = threading.Lock()
+        # Hard-stop recursive UI_NAVIGATE feedback loops (handler → publish →
+        # handler). Depth is per-thread so unrelated threads can still publish.
+        self._navigate_dispatch_depth = threading.local()
+        self._navigate_dropped_reentrant = 0
+        self._navigate_rate_window_start = 0.0
+        self._navigate_rate_count = 0
+        self._navigate_rate_lock = threading.Lock()
         if self._async_dispatch or self._async_adapters:
             self._start_dispatch_thread()
 
@@ -356,8 +364,20 @@ class EventBus:
         source: str = "system",
     ) -> Event:
         event = Event(topic=topic, payload=dict(payload or {}), source=source)
+        if topic == UI_NAVIGATE and getattr(self._navigate_dispatch_depth, "value", 0) > 0:
+            self._navigate_dropped_reentrant += 1
+            logger.warning(
+                "EventBus dropped reentrant ui.navigate source=%s view=%s "
+                "dropped_total=%d",
+                source,
+                str(event.payload.get("view", "")),
+                self._navigate_dropped_reentrant,
+            )
+            return event
         with self._topic_counts_lock:
             self._topic_publish_counts[topic] += 1
+        if topic == UI_NAVIGATE:
+            self._note_navigate_publish_rate(source, event.payload)
         if self._should_enqueue_topic(topic):
             if self._debug_mode:
                 logger.debug(
@@ -371,7 +391,33 @@ class EventBus:
         self._invoke_handlers(event)
         return event
 
+    def _note_navigate_publish_rate(self, source: str, payload: dict[str, Any]) -> None:
+        now = time.monotonic()
+        with self._navigate_rate_lock:
+            if now - self._navigate_rate_window_start >= 1.0:
+                self._navigate_rate_window_start = now
+                self._navigate_rate_count = 0
+            self._navigate_rate_count += 1
+            count = self._navigate_rate_count
+        if count in {5, 20, 50} or (count > 50 and count % 50 == 0):
+            logger.warning(
+                "EventBus ui.navigate storm source=%s view=%s rate=%d/s "
+                "hint=check_publisher_feedback_loop",
+                source,
+                str(payload.get("view", "")),
+                count,
+            )
+
     def dispatch(self, event: Event) -> None:
+        if event.topic == UI_NAVIGATE and getattr(
+            self._navigate_dispatch_depth, "value", 0
+        ) > 0:
+            self._navigate_dropped_reentrant += 1
+            logger.warning(
+                "EventBus dropped reentrant ui.navigate (dispatch) source=%s",
+                event.source,
+            )
+            return
         if self._should_enqueue_topic(event.topic):
             self._enqueue(event)
             return
@@ -393,17 +439,28 @@ class EventBus:
 
     def _invoke_handlers(self, event: Event) -> None:
         topic = event.topic
-        registrations = self._collect_registrations(topic)
-        deferred: list[tuple[Event, Subscriber]] = []
+        depth_token = False
+        if topic == UI_NAVIGATE:
+            depth = getattr(self._navigate_dispatch_depth, "value", 0)
+            self._navigate_dispatch_depth.value = depth + 1
+            depth_token = True
+        try:
+            registrations = self._collect_registrations(topic)
+            deferred: list[tuple[Event, Subscriber]] = []
 
-        for registration in registrations:
-            if self._should_async_handler(topic, registration):
-                deferred.append((event, registration.handler))
-                continue
-            self._invoke_single_handler(event, registration.handler)
+            for registration in registrations:
+                if self._should_async_handler(topic, registration):
+                    deferred.append((event, registration.handler))
+                    continue
+                self._invoke_single_handler(event, registration.handler)
 
-        for deferred_event, handler in deferred:
-            self._enqueue(deferred_event, handler)
+            for deferred_event, handler in deferred:
+                self._enqueue(deferred_event, handler)
+        finally:
+            if depth_token:
+                self._navigate_dispatch_depth.value = max(
+                    0, getattr(self._navigate_dispatch_depth, "value", 1) - 1
+                )
 
     def _invoke_single_handler(self, event: Event, handler: Subscriber) -> None:
         topic = event.topic
@@ -448,9 +505,10 @@ class EventBus:
                 )
                 log(
                     "EventBus handler exceeded budget topic=%s handler=%s "
-                    "elapsed_ms=%.2f budget_ms=%d",
+                    "source=%s elapsed_ms=%.2f budget_ms=%d",
                     topic,
                     handler_name,
+                    event.source,
                     elapsed_ms,
                     budget_ms,
                 )

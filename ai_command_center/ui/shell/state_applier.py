@@ -221,7 +221,7 @@ class StateApplierMixin:
             and snap.active_chat_request_id
             and snap.active_chat_request_id != self._last_started_request_id
         ):
-            self._navigate("chat")
+            self._show_view("chat")
             chat = self._chat_view()
             if chat:
                 if snap.chat_started_user_text:
@@ -265,7 +265,7 @@ class StateApplierMixin:
                 self._last_terminal_chat_key = terminal_key
         elif snap.chat_status == "error":
             if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
-                self._navigate("chat")
+                self._show_view("chat")
                 chat = self._chat_view()
                 if chat:
                     chat.show_error(str(snap.last_chat_error or "Unknown error"))
@@ -283,7 +283,8 @@ class StateApplierMixin:
             if target is not None:
                 view_id = resolve_inspect_navigate_view(target.kind)
                 if view_id is not None:
-                    self._navigate(view_id)
+                    # Apply only — avoid republishing UI_NAVIGATE from AppState.
+                    self._show_view(view_id)
                     self._focus_inspect_navigate_target(target)
             self._last_inspector_navigate_revision = snap.inspector.navigate_revision
 
