@@ -47,6 +47,8 @@ class RuntimeInspector(ctk.CTkToplevel):
         self._ui_queue = ui_queue
         self._filter_request_id = ""
         self._unsubs: list = []
+        self._last_fingerprint: tuple | None = None
+        self._refresh_pending = False
 
         self.title("Runtime Inspector (dev)")
         self.geometry(f"{self.WIDTH}x{self.HEIGHT}")
@@ -131,7 +133,23 @@ class RuntimeInspector(ctk.CTkToplevel):
         self._schedule_refresh()
 
     def _schedule_refresh(self) -> None:
+        if self._refresh_pending:
+            return
+        self._refresh_pending = True
         self._ui_queue.enqueue(self._refresh)
+
+    def _fingerprint(self, state) -> tuple:
+        run = state.orchestration_run
+        return (
+            run.request_id,
+            run.receipt_id,
+            run.execution_success,
+            run.truth_valid,
+            run.response_text,
+            len(state.execution_runs),
+            len(state.provider_health_map),
+            self._filter_request_id,
+        )
 
     def _run(self, snap: OrchestrationRunSnapshot) -> OrchestrationRunSnapshot:
         if not self._filter_request_id:
@@ -142,13 +160,21 @@ class RuntimeInspector(ctk.CTkToplevel):
 
     def _set_text(self, name: str, content: str) -> None:
         widget = self._text_boxes[name]
+        if getattr(widget, "_last_content", None) == content:
+            return
+        widget._last_content = content  # type: ignore[attr-defined]
         widget.configure(state="normal")
         widget.delete("1.0", "end")
         widget.insert("1.0", content)
         widget.configure(state="disabled")
 
     def _refresh(self) -> None:
+        self._refresh_pending = False
         state = self._state_store.snapshot
+        fp = self._fingerprint(state)
+        if fp == self._last_fingerprint:
+            return
+        self._last_fingerprint = fp
         run = self._run(state.orchestration_run)
 
         self._set_text(

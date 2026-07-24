@@ -80,7 +80,7 @@ class SettingsService:
             mcp_servers=dict(payload.get("mcp_servers") or {}),
         )
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any, *, publish: bool = True) -> None:
         validated = value
         if key in self._schema.fields:
             try:
@@ -90,11 +90,30 @@ class SettingsService:
         if isinstance(validated, dict):
             validated = json.dumps(validated, sort_keys=True, separators=(",", ":"))
         self._repo.set(key, validated)
-        if self._bus is not None:
+        if publish and self._bus is not None:
             self._bus.publish(SETTINGS_UPDATED, {"key": key, "value": validated}, source="settings")
             self._bus.publish(SETTINGS_SNAPSHOT, self.get_snapshot().to_payload(), source="settings")
 
-    def update(self, **values: Any) -> None:
+    def set_many(self, values: dict[str, Any], *, publish: bool = True) -> None:
+        """Apply multiple keys with at most one settings.snapshot publish."""
+        last_key = ""
+        last_value: Any = None
         for key, value in values.items():
-            self.set(key, value)
+            self.set(key, value, publish=False)
+            last_key = key
+            last_value = value
+        if publish and self._bus is not None and values:
+            self._bus.publish(
+                SETTINGS_UPDATED,
+                {"key": last_key, "value": last_value},
+                source="settings",
+            )
+            self._bus.publish(
+                SETTINGS_SNAPSHOT,
+                self.get_snapshot().to_payload(),
+                source="settings",
+            )
+
+    def update(self, **values: Any) -> None:
+        self.set_many(values, publish=True)
 

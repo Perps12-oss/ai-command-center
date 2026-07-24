@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Gate-visible topic literals for Phase 5A verification: tool.result, model.selected, memory.stored.
 # Bump when shipping UI freeze remediation so runtime logs prove the build.
-ACC_UI_FREEZE_FIX = "v4"
+ACC_UI_FREEZE_FIX = "v5"
 
 
 class CommandPaletteApp(
@@ -98,7 +98,8 @@ class CommandPaletteApp(
         logger.warning(
             "ACC_UI_RUNTIME freeze_fix=%s handler_budget_includes_name=1 "
             "navigate_reentry_guard=1 uiqueue_threadsafe=1 "
-            "telemetry_navigate_deferred=1 bus_reentrant_navigate_drop=1",
+            "telemetry_async_batch=1 appstate_slice_reduce=1 "
+            "settings_single_snapshot=1 keyring_cache=1 bus_reentrant_navigate_drop=1",
             ACC_UI_FREEZE_FIX,
         )
 

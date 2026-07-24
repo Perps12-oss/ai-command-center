@@ -144,6 +144,7 @@ class Phase6aWiiMeasurementTests(unittest.TestCase):
                 source="tests",
             )
             bus.publish(UI_COMMAND, {"text": "scoped prompt"}, source="tests")
+            telemetry.flush(timeout=2.0)
             rows = repo.fetch_session(telemetry.session_id)
             summary = compute_session_summary(
                 [

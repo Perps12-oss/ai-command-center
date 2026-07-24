@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 
 from ai_command_center.core.context_manager import ContextBundle
 from ai_command_center.core.events.topics import CHAT_COMPLETE, TELEMETRY_EVENT, TOOL_INVOKE, UI_COMMAND
@@ -16,7 +17,8 @@ from ai_command_center.core.event_bus import EventBus
 
 
 def _repo() -> TelemetryRepository:
-    conn = sqlite3.connect(":memory:")
+    # Telemetry writes on a dedicated worker thread.
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     DatabaseBootstrapRepository().apply(conn)
     return TelemetryRepository(conn)
@@ -47,6 +49,12 @@ def test_telemetry_normalizes_workspace_entity_scope() -> None:
             },
             source="agent",
         )
+        deadline = time.time() + 2.0
+        while time.time() < deadline:
+            rows = repo.fetch_session(service.session_id)
+            if len(rows) >= 2 and len(events) >= 1:
+                break
+            time.sleep(0.02)
     finally:
         service.stop()
 
