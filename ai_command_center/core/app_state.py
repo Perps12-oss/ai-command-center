@@ -3607,6 +3607,10 @@ class AppStateStore:
     """
     Holds current AppState; applies reducers on bus events.
     UI reads snapshots; never mutates services directly.
+
+    Slice-based reduction: only topic-indexed reducers run. Dirty detection uses
+    object identity (reducers return the same state object when unchanged),
+    avoiding full 100-field equality on every event.
     """
 
     def __init__(self, bus: EventBus, reducers: tuple[Reducer, ...] | None = None) -> None:
@@ -3616,6 +3620,11 @@ class AppStateStore:
         self._state = AppState()
         self._listeners: list[Callable[[AppState], None]] = []
         self._unsubscribers: list[Callable[[], None]] = []
+        from ai_command_center.core.state.reducer_index import build_topic_reducer_index
+
+        self._reducer_index = build_topic_reducer_index(
+            self._reducers, APP_STATE_TOPICS, empty_state=AppState()
+        )
         for topic in APP_STATE_TOPICS:
             self._unsubscribers.append(bus.subscribe(topic, self._on_event))
 
@@ -3635,14 +3644,22 @@ class AppStateStore:
 
         return unsubscribe
 
+    def _reducers_for(self, topic: str) -> tuple[Reducer, ...]:
+        return self._reducer_index.get(topic) or self._reducers
+
     def _on_event(self, event: Event) -> None:
         listeners: list[Callable[[AppState], None]] = []
         new_state = self._state
+        started = time.perf_counter()
         with self._lock:
             prior_state = self._state
-            for reducer in self._reducers:
-                new_state = reducer(new_state, event)
-            if new_state != self._state:
+            dirty = False
+            for reducer in self._reducers_for(event.topic):
+                nxt = reducer(new_state, event)
+                if nxt is not new_state:
+                    dirty = True
+                    new_state = nxt
+            if dirty:
                 object.__setattr__(new_state, "last_event_timestamp", event.timestamp)
                 self._state = new_state
                 notify_listeners = True
@@ -3656,6 +3673,19 @@ class AppStateStore:
                     notify_listeners = False
                 if notify_listeners:
                     listeners = list(self._listeners)
+
+        try:
+            from ai_command_center.core.perf.metrics import get_perf_metrics
+
+            get_perf_metrics().record(
+                "appstate.reduce",
+                (time.perf_counter() - started) * 1000.0,
+            )
+            get_perf_metrics().incr(
+                f"appstate.topic.{event.topic}",
+            )
+        except Exception:
+            pass
 
         if not listeners:
             return

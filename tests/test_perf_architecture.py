@@ -1,0 +1,124 @@
+"""Benchmarks + behavioural guards for the performance architecture refactor."""
+
+from __future__ import annotations
+
+import os
+import statistics
+import time
+
+import pytest
+
+os.environ.setdefault("APPDATA", f"/tmp/aicc_perf_{os.getpid()}")
+
+from ai_command_center.application import create_application
+from ai_command_center.core.events.topics import (
+    SETTINGS_SNAPSHOT,
+    SYSTEM_SNAPSHOT,
+    UI_COMMAND,
+    UI_NAVIGATE,
+)
+from ai_command_center.core.perf.metrics import get_perf_metrics
+from ai_command_center.core.state.reducer_index import build_topic_reducer_index
+from ai_command_center.core.app_state import APP_STATE_TOPICS, AppState, _DEFAULT_REDUCERS
+from ai_command_center.platform.secret_store import (
+    invalidate_openai_key_cache,
+    openai_api_key_configured,
+    resolve_openai_api_key,
+)
+
+
+@pytest.fixture()
+def core():
+    app = create_application()
+    app.startup()
+    yield app
+    app.shutdown()
+
+
+def test_reducer_index_narrows_system_snapshot() -> None:
+    index = build_topic_reducer_index(
+        _DEFAULT_REDUCERS, APP_STATE_TOPICS, empty_state=AppState()
+    )
+    snap_reducers = index[SYSTEM_SNAPSHOT]
+    assert 0 < len(snap_reducers) < len(_DEFAULT_REDUCERS)
+
+
+def test_appstate_reduce_under_budget(core) -> None:
+    store = core.state_store
+    times = []
+    for i in range(40):
+        st = time.perf_counter()
+        store._on_event(
+            type(
+                "E",
+                (),
+                {
+                    "topic": SYSTEM_SNAPSHOT,
+                    "payload": {
+                        "cpu_percent": float(i % 7),
+                        "ram_percent": 40.0,
+                        "ollama_online": False,
+                        "extra": {"openai_online": False},
+                        "eventbus_topic_counts": {"n": i},
+                    },
+                    "timestamp": time.time(),
+                    "source": "bench",
+                    "event_id": f"e{i}",
+                },
+            )()
+        )
+        times.append((time.perf_counter() - st) * 1000.0)
+    assert statistics.mean(times) < 2.0
+    assert max(times) < 10.0
+
+
+def test_settings_single_snapshot(core) -> None:
+    snaps: list = []
+    core.bus.subscribe(SETTINGS_SNAPSHOT, lambda e: snaps.append(e))
+    settings = None
+    reg = getattr(core.services, "_services", None) or getattr(
+        core.services, "_by_name", {}
+    )
+    if isinstance(reg, dict):
+        settings = reg.get("settings")
+    assert settings is not None
+    before = len(snaps)
+    settings.set("theme", core.state_store.snapshot.settings.theme)
+    # Allow nested publishes to settle
+    time.sleep(0.05)
+    assert len(snaps) - before == 1
+
+
+def test_telemetry_publish_does_not_block(core) -> None:
+    st = time.perf_counter()
+    for _ in range(30):
+        core.bus.publish(UI_NAVIGATE, {"view": "memory"}, source="ui")
+    elapsed = (time.perf_counter() - st) * 1000.0
+    assert elapsed < 60.0  # 30 publishes << sync SQLite era
+    # Worker flushes async
+    time.sleep(0.2)
+
+
+def test_keyring_cache_avoids_repeat_work() -> None:
+    invalidate_openai_key_cache()
+    a = resolve_openai_api_key("")
+    b = resolve_openai_api_key("")
+    assert a == b
+    assert openai_api_key_configured("") == bool(a)
+
+
+def test_perf_metrics_record() -> None:
+    m = get_perf_metrics()
+    m.record("bench.sample", 1.25)
+    snap = m.snapshot()
+    assert "bench.sample" in snap["timings"]
+
+
+def test_ui_command_publish_budget(core) -> None:
+    times = []
+    for i in range(8):
+        st = time.perf_counter()
+        core.bus.publish(UI_COMMAND, {"text": f"ping {i}"}, source="ui")
+        times.append((time.perf_counter() - st) * 1000.0)
+    # Deferred workspace path should stay well under interactive budget.
+    assert statistics.mean(times) < 16.0

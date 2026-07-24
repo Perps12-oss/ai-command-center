@@ -10,6 +10,7 @@ from ai_command_center.platform.hotkey_provider import get_hotkey_provider
 from ai_command_center.core.events.topics import UI_ORCHESTRATION_INSPECTOR_OPEN
 from ai_command_center.ui.app import CommandPaletteApp
 from ai_command_center.ui.orchestration_inspector import OrchestrationInspector
+from ai_command_center.ui.performance_inspector import PerformanceInspector
 from ai_command_center.ui.runtime_inspector import RuntimeInspector
 from ai_command_center.ui.tray import TrayController
 from ai_command_center.ui.workspace_os_inspector import WorkspaceOsInspector
@@ -38,6 +39,7 @@ def main() -> int:
     inspector: WorkspaceOsInspector | None = None
     orch_inspector: OrchestrationInspector | None = None
     runtime_inspector: RuntimeInspector | None = None
+    perf_inspector: PerformanceInspector | None = None
 
     def shutdown() -> None:
         nonlocal shutting_down
@@ -58,6 +60,11 @@ def main() -> int:
         try:
             if orch_inspector is not None:
                 orch_inspector.destroy()
+        except Exception:
+            pass
+        try:
+            if perf_inspector is not None:
+                perf_inspector.destroy()
         except Exception:
             pass
         try:
@@ -112,6 +119,19 @@ def main() -> int:
     def toggle_orchestration_inspector() -> None:
         ui_queue.enqueue(_toggle_orchestration_inspector)
 
+    def _toggle_perf_inspector() -> None:
+        nonlocal perf_inspector
+        if perf_inspector is not None and perf_inspector.winfo_exists():
+            perf_inspector.destroy()
+            perf_inspector = None
+            return
+        perf_inspector = PerformanceInspector(
+            app, core.bus, core.state_store, ui_queue=ui_queue
+        )
+
+    def toggle_perf_inspector() -> None:
+        ui_queue.enqueue(_toggle_perf_inspector)
+
     def _on_orchestration_inspector_open(_event=None) -> None:
         ui_queue.enqueue(_toggle_orchestration_inspector)
 
@@ -147,6 +167,9 @@ def main() -> int:
     runtime_inspector_ok, runtime_inspector_msg = hotkey_provider.register(
         "ctrl+shift+r", toggle_runtime_inspector
     )
+    perf_inspector_ok, perf_inspector_msg = hotkey_provider.register(
+        "ctrl+shift+p", toggle_perf_inspector
+    )
     if orch_inspector_ok:
         print(f"Orchestration Inspector hotkey: {orch_inspector_msg}")
     else:
@@ -161,15 +184,23 @@ def main() -> int:
             f"Runtime Inspector hotkey unavailable: {runtime_inspector_msg}",
             file=sys.stderr,
         )
+    if perf_inspector_ok:
+        print(f"Performance Inspector hotkey: {perf_inspector_msg}")
+    else:
+        print(
+            f"Performance Inspector hotkey unavailable: {perf_inspector_msg}",
+            file=sys.stderr,
+        )
 
     print(
         "AI Command Center running. Alt+Space to toggle palette. "
         "Ctrl+Shift+W for Workspace OS Inspector. "
         "Ctrl+Shift+O for Orchestration Inspector. "
-        "Ctrl+Shift+R for Runtime Inspector. Tray icon active."
+        "Ctrl+Shift+R for Runtime Inspector. "
+        "Ctrl+Shift+P for Performance Inspector. Tray icon active."
     )
     # Must appear on stdout next to the line above — proves which package is live.
-    # If freeze_fix is missing or < v4, you are not running the navigate-storm fix.
+    # If freeze_fix is missing or < v5, you are not running the perf-architecture fix.
     import ai_command_center.core.event_bus as _event_bus_mod
     from ai_command_center.ui.app import ACC_UI_FREEZE_FIX as _freeze_fix
 

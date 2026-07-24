@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,21 @@ _OPENAI_ENV_VAR = "OPENAI_API_KEY"
 
 _keyring_module = None
 _keyring_unavailable = False
+
+_cache_lock = threading.Lock()
+_resolved_cache: dict[str, str] = {}
+_configured_cache: dict[str, bool] = {}
+
+
+def _cache_key(stored: str) -> str:
+    return str(stored or "")
+
+
+def invalidate_openai_key_cache() -> None:
+    """Drop cached keyring/env resolutions (call after store/delete)."""
+    with _cache_lock:
+        _resolved_cache.clear()
+        _configured_cache.clear()
 
 
 def _get_keyring():
@@ -41,25 +57,38 @@ def _get_keyring():
 
 def resolve_openai_api_key(stored: str = "") -> str:
     """Resolve OpenAI API key: env var → OS keyring → SQLite settings."""
+    key = _cache_key(stored)
+    with _cache_lock:
+        cached = _resolved_cache.get(key)
+        if cached is not None:
+            return cached
     env = os.environ.get(_OPENAI_ENV_VAR, "").strip()
     if env:
+        with _cache_lock:
+            _resolved_cache[key] = env
         return env
     keyring = _get_keyring()
     if keyring is not None:
         try:
             value = keyring.get_password(_SERVICE_NAME, _OPENAI_KEY_NAME)
             if value:
-                return value.strip()
+                cleaned = value.strip()
+                with _cache_lock:
+                    _resolved_cache[key] = cleaned
+                return cleaned
         except Exception:
             logger.warning("keyring read failed for OpenAI API key", exc_info=True)
     cleaned = str(stored or "").strip()
     if cleaned in {"", "********"}:
-        return ""
+        cleaned = ""
+    with _cache_lock:
+        _resolved_cache[key] = cleaned
     return cleaned
 
 
 def store_openai_api_key(value: str) -> str:
     """Persist API key off SQLite when possible; return value for settings repo."""
+    invalidate_openai_key_cache()
     cleaned = str(value or "").strip()
     keyring = _get_keyring()
     if keyring is None:
@@ -69,20 +98,31 @@ def store_openai_api_key(value: str) -> str:
             keyring.delete_password(_SERVICE_NAME, _OPENAI_KEY_NAME)
         except Exception:
             logger.warning("keyring delete failed for OpenAI API key", exc_info=True)
+        invalidate_openai_key_cache()
         return ""
     try:
         keyring.set_password(_SERVICE_NAME, _OPENAI_KEY_NAME, cleaned)
+        invalidate_openai_key_cache()
         return ""
     except Exception:
         logger.warning(
             "keyring store failed; persisting OpenAI API key in settings (plaintext fallback)",
             exc_info=True,
         )
+        invalidate_openai_key_cache()
         return cleaned
 
 
 def openai_api_key_configured(stored: str = "") -> bool:
-    return bool(resolve_openai_api_key(stored))
+    key = _cache_key(stored)
+    with _cache_lock:
+        cached = _configured_cache.get(key)
+        if cached is not None:
+            return cached
+    result = bool(resolve_openai_api_key(stored))
+    with _cache_lock:
+        _configured_cache[key] = result
+    return result
 
 
 def openai_api_key_source(stored: str = "") -> str:

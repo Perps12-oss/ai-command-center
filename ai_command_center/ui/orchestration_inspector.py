@@ -29,6 +29,8 @@ class OrchestrationInspector(ctk.CTkToplevel):
         self._state_store = state_store
         self._ui_queue = ui_queue
         self._unsubs: list = []
+        self._last_fingerprint: tuple | None = None
+        self._refresh_pending = False
 
         self.title("Orchestration Inspector (dev)")
         self.geometry(f"{self.WIDTH}x{self.HEIGHT}")
@@ -65,10 +67,27 @@ class OrchestrationInspector(ctk.CTkToplevel):
         self._schedule_refresh()
 
     def _schedule_refresh(self) -> None:
+        if self._refresh_pending:
+            return
+        self._refresh_pending = True
         self._ui_queue.enqueue(self._refresh)
 
     def _refresh(self) -> None:
+        self._refresh_pending = False
         run = self._state_store.snapshot.orchestration_run
+        fp = (
+            run.intent,
+            run.provider_id,
+            run.request_id,
+            run.receipt_id,
+            run.execution_success,
+            run.truth_valid,
+            run.response_text,
+            run.execution_error,
+        )
+        if fp == self._last_fingerprint:
+            return
+        self._last_fingerprint = fp
         lines = [
             f"Intent: {run.intent or '-'}",
             f"Provider: {run.provider_id or '-'}",
@@ -93,9 +112,10 @@ class OrchestrationInspector(ctk.CTkToplevel):
             "Response:",
             run.response_text or "-",
         ]
+        content = "\n".join(lines)
         self._text.configure(state="normal")
         self._text.delete("1.0", "end")
-        self._text.insert("1.0", "\n".join(lines))
+        self._text.insert("1.0", content)
         self._text.configure(state="disabled")
 
     def _on_close(self) -> None:
