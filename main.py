@@ -168,6 +168,15 @@ def main() -> int:
         "Ctrl+Shift+O for Orchestration Inspector. "
         "Ctrl+Shift+R for Runtime Inspector. Tray icon active."
     )
+    # Must appear on stdout next to the line above — proves which package is live.
+    # If freeze_fix is missing or < v4, you are not running the navigate-storm fix.
+    import ai_command_center.core.event_bus as _event_bus_mod
+    from ai_command_center.ui.app import ACC_UI_FREEZE_FIX as _freeze_fix
+
+    print(
+        f"ACC_UI_RUNTIME freeze_fix={_freeze_fix} "
+        f"event_bus={_event_bus_mod.__file__}"
+    )
     app.protocol("WM_DELETE_WINDOW", app.hide)
     app.show()
 
