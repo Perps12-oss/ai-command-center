@@ -43,6 +43,21 @@ def test_reducer_index_narrows_system_snapshot() -> None:
     assert 0 < len(snap_reducers) < len(_DEFAULT_REDUCERS)
 
 
+def test_reducer_index_includes_imported_topic_handlers() -> None:
+    """Handlers that compare against imported topic constants must be indexed."""
+    from ai_command_center.core.events.topics import CHAT_CHUNK, WORKFLOW_STARTED
+
+    index = build_topic_reducer_index(
+        _DEFAULT_REDUCERS, APP_STATE_TOPICS, empty_state=AppState()
+    )
+    chat_names = {getattr(r, "__name__", "") for r in index[CHAT_CHUNK]}
+    workflow_names = {getattr(r, "__name__", "") for r in index[WORKFLOW_STARTED]}
+    assert "_reduce_chat_chunk" in chat_names
+    assert "_reduce_chat_session_snapshot" in chat_names
+    assert "_reduce_workflow_run" in workflow_names
+    assert "_reduce_workflow_graph" in workflow_names
+
+
 def test_appstate_reduce_under_budget(core) -> None:
     store = core.state_store
     times = []

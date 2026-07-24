@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -118,7 +119,14 @@ class Phase6cWiiApproachTests(unittest.TestCase):
                 source="tests",
             )
 
-            rows = repo.fetch_session(telemetry.session_id)
+            telemetry.flush(timeout=2.0)
+            deadline = time.time() + 2.0
+            rows = []
+            while time.time() < deadline:
+                rows = repo.fetch_session(telemetry.session_id)
+                if len(rows) >= 2:
+                    break
+                time.sleep(0.02)
             summary = compute_session_summary(
                 [
                     {

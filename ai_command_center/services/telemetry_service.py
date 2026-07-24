@@ -102,6 +102,18 @@ class TelemetryService(BaseService):
     def session_id(self) -> str:
         return self._session_id
 
+    def flush(self, timeout: float = 2.0) -> None:
+        """Block until the async write queue has been drained (for tests)."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if self._defer_queue.empty():
+                # Allow one batch idle timeout so the worker flushes.
+                time.sleep(_BATCH_WAIT_S + 0.02)
+                if self._defer_queue.empty():
+                    return
+            time.sleep(0.01)
+        raise TimeoutError("TelemetryService defer queue not drained")
+
     def _on_load(self) -> None:
         self._defer_thread = threading.Thread(
             target=self._defer_worker,

@@ -56,17 +56,20 @@ def _get_keyring():
 
 
 def resolve_openai_api_key(stored: str = "") -> str:
-    """Resolve OpenAI API key: env var → OS keyring → SQLite settings."""
+    """Resolve OpenAI API key: env var → OS keyring → SQLite settings.
+
+    Env is checked every call (cheap, mutable) and never cached under ``stored``.
+    Keyring / settings results are cached per stored value and cleared via
+    ``invalidate_openai_key_cache``.
+    """
+    env = os.environ.get(_OPENAI_ENV_VAR, "").strip()
+    if env:
+        return env
     key = _cache_key(stored)
     with _cache_lock:
         cached = _resolved_cache.get(key)
         if cached is not None:
             return cached
-    env = os.environ.get(_OPENAI_ENV_VAR, "").strip()
-    if env:
-        with _cache_lock:
-            _resolved_cache[key] = env
-        return env
     keyring = _get_keyring()
     if keyring is not None:
         try:
@@ -114,6 +117,8 @@ def store_openai_api_key(value: str) -> str:
 
 
 def openai_api_key_configured(stored: str = "") -> bool:
+    if os.environ.get(_OPENAI_ENV_VAR, "").strip():
+        return True
     key = _cache_key(stored)
     with _cache_lock:
         cached = _configured_cache.get(key)
