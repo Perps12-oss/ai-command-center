@@ -18,7 +18,6 @@ from ai_command_center.core.events.topics import (
     NOTE_INDEX_COMPLETE,
     NOTE_SEARCH_RESULTS,
     NOTE_SELECTED,
-    OLLAMA_STATUS,
     OVERLAY_ANCHOR,
     OVERLAY_HIDE,
     OVERLAY_SHOW,
@@ -66,9 +65,15 @@ class EventCoordinatorMixin:
         view = str(event.payload.get("view", "command_center")).lower()
         if view not in VIEW_IDS:
             view = "command_center"
+        if view == getattr(self, "_current_view", None) and view in getattr(
+            self, "_views", {}
+        ):
+            return
         clear_chat = bool(event.payload.get("clear_chat_entity")) or view == "chat"
 
         def update() -> None:
+            if view == getattr(self, "_current_view", None):
+                return
             if clear_chat:
                 self._controller.publish_clear_chat_entity()
             # Apply only — do not call _navigate (would republish UI_NAVIGATE).
@@ -301,9 +306,10 @@ class EventCoordinatorMixin:
         self._bus_unsubs.append(
             self._bus.subscribe(SYSTEM_SNAPSHOT, self._on_system_snapshot)
         )
-        self._bus_unsubs.append(
-            self._bus.subscribe(OLLAMA_STATUS, self._on_ollama_status)
-        )
+        # Do NOT subscribe to OLLAMA_STATUS here. SystemMonitor folds online
+        # into SYSTEM_SNAPSHOT → AppState → _apply_state / top bar. A direct
+        # OLLAMA_STATUS → UIQueue path previously blocked the asyncio publisher
+        # for multi-second Tcl lock waits when Tk was busy.
         self._bus_unsubs.append(
             self._bus.subscribe(SYSTEM_EVENTS, self._on_system_events)
         )
@@ -337,18 +343,6 @@ class EventCoordinatorMixin:
                     extra=dict(payload.get("extra", {})),
                 )
             )
-
-        self._ui_queue.enqueue(update)
-
-    def _on_ollama_status(self, event: Event) -> None:
-        """Project connectivity only — avoid a full AppState shell refresh."""
-        online = bool(event.payload.get("online"))
-        if online == getattr(self, "_last_ollama_online", None):
-            return
-        self._last_ollama_online = online
-
-        def update() -> None:
-            self._top.set_ollama_online(online)
 
         self._ui_queue.enqueue(update)
 
