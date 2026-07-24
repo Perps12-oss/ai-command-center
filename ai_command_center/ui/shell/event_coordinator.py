@@ -107,12 +107,13 @@ class EventCoordinatorMixin:
         )
 
     def _on_note_results(self, event: Event) -> None:
-        """Note search results are projected into AppState; view renders from there."""
+        """Note search results are projected into AppState; do not force navigate.
 
-        def update() -> None:
-            self._navigate("notes")
-
-        self._ui_queue.enqueue(update)
+        Auto-navigating here previously contributed to idle ui.navigate storms when
+        services published search/catalog events during startup.
+        """
+        _ = event
+        self._ui_queue.enqueue(self._queue_state_refresh)
 
     def _on_note_selected(self, event: Event) -> None:
         path = str(event.payload.get("path", ""))
@@ -147,10 +148,12 @@ class EventCoordinatorMixin:
         message = str(event.payload.get("message", "Note error"))
 
         def update() -> None:
-            self._navigate("notes")
+            # Stay on current view; only surface error if Notes is already open.
             notes = self._notes_view()
-            if notes:
+            if notes and getattr(self, "_current_view", "") == "notes":
                 notes.show_error(message)
+            else:
+                self._toast.show(f"Note error: {message}", kind="error")
 
         self._ui_queue.enqueue(update)
 
@@ -182,8 +185,9 @@ class EventCoordinatorMixin:
         label = str(event.payload.get("label", ""))
 
         def update() -> None:
-            self._navigate("memory")
+            # Projection owns MemoryView; toast only — do not force navigate.
             self._toast.show(f"Memory: {label}", kind="info")
+            self._queue_state_refresh()
 
         self._ui_queue.enqueue(update)
 
@@ -191,10 +195,11 @@ class EventCoordinatorMixin:
         message = str(event.payload.get("message", "Memory error"))
 
         def update() -> None:
-            self._navigate("memory")
             memory = self._memory_view()
-            if memory:
+            if memory and getattr(self, "_current_view", "") == "memory":
                 memory.show_error(message)
+            else:
+                self._toast.show(f"Memory error: {message}", kind="error")
 
         self._ui_queue.enqueue(update)
 
@@ -246,12 +251,13 @@ class EventCoordinatorMixin:
         )
 
     def _on_plugin_catalog(self, event: Event) -> None:
-        """Plugin catalog is projected into AppState; view renders from there."""
+        """Plugin catalog is projected into AppState; never force-navigate.
 
-        def update() -> None:
-            self._navigate("plugins")
-
-        self._ui_queue.enqueue(update)
+        Startup catalog publishes used to call ``_navigate("plugins")`` and
+        amplified idle ui.navigate storms when combined with other bus traffic.
+        """
+        _ = event
+        self._ui_queue.enqueue(self._queue_state_refresh)
 
     def _on_plugin_error(self, event: Event) -> None:
         message = str(event.payload.get("message", "Plugin error"))
