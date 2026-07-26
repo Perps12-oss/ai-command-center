@@ -1,0 +1,352 @@
+{
+  "environment": "Linux x86_64 headless create_application",
+  "gui_available": false,
+  "freeze_fix_target": "v5",
+  "db_path": "/home/ubuntu/.local/share/AICommandCenter/app.db",
+  "budgets_vs_actual": {
+    "appstate_reduce_avg_ms": {
+      "constitution_budget": 0.5,
+      "ci_test_budget_mean": 2.0,
+      "last_ms": 0.0829,
+      "avg_ms": 0.0402,
+      "max_ms": 0.1625,
+      "n": 350.0
+    },
+    "ui_navigate_30x_total_ms": {
+      "ci_budget_total": 60.0,
+      "actual_total": 0.3171,
+      "actual_mean": 0.0106,
+      "actual_max": 0.0633
+    },
+    "ui_command_mean_ms": {
+      "ci_budget_mean": 16.0,
+      "actual_mean": 0.2518,
+      "actual_max": 0.6796
+    },
+    "system_snapshot_publish_mean_ms": {
+      "actual_mean": 0.0331,
+      "actual_max": 0.046
+    },
+    "chat_chunk_100x": {
+      "actual_mean_publish_ms": 0.0081,
+      "actual_max_publish_ms": 0.2183,
+      "actual_total_ms": 0.8063
+    },
+    "settings_snapshot_per_set": {
+      "budget": 1,
+      "actual": 1
+    },
+    "ui_thread_avg_p99_ms": {
+      "budget_avg": 2.0,
+      "budget_p99": 8.0,
+      "status": "N/A headless"
+    },
+    "navigation_view_switch_ms": {
+      "budget": 16.0,
+      "status": "N/A headless Tk"
+    },
+    "inspector_refresh_ms": {
+      "budget": 5.0,
+      "status": "N/A headless"
+    },
+    "sqlite_never_on_ui_thread": {
+      "budget": "never",
+      "status": "N/A headless"
+    }
+  },
+  "top10_handlers_by_avg_ms": [
+    {
+      "name": "settings.snapshot",
+      "last_ms": 0.0016,
+      "avg_ms": 7.4968,
+      "max_ms": 82.2266,
+      "n": 11.0
+    },
+    {
+      "name": "capability.providers.ready",
+      "last_ms": 1.3316,
+      "avg_ms": 0.585,
+      "max_ms": 1.3316,
+      "n": 3.0
+    },
+    {
+      "name": "orchestration.provider.health",
+      "last_ms": 0.1926,
+      "avg_ms": 0.106,
+      "max_ms": 0.2067,
+      "n": 20.0
+    },
+    {
+      "name": "settings.changed",
+      "last_ms": 0.0911,
+      "avg_ms": 0.0911,
+      "max_ms": 0.0911,
+      "n": 1.0
+    },
+    {
+      "name": "ui.command",
+      "last_ms": 0.1623,
+      "avg_ms": 0.0798,
+      "max_ms": 0.6563,
+      "n": 24.0
+    },
+    {
+      "name": "chat.history_loaded",
+      "last_ms": 0.0696,
+      "avg_ms": 0.0696,
+      "max_ms": 0.0696,
+      "n": 1.0
+    },
+    {
+      "name": "capability.lifecycle.snapshot",
+      "last_ms": 0.041,
+      "avg_ms": 0.0648,
+      "max_ms": 0.1397,
+      "n": 23.0
+    },
+    {
+      "name": "kernel.state_changed",
+      "last_ms": 0.052,
+      "avg_ms": 0.0552,
+      "max_ms": 0.0583,
+      "n": 2.0
+    },
+    {
+      "name": "plugin.catalog",
+      "last_ms": 0.0501,
+      "avg_ms": 0.0501,
+      "max_ms": 0.0501,
+      "n": 1.0
+    },
+    {
+      "name": "chat.chunk",
+      "last_ms": 0.0772,
+      "avg_ms": 0.0468,
+      "max_ms": 0.1266,
+      "n": 100.0
+    }
+  ],
+  "top10_handlers_by_max_ms": [
+    {
+      "name": "settings.snapshot",
+      "last_ms": 0.0016,
+      "avg_ms": 7.4968,
+      "max_ms": 82.2266,
+      "n": 11.0
+    },
+    {
+      "name": "capability.providers.ready",
+      "last_ms": 1.3316,
+      "avg_ms": 0.585,
+      "max_ms": 1.3316,
+      "n": 3.0
+    },
+    {
+      "name": "ui.command",
+      "last_ms": 0.1623,
+      "avg_ms": 0.0798,
+      "max_ms": 0.6563,
+      "n": 24.0
+    },
+    {
+      "name": "execution.authority.decision",
+      "last_ms": 0.0145,
+      "avg_ms": 0.0271,
+      "max_ms": 0.2654,
+      "n": 24.0
+    },
+    {
+      "name": "orchestration.provider.health",
+      "last_ms": 0.1926,
+      "avg_ms": 0.106,
+      "max_ms": 0.2067,
+      "n": 20.0
+    },
+    {
+      "name": "capability.lifecycle.snapshot",
+      "last_ms": 0.041,
+      "avg_ms": 0.0648,
+      "max_ms": 0.1397,
+      "n": 23.0
+    },
+    {
+      "name": "chat.chunk",
+      "last_ms": 0.0772,
+      "avg_ms": 0.0468,
+      "max_ms": 0.1266,
+      "n": 100.0
+    },
+    {
+      "name": "service.started",
+      "last_ms": 0.0444,
+      "avg_ms": 0.0394,
+      "max_ms": 0.0958,
+      "n": 41.0
+    },
+    {
+      "name": "settings.changed",
+      "last_ms": 0.0911,
+      "avg_ms": 0.0911,
+      "max_ms": 0.0911,
+      "n": 1.0
+    },
+    {
+      "name": "system.snapshot",
+      "last_ms": 0.0251,
+      "avg_ms": 0.0276,
+      "max_ms": 0.0863,
+      "n": 42.0
+    }
+  ],
+  "top10_handlers_by_count": [
+    {
+      "name": "chat.chunk",
+      "last_ms": 0.0772,
+      "avg_ms": 0.0468,
+      "max_ms": 0.1266,
+      "n": 100.0
+    },
+    {
+      "name": "service.state_changed",
+      "last_ms": 0.0517,
+      "avg_ms": 0.0384,
+      "max_ms": 0.0796,
+      "n": 82.0
+    },
+    {
+      "name": "service.ready",
+      "last_ms": 0.0497,
+      "avg_ms": 0.019,
+      "max_ms": 0.0497,
+      "n": 82.0
+    },
+    {
+      "name": "system.snapshot",
+      "last_ms": 0.0251,
+      "avg_ms": 0.0276,
+      "max_ms": 0.0863,
+      "n": 42.0
+    },
+    {
+      "name": "service.started",
+      "last_ms": 0.0444,
+      "avg_ms": 0.0394,
+      "max_ms": 0.0958,
+      "n": 41.0
+    },
+    {
+      "name": "ui.navigate",
+      "last_ms": 0.0001,
+      "avg_ms": 0.0003,
+      "max_ms": 0.0042,
+      "n": 30.0
+    },
+    {
+      "name": "ui.command",
+      "last_ms": 0.1623,
+      "avg_ms": 0.0798,
+      "max_ms": 0.6563,
+      "n": 24.0
+    },
+    {
+      "name": "execution.authority.decision",
+      "last_ms": 0.0145,
+      "avg_ms": 0.0271,
+      "max_ms": 0.2654,
+      "n": 24.0
+    },
+    {
+      "name": "capability.lifecycle.snapshot",
+      "last_ms": 0.041,
+      "avg_ms": 0.0648,
+      "max_ms": 0.1397,
+      "n": 23.0
+    },
+    {
+      "name": "orchestration.provider.health",
+      "last_ms": 0.1926,
+      "avg_ms": 0.106,
+      "max_ms": 0.2067,
+      "n": 20.0
+    }
+  ],
+  "top10_appstate_topic_counts": [
+    {
+      "topic": "chat.chunk",
+      "count": 100
+    },
+    {
+      "topic": "service.state_changed",
+      "count": 82
+    },
+    {
+      "topic": "system.snapshot",
+      "count": 42
+    },
+    {
+      "topic": "service.started",
+      "count": 41
+    },
+    {
+      "topic": "service.ready",
+      "count": 41
+    },
+    {
+      "topic": "capability.lifecycle.snapshot",
+      "count": 12
+    },
+    {
+      "topic": "orchestration.provider.health",
+      "count": 10
+    },
+    {
+      "topic": "execution.authority.decision",
+      "count": 8
+    },
+    {
+      "topic": "action.registered",
+      "count": 3
+    },
+    {
+      "topic": "app.phase",
+      "count": 2
+    }
+  ],
+  "appstate": {
+    "listener_count_headless": 0,
+    "total_reducers": 78,
+    "system_snapshot_indexed_reducers": 1,
+    "topics_in_catalog": 116,
+    "on_event_wrapper_mean_ms": null,
+    "on_event_calls": 0
+  },
+  "sqlite": {
+    "journal_mode": "wal",
+    "synchronous": 2,
+    "read_select1_mean_ms": 0.0304,
+    "read_select1_max_ms": 0.1276,
+    "write_insert_mean_ms": 1.7313,
+    "write_insert_max_ms": 7.6599,
+    "telemetry_timings": {
+      "sqlite.telemetry_batch": {
+        "last_ms": 0.5107,
+        "avg_ms": 4.9532,
+        "max_ms": 9.3957,
+        "n": 2.0
+      }
+    }
+  },
+  "queue_depths": {
+    "eventbus_queue": {
+      "_dispatch_queue": 0
+    },
+    "async_flags_default": "OFF",
+    "bus_stats": {
+      "_handler_duration_total_ms": 103.13526299921705
+    }
+  },
+  "observations": [
+    "ui.navigate storm warnings fired during 30x rapid publish (rate guards)",
+    "settings.snapshot OpenAIHttpService may exceed 5ms SYNC_CRITICAL budget"
+  ]
+}
