@@ -3651,6 +3651,9 @@ class AppStateStore:
         listeners: list[Callable[[AppState], None]] = []
         new_state = self._state
         started = time.perf_counter()
+        # Observation-only: classify notify outcome for PerfMetrics (no control-flow change).
+        notify_skip: str | None = None  # "metrics_only" | "no_listeners" | None (will notify or clean)
+        dirty = False
         with self._lock:
             prior_state = self._state
             dirty = False
@@ -3671,25 +3674,34 @@ class AppStateStore:
                     )
                 ):
                     notify_listeners = False
+                    notify_skip = "metrics_only"
                 if notify_listeners:
                     listeners = list(self._listeners)
+                    if not listeners:
+                        notify_skip = "no_listeners"
 
         try:
             from ai_command_center.core.perf.metrics import get_perf_metrics
 
-            get_perf_metrics().record(
+            metrics = get_perf_metrics()
+            metrics.record(
                 "appstate.reduce",
                 (time.perf_counter() - started) * 1000.0,
             )
-            get_perf_metrics().incr(
-                f"appstate.topic.{event.topic}",
-            )
+            metrics.incr(f"appstate.topic.{event.topic}")
+            if dirty and notify_skip == "metrics_only":
+                metrics.incr("appstate.notify.skipped.metrics_only")
+                metrics.incr(f"appstate.notify.skipped.metrics_only.topic.{event.topic}")
+            elif dirty and notify_skip == "no_listeners":
+                metrics.incr("appstate.notify.skipped.no_listeners")
+                metrics.incr(f"appstate.notify.skipped.no_listeners.topic.{event.topic}")
         except Exception:
             pass
 
         if not listeners:
             return
 
+        notify_started = time.perf_counter()
         for listener in listeners:
             try:
                 listener(new_state)
@@ -3706,6 +3718,19 @@ class AppStateStore:
                     )
                 except Exception:
                     logger.exception("Failed to publish app.error for listener failure")
+        try:
+            from ai_command_center.core.perf.metrics import get_perf_metrics
+
+            metrics = get_perf_metrics()
+            metrics.record(
+                "appstate.notify",
+                (time.perf_counter() - notify_started) * 1000.0,
+            )
+            metrics.incr("appstate.notify")
+            metrics.incr(f"appstate.notify.topic.{event.topic}")
+            metrics.incr("appstate.notify.listener_invocations", len(listeners))
+        except Exception:
+            pass
 
     def close(self) -> None:
         for unsub in self._unsubscribers:

@@ -1,9 +1,22 @@
 # ADR-007: AppState Notification Storms — First Program 1 Investigation
 
-**Status:** Proposed / Investigation  
+**Status:** Proposed / Investigation (Phase 2 instrumentation approved)  
 **Date:** 2026-07-26  
-**Deciders:** Project owner (approval required before implementation)  
+**Deciders:** Project owner (approval required before behavior-changing implementation)  
 **Related:** `PERFORMANCE_CONSTITUTION.md`, `docs/audits/PERF_BASELINE_REPORT_2026-07-26.md`, `docs/audits/PERFORMANCE_RCA_UI_FREEZE_2026-07-24.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`
+
+### Phase 2 metric keys (observation only — no behavior change)
+
+| Key | Meaning |
+|---|---|
+| `appstate.notify` | Timing sample: wall ms for listener fan-out (budget &lt;1 ms) |
+| `appstate.notify` (counter) | Number of notify passes that invoked ≥1 listener |
+| `appstate.notify.topic.<topic>` | Notify passes by topic |
+| `appstate.notify.listener_invocations` | Sum of listeners called |
+| `appstate.notify.skipped.metrics_only` | Dirty `system.snapshot` skipped (metrics-only delta) |
+| `appstate.notify.skipped.no_listeners` | Dirty update with zero subscribers |
+
+Phase 3 fix remains **blocked** until an Investigation Report with these metrics is approved.
 
 ---
 
