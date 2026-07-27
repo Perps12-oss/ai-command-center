@@ -41,8 +41,8 @@ Documentation
 
 ## Status overview
 
-| Repository | Status | RD | Patterns |
-|------------|--------|----|----------|
-| block/goose | Validated | [RD-001](./decisions/RD-001.md) | [PAT-001](./patterns/PAT-001.md), [PAT-003](./patterns/PAT-003.md), [PAT-004](./patterns/PAT-004.md), [PAT-006](./patterns/PAT-006.md), [PAT-007](./patterns/PAT-007.md) |
+| Repository | Status | RD | Patterns | ADRs |
+|------------|--------|----|----------|------|
+| block/goose | Validated | [RD-001](./decisions/RD-001.md) | [PAT-001](./patterns/PAT-001.md), [PAT-003](./patterns/PAT-003.md), [PAT-004](./patterns/PAT-004.md), [PAT-006](./patterns/PAT-006.md), [PAT-007](./patterns/PAT-007.md) | [ADR-007](../docs/architecture/adr/ADR-007_PROVIDER_REGISTRY.md), [ADR-008](../docs/architecture/adr/ADR-008_CONVERSATION_COMPACTION.md), [ADR-009](../docs/architecture/adr/ADR-009_TOOL_CONFIRMATION_ROUTER.md), [ADR-010](../docs/architecture/adr/ADR-010_MODULAR_TOOL_INSPECTION.md), [ADR-011](../docs/architecture/adr/ADR-011_TELEMETRY_BACKENDS.md) |
 
 *Populate as expeditions complete.*
