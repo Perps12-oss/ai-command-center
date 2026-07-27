@@ -4,7 +4,7 @@ Record of repository investigation outcomes. These are research conclusions, not
 
 | ID | Repository | Decision | Date | Summary | Link |
 |----|------------|----------|------|---------|------|
-| RD-001 | block/goose | Proceed | 2026-07-27 | Validate PC-001, PC-003, PC-004; hold PC-002 and PC-005 | [RD-001](./RD-001.md) |
+| RD-001 | block/goose | Proceed | 2026-07-27 | Validated PC-001, PC-003, PC-004; ADRs 007-011 drafted; PC-002 and PC-005 held | [RD-001](./RD-001.md) |
 
 ## Decision values
 
