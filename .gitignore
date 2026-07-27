@@ -67,3 +67,5 @@ ucgs_report.yaml
 coverage.xml
 htmlcov/
 .pytest_cache/
+
+research/repositories/exp-001-goose/goose/
