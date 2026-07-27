@@ -122,7 +122,7 @@ Incoming information is triaged into three classes:
 Source: EPOCH A audit (`~/report.md`) + `PHASE_R1_RUNTIME_RECONCILIATION.md`. Ordered:
 
 1. **Phase B remediation (close program conditions):**
-   - Fix E07 Goal Workspace inspect kind — publish/register `"task"` instead of unregistered `"plan_step"` (`ai_command_center/ui/views/goal_view.py:319`, `ui/shell/view_manager.py:539`). **High.**
+   - Fix E07 Goal Workspace inspect kind — publish/register `"task"` instead of unregistered `"plan_step"` (`ai_command_center/ui/views/goal_view.py:319`, `ai_command_center/ui/shell/view_manager.py:568`). **High.**
    - Add active-goal projection to E02 `GlobalContextBar` (`ai_command_center/ui/components/global_context_bar.py`).
    - Backfill Tom audit artifacts for E00–E03 on `main`.
    - Refresh `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` for Phase B UI surfaces.
