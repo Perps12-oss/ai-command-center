@@ -111,9 +111,10 @@ class PerformanceInspector(ctk.CTkToplevel):
             lines.append(f"  {topic}: {count}")
         lines.append("")
         lines.append("Budget targets:")
-        lines.append("  ui.apply_state < 16ms")
+        lines.append("  ui.apply_state < 16ms / <2ms (constitution UI apply)")
         lines.append("  ui.apply_state.stream < 4ms")
-        lines.append("  appstate.reduce < 2ms (steady)")
+        lines.append("  appstate.reduce < 0.5ms (constitution) / <2ms CI")
+        lines.append("  appstate.notify < 1ms (listener fan-out; PERF-001)")
         lines.append("  sqlite.telemetry_batch (async worker only)")
 
         content = "\n".join(lines)
