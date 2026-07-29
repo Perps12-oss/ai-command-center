@@ -36,7 +36,18 @@ These patterns can be integrated into ACC's EventBus/AppState/service layers wit
 - INT-005: Tool Inspection and Permission Pipeline Enrichment (from PAT-006)
 - INT-007: Telemetry Backend Layering (from PAT-007)
 
+### ADRs drafted (after Architecture Review by Tom)
+
+| Pattern | ADR |
+|---------|-----|
+| PAT-001 | [ADR-007: Provider Registry Snapshot in AppState](../../docs/architecture/adr/ADR-007_PROVIDER_REGISTRY.md) |
+| PAT-003 | [ADR-008: Conversation Context Compaction with Visibility Metadata](../../docs/architecture/adr/ADR-008_CONVERSATION_COMPACTION.md) |
+| PAT-004 | [ADR-009: Tool Confirmation Router Pipeline](../../docs/architecture/adr/ADR-009_TOOL_CONFIRMATION_ROUTER.md) |
+| PAT-006 | [ADR-010: Modular Tool Inspection and Permission Pipeline](../../docs/architecture/adr/ADR-010_MODULAR_TOOL_INSPECTION.md) |
+| PAT-007 | [ADR-011: Layered Telemetry Backends](../../docs/architecture/adr/ADR-011_TELEMETRY_BACKENDS.md) |
+
 ### Next steps
 
-- Draft ADRs for PAT-001, PAT-003, PAT-004, PAT-006, and PAT-007 after Architecture Review (Tom).
+- Move ADRs to `Accepted` status after final architecture sign-off.
+- Produce implementation plans and schedule work against the architecture transition backlog.
 - Keep PC-002 and PC-005 in backlog for future expeditions.
