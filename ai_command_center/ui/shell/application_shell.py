@@ -27,12 +27,15 @@ from ai_command_center.ui.design_system.shortcut import ShortcutOverlay
 from ai_command_center.ui.design_system.toast import ToastManager
 from ai_command_center.ui.design_system import theme_manager
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.mission_control.layout_prefs import LayoutPrefs
 
 
 class ApplicationShellMixin:
     """Builds the CTk shell and handles show/hide plus command input."""
 
     def _build_layout(self) -> None:
+        self._layout_prefs = LayoutPrefs()
+
         self._top = TopBar(
             self,
             on_settings=lambda: self._navigate("settings"),
@@ -47,7 +50,11 @@ class ApplicationShellMixin:
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
 
-        self._sidebar = Sidebar(body, on_navigate=self._on_sidebar_navigate)
+        self._sidebar = Sidebar(
+            body,
+            on_navigate=self._on_sidebar_navigate,
+            layout_prefs=self._layout_prefs,
+        )
         self._sidebar.pack(fill="y", side="left")
 
         right = ctk.CTkFrame(body, fg_color="transparent")
@@ -84,9 +91,15 @@ class ApplicationShellMixin:
     def _setup_keybindings(self) -> None:
         self.bind("<Control-k>", lambda _: self._show_command_palette())
         self.bind("<Control-K>", lambda _: self._show_command_palette())
+        self.bind("<Control-slash>", lambda _: self._focus_command_box())
         self.bind("<Control-h>", lambda _: self._history_drawer.toggle())
         self.bind("<Control-H>", lambda _: self._history_drawer.toggle())
         self.bind("?", self._maybe_show_shortcuts)
+
+    def _focus_command_box(self) -> None:
+        box = getattr(self, "_command_box", None)
+        if box is not None and hasattr(box, "focus"):
+            box.focus()
 
     def _show_command_palette(self) -> None:
         """Open the OS palette with all registered provider commands."""

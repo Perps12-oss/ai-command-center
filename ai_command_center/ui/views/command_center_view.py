@@ -308,40 +308,32 @@ class CommandCenterView(ctk.CTkFrame):
         )
 
         self._ops_cards["executions"].update(
-            metric=f"Running {running_count}",
+            metric=str(running_count if running_count else total_count),
             status="running" if running_count else "ready",
-            sub=f"Completed today {completed_today} · Queued {queued}",
+            sub=f"Running {running_count} · Completed {completed_today} · Queued {queued}",
             timestamp=exec_ts,
-            trend="+25%" if running_count or total_count else "",
+            trend="",
         )
-        # Keep numeric metric accessible for older assertions
-        if str(self._ops_cards["executions"]._metric.cget("text")):
-            pass
-        # Tests assert metric != "" — Running N is fine. Also ensure simple number path:
-        self._ops_cards["executions"]._metric.configure(
-            text=str(running_count if running_count else total_count)
-        )
-        self._ops_cards["executions"]._detail.configure(
-            text=f"Running {running_count} · Completed today {completed_today} · Queued {queued}"
-        )
-
         self._ops_cards["agents"].update(
             metric=str(agent_count),
             status="running" if agent_count else "ready",
             sub=f"Running {agent_count} · Waiting {waiting_agents} · Idle {idle_agents}",
             timestamp=last_ts,
+            trend="",
         )
         self._ops_cards["approvals"].update(
             metric=str(pending_count),
             status="running" if pending_count else "ready",
-            sub="Pending" if pending_count else "None pending · Avg wait —",
+            sub="Pending approval" if pending_count else "None pending",
             timestamp=last_ts,
+            trend="",
         )
         self._ops_cards["providers"].update(
             metric=str(healthy_count),
             status="ready" if healthy_count else "offline",
             sub=f"Healthy {healthy_count}/{provider_total} · Unavailable {max(0, provider_total - healthy_count)}",
             timestamp=last_ts,
+            trend="",
         )
 
         provider_state = "ready"
@@ -372,13 +364,13 @@ class CommandCenterView(ctk.CTkFrame):
             "running" if mutation_count else "ready",
         )
 
-        # Mode-aware recommendation copy
+        # Mode-aware recommendation copy (honest about navigate-only CTAs)
         mode_hints = {
             "idle": "Suggested: Organize Downloads · Summarize Clipboard · Search Notes · Build Workflow",
-            "planning": "Watch the plan graph and reasoning steps in Operations / Brain.",
-            "executing": "Live progress is on the hero and Timeline — Pause or Approve from the Mission panel.",
+            "planning": "Open Operations to inspect the live plan graph and stage progress.",
+            "executing": "Live progress is on the hero and Timeline — open Operations or Approvals to take control.",
             "waiting": "Approvals require your input — open Approval Center to continue.",
-            "failure": "Review diagnostics on Executions, then Retry or Abort the mission.",
+            "failure": "Review diagnostics on Executions, then recover from that surface.",
         }
         self._recommend.configure(
             text=mode_hints.get(mode.value if hasattr(mode, "value") else str(mode), mode_hints["idle"])

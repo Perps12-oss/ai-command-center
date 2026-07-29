@@ -189,6 +189,7 @@ class MissionHeroPanel(GlassCard):
             self._on_navigate(self._action_view)
 
     def _on_secondary(self) -> None:
+        """Secondary CTA — navigate to the relevant control surface (honest labels)."""
         if self._mode == MissionMode.WAITING and self._on_navigate:
             self._on_navigate("approvals")
         elif self._mode == MissionMode.FAILURE and self._on_navigate:
@@ -343,7 +344,10 @@ class MissionHeroPanel(GlassCard):
             )
             self._summary_label.configure(text=count_summary)
             self._show_progress(True)
-            self._bars["planning"].set(1.0 if plan_done(snap) else 0.45, "Complete" if plan_done(snap) else "Running")
+            self._bars["planning"].set(
+                1.0 if plan_done(snap) else 0.0,
+                "Complete" if plan_done(snap) else "Running",
+            )
             self._bars["execution"].set(0.0, "Pending")
             self._bars["verification"].set(0.0, "Pending")
             self._show_suggestions(False)
@@ -355,7 +359,7 @@ class MissionHeroPanel(GlassCard):
                 fg_color=action_color,
                 hover_color=action_color,
             )
-            self._secondary_button.configure(text="View Plan")
+            self._secondary_button.configure(text="Open Operations")
         elif mode == MissionMode.EXECUTING:
             pct = int(progress * 100)
             self._goal_label.configure(
@@ -382,7 +386,7 @@ class MissionHeroPanel(GlassCard):
                 fg_color=action_color,
                 hover_color=action_color,
             )
-            self._secondary_button.configure(text="Pause")
+            self._secondary_button.configure(text="Open Operations")
         elif mode == MissionMode.WAITING:
             self._goal_label.configure(text=active_goal or "Awaiting input")
             self._narrative.configure(
@@ -400,7 +404,7 @@ class MissionHeroPanel(GlassCard):
                 fg_color=T.APPROVAL_ORANGE,
                 hover_color=T.APPROVAL_ORANGE,
             )
-            self._secondary_button.configure(text="Abort")
+            self._secondary_button.configure(text="Open Approvals")
         else:  # FAILURE
             err_text = ""
             if active_plan:
@@ -431,7 +435,7 @@ class MissionHeroPanel(GlassCard):
                     fg_color=action_color,
                     hover_color=action_color,
                 )
-            self._secondary_button.configure(text="Retry")
+            self._secondary_button.configure(text="Open Executions")
 
         return mode
 
