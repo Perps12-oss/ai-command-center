@@ -31,6 +31,7 @@ class MemoryView(ctk.CTkFrame):
         on_add: Callable[[str, str], None] | None = None,
         on_select: Callable[[dict[str, Any]], None] | None = None,
         on_inspect_select: Callable[[InspectableRef], None] | None = None,
+        on_search: Callable[[str], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -38,6 +39,7 @@ class MemoryView(ctk.CTkFrame):
         self._on_add = on_add
         self._on_select = on_select
         self._on_inspect_select = on_inspect_select
+        self._on_search = on_search
         self._items: list[dict[str, Any]] = []
         self._injected_labels: set[str] = set()
         self._selected_id: str | None = None
@@ -89,7 +91,7 @@ class MemoryView(ctk.CTkFrame):
             text_color=T.TEXT_PRIMARY,
         )
         self._search.pack(fill="x", padx=T.PAD, pady=(0, 10))
-        self._search.bind("<KeyRelease>", lambda _: self._render())
+        self._search.bind("<KeyRelease>", lambda _: self._on_search_key())
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
@@ -338,6 +340,12 @@ class MemoryView(ctk.CTkFrame):
             text_color="white",
             command=_confirm,
         ).pack(side="left")
+
+    def _on_search_key(self) -> None:
+        query = self._search.get().strip()
+        if self._on_search is not None:
+            self._on_search(query)
+        self._render()
 
     def _visible_items(self) -> list[dict[str, Any]]:
         q = self._search.get().strip().lower()

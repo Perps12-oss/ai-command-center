@@ -95,9 +95,11 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 
 ### R1.2 exit criteria
 
-- [ ] Registry complete for all authority + orchestration components  
-- [ ] Every “keep” row is factory-registered  
-- [ ] Every “retire” row removed or marked deprecated with migration note  
+- [x] Registry complete for all authority + orchestration components *(truth matrix 2026-07-29)*  
+- [x] Every “keep” row is factory-registered  
+- [ ] Every “retire” row removed or marked deprecated with migration note — OperatorKernel marked research-only (ADR-006); PlanningEngine / AgentCoordinator still **exist-unwired** (defer wire-or-retire decision; not silent feature work)
+
+**P2 status:** IN PROGRESS — composition registry maintained; no Priority 3 coding until Phase B remediation on `main` and explicit P2 close (retire or wire remaining rows).
 
 ---
 

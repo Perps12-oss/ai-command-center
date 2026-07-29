@@ -376,6 +376,7 @@ _UI_MODULES_TO_RELOAD = (
     "ai_command_center.ui.components.graph.base_graph_canvas",
     "ai_command_center.ui.components.graph",
     "ai_command_center.ui.components.graph_canvas",
+    "ai_command_center.ui.components.quick_action_card",
     "ai_command_center.ui.views.home_view",
     "ai_command_center.ui.mission_control.modes",
     "ai_command_center.ui.mission_control.layout_prefs",
