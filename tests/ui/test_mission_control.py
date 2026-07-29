@@ -114,3 +114,36 @@ def test_command_center_brain_and_world_projection() -> None:
     assert "%" in view._brain._values["Confidence"].cget("text")
     assert "Entities 10" in view._world._stats.cget("text")
     assert view._status_strip._pills["runtime"] is not None
+
+
+def test_brain_confidence_preserves_zero() -> None:
+    view = CommandCenterView(None, on_command=lambda _x: None, on_navigate=lambda _x: None)
+    snap = AppState(
+        brain_state=BrainStateSnapshot(
+            recent_observations=(
+                ObservationSnapshot(content="weak", confidence=0.0),
+                ObservationSnapshot(content="ok", confidence=0.5),
+            ),
+        ),
+    )
+    view.apply_state(snap)
+    assert view._brain._values["Confidence"].cget("text") == "25%"
+
+
+def test_failure_hero_cta_matches_executions_target() -> None:
+    navigated: list[str] = []
+    view = CommandCenterView(
+        None,
+        on_command=lambda _x: None,
+        on_navigate=navigated.append,
+    )
+    snap = AppState(
+        execution_library=ExecutionLibrarySnapshot(
+            active_plan=ExecutionPlanSnapshot(status="failed", error="boom", total_steps=2),
+        ),
+    )
+    view.apply_state(snap)
+    assert view._action_button.cget("text") == "Open Executions"
+    assert view._action_view == "executions"
+    view._action_button.invoke()
+    assert navigated == ["executions"]

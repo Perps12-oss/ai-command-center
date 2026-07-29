@@ -99,9 +99,13 @@ class BrainSituationPanel(GlassCard):
         if plan and getattr(plan, "goal", ""):
             reasoning = f"{reasoning} · {getattr(plan, 'goal', '')}"[:72]
 
-        confidences = [
-            float(getattr(o, "confidence", 1.0) or 1.0) for o in observations
-        ]
+        confidences: list[float] = []
+        for o in observations:
+            raw = getattr(o, "confidence", 1.0)
+            if raw is None:
+                confidences.append(1.0)
+            else:
+                confidences.append(float(raw))
         if confidences:
             confidence = sum(confidences) / len(confidences)
             conf_pct = f"{int(confidence * 100)}%"
