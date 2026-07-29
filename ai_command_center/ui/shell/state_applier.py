@@ -138,6 +138,15 @@ class StateApplierMixin:
         if command_center and hasattr(command_center, "apply_state") and current_view == "command_center":
             command_center.apply_state(snap)
 
+        # Sidebar notification badges (approvals / agents) — AppState driven
+        sidebar = getattr(self, "_sidebar", None)
+        if sidebar is not None and hasattr(sidebar, "set_badges"):
+            permission = getattr(snap, "permission_snapshot", None)
+            pending = 1 if (permission and getattr(permission, "has_pending", False)) else 0
+            agent_pipeline = getattr(snap, "agent_pipeline", None)
+            agents = len(getattr(agent_pipeline, "active_run_ids", ()) if agent_pipeline else ())
+            sidebar.set_badges({"approvals": pending, "agents": agents})
+
         goal = self._goal_view()
         if goal and hasattr(goal, "apply_state") and current_view == "goals":
             goal.apply_state(snap)
