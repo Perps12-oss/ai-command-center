@@ -83,6 +83,24 @@ def test_context_bar_projects_active_goal_from_brain_state(context_bar):
     assert "Active from brain" in context_bar._goal_label.cget("text")
 
 
+def test_resolve_active_goal_helper():
+    from ai_command_center.core.state.global_context_state import resolve_active_goal
+    from ai_command_center.domain.brain_state_snapshot import (
+        BrainStateSnapshot,
+        GoalSnapshot,
+    )
+
+    empty = resolve_active_goal(None)
+    assert empty == ("", "")
+    snap = BrainStateSnapshot(
+        recent_goals=(
+            GoalSnapshot(goal_id="g0", text="Done", status="completed"),
+            GoalSnapshot(goal_id="g1", text="Live", status="running"),
+        ),
+    )
+    assert resolve_active_goal(snap) == ("g1", "Live")
+
+
 def test_global_context_reducer_updates_from_context_snapshot():
     """reduce_global_context_state promotes context snapshot to global state."""
     state = _make_state()

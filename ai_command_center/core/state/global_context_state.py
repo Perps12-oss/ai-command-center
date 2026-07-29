@@ -93,6 +93,19 @@ def _goal_fields(payload: dict[str, Any]) -> tuple[str, str]:
     return goal_id, title
 
 
+def resolve_active_goal(brain_state: Any) -> tuple[str, str]:
+    """Return ``(goal_id, title)`` for the first active/queued/running brain goal."""
+    goals = list(getattr(brain_state, "recent_goals", ()) or ())
+    for goal in goals:
+        status = str(getattr(goal, "status", "")).lower()
+        if status in {"active", "queued", "running"}:
+            return (
+                str(getattr(goal, "goal_id", "") or ""),
+                str(getattr(goal, "text", "") or getattr(goal, "title", "") or ""),
+            )
+    return ("", "")
+
+
 def reduce_global_context_state(state: Any, event: Event) -> Any:
     """Update the global_context field on AppState from bus events."""
     if not hasattr(state, "global_context"):
