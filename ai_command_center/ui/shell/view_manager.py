@@ -142,6 +142,7 @@ class ViewManagerMixin:
             on_add=self._on_memory_add,
             on_select=self._on_memory_select,
             on_inspect_select=self._on_chat_inspect_select,
+            on_search=self._controller.publish_memory_search,
         )
         self._view_registry["system"] = lambda: SystemView(self._content)
         self._view_registry["settings"] = lambda: SettingsView(
@@ -567,10 +568,10 @@ class ViewManagerMixin:
             return
         self._controller.publish_goal_task_select(gid, tid)
         self._controller.publish_inspect_select(
-            "plan_step",
+            "task",
             tid,
             label=tid,
-            payload={"goal_id": gid, "task_id": tid, "step_id": tid},
+            payload={"goal_id": gid, "task_id": tid, "step_id": tid, "title": tid},
         )
 
     def _on_brain_goal_select(self, goal_id: str) -> None:

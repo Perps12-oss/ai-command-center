@@ -67,7 +67,7 @@ def test_goal_workspace_projects_tree_tasks_criteria():
 
     view._select_task("s2")
     assert tasks == [("g1", "s2")]
-    assert getattr(inspected[-1], "kind") == "plan_step"
+    assert getattr(inspected[-1], "kind") == "task"
 
 
 def test_goal_tree_and_criteria_components():

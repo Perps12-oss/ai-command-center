@@ -8,17 +8,12 @@ from collections import deque
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
+from ai_command_center.ui.components.quick_action_card import (
+    ActionCard as _ActionCard,
+    QUICK_ACTIONS as _QUICK_ACTIONS,
+)
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.widget_utils import clear_children
-
-_QUICK_ACTIONS: tuple[tuple[str, str, str, str], ...] = (
-    ("\u2318  Ask AI",        "Type any question in the command box below",                  "accent",    "What can you help me with?"),
-    ("\U0001f4cb  Clipboard", "Type \u201csummarize clipboard\u201d to process copied text", "secondary", "summarize clipboard"),
-    ("\U0001f4dd  Notes",     "Type \u201cnote: keyword\u201d to search your Obsidian vault", "secondary", "note: "),
-    ("\U0001f4be  Remember",  "Type \u201cremember: label | content\u201d to store a memory", "secondary", "remember: | "),
-    (">_  Shell",             "Type \u201c> command\u201d to run a shell command",            "secondary", "> "),
-    ("\U0001f9e0  Memory",    "Type \u201cmemory: keyword\u201d to recall stored facts",      "secondary", "memory: "),
-)
 
 _ACTIVITY_ICON = {
     "chat":    "💬",
@@ -32,59 +27,9 @@ _ACTIVITY_ICON = {
 _MAX_ACTIVITY = 5
 
 
-def _accent_for(key: str) -> str:
-    return T.ACCENT_DEFAULT if key == "accent" else T.TEXT_SECONDARY
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 #  Internal widgets
 # ──────────────────────────────────────────────────────────────────────────────
-
-class _ActionCard(ctk.CTkFrame):
-    def __init__(self, master, icon_title: str, hint: str, color_key: str, command=None) -> None:
-        super().__init__(
-            master,
-            fg_color=T.BG_GLASS,
-            border_color=T.BG_GLASS_BORDER,
-            border_width=1,
-            corner_radius=T.CARD_RADIUS,
-        )
-        self._command = command
-        self._default_border = T.BG_GLASS_BORDER
-        self._hover_border = T.GLASS_BORDER_HOVER
-        ctk.CTkLabel(
-            self,
-            text=icon_title,
-            font=T.FONT_HEADER,
-            text_color=_accent_for(color_key),
-            anchor="w",
-        ).pack(fill="x", padx=12, pady=(10, 2))
-        ctk.CTkLabel(
-            self,
-            text=hint,
-            font=T.FONT_SMALL,
-            text_color=T.TEXT_MUTED,
-            anchor="w",
-            wraplength=260,
-            justify="left",
-        ).pack(fill="x", padx=12, pady=(0, 10))
-        if command is not None:
-            self.bind("<Enter>", self._on_enter)
-            self.bind("<Leave>", self._on_leave)
-            self.bind("<Button-1>", lambda _e: self._on_click())
-            for child in self.winfo_children():
-                child.bind("<Button-1>", lambda _e: self._on_click())
-
-    def _on_enter(self, _event) -> None:
-        self.configure(border_color=self._hover_border)
-
-    def _on_leave(self, _event) -> None:
-        self.configure(border_color=self._default_border)
-
-    def _on_click(self) -> None:
-        if self._command is not None:
-            self._command()
-
 
 class _StatusPill(ctk.CTkFrame):
     """Single live-status indicator: dot + label + sub-label."""
