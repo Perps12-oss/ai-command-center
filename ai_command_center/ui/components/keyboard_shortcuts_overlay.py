@@ -20,6 +20,12 @@ SHORTCUTS = [
         {"keys": "Ctrl + K", "description": "Open OS command palette"},
         {"keys": "Ctrl + H", "description": "Toggle command history drawer"},
         {"keys": "?", "description": "Show keyboard shortcuts"},
+        {"keys": "Ctrl + /", "description": "Focus Mission Control command bar"},
+    ]},
+    {"category": "Mission Control", "shortcuts": [
+        {"keys": "Enter", "description": "Submit command"},
+        {"keys": "Esc", "description": "Clear command box / close overlays"},
+        {"keys": "Chip click", "description": "Pre-fill Ask AI / Shell / Notes / Goal"},
     ]},
     {"category": "Selection", "shortcuts": [
         {"keys": "Click", "description": "Select node/edge"},
