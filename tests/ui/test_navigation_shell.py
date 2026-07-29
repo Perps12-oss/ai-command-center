@@ -80,6 +80,28 @@ def test_sidebar_badges_and_favorites(sidebar):
     assert "goals" in sidebar._prefs.recent_pages
 
 
+def test_sidebar_search_clear_restores_collapsed_groups(sidebar):
+    group = sidebar._groups["Workspace"]
+    sidebar._search._kwargs["text"] = "zzzz-no-match"
+    sidebar._on_search()
+    assert not group.is_expanded
+    sidebar._search._kwargs["text"] = ""
+    sidebar._on_search()
+    assert group.is_expanded
+
+
+def test_sidebar_compact_badges_do_not_restore_full_labels(sidebar):
+    sidebar.toggle_collapse()
+    assert sidebar._compact
+    sidebar.set_badges({"approvals": 3, "agents": 1})
+    for btn in sidebar._buttons.values():
+        assert btn.cget("text") == ""
+    sidebar.toggle_collapse()
+    sidebar.set_badges({"approvals": 3})
+    assert "Approvals" in sidebar._buttons["approvals"].cget("text")
+    assert "3" in sidebar._buttons["approvals"].cget("text")
+
+
 def test_nav_group_buttons_call_on_select(nav_group):
     selected: list[str] = []
     nav_group._on_select = lambda v: selected.append(v)
