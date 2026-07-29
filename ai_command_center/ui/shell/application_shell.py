@@ -53,7 +53,7 @@ class ApplicationShellMixin:
         right = ctk.CTkFrame(body, fg_color="transparent")
         right.pack(fill="both", expand=True, side="left")
 
-        self._command_host = ctk.CTkFrame(right, fg_color=T.BG_PANEL, corner_radius=0, height=80)
+        self._command_host = ctk.CTkFrame(right, fg_color=T.BG_PANEL, corner_radius=0, height=120)
         self._command_host.pack(fill="x")
         self._command_host.pack_propagate(False)
 
@@ -61,8 +61,9 @@ class ApplicationShellMixin:
             self._command_host,
             on_submit=self._on_command,
             on_help=self._show_capability_help,
+            on_palette=self._show_command_palette,
         )
-        self._command_box.pack(fill="x", padx=T.PAD, pady=10)
+        self._command_box.pack(fill="x", padx=T.PAD, pady=8)
 
         self._content = ctk.CTkFrame(right, fg_color="transparent")
         self._content.pack(fill="both", expand=True)
@@ -267,6 +268,16 @@ class ApplicationShellMixin:
 
     def _show_capability_help(self) -> None:
         show_capability_help(self)
+
+    def _prefill_command_box(self, text: str) -> None:
+        """Pre-fill the dominant command bar from Mission Control chips."""
+        box = getattr(self, "_command_box", None)
+        if box is not None and hasattr(box, "prefill"):
+            box.prefill(text)
+            return
+        # Fallback: treat as a command submit when box unavailable
+        if text and not text.endswith((" ", "| ", ": ")):
+            self._on_command(text)
 
     def _apply_overlay_geometry(self, mode: str, x: int, y: int) -> None:
         if mode == "compact":

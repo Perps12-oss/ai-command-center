@@ -56,9 +56,18 @@ RIBBON_PILL_BORDER = "#3A3F53"
 # UI Constitution subsystem colors — Article 5
 GOAL_AMBER = "#FFB300"  # Goal Dashboard operational accent
 AGENT_PURPLE = "#9B59B6"  # Agent Monitor operational accent
+REASONING_PURPLE = "#8B5CF6"  # AI reasoning / Brain panel (Mission Control)
 WORLD_TEAL = "#009688"
 APPROVAL_ORANGE = "#FF9800"  # Approval Center operational accent
 EXECUTION_BLUE = "#3B82F6"  # Execution Center operational accent
+
+# Accessibility / theme variants (Mission Control Priority 7)
+HIGH_CONTRAST_TEXT = "#FFFFFF"
+HIGH_CONTRAST_BG = "#000000"
+LIGHT_THEME_BG = "#F5F7FA"
+LIGHT_THEME_PANEL = "#FFFFFF"
+LIGHT_THEME_TEXT = "#1A1A2E"
+FOCUS_RING = "#93C5FD"
 
 # Chat message bubbles
 MSG_USER_BG = "#1E2D4A"
