@@ -7,6 +7,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppState
+from ai_command_center.core.state.global_context_state import resolve_active_goal
 from ai_command_center.providers.defaults import provider_display_name
 from ai_command_center.ui.design_system import theme_v2 as T
 
@@ -120,13 +121,7 @@ class GlobalContextBar(ctk.CTkFrame):
 
         active_goal = ctx.active_goal_title
         if not active_goal:
-            brain_state = getattr(snap, "brain_state", None)
-            goals = list(getattr(brain_state, "recent_goals", ()) if brain_state else ())
-            for goal in goals:
-                status = getattr(goal, "status", "")
-                if status in {"active", "queued", "running"}:
-                    active_goal = getattr(goal, "text", "") or ""
-                    break
+            _goal_id, active_goal = resolve_active_goal(getattr(snap, "brain_state", None))
         self._goal_label.configure(
             text=f"Goal: {active_goal}" if active_goal else "No active goal",
         )
