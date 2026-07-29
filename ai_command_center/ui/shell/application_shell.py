@@ -27,12 +27,15 @@ from ai_command_center.ui.design_system.shortcut import ShortcutOverlay
 from ai_command_center.ui.design_system.toast import ToastManager
 from ai_command_center.ui.design_system import theme_manager
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.mission_control.layout_prefs import LayoutPrefs
 
 
 class ApplicationShellMixin:
     """Builds the CTk shell and handles show/hide plus command input."""
 
     def _build_layout(self) -> None:
+        self._layout_prefs = LayoutPrefs()
+
         self._top = TopBar(
             self,
             on_settings=lambda: self._navigate("settings"),
@@ -47,13 +50,17 @@ class ApplicationShellMixin:
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True)
 
-        self._sidebar = Sidebar(body, on_navigate=self._on_sidebar_navigate)
+        self._sidebar = Sidebar(
+            body,
+            on_navigate=self._on_sidebar_navigate,
+            layout_prefs=self._layout_prefs,
+        )
         self._sidebar.pack(fill="y", side="left")
 
         right = ctk.CTkFrame(body, fg_color="transparent")
         right.pack(fill="both", expand=True, side="left")
 
-        self._command_host = ctk.CTkFrame(right, fg_color=T.BG_PANEL, corner_radius=0, height=80)
+        self._command_host = ctk.CTkFrame(right, fg_color=T.BG_PANEL, corner_radius=0, height=120)
         self._command_host.pack(fill="x")
         self._command_host.pack_propagate(False)
 
@@ -61,8 +68,9 @@ class ApplicationShellMixin:
             self._command_host,
             on_submit=self._on_command,
             on_help=self._show_capability_help,
+            on_palette=self._show_command_palette,
         )
-        self._command_box.pack(fill="x", padx=T.PAD, pady=10)
+        self._command_box.pack(fill="x", padx=T.PAD, pady=8)
 
         self._content = ctk.CTkFrame(right, fg_color="transparent")
         self._content.pack(fill="both", expand=True)
@@ -83,9 +91,15 @@ class ApplicationShellMixin:
     def _setup_keybindings(self) -> None:
         self.bind("<Control-k>", lambda _: self._show_command_palette())
         self.bind("<Control-K>", lambda _: self._show_command_palette())
+        self.bind("<Control-slash>", lambda _: self._focus_command_box())
         self.bind("<Control-h>", lambda _: self._history_drawer.toggle())
         self.bind("<Control-H>", lambda _: self._history_drawer.toggle())
         self.bind("?", self._maybe_show_shortcuts)
+
+    def _focus_command_box(self) -> None:
+        box = getattr(self, "_command_box", None)
+        if box is not None and hasattr(box, "focus"):
+            box.focus()
 
     def _show_command_palette(self) -> None:
         """Open the OS palette with all registered provider commands."""
@@ -267,6 +281,16 @@ class ApplicationShellMixin:
 
     def _show_capability_help(self) -> None:
         show_capability_help(self)
+
+    def _prefill_command_box(self, text: str) -> None:
+        """Pre-fill the dominant command bar from Mission Control chips."""
+        box = getattr(self, "_command_box", None)
+        if box is not None and hasattr(box, "prefill"):
+            box.prefill(text)
+            return
+        # Fallback: treat as a command submit when box unavailable
+        if text and not text.endswith((" ", "| ", ": ")):
+            self._on_command(text)
 
     def _apply_overlay_geometry(self, mode: str, x: int, y: int) -> None:
         if mode == "compact":
