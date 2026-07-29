@@ -13,6 +13,9 @@ from typing import Any, Callable
 
 import customtkinter as ctk
 
+from ai_command_center.ui.components.docks.execution_timeline_dock import (
+    ExecutionTimelineDock,
+)
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.mission_control import (
     ActivityTimeline,
@@ -24,6 +27,7 @@ from ai_command_center.ui.mission_control import (
     StateAwareKpiCard,
     WorldModelWidget,
 )
+from ai_command_center.ui.mission_control.layout_prefs import DEFAULT_WIDGET_ORDER
 
 
 class CommandCenterView(ctk.CTkFrame):
@@ -36,13 +40,24 @@ class CommandCenterView(ctk.CTkFrame):
         on_navigate: Callable[[str], None] | None = None,
         on_prefill: Callable[[str], None] | None = None,
         layout_prefs: LayoutPrefs | None = None,
+        on_pause_goal: Callable[[str], None] | None = None,
+        on_abort_goal: Callable[[str], None] | None = None,
+        on_approve: Callable[[], None] | None = None,
+        on_resume_goal: Callable[[str], None] | None = None,
+        on_scrub: Callable[[int], None] | None = None,
     ) -> None:
         super().__init__(master, fg_color="transparent")
         self._on_command = on_command
         self._on_navigate = on_navigate
         self._on_prefill = on_prefill
+        self._on_pause_goal = on_pause_goal
+        self._on_abort_goal = on_abort_goal
+        self._on_approve = on_approve
+        self._on_resume_goal = on_resume_goal
+        self._on_scrub = on_scrub
         self._prefs = layout_prefs or LayoutPrefs()
         self._action_view = "chat"
+        self._sections: dict[str, ctk.CTkFrame] = {}
         self._build()
 
     def _build(self) -> None:
@@ -62,8 +77,14 @@ class CommandCenterView(ctk.CTkFrame):
             on_navigate=self._on_navigate,
             on_command=self._on_command,
             on_primary=self._on_action,
+            on_pause=self._on_pause_goal,
+            on_abort=self._on_abort_goal,
+            on_approve=self._on_approve,
+            on_resume=self._on_resume_goal,
         )
         self._hero_panel.pack(fill="x", padx=pad, pady=(0, 8))
+        self._sections["hero"] = self._hero_panel
+        self._sections["status"] = self._status_strip
 
         # Compatibility aliases for existing projection tests
         self._hero = self._hero_panel
@@ -73,7 +94,7 @@ class CommandCenterView(ctk.CTkFrame):
         self._action_button = self._hero_panel._action_button
         self._surface_state = self._hero_panel._surface_state
 
-        # Density / progressive disclosure toolbar
+        # Density / progressive disclosure / widget reorder toolbar
         tools = ctk.CTkFrame(scroll, fg_color="transparent")
         tools.pack(fill="x", padx=pad, pady=(0, 6))
         ctk.CTkButton(
@@ -102,12 +123,60 @@ class CommandCenterView(ctk.CTkFrame):
             border_color=T.GLASS_BORDER,
             command=self._toggle_advanced,
         ).pack(side="right", padx=(0, 6))
+        ctk.CTkButton(
+            tools,
+            text="Layout ▲",
+            width=72,
+            height=24,
+            font=T.FONT_SMALL,
+            fg_color=T.BG_GLASS,
+            hover_color=T.LIGHT_GLASS,
+            text_color=T.TEXT_SECONDARY,
+            border_width=1,
+            border_color=T.GLASS_BORDER,
+            command=lambda: self._reorder_focus(-1),
+        ).pack(side="left")
+        ctk.CTkButton(
+            tools,
+            text="Layout ▼",
+            width=72,
+            height=24,
+            font=T.FONT_SMALL,
+            fg_color=T.BG_GLASS,
+            hover_color=T.LIGHT_GLASS,
+            text_color=T.TEXT_SECONDARY,
+            border_width=1,
+            border_color=T.GLASS_BORDER,
+            command=lambda: self._reorder_focus(1),
+        ).pack(side="left", padx=(6, 0))
+        self._layout_focus = "mid"
+        self._layout_focus_label = ctk.CTkLabel(
+            tools,
+            text="Reorder: mid",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+        )
+        self._layout_focus_label.pack(side="left", padx=(8, 0))
+        ctk.CTkButton(
+            tools,
+            text="Focus→",
+            width=64,
+            height=24,
+            font=T.FONT_SMALL,
+            fg_color=T.BG_GLASS,
+            hover_color=T.LIGHT_GLASS,
+            text_color=T.TEXT_SECONDARY,
+            border_width=1,
+            border_color=T.GLASS_BORDER,
+            command=self._cycle_layout_focus,
+        ).pack(side="left", padx=(6, 0))
 
         # Mid band: Timeline | Brain
         mid = ctk.CTkFrame(scroll, fg_color="transparent")
         mid.pack(fill="both", expand=True, padx=pad, pady=(0, 8))
         mid.grid_columnconfigure((0, 1), weight=1)
         mid.grid_rowconfigure(0, weight=1)
+        self._sections["mid"] = mid
 
         self._timeline = ActivityTimeline(mid, max_items=10)
         self._timeline.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
@@ -120,6 +189,7 @@ class CommandCenterView(ctk.CTkFrame):
         ops = ctk.CTkFrame(scroll, fg_color="transparent")
         ops.pack(fill="x", padx=pad, pady=(0, 8))
         ops.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        self._sections["kpis"] = ops
 
         self._ops_cards: dict[str, StateAwareKpiCard] = {}
         for col, (key, title, color) in enumerate(
@@ -150,6 +220,7 @@ class CommandCenterView(ctk.CTkFrame):
         lower = ctk.CTkFrame(scroll, fg_color="transparent")
         lower.pack(fill="x", padx=pad, pady=(0, 8))
         lower.grid_columnconfigure((0, 1), weight=1)
+        self._sections["lower"] = lower
 
         self._world = WorldModelWidget(lower, on_navigate=self._on_navigate)
         self._world.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
@@ -175,7 +246,34 @@ class CommandCenterView(ctk.CTkFrame):
             justify="left",
             wraplength=360,
         )
-        self._recommend.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+        self._recommend.pack(fill="x", padx=T.PAD, pady=(0, 4))
+        ctk.CTkButton(
+            right,
+            text="Open Operations Timeline",
+            height=26,
+            font=T.FONT_SMALL,
+            fg_color=T.EXECUTION_BLUE,
+            hover_color=T.EXECUTION_BLUE,
+            command=lambda: self._on_navigate("operations") if self._on_navigate else None,
+        ).pack(anchor="w", padx=T.PAD, pady=(0, T.PAD))
+
+        # Composed ExecutionTimelineDock (shared primitive with Operations)
+        dock_host = ctk.CTkFrame(
+            scroll,
+            fg_color=T.BG_PANEL,
+            corner_radius=T.CARD_RADIUS,
+            border_width=1,
+            border_color=T.EXECUTION_BLUE,
+        )
+        dock_host.pack(fill="x", padx=pad, pady=(0, 8))
+        self._sections["dock"] = dock_host
+        self._exec_dock = ExecutionTimelineDock(
+            dock_host,
+            on_scrub=self._on_scrub or (lambda _i: None),
+            timeline_height=72,
+            show_section_labels=True,
+        )
+        self._exec_dock.pack(fill="x", padx=4, pady=4)
 
         # System awareness (health rows) — retained for tests + Tier 3 detail
         self._system = ctk.CTkFrame(
@@ -186,6 +284,7 @@ class CommandCenterView(ctk.CTkFrame):
             border_color=T.GLASS_BORDER,
         )
         self._system.pack(fill="x", padx=pad, pady=(0, pad))
+        self._sections["system"] = self._system
         ctk.CTkLabel(
             self._system,
             text="System Awareness",
@@ -198,25 +297,70 @@ class CommandCenterView(ctk.CTkFrame):
             row = _HealthRow(self._system)
             row.pack(fill="x", padx=T.PAD, pady=(0, 4))
             self._health_rows[key] = row
-        # spacer
         ctk.CTkFrame(self._system, fg_color="transparent", height=8).pack()
 
-        self._advanced_host = self._system
+        self._scroll = scroll
+        self._pad = pad
+        self._apply_widget_order()
         if not self._prefs.show_advanced:
             self._system.pack_forget()
+            self._sections["dock"].pack_forget()
 
     def _toggle_density(self) -> None:
         self._prefs.toggle_density()
-        # Density is applied on next rebuild; surface a toast-like label update.
         mode = "compact" if self._prefs.is_compact() else "expanded"
         self._recommend.configure(text=f"Density set to {mode}. Re-open Dashboard to fully reflow.")
 
     def _toggle_advanced(self) -> None:
         show = self._prefs.toggle_advanced()
         if show:
-            self._system.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
+            self._apply_widget_order()
         else:
-            self._system.pack_forget()
+            try:
+                self._system.pack_forget()
+                self._sections["dock"].pack_forget()
+            except Exception:
+                pass
+
+    def _cycle_layout_focus(self) -> None:
+        order = [w for w in DEFAULT_WIDGET_ORDER if w in {"mid", "kpis", "lower", "dock", "system"}]
+        if self._layout_focus not in order:
+            self._layout_focus = order[0]
+        else:
+            idx = order.index(self._layout_focus)
+            self._layout_focus = order[(idx + 1) % len(order)]
+        self._layout_focus_label.configure(text=f"Reorder: {self._layout_focus}")
+
+    def _reorder_focus(self, direction: int) -> None:
+        self._prefs.move_widget(self._layout_focus, direction)
+        self._apply_widget_order()
+        self._layout_focus_label.configure(text=f"Reorder: {self._layout_focus}")
+
+    def _apply_widget_order(self) -> None:
+        """Re-pack reorderable sections according to LayoutPrefs.widget_order."""
+        pad = getattr(self, "_pad", T.PAD)
+        order = list(self._prefs.widget_order) or list(DEFAULT_WIDGET_ORDER)
+        # Always keep status + hero first visually
+        fixed = ["status", "hero"]
+        movable = [w for w in order if w not in fixed and w in self._sections]
+        for wid in DEFAULT_WIDGET_ORDER:
+            if wid not in fixed and wid not in movable and wid in self._sections:
+                movable.append(wid)
+        # Unpack movable
+        for wid in movable:
+            try:
+                self._sections[wid].pack_forget()
+            except Exception:
+                pass
+        for wid in movable:
+            if wid in {"dock", "system"} and not self._prefs.show_advanced:
+                continue
+            frame = self._sections[wid]
+            expand = wid == "mid"
+            try:
+                frame.pack(fill="both" if expand else "x", expand=expand, padx=pad, pady=(0, 8))
+            except Exception:
+                pass
 
     def _on_chip(self, payload: str) -> None:
         if self._on_prefill is not None:
@@ -258,6 +402,7 @@ class CommandCenterView(ctk.CTkFrame):
             self._brain.apply_state(None)
             self._world.apply_state(None)
             self._timeline.update_from_snap(None)
+            self._exec_dock.render([])
             return
 
         mode = self._hero_panel.apply_state(snap)
@@ -266,6 +411,7 @@ class CommandCenterView(ctk.CTkFrame):
         self._brain.apply_state(snap)
         self._world.apply_state(snap)
         self._timeline.update_from_snap(snap)
+        self._render_exec_dock(snap)
 
         now = time.time()
         brain_state = getattr(snap, "brain_state", None)
@@ -364,17 +510,52 @@ class CommandCenterView(ctk.CTkFrame):
             "running" if mutation_count else "ready",
         )
 
-        # Mode-aware recommendation copy (honest about navigate-only CTAs)
         mode_hints = {
             "idle": "Suggested: Organize Downloads · Summarize Clipboard · Search Notes · Build Workflow",
-            "planning": "Open Operations to inspect the live plan graph and stage progress.",
-            "executing": "Live progress is on the hero and Timeline — open Operations or Approvals to take control.",
-            "waiting": "Approvals require your input — open Approval Center to continue.",
-            "failure": "Review diagnostics on Executions, then recover from that surface.",
+            "planning": "Pause from the hero or open Operations for the plan graph.",
+            "executing": "Pause / Abort publish goal control requests; Approvals use Review Approval.",
+            "waiting": "Review Approval grants the pending permission check from the hero.",
+            "failure": "Abort cancels the goal; Open Executions for diagnostics.",
         }
         self._recommend.configure(
             text=mode_hints.get(mode.value if hasattr(mode, "value") else str(mode), mode_hints["idle"])
         )
+
+    def _render_exec_dock(self, snap: Any) -> None:
+        steps: list[dict[str, Any]] = []
+        timeline = getattr(snap, "execution_timeline", None)
+        events = list(getattr(timeline, "events", ()) if timeline else ())
+        if not events:
+            recent = list(getattr(snap, "recent_execution_events", ()) or ())
+            events = recent
+        for i, ev in enumerate(events[:24]):
+            label = str(
+                getattr(ev, "event_type", None)
+                or getattr(ev, "summary", None)
+                or getattr(ev, "type", None)
+                or f"step-{i}"
+            )
+            steps.append(
+                {
+                    "label": label.replace("_", " "),
+                    "status": str(getattr(ev, "status", "") or "ready"),
+                    "timestamp": getattr(ev, "timestamp", 0.0) or 0.0,
+                }
+            )
+        if not steps:
+            # Fall back to ActivityTimeline-derived execution/run history
+            lib = getattr(snap, "execution_library", None)
+            for run in list(getattr(lib, "run_history", ()) if lib else ())[:8]:
+                steps.append(
+                    {
+                        "label": str(getattr(run, "summary", "") or "Execution"),
+                        "status": str(getattr(run, "status", "") or "complete"),
+                        "timestamp": getattr(run, "created_at", 0.0) or 0.0,
+                    }
+                )
+        scrub = getattr(snap, "execution_scrubber", None)
+        scrub_index = int(getattr(scrub, "scrub_index", 0) or 0) if scrub else max(0, len(steps) - 1)
+        self._exec_dock.render(steps, scrub_index=scrub_index)
 
 
 class _HealthRow(ctk.CTkFrame):

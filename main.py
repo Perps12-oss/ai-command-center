@@ -144,8 +144,12 @@ def main() -> int:
         on_open=show_palette,
         on_exit=lambda: ui_queue.enqueue(shutdown),
         get_phase=app.tray_phase,
+        get_status=getattr(app, "tray_status", None),
+        on_open_approvals=lambda: ui_queue.enqueue(lambda: app._navigate("approvals")),
     )
     tray.start()
+    # Keep a handle for optional status refresh from the UI loop
+    app._tray_controller = tray
 
     settings = core.state_store.snapshot.settings
     overlay_hotkey = settings.overlay_hotkey or settings.hotkey or "alt+space"

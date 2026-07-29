@@ -48,4 +48,9 @@ class MigrationManager:
             payload = dict(payload)
             payload.setdefault("model_tier_map", dict(DEFAULT_MODEL_TIER_MAP))
             payload["schema_version"] = 6
+            schema_version = 6
+        if schema_version < 7:
+            payload = dict(payload)
+            payload.setdefault("mission_layout_prefs", {})
+            payload["schema_version"] = 7
         return payload
