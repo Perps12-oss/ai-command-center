@@ -425,9 +425,9 @@ class MissionHeroPanel(GlassCard):
             if not pending and not paused_goal:
                 self._action_view = "executions"
                 self._action_button.configure(
-                    text="Open Chat",
-                    fg_color=T.HERO_CYAN,
-                    hover_color=T.HERO_CYAN,
+                    text="Open Executions",
+                    fg_color=T.EXECUTION_BLUE,
+                    hover_color=T.EXECUTION_BLUE,
                 )
             else:
                 self._action_button.configure(

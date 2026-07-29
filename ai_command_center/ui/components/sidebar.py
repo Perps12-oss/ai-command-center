@@ -84,6 +84,7 @@ class Sidebar(ctk.CTkFrame):
         self._badges: dict[str, int] = {}
         self._active = "command_center"
         self._filter = ""
+        self._compact = False
 
         ctk.CTkLabel(
             self,
@@ -183,6 +184,9 @@ class Sidebar(ctk.CTkFrame):
                         pass
             if self._filter:
                 group.set_expanded(visible > 0)
+            else:
+                # Clearing search must restore groups collapsed only for filtering.
+                group.set_expanded(True)
             # Restore labels with badges after filter
             self._apply_badge_labels()
 
@@ -217,6 +221,10 @@ class Sidebar(ctk.CTkFrame):
 
     def _apply_badge_labels(self) -> None:
         for view_id, btn in self._buttons.items():
+            if self._compact:
+                # Keep icon-only collapsed mode; do not restore full labels on refresh.
+                btn.configure(text="")
+                continue
             base = _LABEL_BY_ID.get(view_id, view_id)
             active_mark = "● " if view_id == self._active else ""
             fav = "★ " if view_id in self._prefs.favorites else ""
@@ -249,11 +257,14 @@ class Sidebar(ctk.CTkFrame):
             group.set_expanded(expanded)
 
     def toggle_collapse(self) -> None:
-        if self.winfo_width() > 60:
+        if not self._compact:
             self.configure(width=48)
+            self._compact = True
             for group in self._groups.values():
                 group.set_compact(True)
         else:
             self.configure(width=T.SIDEBAR_WIDTH)
+            self._compact = False
             for group in self._groups.values():
                 group.set_compact(False)
+            self._apply_badge_labels()
