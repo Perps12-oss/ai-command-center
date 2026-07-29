@@ -1,9 +1,10 @@
 # Implementation Truth Matrix
 
-**Milestone:** PHASE 0R — Repository Truth Reconciliation  
-**Baseline:** `origin/main` @ `e128a72` (verified 2026-07-20)  
+**Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
+**Baseline:** `origin/main` @ `5fcf52b` (verified 2026-07-29)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
-**Plan:** `docs/plans/PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`
+**Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
+**Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
 
 ---
 
@@ -11,21 +12,25 @@
 
 | Capability | Exists | Wired (composition root) | Tested | Live path? | Status | Evidence |
 |------------|:------:|:------------------------:|:------:|:----------:|--------|----------|
-| OperatorKernel | ✅ | ❌ | ⚠️ unit/golden only | ❌ bypassed | **PARTIAL** | `operator/kernel.py`; **not** in `service_factory.py` / `application.py`; tests `tests/test_operator/*` |
-| GoalEngine | ✅ | ✅ | ✅ | ✅ | **WIRED** | constructed in `service_factory.py` (~L200); repo `SQLiteGoalEngineRepository` |
+| OperatorKernel | ✅ | ❌ | ⚠️ unit/golden only | ❌ bypassed | **PARTIAL** | `operator/kernel.py`; **not** in `service_factory.py` / `application.py`; ADR-006 → research only |
+| GoalEngine | ✅ | ✅ | ✅ | ✅ | **WIRED** | constructed in `service_factory.py`; repo `SQLiteGoalEngineRepository` |
 | AgentCoordinator | ✅ | ❌ | ⚠️ orchestration tests | ❌ | **PARTIAL** | `orchestration/agents/`; **not** in `service_factory.py` |
 | PlanningEngine | ✅ | ❌ | ⚠️ tests | ❌ | **PARTIAL** | `orchestration/goals/planning_engine.py`; **not** in factory |
-| ExternalCapabilityBridge | ✅ | ✅ | ✅ | ✅ | **WIRED** | `ExternalCapabilityBridgeService(bus)` in factory (~L208) |
-| BrainRuntime + WorldModel core | ✅ | ✅ | ✅ | ✅ | **WIRED** | `BrainRuntimeService(bus, world_model)` in factory (~L198) |
-| Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory |
-| Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory |
-| ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory (~L268) |
-| StateAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory (~L262) |
-| BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | `ui/components/graph/base_graph_canvas.py`; used by `GraphCanvas`, World Model / relationship views |
-| TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | `timeline_renderer.py`, `execution_timeline_dock.py` |
-| InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal rail; World Model also has `SelectionInspectorPanel` (compose, don’t fork) |
-| Cross-platform hotkey (macOS) | ✅ impl + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **PARTIAL** | `MacOSHotkeyProviderImpl` exists; `get_hotkey_provider()` returns placeholder `MacOSHotkeyProvider` |
+| ExternalCapabilityBridge | ✅ | ✅ | ✅ | ✅ | **WIRED** | `ExternalCapabilityBridgeService(bus)` in factory |
+| BrainRuntime + WorldModel core | ✅ | ✅ | ✅ | ✅ | **WIRED** | `BrainRuntimeService(bus, world_model)` in factory |
+| Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
+| Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
+| ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
+| StateAuthority | ✅ | ✅ | ✅ | ⚠️ projection | **PARTIAL** | factory wired; contract incomplete — R1 P3 / Stage 2 |
+| BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
+| TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
+| InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |
+| GlobalContextBar | ✅ | ✅ (UI shell) | ✅ | ✅ UI | **WIRED** (UI) | `global_context_bar.py` + `GlobalContextSnapshot` incl. active goal |
+| OSPalette + provider registry | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | `palette_provider.py`; Ctrl+K |
+| Brain / Evidence / Operations / Graph / Insights views | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Phase B E06–E13 on main; Insights placeholder by plan |
+| Cross-platform hotkey (macOS) | ✅ impl + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **PARTIAL** | `get_hotkey_provider()` placeholder |
 | Platform tray / notifications | ⚠️ stubs | ❌ | ❌ | ❌ | **MISSING/STUB** | `NotImplementedError` in `platform/platform_service.py` |
+| Phase 5 Async EventBus (tiered + async queue) | ⚠️ policy only | ❌ | ⚠️ | ❌ | **PARTIAL** | `dispatch_policy.py` only; `tiered_dispatch_policy.py` / `async_dispatch_queue.py` **not** implemented — gated by Performance Investigation Report + human approval |
 
 Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
 
@@ -35,44 +40,69 @@ Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
 
 Registered = constructed in factory and started with other services.
 
-| Component | Exists | Registered | Live EventBus role |
-|-----------|:------:|:----------:|-------------------|
-| ExecutionAuthorityService | ✅ | ✅ | **Intake** — `UI_COMMAND` |
-| StateAuthorityService | ✅ | ✅ | State projection before plan |
-| SingleGoalScheduler | ✅ | ✅ | Goal queue → `EXECUTION_RUN_REQUEST` |
-| PlannerService | ✅ | ✅ | `PLAN_REQUEST` when not synthetic |
-| ExecutionOrchestratorService | ✅ | ✅ | Step execution |
-| ChatHandlerService | ✅ | ✅ | `LLM_STEP_REQUEST` handler |
-| RuntimeCapabilityRouterService | ✅ | ✅ | Classifier / provider map (not intake) |
-| OrchestrationService | ✅ | ✅ | Completion observer / receipts |
-| AgentRuntimeService | ✅ | ✅ | Agent plans / pipeline |
-| GoalEngine | ✅ | ✅ | Goal persistence engine |
-| OperatorKernel | ✅ | ❌ | — | **Non-canonical** (ADR-006) — research/tests only |
-| PlanningEngine | ✅ | ❌ | — | Non-canonical until ADR supersedes 006 |
-| AgentCoordinator | ✅ | ❌ | — | Non-canonical until wired + ADR |
-| PredictiveEngine | ✅ | ❌ | — |
-| UndoReplay | ✅ | ❌ | — |
+| Component | Exists | Registered | Live EventBus role | R1 disposition |
+|-----------|:------:|:----------:|--------------------|----------------|
+| ExecutionAuthorityService | ✅ | ✅ | **Intake** — `UI_COMMAND` | **keep** (ADR-006) |
+| StateAuthorityService | ✅ | ✅ | State projection before plan | **keep** — deepen per contract (P3) |
+| SingleGoalScheduler | ✅ | ✅ | Goal queue → `EXECUTION_RUN_REQUEST` | **keep** |
+| PlannerService | ✅ | ✅ | `PLAN_REQUEST` when not synthetic | **keep** |
+| ExecutionOrchestratorService | ✅ | ✅ | Step execution | **keep** |
+| ChatHandlerService | ✅ | ✅ | `LLM_STEP_REQUEST` handler | **keep** |
+| RuntimeCapabilityRouterService | ✅ | ✅ | Classifier / provider map (not intake) | **keep** |
+| OrchestrationService | ✅ | ✅ | Completion observer / receipts | **keep** |
+| AgentRuntimeService | ✅ | ✅ | Agent plans / pipeline | **keep** |
+| GoalEngine | ✅ | ✅ | Goal persistence engine | **keep** |
+| OperatorKernel | ✅ | ❌ | — | **retire from live path** (ADR-006; research/tests only) |
+| PlanningEngine | ✅ | ❌ | — | **defer** — wire or retire at R1.2 gate (not P1) |
+| AgentCoordinator | ✅ | ❌ | — | **defer** — live path uses `AgentRuntimeService` |
+| PredictiveEngine | ✅ | ❌ | — | **P5** |
+| UndoReplay | ✅ | ❌ | — | **P5** |
 
 See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
+
+### R1 priority status (2026-07-29)
+
+| Priority | Gate | Status |
+|----------|------|--------|
+| P1 Runtime authority | ADR-006 | **PASSED** |
+| P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired |
+| P3 Event & state unification | State Authority Contract | **NEXT** (Stage 2) — do not start until Phase B rem on main |
+| P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P1–P3 |
+| P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
+
+---
+
+## Phase B UI surfaces (program close-out)
+
+| Surface | Slice | On main | Tom audit on main | Notes |
+|---------|-------|:-------:|:-----------------:|-------|
+| Canon consolidation | E00 | ✅ | ✅ `TOM_AUDIT_PR_UI_E00.md` | |
+| Universal Inspector | E01 | ✅ | ✅ `TOM_AUDIT_PR_UI_E01.md` | kinds include `task` |
+| Global Context Bar | E02 | ✅ | ✅ `TOM_AUDIT_PR_UI_E02.md` | active goal remediated Stage 1 |
+| OS Palette | E03 | ✅ | ✅ `TOM_AUDIT_PR_UI_E03.md` | |
+| Navigation Shell | E04 | ✅ | ✅ | |
+| Memory / Brain / Goal / … / Insights | E05–E13 | ✅ | ✅ E04–E13 + package audit | E07 task inspect remediated Stage 1 |
+
+**Phase B program COMPLETE:** only after Stage 1 remediation (E07 kind + E02 active goal + E00–E03 audits + this matrix) merges to `main`. Do not declare complete from feature branches alone (`PHASE_COMPLETION_RULE.md`).
 
 ---
 
 ## Critical pattern (OperatorKernel)
 
-Expected authority path:
+Expected authority path (paper / Phase 8):
 
 ```text
 Application → service_factory → OperatorKernel → execution pipeline → receipt → verification
 ```
 
-Observed:
+Observed (canonical — ADR-006):
 
 ```text
-Tests → OperatorKernel
-Application → service_factory → other services → execution
+UI_COMMAND → ExecutionAuthority → GoalScheduler → [PlannerService] → ExecutionOrchestrator
+           → ChatHandler / CapabilityRuntime / Tools → OrchestrationService → AppState
 ```
 
-This is an **exists-but-not-wired** failure. Matrix status stays PARTIAL until factory + live command path use the kernel.
+OperatorKernel remains **exists-but-not-wired**. Matrix status stays PARTIAL until explicitly retired from the tree or an ADR supersedes 006.
 
 ---
 
@@ -80,9 +110,10 @@ This is an **exists-but-not-wired** failure. Matrix status stays PARTIAL until f
 
 | Layer | Maturity |
 |-------|----------|
-| UI surfaces / primitives | Ahead (many WIRED at UI layer) |
+| UI surfaces / primitives | Ahead — Phase B E00–E13 WIRED at UI layer |
 | Runtime authority services | Mixed (Goal/Brain/Authority WIRED; OperatorKernel/Coordinator/Predictive/Undo PARTIAL) |
-| Documentation / plan COMPLETE claims | Historically ahead of both — corrected under DOC_HYGIENE + 0R |
+| State Authority | Projection service WIRED; contract depth is Stage 2 |
+| Documentation / plan COMPLETE claims | Must follow code on `main` — this matrix is the Exists/Wired probe |
 
 ---
 

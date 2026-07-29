@@ -316,10 +316,16 @@ class GoalView(ctk.CTkFrame):
                     status = step.status
                     break
         self._inspect(
-            "plan_step",
+            "task",
             sid,
             label,
-            (("goal_id", goal_id), ("step_id", sid), ("status", status)),
+            (
+                ("title", label),
+                ("goal_id", goal_id),
+                ("task_id", sid),
+                ("step_id", sid),
+                ("status", status),
+            ),
         )
         if self._last_snap is not None:
             self.apply_state(self._last_snap)
