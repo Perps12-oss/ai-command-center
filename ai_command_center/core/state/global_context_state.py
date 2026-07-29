@@ -12,11 +12,34 @@ from typing import Any
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     CONTEXT_SNAPSHOT_CREATED,
+    GOAL_ACTIVATED,
+    GOAL_CANCELLED,
+    GOAL_COMPLETED,
+    GOAL_FAILED,
+    GOAL_PAUSED,
+    GOAL_RESUMED,
+    GOAL_SUBMITTED,
     UI_CONTEXT_CLEAR,
     UI_CONTEXT_SELECT,
     UI_OPEN_CHAT,
     UI_SELECT_ENTITY,
     WORKSPACE_ACTIVE,
+)
+
+_ACTIVE_GOAL_TOPICS = frozenset(
+    {
+        GOAL_SUBMITTED,
+        GOAL_ACTIVATED,
+        GOAL_RESUMED,
+    }
+)
+_CLEAR_ACTIVE_GOAL_TOPICS = frozenset(
+    {
+        GOAL_COMPLETED,
+        GOAL_FAILED,
+        GOAL_CANCELLED,
+        GOAL_PAUSED,
+    }
 )
 
 
@@ -29,6 +52,8 @@ class GlobalContextSnapshot:
     entity_id: str = ""
     entity_type: str = ""
     entity_title: str = ""
+    active_goal_id: str = ""
+    active_goal_title: str = ""
     sources: tuple[str, ...] = ()
     token_estimate: int = 0
     revision: int = 0
@@ -38,6 +63,34 @@ def _coerce_sources(raw: Any) -> tuple[str, ...]:
     if isinstance(raw, (list, tuple)):
         return tuple(str(item) for item in raw)
     return ()
+
+
+def _goal_fields(payload: dict[str, Any]) -> tuple[str, str]:
+    """Extract ``(goal_id, title)`` from goal event payloads."""
+    goal_payload = payload.get("goal")
+    nested = goal_payload if isinstance(goal_payload, dict) else {}
+    goal_id = str(
+        payload.get("goal_id")
+        or nested.get("id")
+        or payload.get("id")
+        or ""
+    ).strip()
+    if isinstance(goal_payload, dict):
+        title = str(
+            nested.get("text")
+            or nested.get("title")
+            or payload.get("text")
+            or payload.get("title")
+            or ""
+        ).strip()
+    else:
+        title = str(
+            payload.get("text")
+            or payload.get("title")
+            or (goal_payload if isinstance(goal_payload, str) else "")
+            or ""
+        ).strip()
+    return goal_id, title
 
 
 def reduce_global_context_state(state: Any, event: Event) -> Any:
@@ -119,5 +172,31 @@ def reduce_global_context_state(state: Any, event: Event) -> Any:
             revision=current.revision + 1,
         )
         return replace(state, global_context=new)
+
+    if topic in _ACTIVE_GOAL_TOPICS:
+        goal_id, title = _goal_fields(payload)
+        goal_id = goal_id or current.active_goal_id
+        title = title or current.active_goal_title
+        if goal_id or title:
+            new = replace(
+                current,
+                active_goal_id=goal_id,
+                active_goal_title=title,
+                revision=current.revision + 1,
+            )
+            return replace(state, global_context=new)
+        return state
+
+    if topic in _CLEAR_ACTIVE_GOAL_TOPICS:
+        goal_id, _ = _goal_fields(payload)
+        if not goal_id or goal_id == current.active_goal_id:
+            new = replace(
+                current,
+                active_goal_id="",
+                active_goal_title="",
+                revision=current.revision + 1,
+            )
+            return replace(state, global_context=new)
+        return state
 
     return state

@@ -55,6 +55,14 @@ class GlobalContextBar(ctk.CTkFrame):
         )
         self._scope_label.pack(side="left")
 
+        self._goal_label = ctk.CTkLabel(
+            left,
+            text="No active goal",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+        )
+        self._goal_label.pack(side="left", padx=(12, 0))
+
         center = ctk.CTkFrame(self, fg_color="transparent")
         center.pack(side="left", expand=True, padx=T.PAD, pady=6)
 
@@ -109,6 +117,19 @@ class GlobalContextBar(ctk.CTkFrame):
             scope_parts.append(ctx.entity_id)
         scope = "  →  ".join(scope_parts) if scope_parts else "No active workspace"
         self._scope_label.configure(text=scope)
+
+        active_goal = ctx.active_goal_title
+        if not active_goal:
+            brain_state = getattr(snap, "brain_state", None)
+            goals = list(getattr(brain_state, "recent_goals", ()) if brain_state else ())
+            for goal in goals:
+                status = getattr(goal, "status", "")
+                if status in {"active", "queued", "running"}:
+                    active_goal = getattr(goal, "text", "") or ""
+                    break
+        self._goal_label.configure(
+            text=f"Goal: {active_goal}" if active_goal else "No active goal",
+        )
 
         if ctx.sources:
             self._sources_label.configure(text=" · ".join(ctx.sources))
