@@ -86,6 +86,7 @@ class ViewManagerMixin:
             self._content,
             on_command=self._on_command,
             on_navigate=self._navigate,
+            on_prefill=self._prefill_command_box,
         )
         self._view_registry["brain"] = lambda: BrainView(
             self._content,
