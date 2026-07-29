@@ -104,9 +104,9 @@ class BrainSituationPanel(GlassCard):
         ]
         if confidences:
             confidence = sum(confidences) / len(confidences)
+            conf_pct = f"{int(confidence * 100)}%"
         else:
-            confidence = 0.96 if mode != MissionMode.FAILURE else 0.42
-        conf_pct = f"{int(confidence * 100)}%"
+            conf_pct = "—"
 
         memory_count = len(observations)
         # Prefer notes/memory snapshot counts when present
@@ -126,12 +126,17 @@ class BrainSituationPanel(GlassCard):
         execution_lib = getattr(snap, "execution_library", None)
         active = getattr(execution_lib, "active_plan", None) if execution_lib else None
         if active and getattr(active, "is_active", False):
-            remaining = max(0, int(getattr(active, "total_steps", 0) or 0) - len(getattr(active, "completed_steps", ()) or ()))
-            prediction = f"Execution finishes in ~{max(remaining, 1) * 14}s"
+            total = int(getattr(active, "total_steps", 0) or 0)
+            done = len(getattr(active, "completed_steps", ()) or ())
+            remaining = max(0, total - done)
+            if total > 0:
+                prediction = f"{done}/{total} steps complete · {remaining} remaining"
+            else:
+                prediction = "Execution in progress"
         elif mode == MissionMode.IDLE:
             prediction = "Ready for the next mission"
         elif mode == MissionMode.PLANNING:
-            prediction = "Plan ready shortly"
+            prediction = "Plan in progress"
         elif mode == MissionMode.WAITING:
             prediction = "Blocked on approval"
         elif mode == MissionMode.FAILURE:
