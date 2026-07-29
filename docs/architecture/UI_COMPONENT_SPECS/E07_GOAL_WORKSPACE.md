@@ -32,4 +32,5 @@ GoalView
 | `ui.goal.task_select` | Plan step focused |
 | `ui.goal.open` | Open goals workspace |
 
-Selection also publishes `UI_INSPECT_SELECT` for goal / plan_step kinds.
+Selection also publishes `UI_INSPECT_SELECT` for goal / task kinds
+(`task` is the registered InspectorHost kind; do not publish `plan_step`).

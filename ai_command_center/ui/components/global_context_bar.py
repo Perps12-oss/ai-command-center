@@ -7,6 +7,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppState
+from ai_command_center.core.state.global_context_state import resolve_active_goal
 from ai_command_center.providers.defaults import provider_display_name
 from ai_command_center.ui.design_system import theme_v2 as T
 
@@ -54,6 +55,14 @@ class GlobalContextBar(ctk.CTkFrame):
             text_color=T.TEXT_SECONDARY,
         )
         self._scope_label.pack(side="left")
+
+        self._goal_label = ctk.CTkLabel(
+            left,
+            text="No active goal",
+            font=T.FONT_SMALL,
+            text_color=T.TEXT_MUTED,
+        )
+        self._goal_label.pack(side="left", padx=(12, 0))
 
         center = ctk.CTkFrame(self, fg_color="transparent")
         center.pack(side="left", expand=True, padx=T.PAD, pady=6)
@@ -109,6 +118,13 @@ class GlobalContextBar(ctk.CTkFrame):
             scope_parts.append(ctx.entity_id)
         scope = "  →  ".join(scope_parts) if scope_parts else "No active workspace"
         self._scope_label.configure(text=scope)
+
+        active_goal = ctx.active_goal_title
+        if not active_goal:
+            _goal_id, active_goal = resolve_active_goal(getattr(snap, "brain_state", None))
+        self._goal_label.configure(
+            text=f"Goal: {active_goal}" if active_goal else "No active goal",
+        )
 
         if ctx.sources:
             self._sources_label.configure(text=" · ".join(ctx.sources))

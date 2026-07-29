@@ -37,6 +37,7 @@ def test_context_bar_shows_workspace_entity_and_sources(context_bar):
         global_context=GlobalContextSnapshot(
             workspace_title="Test Workspace",
             entity_title="Selected Card",
+            active_goal_title="Ship Stage 1",
             sources=("note-1", "memory-2"),
             token_estimate=2048,
         ),
@@ -46,6 +47,7 @@ def test_context_bar_shows_workspace_entity_and_sources(context_bar):
 
     assert "Test Workspace" in context_bar._scope_label.cget("text")
     assert "Selected Card" in context_bar._scope_label.cget("text")
+    assert "Ship Stage 1" in context_bar._goal_label.cget("text")
     assert "note-1" in context_bar._sources_label.cget("text")
     assert "memory-2" in context_bar._sources_label.cget("text")
     assert "2048 tokens" in context_bar._tokens_label.cget("text")
@@ -58,8 +60,45 @@ def test_context_bar_empty_state(context_bar):
     context_bar.update(snap)
 
     assert "No active workspace" in context_bar._scope_label.cget("text")
+    assert "No active goal" in context_bar._goal_label.cget("text")
     assert "No context sources" in context_bar._sources_label.cget("text")
     assert context_bar._tokens_label.cget("text") == ""
+
+
+def test_context_bar_projects_active_goal_from_brain_state(context_bar):
+    """Bar falls back to brain_state.recent_goals when snapshot goal is empty."""
+    from ai_command_center.domain.brain_state_snapshot import (
+        BrainStateSnapshot,
+        GoalSnapshot,
+    )
+
+    snap = _make_state(
+        brain_state=BrainStateSnapshot(
+            recent_goals=(
+                GoalSnapshot(goal_id="g1", text="Active from brain", status="active"),
+            ),
+        ),
+    )
+    context_bar.update(snap)
+    assert "Active from brain" in context_bar._goal_label.cget("text")
+
+
+def test_resolve_active_goal_helper():
+    from ai_command_center.core.state.global_context_state import resolve_active_goal
+    from ai_command_center.domain.brain_state_snapshot import (
+        BrainStateSnapshot,
+        GoalSnapshot,
+    )
+
+    empty = resolve_active_goal(None)
+    assert empty == ("", "")
+    snap = BrainStateSnapshot(
+        recent_goals=(
+            GoalSnapshot(goal_id="g0", text="Done", status="completed"),
+            GoalSnapshot(goal_id="g1", text="Live", status="running"),
+        ),
+    )
+    assert resolve_active_goal(snap) == ("g1", "Live")
 
 
 def test_global_context_reducer_updates_from_context_snapshot():
@@ -96,12 +135,50 @@ def test_global_context_reducer_updates_from_workspace_active():
     assert new_state.global_context.workspace_title == "Active WS"
 
 
+def test_global_context_reducer_sets_active_goal_on_activation():
+    """GOAL_ACTIVATED projects active goal into GlobalContextSnapshot."""
+    state = _make_state()
+    event = type("Event", (), {
+        "topic": "goal.activated",
+        "payload": {"goal": {"id": "g9", "text": "Close Phase B"}},
+        "source": "tests",
+        "timestamp": 0.0,
+    })()
+    new_state = reduce_global_context_state(state, event)
+    assert new_state.global_context.active_goal_id == "g9"
+    assert new_state.global_context.active_goal_title == "Close Phase B"
+    assert new_state.global_context.revision == 1
+
+
+def test_global_context_reducer_clears_active_goal_on_completion():
+    """GOAL_COMPLETED clears the active goal when ids match."""
+    state = _make_state(
+        global_context=GlobalContextSnapshot(
+            active_goal_id="g9",
+            active_goal_title="Close Phase B",
+            revision=2,
+        ),
+    )
+    event = type("Event", (), {
+        "topic": "goal.completed",
+        "payload": {"goal_id": "g9"},
+        "source": "tests",
+        "timestamp": 0.0,
+    })()
+    new_state = reduce_global_context_state(state, event)
+    assert new_state.global_context.active_goal_id == ""
+    assert new_state.global_context.active_goal_title == ""
+    assert new_state.global_context.revision == 3
+
+
 def test_global_context_reducer_clears_on_ui_context_clear():
-    """UI_CONTEXT_CLEAR resets the global context snapshot."""
+    """UI_CONTEXT_CLEAR resets entity/sources but preserves active goal."""
     state = _make_state(
         global_context=GlobalContextSnapshot(
             workspace_id="ws-3",
             entity_id="ent-1",
+            active_goal_id="g1",
+            active_goal_title="Keep me",
             sources=("note",),
             token_estimate=512,
             revision=5,
@@ -117,6 +194,8 @@ def test_global_context_reducer_clears_on_ui_context_clear():
     assert new_state.global_context.entity_id == ""
     assert new_state.global_context.sources == ()
     assert new_state.global_context.token_estimate == 0
+    assert new_state.global_context.active_goal_id == "g1"
+    assert new_state.global_context.active_goal_title == "Keep me"
     assert new_state.global_context.revision == 6
 
 

@@ -134,16 +134,16 @@ Incoming information is triaged into three classes:
 Source: EPOCH A audit + `PHASE_R1_RUNTIME_RECONCILIATION.md`. Ordered:
 
 1. **Phase B remediation (close program conditions):**
-   - Fix E07 Goal Workspace inspect kind — publish/register `"task"` instead of unregistered `"plan_step"` (`ai_command_center/ui/views/goal_view.py:319`, `ai_command_center/ui/shell/view_manager.py:568`). **High.**
-   - Add active-goal projection to E02 `GlobalContextBar` (`ai_command_center/ui/components/global_context_bar.py`).
-   - Backfill Tom audit artifacts for E00–E03 on `main`.
-   - Refresh `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` for Phase B UI surfaces.
-2. **PHASE R1 — Runtime Reconciliation** (priority order: Runtime authority → Composition → State → UI → Features; no Priority N+1 before N's gate passes).
-3. **State Authority Contract** (R1 Priority 3) — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`.
-4. **Phase 5 — Async EventBus** — implement `tiered_dispatch_policy.py` + `async_dispatch_queue.py` (currently only policy-only `dispatch_policy.py` exists); meet exit 5.4. *Gated by PERFORMANCE_CONSTITUTION Art. VII/XII — Performance Investigation Report + human approval before implementation.*
+   - Fix E07 Goal Workspace inspect kind — publish/register `"task"` instead of unregistered `"plan_step"` (`ai_command_center/ui/views/goal_view.py`, `ai_command_center/ui/shell/view_manager.py`). **High.** → **done on Stage 1 branch** (pending `main`).
+   - Add active-goal projection to E02 `GlobalContextBar` (`ai_command_center/ui/components/global_context_bar.py`). → **done on Stage 1 branch** (pending `main`).
+   - Backfill Tom audit artifacts for E00–E03 on `main`. → **artifacts authored** (`TOM_AUDIT_PR_UI_E00`…`E03.md`); complete when merged.
+   - Refresh `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` for Phase B UI surfaces. → **refreshed** on Stage 1 branch (pending `main`).
+2. **PHASE R1 — Runtime Reconciliation** (priority order: Runtime authority → Composition → State → UI → Features; no Priority N+1 before N's gate passes). P1 **passed**. P2 registry updated; PlanningEngine/AgentCoordinator still unwired. P3 = Stage 2.
+3. **State Authority Contract** (R1 Priority 3) — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`. **Stage 2** — blocked until Phase B rem on `main`.
+4. **Phase 5 — Async EventBus** — implement `tiered_dispatch_policy.py` + `async_dispatch_queue.py` (currently only policy-only `dispatch_policy.py` exists); meet exit 5.4. *Gated by PERFORMANCE_CONSTITUTION Art. VII/XII — Performance Investigation Report + human approval before implementation.* **Do not start in Stage 1.**
 5. **Verification** — gates green on `main` per `PHASE_COMPLETION_RULE.md`.
 
-> Per the Tom Phase-B package audit, do not declare Phase B COMPLETE or start Phase 12 / State Authority feature work until Queue 1 items 1a–1d land.
+> Per the Tom Phase-B package audit, do not declare Phase B COMPLETE or start Phase 12 / State Authority feature work until Queue 1 items 1a–1d land **on `main`**.
 
 ### Queue 2 — Evaluate (no implementation yet; Class B)
 

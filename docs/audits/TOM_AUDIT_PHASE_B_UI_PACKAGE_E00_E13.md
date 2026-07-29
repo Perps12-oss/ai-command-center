@@ -12,7 +12,7 @@
 
 ### Executive Summary
 
-Phase B UI evolution **landed end-to-end on `main`**: all fourteen roadmap slices (E00–E13) exist as registered workspaces/shell surfaces, EventBus UI intents, AppState-driven `apply_state` projections, and UI tests. Primitive reuse for Inspector / Timeline / BaseGraphCanvas holds; no second graph or timeline engine was introduced. Package status is **not full COMPLIANT**: two acceptance-level defects remain (Global Context Bar missing **active goal**; Goal Workspace task inspect publishes unregistered kind `plan_step`), Tom audit artifacts for E00–E03 are absent on `main`, and `IMPLEMENTATION_TRUTH_MATRIX.md` was not updated for Phase B UI. Remediation is patch-scale, not a redesign.
+Phase B UI evolution **landed end-to-end on `main`**: all fourteen roadmap slices (E00–E13) exist as registered workspaces/shell surfaces, EventBus UI intents, AppState-driven `apply_state` projections, and UI tests. Primitive reuse for Inspector / Timeline / BaseGraphCanvas holds; no second graph or timeline engine was introduced. At audit tip `8f5c9b8`, package status was **not full COMPLIANT**: two acceptance-level defects remained (Global Context Bar missing **active goal**; Goal Workspace task inspect published unregistered kind `plan_step`), Tom audit artifacts for E00–E03 were absent on `main`, and `IMPLEMENTATION_TRUTH_MATRIX.md` was not updated for Phase B UI. **Stage 1 remediation** addresses all four conditions (code + audit artifacts + matrix); program COMPLETE only after that lands on `main`.
 
 ---
 
@@ -261,21 +261,22 @@ Present: E04–E13. **Absent:** E00–E03 formal `TOM_AUDIT_PR_UI_E0x.md` files 
 
 ## Next actions (ordered)
 
-1. **Fix E07 inspect kind** — publish/register `"task"` (preferred) or alias `"plan_step"` → `TaskInspector`; add regression test that host shows task selection.
-2. **Complete E02 acceptance** — add active goal fields to `GlobalContextSnapshot` + `GlobalContextBar.update` (from `brain_state` / goal projection); test.
-3. **Backfill Tom audit artifacts for E00–E03** on `main` (or a single package-amendment note linking PR evidence) to satisfy program gate wording.
-4. **Update `IMPLEMENTATION_TRUTH_MATRIX.md`** (and Canon cross-links if needed) for Phase B UI surfaces: GlobalContextBar, OSPalette, Brain/Evidence/Operations/Graph/Insights.
-5. **Debt cleanup (non-blocking):** delete empty `chat/inspector` tree / pycache; extract `_ActionCard` out of `home_view` then retire HomeView; wire or remove `UI_MEMORY_SEARCH`; add E05/E06 component specs.
-6. **Do not** start Phase 12 / State Authority work claiming Phase B UI “COMPLIANT complete” until items 1–4 land.
+1. ~~**Fix E07 inspect kind**~~ — Stage 1: publish `"task"` (not `plan_step`); regression in `test_goal_workspace_view.py`.
+2. ~~**Complete E02 acceptance**~~ — Stage 1: `active_goal_*` on `GlobalContextSnapshot` + bar projection.
+3. ~~**Backfill Tom audit artifacts for E00–E03**~~ — Stage 1: `TOM_AUDIT_PR_UI_E00.md` … `E03.md`.
+4. ~~**Update `IMPLEMENTATION_TRUTH_MATRIX.md`**~~ — Stage 1 refresh for Phase B UI + R1 status.
+5. **Merge Stage 1 to `main`** — then re-score package COMPLIANT / program COMPLETE (main-only truth).
+6. **Debt cleanup (non-blocking):** delete empty `chat/inspector` tree / pycache; extract `_ActionCard` out of `home_view` then retire HomeView; wire or remove `UI_MEMORY_SEARCH`; add E05/E06 component specs.
+7. **Do not** start Stage 2 State Authority / Phase 12 claiming Phase B UI “COMPLIANT complete” until item 5 lands on `main`.
 
 ---
 
 ## Final Verdict
 
 ```
-Overall Score:                 88
-Status:                        PARTIALLY_IMPLEMENTED
-CURSOR_AUDIT_GATE (program):   PASS WITH CONDITIONS
+Overall Score:                 88  (pre-remediation package tip)
+Status:                        PARTIALLY_IMPLEMENTED → remediation in Stage 1 PR
+CURSOR_AUDIT_GATE (program):   PASS WITH CONDITIONS → clear on Stage 1 merge
 
 Constitution Compliance:       PASS
 Architecture Compliance:       PASS
@@ -284,6 +285,6 @@ CustomTkinter Compliance:      PASS
 AppState Compliance:           PASS
 ```
 
-**Package judgment:** Phase B UI evolution **substantially achieved** the approved plan on `main` with correct architecture and primitive reuse. It is **not** yet a clean program COMPLIANT close-out: fix E07 task inspector + E02 active goal, backfill early Tom artifacts, refresh truth matrix — then re-score for COMPLIANT / program COMPLETE.
+**Package judgment:** Phase B UI evolution **substantially achieved** the approved plan on `main` with correct architecture and primitive reuse. It is **not** yet a clean program COMPLIANT close-out until Stage 1 remediation merges: E07 task inspector + E02 active goal + early Tom artifacts + refreshed truth matrix — then re-score for COMPLIANT / program COMPLETE.
 
-**Would a senior engineer approve production merge of the package as-is?** Yes for continued product use (already merged). **Would Tom approve declaring Phase B UI program COMPLETE?** Not until CONDITIONS above are cleared.
+**Would a senior engineer approve production merge of the package as-is?** Yes for continued product use (already merged). **Would Tom approve declaring Phase B UI program COMPLETE?** Not until CONDITIONS above are cleared **on `main`**.
