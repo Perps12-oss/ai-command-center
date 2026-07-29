@@ -34,7 +34,11 @@ class ApplicationShellMixin:
     """Builds the CTk shell and handles show/hide plus command input."""
 
     def _build_layout(self) -> None:
-        self._layout_prefs = LayoutPrefs()
+        snap = self._controller.snapshot()
+        settings = getattr(snap, "settings", None)
+        raw_prefs = dict(getattr(settings, "mission_layout_prefs", {}) or {})
+        self._layout_prefs = LayoutPrefs.from_dict(raw_prefs)
+        self._layout_prefs.bind_persist(self._persist_layout_prefs)
 
         self._top = TopBar(
             self,
@@ -376,3 +380,41 @@ class ApplicationShellMixin:
 
     def tray_phase(self) -> str:
         return self._controller.snapshot().phase
+
+    def tray_status(self) -> dict:
+        """Rich status dict for tray tooltip / busy phase (AppState projection)."""
+        snap = self._controller.snapshot()
+        brain = getattr(snap, "brain_state", None)
+        goals = list(getattr(brain, "recent_goals", ()) if brain else ())
+        queue = sum(
+            1
+            for g in goals
+            if str(getattr(g, "status", "")).lower() in {"queued", "pending"}
+        )
+        providers = getattr(snap, "provider_registry", None)
+        permission = getattr(snap, "permission_snapshot", None)
+        agent_pipeline = getattr(snap, "agent_pipeline", None)
+        execution_lib = getattr(snap, "execution_library", None)
+        active = getattr(execution_lib, "active_plan", None) if execution_lib else None
+        system = getattr(snap, "system_snapshot", None)
+        return {
+            "queue": queue,
+            "providers_healthy": int(getattr(providers, "healthy_count", 0) or 0),
+            "providers_total": int(getattr(providers, "total_count", 0) or 0),
+            "pending_approvals": 1 if (permission and getattr(permission, "has_pending", False)) else 0,
+            "active_agents": len(getattr(agent_pipeline, "active_run_ids", ()) if agent_pipeline else ()),
+            "running_executions": 1 if (active and getattr(active, "is_active", False)) else 0,
+            "ollama_online": bool(getattr(system, "ollama_online", False)) if system else False,
+        }
+
+    def _persist_layout_prefs(self, prefs: LayoutPrefs) -> None:
+        """Persist Mission Control layout prefs via SETTINGS_SET_REQUEST."""
+        import json
+
+        try:
+            self._controller.request_settings_change(
+                "mission_layout_prefs",
+                json.dumps(prefs.to_dict(), sort_keys=True, separators=(",", ":")),
+            )
+        except Exception:
+            pass

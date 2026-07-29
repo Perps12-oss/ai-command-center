@@ -24,6 +24,19 @@ from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.platform.model_registry import normalize_tier_map
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Coerce repo JSON strings or dicts into a plain dict."""
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value or "{}")
+        except json.JSONDecodeError:
+            return {}
+        return dict(parsed) if isinstance(parsed, dict) else {}
+    return {}
+
+
 class SettingsService:
     """Minimal service facade around a settings repository and schema."""
 
@@ -77,7 +90,8 @@ class SettingsService:
             qwenpaw_auto_start=bool(payload.get("qwenpaw_auto_start", False)),
             qwenpaw_python=str(payload.get("qwenpaw_python", "")),
             qwenpaw_auth_token=str(payload.get("qwenpaw_auth_token", "")),
-            mcp_servers=dict(payload.get("mcp_servers") or {}),
+            mcp_servers=_as_dict(payload.get("mcp_servers")),
+            mission_layout_prefs=_as_dict(payload.get("mission_layout_prefs")),
         )
 
     def set(self, key: str, value: Any, *, publish: bool = True) -> None:

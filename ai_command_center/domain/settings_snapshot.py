@@ -42,7 +42,7 @@ class SettingsSnapshot:
     telemetry_enabled: bool = True
     otel_enabled: bool = False
     otel_endpoint: str = "http://127.0.0.1:4318"
-    schema_version: int = 6
+    schema_version: int = 7
     capability_provider_map: dict[str, str] = field(
         default_factory=lambda: dict(DEFAULT_CAPABILITY_PROVIDER_MAP)
     )
@@ -53,6 +53,7 @@ class SettingsSnapshot:
     qwenpaw_python: str = ""
     qwenpaw_auth_token: str = ""
     mcp_servers: dict[str, dict[str, object]] = field(default_factory=dict)
+    mission_layout_prefs: dict[str, object] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -90,4 +91,5 @@ class SettingsSnapshot:
             "qwenpaw_python": self.qwenpaw_python,
             "qwenpaw_auth_token": self.qwenpaw_auth_token,
             "mcp_servers": dict(self.mcp_servers),
+            "mission_layout_prefs": dict(self.mission_layout_prefs),
         }

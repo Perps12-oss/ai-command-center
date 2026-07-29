@@ -41,12 +41,13 @@ def test_settings_round_trip_capability_providers() -> None:
             db.close()
 
 
-def test_migration_v3_advances_to_v6_with_defaults() -> None:
+def test_migration_v3_advances_to_v7_with_defaults() -> None:
     from ai_command_center.core.settings.migration_manager import MigrationManager
 
     migrated = MigrationManager().migrate({"schema_version": 3, "theme": "dark"})
-    assert migrated["schema_version"] == 6
+    assert migrated["schema_version"] == 7
     assert migrated["mcp_servers"] == {}
+    assert migrated["mission_layout_prefs"] == {}
     assert migrated["model_tier_map"] == dict(DEFAULT_MODEL_TIER_MAP)
     for kind, default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
         assert migrated[settings_key_for_kind(kind)] == default

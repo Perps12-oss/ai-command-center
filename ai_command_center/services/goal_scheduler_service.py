@@ -12,10 +12,13 @@ from ai_command_center.core.events.topics import (
     EXECUTION_RUN_FAILED,
     EXECUTION_RUN_REQUEST,
     GOAL_ACTIVATED,
+    GOAL_CANCEL_REQUEST,
     GOAL_CANCELLED,
     GOAL_COMPLETED,
     GOAL_FAILED,
+    GOAL_PAUSE_REQUEST,
     GOAL_PAUSED,
+    GOAL_RESUME_REQUEST,
     GOAL_RESUMED,
     GOAL_SUBMIT_REQUEST,
     GOAL_SUBMITTED,
@@ -59,6 +62,9 @@ class SingleGoalScheduler(BaseService):
         self._unsubscribers.extend(
             [
                 self._bus.subscribe(GOAL_SUBMIT_REQUEST, self._on_submit_request),
+                self._bus.subscribe(GOAL_PAUSE_REQUEST, self._on_pause_request),
+                self._bus.subscribe(GOAL_RESUME_REQUEST, self._on_resume_request),
+                self._bus.subscribe(GOAL_CANCEL_REQUEST, self._on_cancel_request),
                 self._bus.subscribe(PLAN_GENERATED, self._on_plan_generated),
                 self._bus.subscribe(PLAN_FAILED, self._on_plan_failed),
                 self._bus.subscribe(EXECUTION_RUN_COMPLETE, self._on_execution_complete),
@@ -175,6 +181,30 @@ class SingleGoalScheduler(BaseService):
             source=self.name,
         )
         return task
+
+    def _on_pause_request(self, event: Event) -> None:
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        goal_id = str(payload.get("goal_id") or "").strip()
+        if not goal_id:
+            return
+        correlation = CorrelationContext.from_payload(payload).with_goal(goal_id)
+        self.pause_goal(goal_id, correlation)
+
+    def _on_resume_request(self, event: Event) -> None:
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        goal_id = str(payload.get("goal_id") or "").strip()
+        if not goal_id:
+            return
+        correlation = CorrelationContext.from_payload(payload).with_goal(goal_id)
+        self.resume_goal(goal_id, correlation)
+
+    def _on_cancel_request(self, event: Event) -> None:
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        goal_id = str(payload.get("goal_id") or "").strip()
+        if not goal_id:
+            return
+        correlation = CorrelationContext.from_payload(payload).with_goal(goal_id)
+        self.cancel_goal(goal_id, correlation)
 
     def _on_submit_request(self, event: Event) -> None:
         payload = event.payload
