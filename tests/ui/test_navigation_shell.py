@@ -39,11 +39,14 @@ def test_view_ids_starts_with_command_center_and_has_no_home():
 
 def test_nav_groups_define_expected_sections():
     sections = [name for name, _ in NAV_GROUPS]
-    assert sections == ["Workspaces", "Ops", "Monitor", "Library", "Settings"]
+    assert sections == ["Workspace", "Knowledge", "Monitoring", "System"]
     view_ids = [vid for _, items in NAV_GROUPS for vid, _ in items]
     assert "command_center" in view_ids
     assert "workspace" in view_ids
     assert "settings" in view_ids
+    assert "world_explorer" in view_ids
+    assert "memory" in view_ids
+    assert "timeline" in view_ids
 
 
 def test_sidebar_default_active_is_command_center(sidebar):
@@ -60,12 +63,21 @@ def test_sidebar_set_active_updates_button_colors(sidebar):
 
 
 def test_sidebar_group_toggles_update_visibility(sidebar):
-    group = sidebar._groups["Ops"]
+    group = sidebar._groups["Workspace"]
     assert group.is_expanded
-    sidebar.toggle_group("Ops")
+    sidebar.toggle_group("Workspace")
     assert not group.is_expanded
-    sidebar.set_group_expanded("Ops", True)
+    sidebar.set_group_expanded("Workspace", True)
     assert group.is_expanded
+
+
+def test_sidebar_badges_and_favorites(sidebar):
+    sidebar.set_badge("approvals", 2)
+    assert "2" in sidebar._buttons["approvals"].cget("text")
+    sidebar.toggle_favorite("chat")
+    assert "chat" in sidebar._prefs.favorites
+    sidebar._select("goals")
+    assert "goals" in sidebar._prefs.recent_pages
 
 
 def test_nav_group_buttons_call_on_select(nav_group):
