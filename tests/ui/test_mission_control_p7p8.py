@@ -276,6 +276,61 @@ def test_exec_dock_shows_most_recent_events() -> None:
     assert steps[-1]["label"] == "step 29"
 
 
+def test_exec_dock_fallback_recent_events_are_newest_first() -> None:
+    """recent_execution_events is newest-first; dock must still show the latest window."""
+    from ai_command_center.core.state.execution_event_state import ExecutionEventItem
+
+    # Newest-first catalog (index 0 = newest), as AppState maintains it.
+    recent = tuple(
+        ExecutionEventItem(
+            event_id=f"e{i}",
+            timestamp=float(i),
+            event_type=f"step_{i}",
+            request_id="r1",
+        )
+        for i in range(29, -1, -1)
+    )
+    view = CommandCenterView(None, on_command=lambda _x: None, on_navigate=lambda _x: None)
+    view.apply_state(AppState(recent_execution_events=recent))
+    steps = view._exec_dock._steps
+    assert len(steps) == 24
+    assert steps[0]["label"] == "step 6"
+    assert steps[-1]["label"] == "step 29"
+
+
+def test_exec_dock_scrub_publishes_global_index_with_offset() -> None:
+    from ai_command_center.core.state.execution_timeline_state import ExecutionTimelineState
+    from ai_command_center.domain.execution_event import ExecutionEvent
+
+    scrubbed: list[int] = []
+    events = tuple(
+        ExecutionEvent(
+            event_id=f"e{i}",
+            trace_id="t1",
+            parent_event_id=None,
+            timestamp=float(i),
+            event_type=f"step_{i}",
+            actor="system",
+            scope="execution",
+            request_id="r1",
+        )
+        for i in range(30)
+    )
+    view = CommandCenterView(
+        None,
+        on_command=lambda _x: None,
+        on_navigate=lambda _x: None,
+        on_scrub=scrubbed.append,
+    )
+    view.apply_state(AppState(execution_timeline=ExecutionTimelineState(events=events, revision=1)))
+    assert view._exec_window_offset == 6
+    # Local index 0 in the visible window → global index 6
+    view._handle_exec_scrub(0)
+    assert scrubbed == [6]
+    view._handle_exec_scrub(23)
+    assert scrubbed[-1] == 29
+
+
 def test_tray_refresh_updates_title() -> None:
     status = {"queue": 0, "providers_healthy": 1, "providers_total": 1, "pending_approvals": 0, "ollama_online": False}
 
