@@ -148,8 +148,23 @@ def main() -> int:
         on_open_approvals=lambda: ui_queue.enqueue(lambda: app._navigate("approvals")),
     )
     tray.start()
-    # Keep a handle for optional status refresh from the UI loop
+    # Keep a handle so StateApplierMixin can refresh tooltip/icon from AppState.
     app._tray_controller = tray
+
+    def _tick_tray() -> None:
+        try:
+            tray.refresh()
+        except Exception:
+            pass
+        try:
+            app.after(2000, _tick_tray)
+        except Exception:
+            pass
+
+    try:
+        app.after(2000, _tick_tray)
+    except Exception:
+        pass
 
     settings = core.state_store.snapshot.settings
     overlay_hotkey = settings.overlay_hotkey or settings.hotkey or "alt+space"
