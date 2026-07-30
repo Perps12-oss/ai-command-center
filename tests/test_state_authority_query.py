@@ -186,3 +186,67 @@ def test_mutate_then_query_reconstructs_without_chat() -> None:
     projection = sa.query(StateQuery(text="No chat", workspace_id="ws-recon"))
     assert any(e.get("id") == "note:recon" for e in projection.entities)
     sa.stop()
+
+
+def test_mutate_create_and_delete_edge() -> None:
+    from ai_command_center.core.events.topics import WORLD_MODEL_MUTATION_APPLIED
+
+    bus = EventBus()
+    wm = _world()
+    sa = StateAuthorityService(bus, wm)
+    sa.start()
+    published: list[dict] = []
+    bus.subscribe(
+        WORLD_MODEL_MUTATION_APPLIED,
+        lambda e: published.append(dict(e.payload or {})),
+    )
+
+    create = sa.mutate(
+        StateDelta(
+            workspace_id="ws-1",
+            correlation_id="corr-edge",
+            operations=(
+                {
+                    "op": "create_edge",
+                    "edge": {
+                        "id": "edge:note-app",
+                        "from_node_id": "n-note-1",
+                        "to_node_id": "n-app-1",
+                        "type": "mentions",
+                    },
+                },
+            ),
+        )
+    )
+    assert create.ok is True
+    assert create.applied[0]["edge_id"] == "edge:note-app"
+    assert any(e.id == "edge:note-app" for e in wm.get_edges("n-note-1", "out"))
+
+    projection = sa.query(StateQuery(text="Ship Stage", workspace_id="ws-1"))
+    assert any(r.get("id") == "edge:note-app" for r in projection.relationships)
+
+    delete = sa.mutate(
+        StateDelta(
+            workspace_id="ws-1",
+            operations=({"op": "delete_edge", "edge_id": "edge:note-app"},),
+        )
+    )
+    assert delete.ok is True
+    assert not any(e.id == "edge:note-app" for e in wm.get_edges("n-note-1", "out"))
+    assert len(published) >= 2
+    sa.stop()
+
+
+def test_mutate_create_edge_requires_endpoints() -> None:
+    bus = EventBus()
+    sa = StateAuthorityService(bus, _world())
+    sa.start()
+    receipt = sa.mutate(
+        StateDelta(
+            workspace_id="ws-1",
+            operations=({"op": "create_edge", "edge": {"id": "e1", "type": "related"}},),
+        )
+    )
+    assert receipt.ok is False
+    assert "from_node_id" in receipt.message or "required" in receipt.message.lower()
+    sa.stop()

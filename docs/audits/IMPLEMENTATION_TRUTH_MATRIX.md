@@ -1,7 +1,7 @@
 # Implementation Truth Matrix
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
-**Baseline:** `origin/main` @ `5fcf52b` (verified 2026-07-29)  
+**Baseline:** `origin/main` @ `77b4baa` (verified 2026-07-30)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
 **Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
@@ -13,7 +13,7 @@
 | Capability | Exists | Wired (composition root) | Tested | Live path? | Status | Evidence |
 |------------|:------:|:------------------------:|:------:|:----------:|--------|----------|
 | OperatorKernel | ✅ | ❌ | ⚠️ unit/golden only | ❌ bypassed | **PARTIAL** | `operator/kernel.py`; **not** in `service_factory.py` / `application.py`; ADR-006 → research only |
-| GoalEngine | ✅ | ✅ | ✅ | ✅ | **WIRED** | constructed in `service_factory.py`; repo `SQLiteGoalEngineRepository` |
+| GoalEngine | ✅ | ⚠️ constructed only | ✅ | ❌ not on intake | **PARTIAL** | factory builds + `WiredServices.goal_engine`; **not** `services.register`; dual-path inventory Slice 4 |
 | AgentCoordinator | ✅ | ❌ | ⚠️ orchestration tests | ❌ | **PARTIAL** | `orchestration/agents/`; **not** in `service_factory.py` |
 | PlanningEngine | ✅ | ❌ | ⚠️ tests | ❌ | **PARTIAL** | `orchestration/goals/planning_engine.py`; **not** in factory |
 | ExternalCapabilityBridge | ✅ | ✅ | ✅ | ✅ | **WIRED** | `ExternalCapabilityBridgeService(bus)` in factory |
@@ -21,7 +21,7 @@
 | Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
 | Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
-| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM mutate | **PARTIAL** | Slices 1–3; edges/goals/workflows shadow remain |
+| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM node/edge mutate | **PARTIAL** | Slices 1–4; goals/workflows shadow remain |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
 | TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
 | InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |
@@ -43,30 +43,31 @@ Registered = constructed in factory and started with other services.
 | Component | Exists | Registered | Live EventBus role | R1 disposition |
 |-----------|:------:|:----------:|--------------------|----------------|
 | ExecutionAuthorityService | ✅ | ✅ | **Intake** — `UI_COMMAND` | **keep** (ADR-006) |
-| StateAuthorityService | ✅ | ✅ | State projection before plan | **keep** — deepen per contract (P3) |
-| SingleGoalScheduler | ✅ | ✅ | Goal queue → `EXECUTION_RUN_REQUEST` | **keep** |
+| StateAuthorityService | ✅ | ✅ | State projection before plan; WM mutate | **keep** — deepen per contract (P3) |
+| SingleGoalScheduler | ✅ | ✅ | Goal queue → `EXECUTION_RUN_REQUEST` | **keep** — live goals SoT |
 | PlannerService | ✅ | ✅ | `PLAN_REQUEST` when not synthetic | **keep** |
 | ExecutionOrchestratorService | ✅ | ✅ | Step execution | **keep** |
 | ChatHandlerService | ✅ | ✅ | `LLM_STEP_REQUEST` handler | **keep** |
 | RuntimeCapabilityRouterService | ✅ | ✅ | Classifier / provider map (not intake) | **keep** |
 | OrchestrationService | ✅ | ✅ | Completion observer / receipts | **keep** |
 | AgentRuntimeService | ✅ | ✅ | Agent plans / pipeline | **keep** |
-| GoalEngine | ✅ | ✅ | Goal persistence engine | **keep** |
+| GoalEngine | ✅ | ❌ (constructed only) | — | **retire or research-only** — see Goals dual-path inventory |
 | OperatorKernel | ✅ | ❌ | — | **retire from live path** (ADR-006; research/tests only) |
 | PlanningEngine | ✅ | ❌ | — | **defer** — wire or retire at R1.2 gate (not P1) |
 | AgentCoordinator | ✅ | ❌ | — | **defer** — live path uses `AgentRuntimeService` |
 | PredictiveEngine | ✅ | ❌ | — | **P5** |
 | UndoReplay | ✅ | ❌ | — | **P5** |
 
-See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
+See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.  
+Goals dual-path: `docs/architecture/state_authority/GOALS_DUAL_PATH_INVENTORY.md`.
 
-### R1 priority status (2026-07-29)
+### R1 priority status (2026-07-30)
 
 | Priority | Gate | Status |
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
-| P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired |
-| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Slices 1–3 (query, planner, WM node mutate); shadow-SoT remain |
+| P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired; GoalEngine constructed-only |
+| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Slices 1–4 (query, planner, WM node+edge mutate, Goals inventory); workflows/agents remain |
 | P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P3 close |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
@@ -112,7 +113,7 @@ OperatorKernel remains **exists-but-not-wired**. Matrix status stays PARTIAL unt
 |-------|----------|
 | UI surfaces / primitives | Ahead — Phase B E00–E13 WIRED at UI layer |
 | Runtime authority services | Mixed (Goal/Brain/Authority WIRED; OperatorKernel/Coordinator/Predictive/Undo PARTIAL) |
-| State Authority | Projection service WIRED; contract depth is Stage 2 |
+| State Authority | Projection + WM node/edge mutate WIRED; Goals dual-path inventoried (Slice 4) |
 | Documentation / plan COMPLETE claims | Must follow code on `main` — this matrix is the Exists/Wired probe |
 
 ---
