@@ -268,6 +268,9 @@ EXECUTION_STEP_FAILED = "execution.step.failed"
 
 # Brain v1 goal scheduler (single-active-goal queue)
 GOAL_SUBMIT_REQUEST = "goal.submit.request"
+GOAL_PAUSE_REQUEST = "goal.pause.request"
+GOAL_RESUME_REQUEST = "goal.resume.request"
+GOAL_CANCEL_REQUEST = "goal.cancel.request"
 GOAL_SUBMITTED = "goal.submitted"
 GOAL_ACTIVATED = "goal.activated"
 GOAL_PAUSED = "goal.paused"
@@ -633,6 +636,9 @@ __all__ = [
     "EXECUTION_STEP_COMPLETED",
     "EXECUTION_STEP_FAILED",
     "GOAL_SUBMIT_REQUEST",
+    "GOAL_PAUSE_REQUEST",
+    "GOAL_RESUME_REQUEST",
+    "GOAL_CANCEL_REQUEST",
     "GOAL_SUBMITTED",
     "GOAL_ACTIVATED",
     "GOAL_PAUSED",

@@ -88,6 +88,10 @@ class ViewManagerMixin:
             on_navigate=self._navigate,
             on_prefill=self._prefill_command_box,
             layout_prefs=getattr(self, "_layout_prefs", None),
+            on_pause_goal=self._on_mission_pause,
+            on_abort_goal=self._on_mission_abort,
+            on_approve=self._on_mission_approve,
+            on_resume_goal=self._on_mission_resume,
         )
         self._view_registry["brain"] = lambda: BrainView(
             self._content,
@@ -606,6 +610,38 @@ class ViewManagerMixin:
     def _on_agent_cancel(self, agent_id: str, reason: str = "cancelled") -> None:
         """Publish AGENT_CANCEL_REQUEST for the contextual agent target."""
         self._controller.publish_agent_cancel_request(agent_id, reason=reason)
+
+    def _on_mission_pause(self, goal_id: str) -> None:
+        """Mission Control hero Pause → GOAL_PAUSE_REQUEST."""
+        self._controller.publish_goal_pause_request(goal_id)
+
+    def _on_mission_resume(self, goal_id: str) -> None:
+        """Mission Control hero Resume → GOAL_RESUME_REQUEST."""
+        self._controller.publish_goal_resume_request(goal_id)
+
+    def _on_mission_abort(self, goal_id: str) -> None:
+        """Mission Control hero Abort → GOAL_CANCEL_REQUEST (+ agent cancel if active)."""
+        self._controller.publish_goal_cancel_request(goal_id, reason="aborted")
+        snap = self._controller.snapshot()
+        pipeline = getattr(snap, "agent_pipeline", None)
+        for aid in list(getattr(pipeline, "active_run_ids", ()) if pipeline else ()):
+            self._controller.publish_agent_cancel_request(str(aid), reason="aborted")
+
+    def _on_mission_approve(self) -> None:
+        """Mission Control hero Review Approval → PERMISSION_CHECK_RESULT granted."""
+        snap = self._controller.snapshot()
+        permission = getattr(snap, "permission_snapshot", None)
+        pending = getattr(permission, "pending", None) if permission else None
+        if pending is None:
+            self._navigate("approvals")
+            return
+        self._controller.publish_permission_result(
+            check_id=str(getattr(pending, "check_id", "") or ""),
+            granted=True,
+            permissions=tuple(getattr(pending, "permissions", ()) or ()),
+            actor_type=str(getattr(pending, "actor_type", "agent") or "agent"),
+            actor_id=str(getattr(pending, "actor_id", "") or ""),
+        )
 
     def _on_execution_select(self, request_id: str) -> None:
         """Open execution detail and request timeline projection."""

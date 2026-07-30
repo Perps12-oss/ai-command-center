@@ -66,6 +66,7 @@ class SettingsSchema:
             "qwenpaw_python": SettingsField("qwenpaw_python", str, ""),
             "qwenpaw_auth_token": SettingsField("qwenpaw_auth_token", str, ""),
             "mcp_servers": SettingsField("mcp_servers", dict, {}),
+            "mission_layout_prefs": SettingsField("mission_layout_prefs", dict, {}),
         }
         for kind, default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
             self.fields[settings_key_for_kind(kind)] = SettingsField(
