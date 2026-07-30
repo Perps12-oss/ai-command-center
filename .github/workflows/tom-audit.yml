@@ -153,9 +153,28 @@ jobs:
           else:
               checklist_items.append("✅ **Dependencies:** No dependency files modified")
 
-          # Check 5: Breaking changes
-          breaking_keywords = ['BREAKING', 'MAJOR', 'DESTROY', 'DELETE']
-          has_breaking = any(kw in body.upper() for kw in breaking_keywords)
+          # Check 5: Breaking changes (phrase/marker match — not substrings like "destroy")
+          import re
+          import sys
+          from pathlib import Path
+
+          repo_root = Path(".").resolve()
+          sys.path.insert(0, str(repo_root))
+          try:
+              from tools.tom_breaking_detect import has_breaking_change_marker
+              has_breaking = has_breaking_change_marker(f"{title}\n{body}")
+          except Exception:
+              # Fallback if checkout is incomplete: same rules as tools/tom_breaking_detect.py
+              patterns = (
+                  r"\bBREAKING\s+CHANGE\b",
+                  r"\bBREAKING:",
+                  r"\bMAJOR\s+VERSION\b",
+                  r"\bAPI\s+BREAK(?:ING)?\b",
+                  r"\bDESTROY:",
+                  r"\bDELETE:",
+              )
+              blob = re.sub(r"```[\s\S]*?```|`[^`]+`", " ", f"{title}\n{body}")
+              has_breaking = any(re.search(p, blob, re.IGNORECASE) for p in patterns)
           if has_breaking:
               checklist_items.append("🚨 **Breaking Changes:** Detected - manual review required")
           else:
