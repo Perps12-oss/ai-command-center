@@ -26,11 +26,22 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-test.txt
+
       - name: Run Deep Architecture Analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          APPDATA: ${{ runner.temp }}/aicc_appdata
         run: |
           python3 << 'TOM_DEEP_AUDIT'
           import os
@@ -54,13 +65,21 @@ jobs:
               print("⚠️ Architecture boundaries: ISSUES FOUND")
               print(result.stdout[-500:] if len(result.stdout) > 500 else result.stdout)
 
-          # Run tests
-          print("\n🧪 Running test suite...")
+          # Smoke subset — full suite already runs in Risk-Area / PR CI.
+          # Requires deps + APPDATA (installed in prior steps) so this is not a false fail.
+          print("\n🧪 Running focused smoke tests...")
+          env = os.environ.copy()
+          env.setdefault("APPDATA", os.path.join(os.environ.get("RUNNER_TEMP", "/tmp"), "aicc_appdata"))
           result = subprocess.run(
-              ["python", "-m", "pytest", "-x", "-q", "--tb=no"],
+              [
+                  "python", "-m", "pytest", "-x", "-q", "--tb=line",
+                  "tests/tools",
+                  "-m", "not slow",
+              ],
               capture_output=True,
               text=True,
-              timeout=300
+              timeout=300,
+              env=env,
           )
           test_output = result.stdout + result.stderr
           if "passed" in test_output:
@@ -70,6 +89,7 @@ jobs:
                   print(f"✅ Tests: {match.group(1)} passed")
           if result.returncode != 0:
               print("⚠️ Some tests failed - see CI for details")
+              print(test_output[-1500:] if len(test_output) > 1500 else test_output)
 
           # Check for Phase-specific code
           print("\n🎯 Phase Implementation Checks...")
