@@ -30,6 +30,10 @@ env/
 *.pem
 credentials.json
 
+# Tom auditor — local invocation secret only (never commit)
+.tom-invocation-token
+*.tom-invocation-token
+
 data/
 
 # Cursor - UCGS kit is tracked under .cursor/rules, .cursor/hooks, and .cursor/skills

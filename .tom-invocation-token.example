@@ -1,0 +1,8 @@
+# Copy to .tom-invocation-token (gitignored) and replace with a fresh secret:
+#   cp .tom-invocation-token.example .tom-invocation-token
+#   echo "TOKEN-$(openssl rand -hex 16)" > .tom-invocation-token
+#
+# Or set: export TOM_INVOCATION_TOKEN="TOKEN-$(openssl rand -hex 16)"
+#
+# Never commit .tom-invocation-token.
+TOKEN-replace-with-openssl-rand-hex-16
