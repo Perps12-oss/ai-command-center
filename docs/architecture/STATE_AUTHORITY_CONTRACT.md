@@ -4,7 +4,7 @@
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-005_WORLD_MODEL_AUTHORITY.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`  
 **Implementation today:** `ai_command_center/services/state_authority_service.py`  
 **Domain types:** `ai_command_center/domain/state_authority.py` (`StateQuery`, `StateProjection`, `StateDelta`, `MutationReceipt`, `ProjectionScope`)  
-**Milestone:** PHASE R1 Priority 3 / Stage 2 (Slices 1–3: query, planner mandate, WM node mutate, shadow SoT inventory + Goals quarantine)
+**Milestone:** PHASE R1 Priority 3 / Stage 2 (Slices 1–4: query, planner, Goals quarantine, WM node+edge mutate, reconstruction)
 
 ---
 
@@ -145,7 +145,7 @@ The system must be able to reconstruct workspace reality after deleting all chat
 |------------|--------------------------------|-----------------|
 | `StateAuthorityService.project()` | ✅ wired into ExecutionAuthority; delegates to `query` | Keep; extend |
 | `query()` with structured `StateQuery` | ✅ Stage 2 Slice 1 | Keep; deepen filters |
-| `mutate()` with `StateDelta` | ✅ WM node create/update/upsert/delete + receipt (Slice 3); edges/goals/workflows still shadow | Deepen; unify remaining domains |
+| `mutate()` with `StateDelta` | ✅ WM node + edge ops + receipt (Slice 3–4); goals/workflows still shadow | Deepen remaining domains |
 | Planner reads state | ✅ every `PLAN_REQUEST` resolves `StateContext` (payload or `SA.query`) | Keep; deepen |
 | Goals / agents / workflows query WM | ✅ goals via `goal_lookup`; GoalEngine quarantined | Memory/workflows still soft shadow |
 | Shadow SoT elimination | ⚠️ inventory + Goals quarantine (Slice 3) | Memory/workflows/executions next; mutate later |
@@ -180,15 +180,15 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 2. ~~Extend `StateAuthorityService` to implement full contract surface.~~ ✅ `query`/`project`; `mutate` stub  
 3. ~~Route PlannerService to require state projection on every `PLAN_REQUEST`.~~ ✅ Slice 2  
 4. ~~Inventory shadow SoT services; migration plan per domain (Goals dual-path first).~~ ✅ Slice 3 — `docs/architecture/SHADOW_SOT_INVENTORY.md`; GoalEngine quarantined from live factory  
-5. ~~Add reconstruction acceptance test (no chat history).~~ ✅ thin mutate→query probe (Slice 3)  
-6. ~~Unify `mutate()` onto World Model with real `MutationReceipt`s.~~ ✅ node ops (Slice 3); edges/goals/workflows still deferred  
+5. ~~Add reconstruction acceptance test (no chat history).~~ ✅ thin probe (Slice 3) + journal recover with edges (Slice 4)  
+6. ~~Unify `mutate()` onto World Model with real `MutationReceipt`s.~~ ✅ node ops (Slice 3) + edge ops (Slice 4); goals/workflows still deferred  
 
-### Shadow SoT inventory (Slice 3)
+### Shadow SoT inventory (Slice 3–4)
 
-| Domain | Status after Slice 3 |
+| Domain | Status after Slice 4 |
 |--------|----------------------|
 | World Model nodes | ✅ authoritative via `SA.mutate` / `SA.query` |
-| World Model edges | ❌ still BrainRuntime / direct WM only |
+| World Model edges | ✅ authoritative via `SA.mutate` (`create_edge` / `delete_edge`) |
 | Goals (`GoalEngine` vs `GoalRepository`) | ✅ live = `GoalRepository`; GoalEngine quarantined from factory |
 | Workflows / executions / agents | ⚠️ outside SA mutate |
 | Memory | ⚠️ lookup hook on query; not mutate |

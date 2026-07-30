@@ -5,8 +5,8 @@ Implements the Stage 2 contract surface:
 * ``query(StateQuery) -> StateProjection`` — structured read (no side effects
   beyond publishing ``STATE_CONTEXT_BUILT`` for observability)
 * ``project(...)`` — convenience wrapper used by ExecutionAuthority today
-* ``mutate(StateDelta)`` — surface reserved; World Model mutations remain on
-  the BrainRuntime / ``RUNTIME_ACTION_REQUEST`` path until unified
+* ``mutate(StateDelta)`` — World Model node + edge mutations with ``MutationReceipt``
+  (goals/workflows still outside this surface)
 
 See ``docs/architecture/STATE_AUTHORITY_CONTRACT.md``.
 """
@@ -26,7 +26,11 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
 )
-from ai_command_center.core.world_model.world_model import WorldModel, mutation_for_node
+from ai_command_center.core.world_model.world_model import (
+    WorldModel,
+    mutation_for_edge,
+    mutation_for_node,
+)
 from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.state_authority import (
     MutationReceipt,
@@ -36,7 +40,7 @@ from ai_command_center.domain.state_authority import (
     StateQuery,
 )
 from ai_command_center.domain.state_context import StateContext
-from ai_command_center.domain.world_model import Mutation, MutationType, Node
+from ai_command_center.domain.world_model import Edge, Mutation, MutationType, Node
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
@@ -57,7 +61,9 @@ _ALWAYS_KEEP_TYPES = frozenset(
 
 _NODE_WRITE_OPS = frozenset({"create_node", "update_node", "upsert_node"})
 _NODE_DELETE_OPS = frozenset({"delete_node"})
-_SUPPORTED_OPS = _NODE_WRITE_OPS | _NODE_DELETE_OPS
+_EDGE_WRITE_OPS = frozenset({"create_edge"})
+_EDGE_DELETE_OPS = frozenset({"delete_edge"})
+_SUPPORTED_OPS = _NODE_WRITE_OPS | _NODE_DELETE_OPS | _EDGE_WRITE_OPS | _EDGE_DELETE_OPS
 
 
 def _correlation_for_delta(delta: StateDelta) -> CorrelationContext:
@@ -84,6 +90,24 @@ def _node_from_op(raw: dict[str, Any], *, workspace_id: str) -> Node | None:
         id=node_id,
         type=str(node_raw.get("type") or "resource"),
         attributes=attrs,
+    )
+
+
+def _edge_from_op(raw: dict[str, Any]) -> Edge | None:
+    edge_raw = raw.get("edge") if isinstance(raw.get("edge"), dict) else raw
+    if not isinstance(edge_raw, dict):
+        return None
+    edge_id = str(edge_raw.get("id") or "").strip()
+    from_id = str(edge_raw.get("from_node_id") or "").strip()
+    to_id = str(edge_raw.get("to_node_id") or "").strip()
+    if not edge_id or not from_id or not to_id:
+        return None
+    return Edge(
+        id=edge_id,
+        from_node_id=from_id,
+        to_node_id=to_id,
+        type=str(edge_raw.get("type") or "related"),
+        attributes=dict(edge_raw.get("attributes") or {}),
     )
 
 
@@ -264,14 +288,16 @@ class StateAuthorityService(BaseService):
         )
 
     def mutate(self, delta: StateDelta) -> MutationReceipt:
-        """Apply authoritative World Model node mutations (Stage 2 Slice 3).
+        """Apply authoritative World Model node/edge mutations (Stage 2).
 
         Supported ``StateDelta.operations``:
 
         * ``{"op": "create_node"|"update_node"|"upsert_node", "node": {...}}``
         * ``{"op": "delete_node", "node_id": "..."}``
+        * ``{"op": "create_edge", "edge": {...}}``
+        * ``{"op": "delete_edge", "edge_id": "..."}``
 
-        Goals / workflows / edges remain outside this surface (shadow SoT).
+        Goals / workflows remain outside this surface (shadow SoT).
         Orchestration may still use ``RUNTIME_ACTION_REQUEST`` → BrainRuntime;
         callers that go through State Authority must not invent a parallel store.
         """
@@ -311,7 +337,6 @@ class StateAuthorityService(BaseService):
                     elif op == "update_node":
                         mtype = MutationType.UPDATE_NODE
                     else:
-                        # upsert_node — prefer UPDATE when present, else CREATE
                         existing = self._world_model.get_node(node.id)
                         mtype = (
                             MutationType.UPDATE_NODE
@@ -338,7 +363,7 @@ class StateAuthorityService(BaseService):
                             "node_id": node.id,
                         }
                     )
-                else:  # delete_node
+                elif op in _NODE_DELETE_OPS:
                     node_id = str(raw.get("node_id") or "").strip()
                     if not node_id and isinstance(raw.get("node"), dict):
                         node_id = str(raw["node"].get("id") or "").strip()
@@ -363,6 +388,59 @@ class StateAuthorityService(BaseService):
                             "mutation_id": mutation.id,
                             "mutation_type": mutation.type.value,
                             "node_id": node_id,
+                        }
+                    )
+                elif op in _EDGE_WRITE_OPS:
+                    edge = _edge_from_op(raw)
+                    if edge is None:
+                        errors.append(
+                            f"op[{index}]: edge.id, from_node_id, to_node_id required"
+                        )
+                        continue
+                    mutation = mutation_for_edge(
+                        mutation_id=mutation_id,
+                        edge=edge,
+                        correlation=correlation,
+                    )
+                    self._world_model.apply(mutation)
+                    self._bus.publish(
+                        WORLD_MODEL_MUTATION_APPLIED,
+                        {"mutation": mutation.to_payload()},
+                        source=self.name,
+                    )
+                    applied.append(
+                        {
+                            "op": op,
+                            "mutation_id": mutation.id,
+                            "mutation_type": mutation.type.value,
+                            "edge_id": edge.id,
+                        }
+                    )
+                else:  # delete_edge
+                    edge_id = str(raw.get("edge_id") or "").strip()
+                    if not edge_id and isinstance(raw.get("edge"), dict):
+                        edge_id = str(raw["edge"].get("id") or "").strip()
+                    if not edge_id:
+                        errors.append(f"op[{index}]: edge_id required")
+                        continue
+                    mutation = Mutation(
+                        id=mutation_id,
+                        correlation=correlation,
+                        type=MutationType.DELETE_EDGE,
+                        payload={"edge_id": edge_id},
+                    )
+                    self._world_model.apply(mutation)
+                    self._bus.publish(
+                        WORLD_MODEL_MUTATION_APPLIED,
+                        {"mutation": mutation.to_payload()},
+                        source=self.name,
+                    )
+                    applied.append(
+                        {
+                            "op": op,
+                            "mutation_id": mutation.id,
+                            "mutation_type": mutation.type.value,
+                            "edge_id": edge_id,
                         }
                     )
             except Exception as exc:  # noqa: BLE001 — receipt must report failure
