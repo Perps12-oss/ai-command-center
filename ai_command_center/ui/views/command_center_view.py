@@ -513,9 +513,9 @@ class CommandCenterView(ctk.CTkFrame):
         mode_hints = {
             "idle": "Suggested: Organize Downloads · Summarize Clipboard · Search Notes · Build Workflow",
             "planning": "Pause from the hero or open Operations for the plan graph.",
-            "executing": "Pause / Abort publish goal control requests; Approvals use Review Approval.",
-            "waiting": "Review Approval grants the pending permission check from the hero.",
-            "failure": "Abort cancels the goal; Open Executions for diagnostics.",
+            "executing": "Pause / Abort publish goal control requests; Approvals open Review Approval.",
+            "waiting": "Review Approval opens the Approvals surface — decide grant/deny there.",
+            "failure": "Abort cancels an active or paused goal; Open Executions for diagnostics.",
         }
         self._recommend.configure(
             text=mode_hints.get(mode.value if hasattr(mode, "value") else str(mode), mode_hints["idle"])
@@ -528,7 +528,10 @@ class CommandCenterView(ctk.CTkFrame):
         if not events:
             recent = list(getattr(snap, "recent_execution_events", ()) or ())
             events = recent
-        for i, ev in enumerate(events[:24]):
+        # events are oldest-first; show the most recent window on the dashboard.
+        window = list(events)[-24:]
+        offset = max(0, len(events) - len(window))
+        for i, ev in enumerate(window):
             label = str(
                 getattr(ev, "event_type", None)
                 or getattr(ev, "summary", None)
@@ -554,7 +557,14 @@ class CommandCenterView(ctk.CTkFrame):
                     }
                 )
         scrub = getattr(snap, "execution_scrubber", None)
-        scrub_index = int(getattr(scrub, "scrub_index", 0) or 0) if scrub else max(0, len(steps) - 1)
+        raw_scrub = int(getattr(scrub, "scrub_index", 0) or 0) if scrub else max(0, len(events) - 1)
+        if steps and offset:
+            local_scrub = raw_scrub - offset
+            scrub_index = max(0, min(local_scrub, len(steps) - 1))
+        elif steps:
+            scrub_index = max(0, min(raw_scrub, len(steps) - 1))
+        else:
+            scrub_index = 0
         self._exec_dock.render(steps, scrub_index=scrub_index)
 
 

@@ -38,7 +38,11 @@ class ApplicationShellMixin:
         settings = getattr(snap, "settings", None)
         raw_prefs = dict(getattr(settings, "mission_layout_prefs", {}) or {})
         self._layout_prefs = LayoutPrefs.from_dict(raw_prefs)
-        self._layout_prefs.bind_persist(self._persist_layout_prefs)
+        self._layout_persist_after_id: str | None = None
+        self._layout_prefs.bind_persist(
+            self._persist_layout_prefs,
+            on_debounce=self._debounce_layout_prefs,
+        )
 
         self._top = TopBar(
             self,
@@ -369,6 +373,20 @@ class ApplicationShellMixin:
             prev = self._views[self._current_view]
             if hasattr(prev, "on_hide"):
                 prev.on_hide()
+        # Flush pending layout prefs (recent_pages) before tearing down.
+        try:
+            after_id = getattr(self, "_layout_persist_after_id", None)
+            if after_id is not None:
+                self.after_cancel(after_id)
+                self._layout_persist_after_id = None
+        except Exception:
+            pass
+        prefs = getattr(self, "_layout_prefs", None)
+        if prefs is not None:
+            try:
+                prefs.flush()
+            except Exception:
+                pass
         for unsub in self._bus_unsubs:
             try:
                 unsub()
@@ -406,6 +424,26 @@ class ApplicationShellMixin:
             "running_executions": 1 if (active and getattr(active, "is_active", False)) else 0,
             "ollama_online": bool(getattr(system, "ollama_online", False)) if system else False,
         }
+
+    def _debounce_layout_prefs(self, _prefs: LayoutPrefs) -> None:
+        """Coalesce recent_pages writes — avoid SYNC_CRITICAL settings I/O per nav click."""
+        after_id = getattr(self, "_layout_persist_after_id", None)
+        if after_id is not None:
+            try:
+                self.after_cancel(after_id)
+            except Exception:
+                pass
+        try:
+            self._layout_persist_after_id = self.after(1500, self._flush_layout_prefs)
+        except Exception:
+            # Headless / destroyed window — keep dirty; flush on destroy.
+            self._layout_persist_after_id = None
+
+    def _flush_layout_prefs(self) -> None:
+        self._layout_persist_after_id = None
+        prefs = getattr(self, "_layout_prefs", None)
+        if prefs is not None:
+            prefs.flush()
 
     def _persist_layout_prefs(self, prefs: LayoutPrefs) -> None:
         """Persist Mission Control layout prefs via SETTINGS_SET_REQUEST."""

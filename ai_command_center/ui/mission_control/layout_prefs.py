@@ -40,16 +40,41 @@ class LayoutPrefs:
     _max_recent: int = 8
     _max_favorites: int = 12
     _on_change: Any = None  # optional Callable[[LayoutPrefs], None]
+    _on_debounce: Any = None  # optional Callable[[LayoutPrefs], None] for navigation
+    _dirty: bool = False
 
-    def bind_persist(self, on_change) -> None:
+    def bind_persist(self, on_change, *, on_debounce: Any = None) -> None:
+        """Bind immediate persist (density/favorites/order) and optional debounce.
+
+        ``on_debounce`` is used for high-frequency updates such as ``record_page``
+        so sidebar navigation does not block the UI on SYNC_CRITICAL settings I/O.
+        """
         self._on_change = on_change
+        self._on_debounce = on_debounce
 
     def _persist(self) -> None:
+        self._dirty = False
         if callable(self._on_change):
             try:
                 self._on_change(self)
             except Exception:
                 pass
+
+    def _persist_debounced(self) -> None:
+        """Mark dirty and schedule coalesced persist (or persist immediately)."""
+        self._dirty = True
+        if callable(self._on_debounce):
+            try:
+                self._on_debounce(self)
+                return
+            except Exception:
+                pass
+        # No scheduler available — skip per-click write; flush() later.
+
+    def flush(self) -> None:
+        """Write pending (e.g. recent_pages) changes if dirty."""
+        if self._dirty:
+            self._persist()
 
     def toggle_density(self) -> Density:
         self.density = (
@@ -83,10 +108,11 @@ class LayoutPrefs:
         return True
 
     def record_page(self, view_id: str) -> None:
+        """Update recent pages in memory; persist via debounce (not every click)."""
         self.recent_pages = [v for v in self.recent_pages if v != view_id]
         self.recent_pages.insert(0, view_id)
         self.recent_pages = self.recent_pages[: self._max_recent]
-        self._persist()
+        self._persist_debounced()
 
     def toggle_advanced(self) -> bool:
         self.show_advanced = not self.show_advanced
