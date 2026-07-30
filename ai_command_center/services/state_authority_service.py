@@ -1,7 +1,14 @@
 """State Authority — World Model / workspace reality projection before decisions.
 
-Builds StateContext from World Model (+ optional memory/goal signals) so
-ExecutionAuthority and Planner can decide from known state, not text alone.
+Implements the Stage 2 contract surface:
+
+* ``query(StateQuery) -> StateProjection`` — structured read (no side effects
+  beyond publishing ``STATE_CONTEXT_BUILT`` for observability)
+* ``project(...)`` — convenience wrapper used by ExecutionAuthority today
+* ``mutate(StateDelta)`` — surface reserved; World Model mutations remain on
+  the BrainRuntime / ``RUNTIME_ACTION_REQUEST`` path until unified
+
+See ``docs/architecture/STATE_AUTHORITY_CONTRACT.md``.
 """
 
 from __future__ import annotations
@@ -9,7 +16,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
@@ -18,12 +25,49 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_DEACTIVATED,
 )
 from ai_command_center.core.world_model.world_model import WorldModel
+from ai_command_center.domain.state_authority import (
+    MutationReceipt,
+    ProjectionScope,
+    StateDelta,
+    StateProjection,
+    StateQuery,
+)
 from ai_command_center.domain.state_context import StateContext
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
 
 _TOKEN_RE = re.compile(r"[a-z0-9_]{3,}", re.IGNORECASE)
+
+_ALWAYS_KEEP_TYPES = frozenset(
+    {
+        "note",
+        "memory",
+        "goal",
+        "application",
+        "task",
+        "workspace",
+        "execution_run",
+    }
+)
+
+
+class StateAuthority(Protocol):
+    """Behavioral contract — sole approved query / mutate / project path."""
+
+    def query(self, query: StateQuery) -> StateProjection:
+        """Read authoritative workspace reality for a scope. No store writes."""
+
+    def mutate(self, delta: StateDelta) -> MutationReceipt:
+        """Apply an authoritative state change. Returns a correlatable receipt."""
+
+    def project(
+        self,
+        *,
+        text: str = "",
+        workspace_id: str = "",
+    ) -> StateContext:
+        """Build decision-facing projection (ExecutionAuthority convenience)."""
 
 
 class StateAuthorityService(BaseService):
@@ -69,15 +113,12 @@ class StateAuthorityService(BaseService):
         if not cleared or cleared == self._active_workspace_id:
             self._active_workspace_id = ""
 
-    def project(
-        self,
-        *,
-        text: str = "",
-        workspace_id: str = "",
-    ) -> StateContext:
-        """Query World Model (+ optional stores) and return decision context."""
-        ws = (workspace_id or self._active_workspace_id).strip()
+    def query(self, query: StateQuery) -> StateProjection:
+        """Structured read of World Model (+ optional memory/goal signals)."""
+        ws = (query.workspace_id or self._active_workspace_id).strip()
+        text = query.text.strip()
         tokens = set(_TOKEN_RE.findall(text.lower()))
+        type_filter = {t.lower() for t in query.entity_types if t}
         entities: list[dict[str, Any]] = []
         relationships: list[dict[str, Any]] = []
 
@@ -88,6 +129,8 @@ class StateAuthorityService(BaseService):
             cached = self._world_model.iter_cached_nodes()
 
         for node in cached:
+            if type_filter and str(node.type).lower() not in type_filter:
+                continue
             label = str(
                 node.attributes.get("name")
                 or node.attributes.get("title")
@@ -97,15 +140,7 @@ class StateAuthorityService(BaseService):
             blob = f"{node.type} {label} {node.attributes}".lower()
             if tokens and not any(tok in blob for tok in tokens):
                 # Keep domain-typed nodes always so reconstruction stays available.
-                if node.type not in {
-                    "note",
-                    "memory",
-                    "goal",
-                    "application",
-                    "task",
-                    "workspace",
-                    "execution_run",
-                }:
+                if node.type not in _ALWAYS_KEEP_TYPES:
                     continue
             entities.append(
                 {
@@ -126,14 +161,14 @@ class StateAuthorityService(BaseService):
                 )
 
         memories: list[dict[str, Any]] = []
-        if self._memory_lookup is not None and text.strip():
+        if query.include_memories and self._memory_lookup is not None and text:
             try:
-                memories = list(self._memory_lookup(text.strip(), workspace_id=ws) or [])
+                memories = list(self._memory_lookup(text, workspace_id=ws) or [])
             except Exception as exc:  # noqa: BLE001 — projection must not fail intake
                 _logger.warning("state_authority.memory_lookup_failed: %s", exc)
 
         goals: list[dict[str, Any]] = []
-        if self._goal_lookup is not None:
+        if query.include_goals and self._goal_lookup is not None:
             try:
                 goals = list(self._goal_lookup(workspace_id=ws) or [])
             except Exception as exc:  # noqa: BLE001
@@ -162,7 +197,7 @@ class StateAuthorityService(BaseService):
             memories=tuple(memories[:10]),
             goals=tuple(goals[:10]),
             summary="; ".join(summary_parts),
-            query_text=text.strip(),
+            query_text=text,
         )
         self._bus.publish(
             STATE_CONTEXT_BUILT,
@@ -170,10 +205,42 @@ class StateAuthorityService(BaseService):
             source=self.name,
         )
         _logger.info(
-            "state_authority.project workspace=%s entities=%d memories=%d goals=%d",
+            "state_authority.query workspace=%s entities=%d memories=%d goals=%d",
             ws,
             len(context.entities),
             len(context.memories),
             len(context.goals),
         )
         return context
+
+    def project(
+        self,
+        *,
+        text: str = "",
+        workspace_id: str = "",
+        scope: ProjectionScope | None = None,
+    ) -> StateContext:
+        """Decision-facing projection — delegates to :meth:`query`."""
+        if scope is not None:
+            text = scope.text or text
+            workspace_id = scope.workspace_id or workspace_id
+        return self.query(
+            StateQuery(workspace_id=workspace_id, text=text),
+        )
+
+    def mutate(self, delta: StateDelta) -> MutationReceipt:
+        """Authoritative mutate surface — not unified in Stage 2 Slice 1.
+
+        Interim path: World Model mutations continue via BrainRuntime on
+        ``RUNTIME_ACTION_REQUEST``. Callers must not invent a parallel SoT.
+        """
+        return MutationReceipt(
+            workspace_id=delta.workspace_id,
+            ok=False,
+            message=(
+                "StateAuthority.mutate is not unified yet; "
+                "use RUNTIME_ACTION_REQUEST → BrainRuntime → WorldModel "
+                "(see STATE_AUTHORITY_CONTRACT.md Stage 2+)."
+            ),
+            correlation_id=delta.correlation_id,
+        )
