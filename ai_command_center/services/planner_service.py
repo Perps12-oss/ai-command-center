@@ -21,6 +21,8 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
+from ai_command_center.domain.state_authority import StateQuery
+from ai_command_center.domain.state_context import StateContext
 from ai_command_center.services.base import BaseService
 
 _NOTE_GOAL = re.compile(r"\b(note|memo)\b", re.IGNORECASE)
@@ -185,14 +187,46 @@ def parse_structured_plan_response(raw_response: str) -> ExecutionPlan:
 
 
 class PlannerService(BaseService):
-    """Subscribes to plan.request and publishes plan.generated — never executes."""
+    """Subscribes to plan.request and publishes plan.generated — never executes.
+
+    Contract R2: every plan consumes a State Authority projection (payload or
+    live ``query``). Chat / ContextManager alone is never the sole workspace truth.
+    """
 
     name = "planner"
 
-    def __init__(self, bus, *, context_manager: ContextManager) -> None:
+    def __init__(
+        self,
+        bus,
+        *,
+        context_manager: ContextManager,
+        state_authority: Any | None = None,
+    ) -> None:
         super().__init__(bus)
         self._context_manager = context_manager
+        self._state_authority = state_authority
         self._unsubscribers: list[Callable[[], None]] = []
+
+    def _resolve_state_context(
+        self,
+        *,
+        goal: str,
+        workspace_id: str,
+        payload: dict[str, Any],
+    ) -> StateContext:
+        """Require a StateProjection on every PLAN_REQUEST (contract R2)."""
+        raw = payload.get("state_context")
+        if isinstance(raw, dict):
+            ctx = StateContext.from_dict(raw)
+            if ctx.summary or ctx.entities or ctx.memories or ctx.goals:
+                return ctx
+        if self._state_authority is not None:
+            return self._state_authority.query(
+                StateQuery(workspace_id=workspace_id, text=goal),
+            )
+        if isinstance(raw, dict):
+            return StateContext.from_dict(raw)
+        return StateContext.empty(workspace_id=workspace_id, query_text=goal)
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
@@ -291,17 +325,19 @@ class PlannerService(BaseService):
             return
 
         try:
+            state_context = self._resolve_state_context(
+                goal=goal,
+                workspace_id=workspace_id,
+                payload=dict(event.payload or {}),
+            )
             workspace_snippets: list[str] = []
+            # Contract path: State Authority projection first.
+            workspace_snippets.extend(state_context.to_planner_snippets())
             injected = event.payload.get("workspace_snippets")
             if isinstance(injected, list):
                 workspace_snippets.extend(
                     str(item) for item in injected if str(item).strip()
                 )
-            state_context = event.payload.get("state_context")
-            if isinstance(state_context, dict):
-                summary = str(state_context.get("summary") or "").strip()
-                if summary and summary not in workspace_snippets:
-                    workspace_snippets.insert(0, f"[world_model]\n{summary}")
             if workspace_id:
                 workspace_snippets.extend(
                     self._fetch_workspace_snippets(
@@ -337,6 +373,8 @@ class PlannerService(BaseService):
             else:
                 plan = build_deterministic_plan(goal, specs)
                 planner_mode = "deterministic"
+            if state_context.summary or state_context.entities:
+                planner_mode = f"{planner_mode}+state_aware"
             if not plan.steps:
                 self._bus.publish(
                     PLAN_FAILED,
@@ -361,6 +399,7 @@ class PlannerService(BaseService):
                     "planner_mode": planner_mode,
                     "context_version": bundle.version,
                     "context_token_estimate": bundle.token_estimate,
+                    "state_context": state_context.to_dict(),
                     "correlation": correlation.to_payload(),
                 },
                 source=self.name,
