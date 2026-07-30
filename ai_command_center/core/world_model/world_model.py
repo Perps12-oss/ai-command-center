@@ -92,3 +92,18 @@ def mutation_for_node(
         type=mutation_type,
         payload={"node": node.to_payload()},
     )
+
+
+def mutation_for_edge(
+    *,
+    mutation_id: str,
+    edge: Edge,
+    correlation: CorrelationContext,
+) -> Mutation:
+    """Build a CREATE_EDGE mutation for State Authority / BrainRuntime callers."""
+    return Mutation(
+        id=mutation_id,
+        correlation=correlation,
+        type=MutationType.CREATE_EDGE,
+        payload={"edge": edge.to_payload()},
+    )

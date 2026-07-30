@@ -13,7 +13,7 @@
 | Capability | Exists | Wired (composition root) | Tested | Live path? | Status | Evidence |
 |------------|:------:|:------------------------:|:------:|:----------:|--------|----------|
 | OperatorKernel | ✅ | ❌ | ⚠️ unit/golden only | ❌ bypassed | **PARTIAL** | `operator/kernel.py`; **not** in `service_factory.py` / `application.py`; ADR-006 → research only |
-| GoalEngine | ✅ | ✅ | ✅ | ✅ | **WIRED** | constructed in `service_factory.py`; repo `SQLiteGoalEngineRepository` |
+| GoalEngine | ✅ | ❌ | ✅ unit | ❌ | **QUARANTINED** | Phase-9 stack exists; **not** constructed in `service_factory` (Slice 3); live goals = `GoalRepository` + `SingleGoalScheduler` |
 | AgentCoordinator | ✅ | ❌ | ⚠️ orchestration tests | ❌ | **PARTIAL** | `orchestration/agents/`; **not** in `service_factory.py` |
 | PlanningEngine | ✅ | ❌ | ⚠️ tests | ❌ | **PARTIAL** | `orchestration/goals/planning_engine.py`; **not** in factory |
 | ExternalCapabilityBridge | ✅ | ✅ | ✅ | ✅ | **WIRED** | `ExternalCapabilityBridgeService(bus)` in factory |
@@ -21,7 +21,7 @@
 | Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
 | Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
-| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM mutate | **PARTIAL** | Slices 1–3; edges/goals/workflows shadow remain |
+| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM mutate; goals quarantine | **PARTIAL** | Slices 1–3; GoalEngine quarantined; edges/workflows shadow remain; see `SHADOW_SOT_INVENTORY.md` |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
 | TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
 | InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |
@@ -51,7 +51,7 @@ Registered = constructed in factory and started with other services.
 | RuntimeCapabilityRouterService | ✅ | ✅ | Classifier / provider map (not intake) | **keep** |
 | OrchestrationService | ✅ | ✅ | Completion observer / receipts | **keep** |
 | AgentRuntimeService | ✅ | ✅ | Agent plans / pipeline | **keep** |
-| GoalEngine | ✅ | ✅ | Goal persistence engine | **keep** |
+| GoalEngine | ✅ | ❌ | Goal persistence engine (Phase-9) | **retire from live path** (Slice 3 quarantine; ADR required to re-wire) |
 | OperatorKernel | ✅ | ❌ | — | **retire from live path** (ADR-006; research/tests only) |
 | PlanningEngine | ✅ | ❌ | — | **defer** — wire or retire at R1.2 gate (not P1) |
 | AgentCoordinator | ✅ | ❌ | — | **defer** — live path uses `AgentRuntimeService` |
@@ -66,7 +66,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired |
-| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Slices 1–3 (query, planner, WM node mutate); shadow-SoT remain |
+| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Slices 1–3 (query, planner, WM node mutate, shadow inventory + Goals quarantine); edges/workflows shadow remain |
 | P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P3 close |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
