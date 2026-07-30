@@ -21,7 +21,7 @@
 | Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
 | Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
-| StateAuthority | ✅ | ✅ | ✅ | ⚠️ projection | **PARTIAL** | factory wired; contract incomplete — R1 P3 / Stage 2 |
+| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project | **PARTIAL** | factory wired; Slice 1 `query(StateQuery)`; `mutate` deferred receipt |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
 | TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
 | InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |
@@ -66,8 +66,8 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired |
-| P3 Event & state unification | State Authority Contract | **NEXT** (Stage 2) — do not start until Phase B rem on main |
-| P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P1–P3 |
+| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Slice 1 (`query` + ownership table + topics); mutate/shadow-SoT next |
+| P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P3 close |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
 ---
@@ -83,7 +83,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 | Navigation Shell | E04 | ✅ | ✅ | |
 | Memory / Brain / Goal / … / Insights | E05–E13 | ✅ | ✅ E04–E13 + package audit | E07 task inspect remediated Stage 1 |
 
-**Phase B program COMPLETE:** only after Stage 1 remediation (E07 kind + E02 active goal + E00–E03 audits + this matrix) merges to `main`. Do not declare complete from feature branches alone (`PHASE_COMPLETION_RULE.md`).
+**Phase B program COMPLETE:** ✅ on `main` via [#105](https://github.com/Perps12-oss/ai-command-center/pull/105) (`f03a4fa`, 2026-07-29).
 
 ---
 
