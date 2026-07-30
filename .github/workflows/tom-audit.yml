@@ -166,14 +166,14 @@ jobs:
           except Exception:
               # Fallback if checkout is incomplete: same rules as tools/tom_breaking_detect.py
               patterns = (
-                  r"\bBREAKING(?:\s+CHANGE)?\b",
+                  r"\bBREAKING\s+CHANGE\b",
                   r"\bBREAKING:",
                   r"\bMAJOR\s+VERSION\b",
                   r"\bAPI\s+BREAK(?:ING)?\b",
                   r"\bDESTROY:",
                   r"\bDELETE:",
               )
-              blob = f"{title}\n{body}"
+              blob = re.sub(r"```[\s\S]*?```|`[^`]+`", " ", f"{title}\n{body}")
               has_breaking = any(re.search(p, blob, re.IGNORECASE) for p in patterns)
           if has_breaking:
               checklist_items.append("🚨 **Breaking Changes:** Detected - manual review required")
