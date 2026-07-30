@@ -70,8 +70,8 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | 4 | Memory | Route decision reads exclusively through SA `query` / lookup | Contract R1 |
 | 5 | Workflows | Document owner; SA project hooks or keep execution-scoped | No silent merge |
 | 6 | Executions | Keep append-only; correlate via receipts when `mutate()` unifies | Contract item 6 |
-| 7 | All | Reconstruction acceptance test (no chat) | Contract item 5 |
-| 8 | All | Unify `mutate()` onto World Model with `MutationReceipt` | Contract item 6 |
+| **7 ✅** | All | Thin reconstruction probe (mutate→query, no chat) | Contract item 5 (WM nodes) |
+| **8 ✅** | All | Unify `mutate()` onto World Model with `MutationReceipt` | Contract item 6 (node ops; edges/goals/workflows deferred) |
 
 ---
 

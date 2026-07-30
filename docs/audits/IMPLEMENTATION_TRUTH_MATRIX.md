@@ -21,7 +21,7 @@
 | Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
 | Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
-| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner; goals quarantine | **PARTIAL** | Slice 1–3; `mutate` deferred; see `SHADOW_SOT_INVENTORY.md` |
+| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM mutate; goals quarantine | **PARTIAL** | Slices 1–3; GoalEngine quarantined; edges/workflows shadow remain; see `SHADOW_SOT_INVENTORY.md` |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
 | TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
 | InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |
@@ -66,7 +66,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired |
-| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Slice 1–3 (`query`, planner mandate, shadow inventory + Goals quarantine); mutate + reconstruction next |
+| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Slices 1–3 (query, planner, WM node mutate, shadow inventory + Goals quarantine); edges/workflows shadow remain |
 | P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P3 close |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
