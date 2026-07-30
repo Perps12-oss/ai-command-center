@@ -145,7 +145,7 @@ The system must be able to reconstruct workspace reality after deleting all chat
 | `StateAuthorityService.project()` | ✅ wired into ExecutionAuthority; delegates to `query` | Keep; extend |
 | `query()` with structured `StateQuery` | ✅ Stage 2 Slice 1 | Keep; deepen filters |
 | `mutate()` with `StateDelta` | ⚠️ surface returns deferred receipt; live path = BrainRuntime | Unify |
-| Planner reads state | ⚠️ snippets when `planner_mode=state_aware` | Mandatory |
+| Planner reads state | ✅ every `PLAN_REQUEST` resolves `StateContext` (payload or `SA.query`) | Keep; deepen |
 | Goals / agents / workflows query WM | ⚠️ goals via lookup; dual GoalEngine remains | Wire through contract |
 | Shadow SoT elimination | ❌ multiple repos | Registry + migration |
 | Domain types | ✅ `domain/state_authority.py` | Evolve without breaking bus dicts |
@@ -177,7 +177,7 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 
 1. ~~Define `StateQuery`, `StateDelta`, `MutationReceipt` domain types (dataclasses).~~ ✅ Slice 1  
 2. ~~Extend `StateAuthorityService` to implement full contract surface.~~ ✅ `query`/`project`; `mutate` stub  
-3. Route PlannerService to require state projection on every `PLAN_REQUEST`.  
+3. ~~Route PlannerService to require state projection on every `PLAN_REQUEST`.~~ ✅ Slice 2  
 4. Inventory shadow SoT services; migration plan per domain (Goals dual-path first).  
 5. Add reconstruction acceptance test (no chat history).  
 6. Unify `mutate()` onto World Model with real `MutationReceipt`s.

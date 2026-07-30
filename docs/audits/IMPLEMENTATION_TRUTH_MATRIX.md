@@ -21,7 +21,7 @@
 | Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
 | Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
-| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project | **PARTIAL** | factory wired; Slice 1 `query(StateQuery)`; `mutate` deferred receipt |
+| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner | **PARTIAL** | Slice 1 `query`; Slice 2 planner requires projection; `mutate` deferred |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
 | TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
 | InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |

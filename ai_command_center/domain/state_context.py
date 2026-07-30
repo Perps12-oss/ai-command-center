@@ -48,3 +48,28 @@ class StateContext:
     @classmethod
     def empty(cls, *, workspace_id: str = "", query_text: str = "") -> StateContext:
         return cls(workspace_id=workspace_id, query_text=query_text)
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> StateContext:
+        """Rebuild a projection from a bus / planner payload dict."""
+        if not isinstance(raw, dict):
+            return cls.empty()
+        return cls(
+            workspace_id=str(raw.get("workspace_id") or ""),
+            entities=tuple(
+                dict(item) for item in (raw.get("entities") or ()) if isinstance(item, dict)
+            ),
+            relationships=tuple(
+                dict(item)
+                for item in (raw.get("relationships") or ())
+                if isinstance(item, dict)
+            ),
+            memories=tuple(
+                dict(item) for item in (raw.get("memories") or ()) if isinstance(item, dict)
+            ),
+            goals=tuple(
+                dict(item) for item in (raw.get("goals") or ()) if isinstance(item, dict)
+            ),
+            summary=str(raw.get("summary") or ""),
+            query_text=str(raw.get("query_text") or ""),
+        )
