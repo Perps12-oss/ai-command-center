@@ -85,7 +85,7 @@ def test_project_delegates_to_query() -> None:
     sa.stop()
 
 
-def test_mutate_returns_deferred_receipt() -> None:
+def test_mutate_rejects_unsupported_op() -> None:
     bus = EventBus()
     sa = StateAuthorityService(bus, _world())
     sa.start()
@@ -94,6 +94,95 @@ def test_mutate_returns_deferred_receipt() -> None:
     )
     assert isinstance(receipt, MutationReceipt)
     assert receipt.ok is False
-    assert "not unified" in receipt.message.lower() or "BrainRuntime" in receipt.message
+    assert "unsupported" in receipt.message.lower()
     assert receipt.correlation_id == "c1"
+    sa.stop()
+
+
+def test_mutate_create_update_delete_and_publish() -> None:
+    from ai_command_center.core.events.topics import WORLD_MODEL_MUTATION_APPLIED
+
+    bus = EventBus()
+    wm = _world()
+    sa = StateAuthorityService(bus, wm)
+    sa.start()
+    published: list[dict] = []
+    bus.subscribe(
+        WORLD_MODEL_MUTATION_APPLIED,
+        lambda e: published.append(dict(e.payload or {})),
+    )
+
+    create = sa.mutate(
+        StateDelta(
+            workspace_id="ws-1",
+            correlation_id="corr-create",
+            operations=(
+                {
+                    "op": "create_node",
+                    "node": {
+                        "id": "note:stage2",
+                        "type": "note",
+                        "attributes": {"title": "Stage 2 mutate"},
+                    },
+                },
+            ),
+        )
+    )
+    assert create.ok is True
+    assert create.applied[0]["node_id"] == "note:stage2"
+    assert wm.get_node("note:stage2") is not None
+
+    update = sa.mutate(
+        StateDelta(
+            workspace_id="ws-1",
+            operations=(
+                {
+                    "op": "update_node",
+                    "node": {
+                        "id": "note:stage2",
+                        "type": "note",
+                        "attributes": {"title": "Stage 2 mutated"},
+                    },
+                },
+            ),
+        )
+    )
+    assert update.ok is True
+    assert wm.get_node("note:stage2").attributes.get("title") == "Stage 2 mutated"
+
+    delete = sa.mutate(
+        StateDelta(
+            workspace_id="ws-1",
+            operations=({"op": "delete_node", "node_id": "note:stage2"},),
+        )
+    )
+    assert delete.ok is True
+    assert wm.get_node("note:stage2") is None
+    assert len(published) >= 3
+    sa.stop()
+
+
+def test_mutate_then_query_reconstructs_without_chat() -> None:
+    """ADR-006 / contract R5 thin probe: durable WM truth without conversation."""
+    bus = EventBus()
+    sa = StateAuthorityService(bus, _world())
+    sa.start()
+    receipt = sa.mutate(
+        StateDelta(
+            workspace_id="ws-recon",
+            operations=(
+                {
+                    "op": "upsert_node",
+                    "node": {
+                        "id": "note:recon",
+                        "type": "note",
+                        "attributes": {"title": "No chat needed"},
+                    },
+                },
+            ),
+        )
+    )
+    assert receipt.ok is True
+    projection = sa.query(StateQuery(text="No chat", workspace_id="ws-recon"))
+    assert any(e.get("id") == "note:recon" for e in projection.entities)
     sa.stop()

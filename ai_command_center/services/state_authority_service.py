@@ -15,16 +15,19 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
 from collections.abc import Callable
 from typing import Any, Protocol
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     STATE_CONTEXT_BUILT,
+    WORLD_MODEL_MUTATION_APPLIED,
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
 )
-from ai_command_center.core.world_model.world_model import WorldModel
+from ai_command_center.core.world_model.world_model import WorldModel, mutation_for_node
+from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.state_authority import (
     MutationReceipt,
     ProjectionScope,
@@ -33,6 +36,7 @@ from ai_command_center.domain.state_authority import (
     StateQuery,
 )
 from ai_command_center.domain.state_context import StateContext
+from ai_command_center.domain.world_model import Mutation, MutationType, Node
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
@@ -50,6 +54,37 @@ _ALWAYS_KEEP_TYPES = frozenset(
         "execution_run",
     }
 )
+
+_NODE_WRITE_OPS = frozenset({"create_node", "update_node", "upsert_node"})
+_NODE_DELETE_OPS = frozenset({"delete_node"})
+_SUPPORTED_OPS = _NODE_WRITE_OPS | _NODE_DELETE_OPS
+
+
+def _correlation_for_delta(delta: StateDelta) -> CorrelationContext:
+    if delta.correlation_id.strip():
+        return CorrelationContext(
+            correlation_id=delta.correlation_id.strip(),
+            goal_id="",
+            action_id="state_authority.mutate",
+        )
+    return CorrelationContext.new(action_id="state_authority.mutate")
+
+
+def _node_from_op(raw: dict[str, Any], *, workspace_id: str) -> Node | None:
+    node_raw = raw.get("node") if isinstance(raw.get("node"), dict) else raw
+    if not isinstance(node_raw, dict):
+        return None
+    node_id = str(node_raw.get("id") or "").strip()
+    if not node_id:
+        return None
+    attrs = dict(node_raw.get("attributes") or {})
+    if workspace_id and "workspace_id" not in attrs:
+        attrs["workspace_id"] = workspace_id
+    return Node(
+        id=node_id,
+        type=str(node_raw.get("type") or "resource"),
+        attributes=attrs,
+    )
 
 
 class StateAuthority(Protocol):
@@ -229,18 +264,133 @@ class StateAuthorityService(BaseService):
         )
 
     def mutate(self, delta: StateDelta) -> MutationReceipt:
-        """Authoritative mutate surface — not unified in Stage 2 Slice 1.
+        """Apply authoritative World Model node mutations (Stage 2 Slice 3).
 
-        Interim path: World Model mutations continue via BrainRuntime on
-        ``RUNTIME_ACTION_REQUEST``. Callers must not invent a parallel SoT.
+        Supported ``StateDelta.operations``:
+
+        * ``{"op": "create_node"|"update_node"|"upsert_node", "node": {...}}``
+        * ``{"op": "delete_node", "node_id": "..."}``
+
+        Goals / workflows / edges remain outside this surface (shadow SoT).
+        Orchestration may still use ``RUNTIME_ACTION_REQUEST`` → BrainRuntime;
+        callers that go through State Authority must not invent a parallel store.
         """
+        if not delta.operations:
+            return MutationReceipt(
+                workspace_id=delta.workspace_id,
+                ok=False,
+                message="StateDelta.operations is empty",
+                correlation_id=delta.correlation_id,
+            )
+
+        correlation = _correlation_for_delta(delta)
+        applied: list[dict[str, Any]] = []
+        errors: list[str] = []
+
+        for index, raw in enumerate(delta.operations):
+            if not isinstance(raw, dict):
+                errors.append(f"op[{index}]: expected dict")
+                continue
+            op = str(raw.get("op") or "").strip().lower()
+            if op not in _SUPPORTED_OPS:
+                errors.append(
+                    f"op[{index}]: unsupported op {op!r} "
+                    f"(supported: {sorted(_SUPPORTED_OPS)})"
+                )
+                continue
+
+            mutation_id = str(raw.get("mutation_id") or f"sa-{uuid.uuid4().hex[:12]}")
+            try:
+                if op in _NODE_WRITE_OPS:
+                    node = _node_from_op(raw, workspace_id=delta.workspace_id)
+                    if node is None or not node.id:
+                        errors.append(f"op[{index}]: node.id required")
+                        continue
+                    if op == "create_node":
+                        mtype = MutationType.CREATE_NODE
+                    elif op == "update_node":
+                        mtype = MutationType.UPDATE_NODE
+                    else:
+                        # upsert_node — prefer UPDATE when present, else CREATE
+                        existing = self._world_model.get_node(node.id)
+                        mtype = (
+                            MutationType.UPDATE_NODE
+                            if existing is not None
+                            else MutationType.CREATE_NODE
+                        )
+                    mutation = mutation_for_node(
+                        mutation_id=mutation_id,
+                        node=node,
+                        correlation=correlation,
+                        mutation_type=mtype,
+                    )
+                    self._world_model.apply(mutation)
+                    self._bus.publish(
+                        WORLD_MODEL_MUTATION_APPLIED,
+                        {"mutation": mutation.to_payload()},
+                        source=self.name,
+                    )
+                    applied.append(
+                        {
+                            "op": op,
+                            "mutation_id": mutation.id,
+                            "mutation_type": mutation.type.value,
+                            "node_id": node.id,
+                        }
+                    )
+                else:  # delete_node
+                    node_id = str(raw.get("node_id") or "").strip()
+                    if not node_id and isinstance(raw.get("node"), dict):
+                        node_id = str(raw["node"].get("id") or "").strip()
+                    if not node_id:
+                        errors.append(f"op[{index}]: node_id required")
+                        continue
+                    mutation = Mutation(
+                        id=mutation_id,
+                        correlation=correlation,
+                        type=MutationType.DELETE_NODE,
+                        payload={"node_id": node_id},
+                    )
+                    self._world_model.apply(mutation)
+                    self._bus.publish(
+                        WORLD_MODEL_MUTATION_APPLIED,
+                        {"mutation": mutation.to_payload()},
+                        source=self.name,
+                    )
+                    applied.append(
+                        {
+                            "op": op,
+                            "mutation_id": mutation.id,
+                            "mutation_type": mutation.type.value,
+                            "node_id": node_id,
+                        }
+                    )
+            except Exception as exc:  # noqa: BLE001 — receipt must report failure
+                _logger.warning("state_authority.mutate_failed op=%s: %s", op, exc)
+                errors.append(f"op[{index}]: {exc}")
+
+        ok = bool(applied) and not errors
+        if applied and errors:
+            message = (
+                f"partial apply: {len(applied)} ok, {len(errors)} failed — "
+                + "; ".join(errors)
+            )
+            ok = False
+        elif errors:
+            message = "; ".join(errors)
+        else:
+            message = f"applied {len(applied)} world-model mutation(s)"
+
+        _logger.info(
+            "state_authority.mutate workspace=%s applied=%d ok=%s",
+            delta.workspace_id,
+            len(applied),
+            ok,
+        )
         return MutationReceipt(
             workspace_id=delta.workspace_id,
-            ok=False,
-            message=(
-                "StateAuthority.mutate is not unified yet; "
-                "use RUNTIME_ACTION_REQUEST → BrainRuntime → WorldModel "
-                "(see STATE_AUTHORITY_CONTRACT.md Stage 2+)."
-            ),
-            correlation_id=delta.correlation_id,
+            ok=ok,
+            message=message,
+            correlation_id=correlation.correlation_id,
+            applied=tuple(applied),
         )
