@@ -395,6 +395,17 @@ class StateApplierMixin:
             )
         except Exception:
             pass
+        # Keep tray tooltip/icon in sync with AppState (throttled).
+        tray = getattr(self, "_tray_controller", None)
+        if tray is not None and hasattr(tray, "refresh"):
+            now = time.monotonic()
+            last = float(getattr(self, "_tray_refresh_at", 0.0) or 0.0)
+            if now - last >= 1.0:
+                self._tray_refresh_at = now
+                try:
+                    tray.refresh()
+                except Exception:
+                    pass
         if self._state_refresh_pending:
             self._queue_state_refresh()
 
