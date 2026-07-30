@@ -90,11 +90,68 @@ def test_planner_service_bus_round_trip() -> None:
     payload = generated[0]
     assert payload["request_id"] == "plan-1"
     assert payload["planner_mode"] == "deterministic"
+    assert "state_context" in payload
     plan = ExecutionPlan.from_dict(payload["plan"])
     assert plan.steps
     assert plan.steps[0].capability == "create_note"
 
     assert app_state.snapshot.planner_last_plan.get("goal") == "Add a new note for milk"
+
+
+def test_planner_requires_state_projection_via_state_authority() -> None:
+    """Contract R2: PLAN_REQUEST without state_context queries State Authority."""
+    from ai_command_center.core.world_model.world_model import WorldModel, mutation_for_node
+    from ai_command_center.domain.correlation import CorrelationContext
+    from ai_command_center.domain.world_model import MutationType, Node
+    from ai_command_center.repositories.world_model_repository import (
+        SQLiteWorldModelRepository,
+    )
+    from ai_command_center.services.state_authority_service import StateAuthorityService
+    import sqlite3
+
+    bus = EventBus()
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    wm = WorldModel(SQLiteWorldModelRepository(conn))
+    wm.apply(
+        mutation_for_node(
+            mutation_id="mut-1",
+            node=Node("note:milk", "note", {"title": "Milk list"}),
+            correlation=CorrelationContext.new(goal_id="seed"),
+            mutation_type=MutationType.CREATE_NODE,
+        )
+    )
+    sa = StateAuthorityService(bus, wm)
+    registry = ToolRegistry()
+    registry.register_tool(
+        ToolSpec(name="create_note", description="Creates a note", handler=_noop_tool)
+    )
+    catalog = CapabilityPromptCatalogService(bus, tool_registry=registry)
+    planner = PlannerService(
+        bus, context_manager=ContextManager(), state_authority=sa
+    )
+    sa.start()
+    catalog.start()
+    planner.start()
+
+    generated: list[dict] = []
+    bus.subscribe(PLAN_GENERATED, lambda e: generated.append(dict(e.payload)))
+
+    bus.publish(
+        PLAN_REQUEST,
+        {
+            "request_id": "plan-state",
+            "goal": "Add a new note for milk",
+            "workspace_id": "ws-1",
+            "entity_types": ["note"],
+        },
+        source="test",
+    )
+
+    assert generated
+    ctx = generated[0]["state_context"]
+    assert any(e.get("id") == "note:milk" for e in ctx.get("entities", []))
+    assert "state_aware" in generated[0]["planner_mode"]
 
 
 def test_planner_service_fails_without_goal() -> None:

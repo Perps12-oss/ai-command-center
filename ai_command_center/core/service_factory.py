@@ -203,7 +203,7 @@ def build_services(
         bus,
         filesystem_roots=_observer_roots_from_settings(settings_snapshot),
     )
-    planner = PlannerService(bus, context_manager=context_manager)
+    # Planner constructed after StateAuthority (injected below).
     execution_orchestrator = ExecutionOrchestratorService(bus)
     external_capability_bridge = ExternalCapabilityBridgeService(bus)
     execution_run = ExecutionRunService(bus, repo=ExecutionRunRepository(db))
@@ -264,6 +264,11 @@ def build_services(
         world_model,
         memory_lookup=memory_graph.lookup_for_state,
         goal_lookup=_goal_lookup,
+    )
+    planner = PlannerService(
+        bus,
+        context_manager=context_manager,
+        state_authority=state_authority,
     )
     execution_authority = ExecutionAuthorityService(
         bus,
