@@ -18,6 +18,9 @@ from ai_command_center.core.events.topics import (
     CLIPBOARD_CONTENT,
     CLIPBOARD_REQUEST,
     ENTITY_CREATE_REQUEST,
+    GOAL_CANCEL_REQUEST,
+    GOAL_PAUSE_REQUEST,
+    GOAL_RESUME_REQUEST,
     GOAL_SUBMIT_REQUEST,
     MEMORY_DELETE_REQUEST,
     MEMORY_REMEMBER,
@@ -793,3 +796,28 @@ class UIController:
         if gid:
             payload["goal_id"] = gid
         self._bus.publish(GOAL_SUBMIT_REQUEST, payload, source="ui")
+
+    def publish_goal_pause_request(self, goal_id: str) -> None:
+        """Publish goal pause intent (scheduler owns GOAL_PAUSED fact)."""
+        gid = str(goal_id or "").strip()
+        if not gid:
+            return
+        self._bus.publish(GOAL_PAUSE_REQUEST, {"goal_id": gid}, source="ui")
+
+    def publish_goal_resume_request(self, goal_id: str) -> None:
+        """Publish goal resume intent (scheduler owns GOAL_RESUMED fact)."""
+        gid = str(goal_id or "").strip()
+        if not gid:
+            return
+        self._bus.publish(GOAL_RESUME_REQUEST, {"goal_id": gid}, source="ui")
+
+    def publish_goal_cancel_request(self, goal_id: str, *, reason: str = "aborted") -> None:
+        """Publish goal cancel/abort intent (scheduler owns GOAL_CANCELLED fact)."""
+        gid = str(goal_id or "").strip()
+        if not gid:
+            return
+        self._bus.publish(
+            GOAL_CANCEL_REQUEST,
+            {"goal_id": gid, "reason": str(reason or "aborted")},
+            source="ui",
+        )

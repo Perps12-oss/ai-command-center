@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -752,7 +753,21 @@ def _settings_from_payload(payload: dict[str, Any]) -> SettingsSnapshot:
         qwenpaw_auto_start=_coerce_bool(payload.get("qwenpaw_auto_start", False)),
         qwenpaw_python=str(payload.get("qwenpaw_python", "")),
         qwenpaw_auth_token=str(payload.get("qwenpaw_auth_token", "")),
+        mcp_servers=_payload_dict(payload.get("mcp_servers")),
+        mission_layout_prefs=_payload_dict(payload.get("mission_layout_prefs")),
     )
+
+
+def _payload_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value or "{}")
+        except json.JSONDecodeError:
+            return {}
+        return dict(parsed) if isinstance(parsed, dict) else {}
+    return {}
 
 
 def _reduce_service_state(state: AppState, event: Event) -> AppState:

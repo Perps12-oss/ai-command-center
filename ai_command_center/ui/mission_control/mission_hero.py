@@ -41,13 +41,24 @@ class MissionHeroPanel(GlassCard):
         on_navigate: Callable[[str], None] | None = None,
         on_command: Callable[[str], None] | None = None,
         on_primary: Callable[[], None] | None = None,
+        on_pause: Callable[[str], None] | None = None,
+        on_abort: Callable[[str], None] | None = None,
+        on_approve: Callable[[], None] | None = None,
+        on_resume: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(master, fg_color=T.BG_PANEL, border_color=T.GLASS_BORDER)
         self._on_navigate = on_navigate
         self._on_command = on_command
         self._on_primary = on_primary
+        self._on_pause = on_pause
+        self._on_abort = on_abort
+        self._on_approve = on_approve
+        self._on_resume = on_resume
         self._action_view = "goals"
         self._mode = MissionMode.IDLE
+        self._active_goal_id = ""
+        self._primary_kind = "navigate"  # navigate | approve | resume
+        self._secondary_kind = "navigate"  # navigate | pause | abort
 
         # Compatibility labels expected by projection tests
         hero_top = ctk.CTkFrame(self, fg_color="transparent")
@@ -182,6 +193,12 @@ class MissionHeroPanel(GlassCard):
         self._surface_state.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
     def _on_action(self) -> None:
+        if self._primary_kind == "approve" and self._on_approve:
+            self._on_approve()
+            return
+        if self._primary_kind == "resume" and self._on_resume and self._active_goal_id:
+            self._on_resume(self._active_goal_id)
+            return
         if self._on_primary:
             self._on_primary()
             return
@@ -189,7 +206,13 @@ class MissionHeroPanel(GlassCard):
             self._on_navigate(self._action_view)
 
     def _on_secondary(self) -> None:
-        """Secondary CTA — navigate to the relevant control surface (honest labels)."""
+        """Secondary CTA — EventBus control when available, else navigate."""
+        if self._secondary_kind == "pause" and self._on_pause and self._active_goal_id:
+            self._on_pause(self._active_goal_id)
+            return
+        if self._secondary_kind == "abort" and self._on_abort and self._active_goal_id:
+            self._on_abort(self._active_goal_id)
+            return
         if self._mode == MissionMode.WAITING and self._on_navigate:
             self._on_navigate("approvals")
         elif self._mode == MissionMode.FAILURE and self._on_navigate:
@@ -222,19 +245,27 @@ class MissionHeroPanel(GlassCard):
         brain = getattr(snap, "brain_state", None)
         goals = list(getattr(brain, "recent_goals", ()) if brain else ())
         active_goal = ""
+        active_goal_id = ""
         goal_status = "ready"
         paused_goal = None
         for g in goals:
             status = str(getattr(g, "status", "") or "")
             if status in {"active", "queued", "running", "planning"}:
                 active_goal = str(getattr(g, "text", "") or "")
+                active_goal_id = str(getattr(g, "goal_id", "") or "")
                 goal_status = status
                 break
             if status == "paused":
                 paused_goal = g
         if not active_goal and goals:
             active_goal = str(getattr(goals[0], "text", "") or "")
+            active_goal_id = str(getattr(goals[0], "goal_id", "") or "")
             goal_status = str(getattr(goals[0], "status", "") or "")
+        if paused_goal is not None and not active_goal_id:
+            active_goal_id = str(getattr(paused_goal, "goal_id", "") or "")
+        self._active_goal_id = active_goal_id
+        self._primary_kind = "navigate"
+        self._secondary_kind = "navigate"
 
         execution_lib = getattr(snap, "execution_library", None)
         active_plan = getattr(execution_lib, "active_plan", None) if execution_lib else None
@@ -359,7 +390,11 @@ class MissionHeroPanel(GlassCard):
                 fg_color=action_color,
                 hover_color=action_color,
             )
-            self._secondary_button.configure(text="Open Operations")
+            if self._active_goal_id and self._on_pause:
+                self._secondary_kind = "pause"
+                self._secondary_button.configure(text="Pause")
+            else:
+                self._secondary_button.configure(text="Open Operations")
         elif mode == MissionMode.EXECUTING:
             pct = int(progress * 100)
             self._goal_label.configure(
@@ -386,7 +421,11 @@ class MissionHeroPanel(GlassCard):
                 fg_color=action_color,
                 hover_color=action_color,
             )
-            self._secondary_button.configure(text="Open Operations")
+            if self._active_goal_id and self._on_pause:
+                self._secondary_kind = "pause"
+                self._secondary_button.configure(text="Pause")
+            else:
+                self._secondary_button.configure(text="Open Operations")
         elif mode == MissionMode.WAITING:
             self._goal_label.configure(text=active_goal or "Awaiting input")
             self._narrative.configure(
@@ -399,12 +438,18 @@ class MissionHeroPanel(GlassCard):
             self._bars["verification"].set(0.0, "Pending")
             self._show_suggestions(False)
             self._action_view = "approvals"
+            if self._on_approve:
+                self._primary_kind = "approve"
             self._action_button.configure(
                 text="Review Approval",
                 fg_color=T.APPROVAL_ORANGE,
                 hover_color=T.APPROVAL_ORANGE,
             )
-            self._secondary_button.configure(text="Open Approvals")
+            if self._active_goal_id and self._on_abort:
+                self._secondary_kind = "abort"
+                self._secondary_button.configure(text="Abort")
+            else:
+                self._secondary_button.configure(text="Open Approvals")
         else:  # FAILURE
             err_text = ""
             if active_plan:
@@ -430,12 +475,26 @@ class MissionHeroPanel(GlassCard):
                     hover_color=T.EXECUTION_BLUE,
                 )
             else:
+                if paused_goal is not None and self._on_resume:
+                    self._primary_kind = "resume"
                 self._action_button.configure(
                     text=action_text,
                     fg_color=action_color,
                     hover_color=action_color,
                 )
-            self._secondary_button.configure(text="Open Executions")
+            if self._active_goal_id and self._on_abort:
+                self._secondary_kind = "abort"
+                self._secondary_button.configure(text="Abort")
+            else:
+                self._secondary_button.configure(text="Open Executions")
+
+        # Resume Goal primary when resolve_hero_action selected it
+        if (
+            self._action_button.cget("text") == "Resume Goal"
+            and self._on_resume
+            and self._active_goal_id
+        ):
+            self._primary_kind = "resume"
 
         return mode
 

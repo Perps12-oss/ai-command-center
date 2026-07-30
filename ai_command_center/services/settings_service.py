@@ -48,6 +48,7 @@ _DEFAULTS: dict[str, str] = {
     "qwenpaw_auto_start": "false",
     "qwenpaw_python": "",
     "qwenpaw_auth_token": "",
+    "mission_layout_prefs": "{}",
 }
 for _kind, _default in DEFAULT_CAPABILITY_PROVIDER_MAP.items():
     _DEFAULTS[settings_key_for_kind(_kind)] = _default
