@@ -92,6 +92,7 @@ class ViewManagerMixin:
             on_abort_goal=self._on_mission_abort,
             on_approve=self._on_mission_approve,
             on_resume_goal=self._on_mission_resume,
+            on_scrub=self._on_mission_timeline_scrub,
         )
         self._view_registry["brain"] = lambda: BrainView(
             self._content,
@@ -628,20 +629,20 @@ class ViewManagerMixin:
             self._controller.publish_agent_cancel_request(str(aid), reason="aborted")
 
     def _on_mission_approve(self) -> None:
-        """Mission Control hero Review Approval → PERMISSION_CHECK_RESULT granted."""
+        """Mission Control hero Review Approval → open Approvals (never auto-grant)."""
+        self._navigate("approvals")
+
+    def _on_mission_timeline_scrub(self, index: int) -> None:
+        """Dashboard ExecutionTimelineDock scrub → timeline + operation scrub topics."""
         snap = self._controller.snapshot()
-        permission = getattr(snap, "permission_snapshot", None)
-        pending = getattr(permission, "pending", None) if permission else None
-        if pending is None:
-            self._navigate("approvals")
-            return
-        self._controller.publish_permission_result(
-            check_id=str(getattr(pending, "check_id", "") or ""),
-            granted=True,
-            permissions=tuple(getattr(pending, "permissions", ()) or ()),
-            actor_type=str(getattr(pending, "actor_type", "agent") or "agent"),
-            actor_id=str(getattr(pending, "actor_id", "") or ""),
+        request_id = str(
+            snap.execution_scrubber.request_id
+            or snap.orchestration_run.request_id
+            or ""
         )
+        self._controller.publish_operation_scrub(index, request_id=request_id)
+        if request_id:
+            self._controller.publish_execution_timeline_scrub(request_id, index)
 
     def _on_execution_select(self, request_id: str) -> None:
         """Open execution detail and request timeline projection."""

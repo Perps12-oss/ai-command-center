@@ -58,6 +58,10 @@ class CommandCenterView(ctk.CTkFrame):
         self._prefs = layout_prefs or LayoutPrefs()
         self._action_view = "chat"
         self._sections: dict[str, ctk.CTkFrame] = {}
+        # Dashboard timeline window: local scrub index + offset into full oldest-first list.
+        self._exec_window_offset = 0
+        self._exec_window_ids: tuple[str, ...] = ()
+        self._local_scrub_index: int | None = None
         self._build()
 
     def _build(self) -> None:
@@ -269,7 +273,7 @@ class CommandCenterView(ctk.CTkFrame):
         self._sections["dock"] = dock_host
         self._exec_dock = ExecutionTimelineDock(
             dock_host,
-            on_scrub=self._on_scrub or (lambda _i: None),
+            on_scrub=self._handle_exec_scrub,
             timeline_height=72,
             show_section_labels=True,
         )
@@ -513,22 +517,40 @@ class CommandCenterView(ctk.CTkFrame):
         mode_hints = {
             "idle": "Suggested: Organize Downloads · Summarize Clipboard · Search Notes · Build Workflow",
             "planning": "Pause from the hero or open Operations for the plan graph.",
-            "executing": "Pause / Abort publish goal control requests; Approvals use Review Approval.",
-            "waiting": "Review Approval grants the pending permission check from the hero.",
-            "failure": "Abort cancels the goal; Open Executions for diagnostics.",
+            "executing": "Pause / Abort publish goal control requests; Approvals open Review Approval.",
+            "waiting": "Review Approval opens the Approvals surface — decide grant/deny there.",
+            "failure": "Abort cancels an active or paused goal; Open Executions for diagnostics.",
         }
         self._recommend.configure(
             text=mode_hints.get(mode.value if hasattr(mode, "value") else str(mode), mode_hints["idle"])
         )
 
+    def _handle_exec_scrub(self, local_index: int) -> None:
+        """Map dock-local scrub index back to the full oldest-first event list."""
+        self._local_scrub_index = int(local_index)
+        global_index = int(local_index) + int(self._exec_window_offset)
+        if self._on_scrub is not None:
+            self._on_scrub(global_index)
+
     def _render_exec_dock(self, snap: Any) -> None:
         steps: list[dict[str, Any]] = []
         timeline = getattr(snap, "execution_timeline", None)
-        events = list(getattr(timeline, "events", ()) if timeline else ())
-        if not events:
+        timeline_events = list(getattr(timeline, "events", ()) if timeline else ())
+        # execution_timeline.events is oldest-first; recent_execution_events is newest-first.
+        if timeline_events:
+            events = timeline_events
+        else:
             recent = list(getattr(snap, "recent_execution_events", ()) or ())
-            events = recent
-        for i, ev in enumerate(events[:24]):
+            events = list(reversed(recent))
+        # Show the most recent window on the dashboard (always oldest→newest within window).
+        window = list(events)[-24:]
+        offset = max(0, len(events) - len(window))
+        self._exec_window_offset = offset
+        window_ids = tuple(str(getattr(ev, "event_id", "") or "") for ev in window)
+        if window_ids != self._exec_window_ids:
+            self._exec_window_ids = window_ids
+            self._local_scrub_index = None
+        for i, ev in enumerate(window):
             label = str(
                 getattr(ev, "event_type", None)
                 or getattr(ev, "summary", None)
@@ -540,6 +562,7 @@ class CommandCenterView(ctk.CTkFrame):
                     "label": label.replace("_", " "),
                     "status": str(getattr(ev, "status", "") or "ready"),
                     "timestamp": getattr(ev, "timestamp", 0.0) or 0.0,
+                    "event_id": str(getattr(ev, "event_id", "") or ""),
                 }
             )
         if not steps:
@@ -551,11 +574,37 @@ class CommandCenterView(ctk.CTkFrame):
                         "label": str(getattr(run, "summary", "") or "Execution"),
                         "status": str(getattr(run, "status", "") or "complete"),
                         "timestamp": getattr(run, "created_at", 0.0) or 0.0,
+                        "event_id": "",
                     }
                 )
-        scrub = getattr(snap, "execution_scrubber", None)
-        scrub_index = int(getattr(scrub, "scrub_index", 0) or 0) if scrub else max(0, len(steps) - 1)
+            self._exec_window_offset = 0
+        scrub_index = self._resolve_exec_scrub_index(snap, steps, window)
         self._exec_dock.render(steps, scrub_index=scrub_index)
+
+    def _resolve_exec_scrub_index(
+        self,
+        snap: Any,
+        steps: list[dict[str, Any]],
+        window: list[Any],
+    ) -> int:
+        """Highlight within the visible window using the same event list we render."""
+        if not steps:
+            return 0
+        if self._local_scrub_index is not None:
+            return max(0, min(int(self._local_scrub_index), len(steps) - 1))
+        # Prefer matching the scrubber's selected event_id into this window.
+        scrub = getattr(snap, "execution_scrubber", None)
+        scrub_events = list(getattr(scrub, "events", ()) if scrub else ())
+        if scrub_events:
+            raw = int(getattr(scrub, "scrub_index", 0) or 0)
+            raw = max(0, min(raw, len(scrub_events) - 1))
+            selected_id = str(getattr(scrub_events[raw], "event_id", "") or "")
+            if selected_id:
+                for i, ev in enumerate(window):
+                    if str(getattr(ev, "event_id", "") or "") == selected_id:
+                        return i
+        # Default: most recent step in the visible window.
+        return len(steps) - 1
 
 
 class _HealthRow(ctk.CTkFrame):
