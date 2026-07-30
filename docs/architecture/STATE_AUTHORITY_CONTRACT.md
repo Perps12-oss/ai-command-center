@@ -2,8 +2,9 @@
 
 **Status:** ACTIVE (next architectural work after ADR-006)  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-005_WORLD_MODEL_AUTHORITY.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`  
-**Implementation today:** `ai_command_center/services/state_authority_service.py` (partial — projection only)  
-**Milestone:** PHASE R1 Priority 3
+**Implementation today:** `ai_command_center/services/state_authority_service.py`  
+**Domain types:** `ai_command_center/domain/state_authority.py` (`StateQuery`, `StateProjection`, `StateDelta`, `MutationReceipt`, `ProjectionScope`)  
+**Milestone:** PHASE R1 Priority 3 / Stage 2 Slice 1 (query surface shipped; mutate unification deferred)
 
 ---
 
@@ -80,19 +81,30 @@ class StateAuthority:
 
 ### Backing systems (aggregated, not bypassed)
 
+**Ownership table — PUBLISHED (R1.3)** — verified on `main` 2026-07-30.
+
 State Authority **may aggregate** internally; callers must not care which store backs a projection:
 
-| Domain | Current backing (evidence on `main`) | Authoritative? |
-|--------|--------------------------------------|----------------|
-| World Model | `WorldModel` + SQLite repo | ✅ primary (ADR-005) |
-| Goals | `GoalRepository`, `GoalEngine` | ⚠️ parallel to scheduler |
-| Memory | `MemoryGraphService` | ⚠️ lookup hook only |
-| Timeline / executions | `ExecutionRunRepository`, events | ⚠️ partial |
-| Workflows | `WorkflowRunRepository` | ⚠️ risk of shadow SoT |
-| Agent runtime | `AgentRuntimeService` pipeline state | ⚠️ partial |
-| UI | `AppState` | projection only — **never** authoritative |
+| Domain | Current backing (evidence on `main`) | Authoritative? | Stage 2 disposition |
+|--------|--------------------------------------|----------------|---------------------|
+| World Model | `WorldModel` + SQLite repo | ✅ primary (ADR-005) | Aggregate via `query` / `project` |
+| Goals | `GoalRepository` (SA lookup) **and** `GoalEngine` (parallel) | ⚠️ dual path | Documented dual; merge later — SA uses `goal_repo` lookup only |
+| Memory | `MemoryGraphService` | ⚠️ lookup hook only | Aggregate via optional `memory_lookup` |
+| Timeline / executions | `ExecutionRunRepository`, events | ⚠️ partial | Out of Slice 1 mutate |
+| Workflows | `WorkflowRunRepository` | ⚠️ risk of shadow SoT | Inventory; no silent merge |
+| Agent runtime | `AgentRuntimeService` pipeline state | ⚠️ partial | Inventory; no silent merge |
+| UI | `AppState` | projection only — **never** authoritative | Unchanged |
 
 **Objective:** one authoritative access layer — not “move everything into World Model overnight,” but **no durable truth outside the contract**.
+
+### Event topics (State Authority)
+
+| Topic | Role |
+|-------|------|
+| `state.context.built` | Published after successful `query` / `project` |
+| `state.context.request` / `state.context.result` | Reserved bus pair — not yet consumed |
+| `workspace.active` / `workspace.deactivated` | SA tracks active workspace for default scope |
+| `runtime.action.request` → BrainRuntime → WM | **Interim mutate path** until `mutate()` is unified |
 
 ---
 
@@ -128,16 +140,17 @@ The system must be able to reconstruct workspace reality after deleting all chat
 
 ## Current implementation gap (honest baseline)
 
-| Capability | Today on `main` | Contract target |
-|------------|-----------------|-----------------|
-| `StateAuthorityService.project()` | ✅ wired into ExecutionAuthority | Keep; extend |
-| `query()` with structured `StateQuery` | ❌ implicit via text tokens | Add |
-| `mutate()` with `StateDelta` | ❌ scattered across services | Unify |
+| Capability | Today on `main` (post Slice 1) | Contract target |
+|------------|--------------------------------|-----------------|
+| `StateAuthorityService.project()` | ✅ wired into ExecutionAuthority; delegates to `query` | Keep; extend |
+| `query()` with structured `StateQuery` | ✅ Stage 2 Slice 1 | Keep; deepen filters |
+| `mutate()` with `StateDelta` | ⚠️ surface returns deferred receipt; live path = BrainRuntime | Unify |
 | Planner reads state | ⚠️ snippets when `planner_mode=state_aware` | Mandatory |
-| Goals / agents / workflows query WM | ❌ per bypass audits | Wire through contract |
+| Goals / agents / workflows query WM | ⚠️ goals via lookup; dual GoalEngine remains | Wire through contract |
 | Shadow SoT elimination | ❌ multiple repos | Registry + migration |
+| Domain types | ✅ `domain/state_authority.py` | Evolve without breaking bus dicts |
 
-Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection DTO. Evolve toward `StateQuery` / `StateProjection` / `StateDelta` / `MutationReceipt` without breaking AppState reducers.
+Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection DTO (`StateProjection` alias). Evolve toward richer projections without breaking AppState reducers.
 
 ---
 
@@ -160,13 +173,14 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 
 ---
 
-## Next implementation steps (Devin, after Guardian approves contract v1 scope)
+## Next implementation steps (after Slice 1)
 
-1. Define `StateQuery`, `StateDelta`, `MutationReceipt` domain types (dataclasses).  
-2. Extend `StateAuthorityService` to implement full contract surface.  
+1. ~~Define `StateQuery`, `StateDelta`, `MutationReceipt` domain types (dataclasses).~~ ✅ Slice 1  
+2. ~~Extend `StateAuthorityService` to implement full contract surface.~~ ✅ `query`/`project`; `mutate` stub  
 3. Route PlannerService to require state projection on every `PLAN_REQUEST`.  
-4. Inventory shadow SoT services; migration plan per domain.  
+4. Inventory shadow SoT services; migration plan per domain (Goals dual-path first).  
 5. Add reconstruction acceptance test (no chat history).  
+6. Unify `mutate()` onto World Model with real `MutationReceipt`s.
 
 ---
 
