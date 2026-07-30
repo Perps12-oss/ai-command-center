@@ -101,11 +101,11 @@ Provider / Tools
 
 | System | Wired | Notes |
 |--------|:-----:|-------|
-| `GoalEngine` + SQLite repo | ✅ | factory ~L200 |
-| `SingleGoalScheduler` + Goal repo | ✅ | factory ~L201 |
+| `GoalEngine` + SQLite repo | ❌ | **Quarantined** (Stage 2 Slice 3) — not constructed in factory |
+| `SingleGoalScheduler` + Goal repo | ✅ | **Canonical live goals path** |
 | UI `GOAL_SUBMIT_REQUEST` | ✅ | ExecutionAuthority + Goal Dashboard |
 
-Both goal engines coexist. R1 must decide whether they converge or divide responsibility explicitly.
+Live durable goals SoT is `GoalRepository` only. Phase-9 `GoalEngine` remains in-tree for unit tests / future ADR; see `docs/architecture/SHADOW_SOT_INVENTORY.md`.
 
 ---
 

@@ -4,7 +4,7 @@
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-005_WORLD_MODEL_AUTHORITY.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`  
 **Implementation today:** `ai_command_center/services/state_authority_service.py`  
 **Domain types:** `ai_command_center/domain/state_authority.py` (`StateQuery`, `StateProjection`, `StateDelta`, `MutationReceipt`, `ProjectionScope`)  
-**Milestone:** PHASE R1 Priority 3 / Stage 2 Slice 1 (query surface shipped; mutate unification deferred)
+**Milestone:** PHASE R1 Priority 3 / Stage 2 Slice 3 (shadow SoT inventory + Goals quarantine; mutate unification deferred)
 
 ---
 
@@ -88,7 +88,7 @@ State Authority **may aggregate** internally; callers must not care which store 
 | Domain | Current backing (evidence on `main`) | Authoritative? | Stage 2 disposition |
 |--------|--------------------------------------|----------------|---------------------|
 | World Model | `WorldModel` + SQLite repo | ✅ primary (ADR-005) | Aggregate via `query` / `project` |
-| Goals | `GoalRepository` (SA lookup) **and** `GoalEngine` (parallel) | ⚠️ dual path | Documented dual; merge later — SA uses `goal_repo` lookup only |
+| Goals | `GoalRepository` + `SingleGoalScheduler` (live); `GoalEngine` quarantined | ✅ live / ❌ Phase-9 | Live via `goal_lookup`; Phase-9 off composition root — see `SHADOW_SOT_INVENTORY.md` |
 | Memory | `MemoryGraphService` | ⚠️ lookup hook only | Aggregate via optional `memory_lookup` |
 | Timeline / executions | `ExecutionRunRepository`, events | ⚠️ partial | Out of Slice 1 mutate |
 | Workflows | `WorkflowRunRepository` | ⚠️ risk of shadow SoT | Inventory; no silent merge |
@@ -146,8 +146,8 @@ The system must be able to reconstruct workspace reality after deleting all chat
 | `query()` with structured `StateQuery` | ✅ Stage 2 Slice 1 | Keep; deepen filters |
 | `mutate()` with `StateDelta` | ⚠️ surface returns deferred receipt; live path = BrainRuntime | Unify |
 | Planner reads state | ✅ every `PLAN_REQUEST` resolves `StateContext` (payload or `SA.query`) | Keep; deepen |
-| Goals / agents / workflows query WM | ⚠️ goals via lookup; dual GoalEngine remains | Wire through contract |
-| Shadow SoT elimination | ❌ multiple repos | Registry + migration |
+| Goals / agents / workflows query WM | ✅ goals via `goal_lookup`; GoalEngine quarantined | Memory/workflows still soft shadow |
+| Shadow SoT elimination | ⚠️ inventory + Goals quarantine (Slice 3) | Memory/workflows/executions next; mutate later |
 | Domain types | ✅ `domain/state_authority.py` | Evolve without breaking bus dicts |
 
 Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection DTO (`StateProjection` alias). Evolve toward richer projections without breaking AppState reducers.
@@ -178,7 +178,7 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 1. ~~Define `StateQuery`, `StateDelta`, `MutationReceipt` domain types (dataclasses).~~ ✅ Slice 1  
 2. ~~Extend `StateAuthorityService` to implement full contract surface.~~ ✅ `query`/`project`; `mutate` stub  
 3. ~~Route PlannerService to require state projection on every `PLAN_REQUEST`.~~ ✅ Slice 2  
-4. Inventory shadow SoT services; migration plan per domain (Goals dual-path first).  
+4. ~~Inventory shadow SoT services; migration plan per domain (Goals dual-path first).~~ ✅ Slice 3 — `docs/architecture/SHADOW_SOT_INVENTORY.md`; GoalEngine quarantined from live factory  
 5. Add reconstruction acceptance test (no chat history).  
 6. Unify `mutate()` onto World Model with real `MutationReceipt`s.
 
@@ -189,5 +189,7 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 - `docs/architecture/adr/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`  
 - `docs/architecture/adr/ADR-005_WORLD_MODEL_AUTHORITY.md`  
 - `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md`  
+- `docs/architecture/SHADOW_SOT_INVENTORY.md`  
 - `ai_command_center/services/state_authority_service.py`  
-- `ai_command_center/services/execution_authority_service.py` (`_project_state`)
+- `ai_command_center/services/execution_authority_service.py` (`_project_state`)  
+- `ai_command_center/core/service_factory.py`

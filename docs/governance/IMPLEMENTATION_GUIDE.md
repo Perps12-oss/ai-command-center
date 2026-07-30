@@ -135,7 +135,7 @@ Source: EPOCH A audit + `PHASE_R1_RUNTIME_RECONCILIATION.md`. Ordered:
 
 1. **Phase B remediation (close program conditions):** ✅ **on `main`** via [#105](https://github.com/Perps12-oss/ai-command-center/pull/105) (`f03a4fa`, 2026-07-29). Phase B UI program CONDITIONS cleared.
 2. **PHASE R1 — Runtime Reconciliation** (priority order: Runtime authority → Composition → State → UI → Features; no Priority N+1 before N's gate passes). P1 **passed**. P2 registry updated; PlanningEngine/AgentCoordinator still unwired. **P3 Stage 2 Slice 1:** typed `query` + ownership table + topics.
-3. **State Authority Contract** (R1 Priority 3) — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`. **Stage 2 in progress** (Slice 1 `query` + Slice 2 planner mandate; mutate unification next).
+3. **State Authority Contract** (R1 Priority 3) — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`. **Stage 2 in progress** (Slice 1–3: `query`, planner mandate, shadow SoT inventory + Goals quarantine; mutate + reconstruction next).
 4. **Phase 5 — Async EventBus** — implement `tiered_dispatch_policy.py` + `async_dispatch_queue.py` (currently only policy-only `dispatch_policy.py` exists); meet exit 5.4. *Gated by PERFORMANCE_CONSTITUTION Art. VII/XII — Performance Investigation Report + human approval before implementation.*
 5. **Verification** — gates green on `main` per `PHASE_COMPLETION_RULE.md`.
 
@@ -154,7 +154,7 @@ Pattern registry, plugin marketplace, advanced runtime, new UI ideas, performanc
 ## Immediate roadmap
 
 1. **Stage 1 — Stabilization:** Phase B rem + truth matrix **done on `main` (#105)**. Remaining: R1 P2 wire-or-retire; EventBus only after approval. **No Goose integration.**
-2. **Stage 2 — State Authority:** **in progress** — Slice 1 `query` + Slice 2 planner state mandate on `main` path; mutate + shadow-SoT next. No Goose unless it directly supports this work.
+2. **Stage 2 — State Authority:** **in progress** — Slice 1–3 on `main` path (`query`, planner mandate, `SHADOW_SOT_INVENTORY` + GoalEngine quarantine); reconstruction test + `mutate()` next. No Goose unless it directly supports this work.
 3. **Stage 3 — Goose Review:** only after the canonical roadmap reaches a stable checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"*
 
 ---

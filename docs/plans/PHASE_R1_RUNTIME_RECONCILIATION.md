@@ -127,7 +127,7 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 ### R1.3 exit criteria
 
 - [x] State ownership table published *(contract § Backing systems — 2026-07-30)*  
-- [ ] No UI or service maintains shadow SoT for listed domains *(inventory noted; dual GoalEngine deferred)*  
+- [x] No UI or service maintains shadow SoT for listed domains *(Slice 3 inventory + Goals quarantine; Memory/Workflows soft)*  
 - [x] Event topics documented for cross-subsystem flows *(contract § Event topics — SA surface; mutate interim path)*
 
 ---
