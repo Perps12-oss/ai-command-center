@@ -228,6 +228,40 @@ def test_mutate_create_and_delete_edge() -> None:
     sa.stop()
 
 
+def test_mutate_create_edge_requires_endpoints() -> None:
+    bus = EventBus()
+    sa = StateAuthorityService(bus, _world())
+    sa.start()
+    receipt = sa.mutate(
+        StateDelta(
+            workspace_id="ws-1",
+            operations=({"op": "create_edge", "edge": {"id": "e1", "type": "related"}},),
+        )
+    )
+    assert receipt.ok is False
+    assert "from_node_id" in receipt.message or "required" in receipt.message.lower()
+    sa.stop()
+
+
+def test_mutation_for_edge_supports_delete() -> None:
+    from ai_command_center.core.world_model.world_model import mutation_for_edge
+    from ai_command_center.domain.correlation import CorrelationContext
+    from ai_command_center.domain.world_model import Edge, MutationType
+
+    edge = Edge(id="e1", from_node_id="a", to_node_id="b", type="related")
+    corr = CorrelationContext.new(action_id="test")
+    created = mutation_for_edge(mutation_id="m1", edge=edge, correlation=corr)
+    assert created.type == MutationType.CREATE_EDGE
+    deleted = mutation_for_edge(
+        mutation_id="m2",
+        edge=edge,
+        correlation=corr,
+        mutation_type=MutationType.DELETE_EDGE,
+    )
+    assert deleted.type == MutationType.DELETE_EDGE
+    assert deleted.payload.get("edge_id") == "e1"
+
+
 def test_reconstruction_after_recover_without_chat_history() -> None:
     """R5: after journal recover (simulating restart), SA.query restores graph — no chat."""
     conn = sqlite3.connect(":memory:")

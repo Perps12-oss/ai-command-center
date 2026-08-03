@@ -1,7 +1,9 @@
 # Goal Engine
 
-**Status:** Proposed Phase 0 contract, pending approval  
-**Authority:** `PROJECT_CONSTITUTION_V4.md`, `docs/architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md`
+**Status:** Proposed Phase 0 contract — **not live intake**  
+**Live goals path:** `SingleGoalScheduler` + `GoalRepository` (ADR-006)  
+**Phase-9 `GoalEngine` stack:** quarantined from factory (Slice 3a); disposition **ADR-012** (Proposed)  
+**Authority:** `PROJECT_CONSTITUTION_V4.md`, `docs/architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md`, ADR-012
 
 ## Purpose
 
