@@ -101,7 +101,7 @@ def mutation_for_edge(
     correlation: CorrelationContext,
     mutation_type: MutationType = MutationType.CREATE_EDGE,
 ) -> Mutation:
-    """Build a CREATE_EDGE or DELETE_EDGE mutation for World Model apply."""
+    """Build a CREATE_EDGE or DELETE_EDGE mutation for State Authority / BrainRuntime."""
     if mutation_type == MutationType.DELETE_EDGE:
         return Mutation(
             id=mutation_id,

@@ -5,7 +5,8 @@ Implements the Stage 2 contract surface:
 * ``query(StateQuery) -> StateProjection`` — structured read (no side effects
   beyond publishing ``STATE_CONTEXT_BUILT`` for observability)
 * ``project(...)`` — convenience wrapper used by ExecutionAuthority today
-* ``mutate(StateDelta)`` — World Model node + edge ops with ``MutationReceipt``
+* ``mutate(StateDelta)`` — World Model node + edge mutations with ``MutationReceipt``
+  (goals/workflows/memory still outside this surface)
 
 See ``docs/architecture/STATE_AUTHORITY_CONTRACT.md``.
 """
@@ -336,7 +337,6 @@ class StateAuthorityService(BaseService):
                     elif op == "update_node":
                         mtype = MutationType.UPDATE_NODE
                     else:
-                        # upsert_node — prefer UPDATE when present, else CREATE
                         existing = self._world_model.get_node(node.id)
                         mtype = (
                             MutationType.UPDATE_NODE

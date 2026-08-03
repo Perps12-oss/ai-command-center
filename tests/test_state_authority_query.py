@@ -220,7 +220,8 @@ def test_mutate_create_and_delete_edge() -> None:
     )
     assert create.ok is True
     assert create.applied[0]["edge_id"] == "edge:note-app"
-    assert any(e.id == "edge:note-app" for e in wm.get_edges("n-note-1", "out"))
+    edges = wm.get_edges("n-note-1", "out")
+    assert any(e.id == "edge:note-app" for e in edges)
 
     projection = sa.query(StateQuery(text="Ship Stage", workspace_id="ws-1"))
     assert any(r.get("id") == "edge:note-app" for r in projection.relationships)
@@ -250,3 +251,64 @@ def test_mutate_create_edge_requires_endpoints() -> None:
     assert receipt.ok is False
     assert "from_node_id" in receipt.message or "required" in receipt.message.lower()
     sa.stop()
+
+
+def test_reconstruction_after_recover_without_chat_history() -> None:
+    """R5: after journal recover (simulating restart), SA.query restores graph — no chat."""
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    repo = SQLiteWorldModelRepository(conn)
+    wm = WorldModel(repo)
+    bus = EventBus()
+    sa = StateAuthorityService(bus, wm)
+    sa.start()
+
+    receipt = sa.mutate(
+        StateDelta(
+            workspace_id="ws-r5",
+            correlation_id="recon-1",
+            operations=(
+                {
+                    "op": "upsert_node",
+                    "node": {
+                        "id": "note:durable",
+                        "type": "note",
+                        "attributes": {"title": "Durable note"},
+                    },
+                },
+                {
+                    "op": "upsert_node",
+                    "node": {
+                        "id": "task:followup",
+                        "type": "task",
+                        "attributes": {"title": "Follow up"},
+                    },
+                },
+                {
+                    "op": "create_edge",
+                    "edge": {
+                        "id": "edge:note-task",
+                        "from_node_id": "note:durable",
+                        "to_node_id": "task:followup",
+                        "type": "spawns",
+                    },
+                },
+            ),
+        )
+    )
+    assert receipt.ok is True
+    sa.stop()
+
+    # Simulate process restart: new WorldModel + SA, empty chat, recover from journal.
+    wm2 = WorldModel(repo)
+    wm2.recover(replay_limit=500)
+    bus2 = EventBus()
+    sa2 = StateAuthorityService(bus2, wm2)
+    sa2.start()
+    projection = sa2.query(StateQuery(text="Durable", workspace_id="ws-r5"))
+    assert any(e.get("id") == "note:durable" for e in projection.entities)
+    assert any(e.get("id") == "task:followup" for e in projection.entities)
+    assert any(r.get("id") == "edge:note-task" for r in projection.relationships)
+    # No conversation store was used — reconstruction is World Model only.
+    assert projection.query_text == "Durable"
+    sa2.stop()
