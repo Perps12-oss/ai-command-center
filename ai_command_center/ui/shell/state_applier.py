@@ -321,7 +321,12 @@ class StateApplierMixin:
                 ):
                     selected = snap.inspector.selected
                     if selected is not None and selected.kind == "world_node":
-                        world_explorer.show_inspector(selected)
+                        from ai_command_center.ui.views.world_model.selection_inspector_panel import (
+                            inspectable_ref_for_node,
+                        )
+
+                        rich = inspectable_ref_for_node(snap.world_model, selected.ref_id)
+                        world_explorer.show_inspector(rich or selected)
                     elif selected is None:
                         world_explorer.clear_inspector()
                     self._last_world_explorer_inspector_revision = snap.inspector.revision
@@ -341,7 +346,12 @@ class StateApplierMixin:
                 ):
                     selected = snap.inspector.selected
                     if selected is not None and selected.kind == "world_node":
-                        graph_workspace.show_inspector(selected)
+                        from ai_command_center.ui.views.world_model.selection_inspector_panel import (
+                            inspectable_ref_for_node,
+                        )
+
+                        rich = inspectable_ref_for_node(snap.world_model, selected.ref_id)
+                        graph_workspace.show_inspector(rich or selected)
                     elif selected is None:
                         graph_workspace.clear_inspector()
                     self._last_graph_workspace_inspector_revision = snap.inspector.revision

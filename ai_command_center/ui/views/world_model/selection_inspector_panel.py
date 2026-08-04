@@ -13,6 +13,12 @@ from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.widget_utils import clear_children
 
 _META_KEYS = frozenset({"created_at", "updated_at", "workspace_id", "source", "metadata"})
+_MACHINE_KEYS = frozenset({"node_id", "node_type", "label"})
+_MACHINE_LABELS = {
+    "node_id": "Entity ID",
+    "node_type": "Type",
+    "label": "Name",
+}
 
 
 def inspectable_ref_for_node(
@@ -48,20 +54,21 @@ def inspectable_ref_for_node(
         ("Goal Links", ", ".join(goal_links) if goal_links else "—"),
     ]
     if node.attributes:
-        payload.append(("__section__", "Attributes"))
+        payload.append(("__section__:Attributes", "Attributes"))
         for key, value in node.attributes:
             payload.append((key, value))
     else:
         payload.append(("Attributes", "—"))
 
     meta_pairs = [(k, v) for k, v in node.attributes if k.lower() in _META_KEYS]
-    payload.append(("__section__", "Metadata"))
+    payload.append(("__section__:Metadata", "Metadata"))
     if meta_pairs:
         for key, value in meta_pairs:
             payload.append((key, value))
     else:
         payload.append(("Metadata", "—"))
 
+    # Machine keys last for generic consumers; panel skips them when Art. 12 rows exist.
     payload.extend(
         (
             ("node_id", node.node_id),
@@ -90,9 +97,10 @@ class SelectionInspectorPanel(BaseInspector):
     def __init__(self, master: Any) -> None:
         super().__init__(
             master,
-            fg_color=T.BG_DEEP,
-            border_width=0,
-            corner_radius=T.SMALL_RADIUS,
+            fg_color=T.BG_PANEL,
+            border_color=T.WORLD_TEAL,
+            border_width=1,
+            corner_radius=T.CORNER_RADIUS,
         )
         self._body = ctk.CTkScrollableFrame(
             self,
@@ -108,19 +116,37 @@ class SelectionInspectorPanel(BaseInspector):
         if ref.kind != "world_node" or not ref.payload:
             self._empty()
             return
-        for key, value in ref.payload:
-            if key in {"node_id", "node_type", "label"}:
-                continue
-            if key == "__section__":
-                ctk.CTkLabel(
-                    self._body,
-                    text=value,
-                    font=T.FONT_HEADER,
-                    text_color=T.TEXT_SECONDARY,
-                    anchor="w",
-                ).pack(fill="x", padx=4, pady=(10, 2))
-                continue
-            self._row(key, value)
+
+        art12_rows = [
+            (key, value)
+            for key, value in ref.payload
+            if key not in _MACHINE_KEYS
+        ]
+        if art12_rows:
+            for key, value in art12_rows:
+                if key.startswith("__section__:"):
+                    title = key.split(":", 1)[1] or value
+                    ctk.CTkLabel(
+                        self._body,
+                        text=title,
+                        font=T.FONT_HEADER,
+                        text_color=T.TEXT_SECONDARY,
+                        anchor="w",
+                    ).pack(fill="x", padx=4, pady=(10, 2))
+                    continue
+                self._row(key, value)
+            return
+
+        # Thin AppState payloads (machine keys only) — still show readable rows.
+        payload = dict(ref.payload)
+        shown = False
+        for machine_key, label in _MACHINE_LABELS.items():
+            value = str(payload.get(machine_key) or "").strip()
+            if value:
+                self._row(label, value)
+                shown = True
+        if not shown:
+            self._empty()
 
     def apply_snapshot(self, wm: WorldModelSnapshot) -> None:
         """Compat helper — prefer InspectorDock.show(inspectable_ref_from_world_model)."""

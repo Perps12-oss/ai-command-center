@@ -151,8 +151,8 @@ class WorldExplorerView(ctk.CTkFrame):
         self._selection_inspector = SelectionInspectorPanel(self._inspector_dock.host)
         self._inspector_dock.register("world_node", self._selection_inspector)
         self._inspector_dock.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
-        # Compat alias for tests / older call sites expecting `_inspector`.
-        self._inspector = self._inspector_dock
+        # Compat alias: projection tests read `_inspector._body` (Art. 12 panel).
+        self._inspector = self._selection_inspector
 
         self._relationships = RelationshipExplorerPanel(right, on_select=self._select)
         self._relationships.grid(row=1, column=0, sticky="nsew")
