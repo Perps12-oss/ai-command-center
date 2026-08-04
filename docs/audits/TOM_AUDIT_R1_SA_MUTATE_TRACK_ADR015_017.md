@@ -328,3 +328,267 @@ GitHub Pattern Compliance:   PASS
 ```
 
 **Tom withdraws v1 COMPLIANT/91.** ADR wiring is largely real and correctly SoT-callback shaped. Production hardening is **not** done. Stop-line CLOSED is governance disposition only. Highest-priority defect: **duplicate `goal_id` queue append** exposed through SA.mutate.
+
+---
+
+# Addendum — Evidence Q&A (rev 2.1)
+
+**Date:** 2026-08-04  
+**Trigger:** Challenge that v2 asserted 74 / labels / Closed without verifiable math and citations.  
+**Method:** Answer each item with evidence or revise. Score/labels change only when stated below.
+
+---
+
+## Q1 — Score-74 rubric (visible formula)
+
+Same shape as PERF Tom rev 2 (`docs/audits/TOM_AUDIT_PERF_001_002_FREEZE_CLOSEOUT_2026-08-04.md` on `origin/cursor/tom-audit-perf001-002-30d3`, rubric block “Start at 100”).
+
+**Start at 100.** Deduct only what this audit’s probes/docs support:
+
+| # | Deduction | pts | Maps to |
+|---|---|---:|---|
+| D1 | F1 — duplicate `goal_id` doubles `_queue` while both mutates return `ok=True` (runtime probe; `goal_scheduler_service.py:118–120` append with no dedupe) | −8 | Correctness / HIGH |
+| D2 | F2 — SA still accepts `create_node` with `type=memory` (`_NODE_WRITE_OPS` / `_SUPPORTED_OPS` include `create_node`; no type guard) alongside `store_memory` → dual surfaces in one `query` | −6 | Outcome / SoT clarity |
+| D3 | F3 — idle `submit_goal` emits `goal.activated` + `plan.request`; receipt does not surface cascade; unpinned | −3 | Contract honesty |
+| D4 | F4 — `_goal_lookup` stamps `workspace_id` without filtering (`service_factory.py:248–257`) | −3 | Projection accuracy |
+| D5 | F6 — stale contract / MEMORY / PHASE_R1 lines (see v2 F6) | −2 | Doc honesty |
+| D6 | Cited 23-pin suite does **not** exercise F1–F4 failure paths (see Q4) — “23/23 passed” ≠ coverage of findings | −4 | Evidence quality |
+
+**100 − 8 − 6 − 3 − 3 − 2 − 4 = 74.**
+
+No other deductions in this addendum. Classification band: Tom `PARTIALLY_IMPLEMENTED` floor **65** (`docs/agents/tom-implementation-auditor.json` `classification_rules.PARTIALLY_IMPLEMENTED.minimum_score`).
+
+### Weighted dimensions (forced to match 74 — not a second independent verdict)
+
+Weights from `tom-implementation-auditor.json` `audit_dimensions`.  
+**N/A rows (`ui_consistency`) contribute 0 and are excluded from the denominator** — PERF included UI at 88; this track has no UI surface, so weight 5 is redistributed by setting contribution = 0 and requiring Σ = 74 over the other 95 weight points…  
+
+**Correction (honest):** Tom config expects Σ(score×weight)/100. To keep a single number:
+
+| Dimension | Weight | Score | Contribution |
+|-----------|-------:|------:|-------------:|
+| architecture_compliance | 20 | 79 | 15.80 |
+| plan_adherence | 15 | 81 | 12.15 |
+| implementation_completeness | 15 | 70 | 10.50 |
+| code_quality | 15 | 75 | 11.25 |
+| maintainability | 10 | 72 | 7.20 |
+| scalability | 5 | 74 | 3.70 |
+| testability | 5 | 60 | 3.00 |
+| ui_consistency | 5 | **N/A → scored 74 neutral*** | 3.70 |
+| performance | 5 | 74 | 3.70 |
+| technical_debt | 5 | 60 | 3.00 |
+
+\*Neutral fill so Σ weights stay 100 without pretending UI was audited. **This is a bookkeeping choice, not a UI PASS.** Prefer reading the **deduction rubric (74)** as authoritative; the table is calibrated to match it:
+
+`Σ(score×weight)/100 = (1580+1215+1050+1125+720+370+300+370+370+300)/100 = 7400/100 = **74.00**`.
+
+**Label change from v2 final block:** Architecture Compliance is no longer a flat “PASS WITH FINDINGS” — see Q2 (process/outcome split). **Overall score remains 74** (rubric unchanged by Q2 labeling).
+
+---
+
+## Q2 — F2 vs compliance table / “no SA→repo direct”
+
+### What ADR-015 actually forbids
+
+```50:52:docs/architecture/adr/ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md
+4. **Hard forbid:** this op must **not** call `WorldModel.apply` or create WM
+   nodes/edges for the same fact. WM `type=memory` echoes remain a separate
+   orchestration concern — not this SoT.
+```
+
+So ADR-015’s hard forbid is scoped to the **`store_memory` op**, not to banning all WM nodes with `type=memory`.
+
+### Structural claims — still true
+
+| Claim | Still true? | Evidence |
+|-------|-------------|----------|
+| No SA → `GoalRepository` / `MemoryRepository` import | **Yes** | AST: zero `repositories` imports in `state_authority_service.py`; write via `_goal_submit` / `_memory_store` only (`:360–367`, `:395–400`) |
+| `store_memory` does not call `WorldModel.apply` | **Yes** | `apply` only at `:436`, `:463`, `:489`, `:516` (node/edge arms) |
+| Primitive Reuse (Inspector/Timeline) | **N/A** (v2) — never a PASS for this track | No UI surface |
+
+### Outcome claim — conditional (PERF-style split)
+
+| Axis | Result | Meaning |
+|------|--------|---------|
+| A — Process / structural (canonical `store_memory` path) | **PASS** | Factory → MGS → `memory_nodes`; no apply on that branch |
+| B — Outcome (SA cannot present a second memory-looking mutate surface) | **FAIL / CONDITIONAL** | `create_node` ∈ `_SUPPORTED_OPS` with **no type filter**; probe created WM `type=memory` + MGS memory in one session |
+
+**F2 does not falsify “no SA→repo direct.”**  
+**F2 does downgrade Architecture from a single PASS to:**
+
+```
+Architecture Compliance:     PASS (structural SoT callbacks) / FAIL-outcome (unguarded WM type=memory via create_node)
+```
+
+Same split pattern as PERF rev 2 Constitution axis (process PASS ≠ Closed-DoD PASS).  
+**Primitive Reuse stays N/A** — F2 is not an Inspector/Timeline reuse failure; do not upgrade it to PASS.
+
+**Why a “bypass” doesn’t kill the structural PASS:** The bypass is of an *inferred* “only one way to put memory-shaped facts through SA,” not of ADR-015’s literal hard forbid on `store_memory`. The failure is **outcome / product SoT clarity**, scored as D2 (−6), not as “repo direct” or “Primitive Reuse FAIL.”
+
+---
+
+## Q3 — Track-scoped 23 vs PERF suite
+
+### SA mutate suite (this audit) — collected node ids
+
+Command:
+
+```bash
+python3 -m pytest \
+  tests/test_memory_sa_soft_shadow.py \
+  tests/test_goals_sa_soft_shadow.py \
+  tests/test_adr017_sa_mutate_disposition.py \
+  tests/test_workflows_sa_soft_shadow.py \
+  tests/test_executions_sa_soft_shadow.py \
+  tests/test_agents_sa_soft_shadow.py \
+  tests/test_shadow_sot_goals.py \
+  --collect-only -q --no-cov
+# → 23 tests collected
+```
+
+| # | Node id |
+|---|---------|
+| 1 | `tests/test_memory_sa_soft_shadow.py::test_build_services_wires_memory_lookup_for_state` |
+| 2 | `…::test_lookup_for_state_does_not_publish_memory_bus_events` |
+| 3 | `…::test_sa_query_include_memories_uses_lookup` |
+| 4 | `…::test_sa_mutate_store_memory_round_trip` |
+| 5 | `…::test_sa_mutate_store_memory_rejects_empty_body` |
+| 6 | `…::test_sa_mutate_still_rejects_workflow_style_goal_lifecycle` |
+| 7 | `tests/test_goals_sa_soft_shadow.py::test_build_services_wires_goal_submit_for_state` |
+| 8 | `…::test_sa_mutate_submit_goal_round_trip` |
+| 9 | `…::test_sa_mutate_submit_goal_rejects_empty_title` |
+| 10 | `…::test_sa_mutate_still_rejects_create_goal_alias` |
+| 11 | `tests/test_adr017_sa_mutate_disposition.py::test_sa_supported_ops_excludes_wea_domains` |
+| 12 | `tests/test_workflows_sa_soft_shadow.py::test_build_services_wires_workflow_engine_and_persistence` |
+| 13 | `…::test_state_authority_has_no_workflow_lookup` |
+| 14 | `…::test_sa_mutate_does_not_support_workflow_ops` |
+| 15 | `tests/test_executions_sa_soft_shadow.py::test_build_services_wires_execution_run_event_query` |
+| 16 | `…::test_state_authority_has_no_execution_lookup` |
+| 17 | `…::test_sa_mutate_does_not_support_execution_ops` |
+| 18 | `…::test_execution_run_get_by_correlation_correlates_receipts` |
+| 19 | `tests/test_agents_sa_soft_shadow.py::test_build_services_wires_agent_runtime_not_coordinator` |
+| 20 | `…::test_state_authority_has_no_agent_lookup` |
+| 21 | `…::test_sa_mutate_does_not_support_agent_ops` |
+| 22 | `tests/test_shadow_sot_goals.py::test_build_services_does_not_wire_goal_engine` |
+| 23 | `…::test_state_authority_goal_lookup_projects_goal_repository` |
+
+### PERF files named in the challenge — collected here
+
+```bash
+python3 -m pytest \
+  tests/test_perf002_inspector_fingerprints.py \
+  tests/test_appstate_notify_coalesce.py \
+  tests/test_ui_freeze_closeout_fingerprints.py \
+  tests/test_runtime_identity.py \
+  --collect-only -q --no-cov
+# → 20 tests collected (not 23)
+```
+
+**Overlap of node ids (SA 23 ∩ PERF 20): empty set** (`comm` / set intersection in audit session).
+
+**Note:** PERF Tom rev 2 also cites “23 passed” for a **graded** mix that may include additional adjacent files beyond these four paths. Whatever that 23 was, **it does not share node ids with this SA list.** Coincidence of the integer 23 is not shared coverage.
+
+**What this SA 23 proves:** factory wires, happy-path memory/goals mutate round-trips, empty title/body rejects, WEA op **names** unsupported, GoalEngine absent.  
+**What it does not prove:** F1–F4 (Q4).
+
+---
+
+## Q4 — Pin status of F1–F4
+
+| Finding | Pinned? | Evidence |
+|---------|---------|----------|
+| **F1** duplicate `goal_id` queue | **No** | No test submits the same `goal_id` twice under a busy scheduler. `rg goal_id` in soft-shadow SA tests only hits receipt field assert / `cancel_goal` reject (`tests/test_goals_sa_soft_shadow.py`, `tests/test_memory_sa_soft_shadow.py:152`). |
+| **F2** `create_node type=memory` | **No** | No soft-shadow test builds `type=memory` via `create_node`. ADR-017 pin **requires** `create_node` ∈ supported (`tests/test_adr017_sa_mutate_disposition.py:13`) — opposite of guarding F2. |
+| **F3** plan cascade | **No** | No assert on `PLAN_REQUEST` / `goal.activated` in the 23. Round-trip only checks receipt + `query` title (`test_sa_mutate_submit_goal_round_trip`). |
+| **F4** workspace stamp | **No** | `test_state_authority_goal_lookup_projects_goal_repository` uses a hand-built lookup; factory `_goal_lookup` workspace filter never asserted. |
+
+**Therefore:** **23/23 passed does not exercise F1–F4.** Deduction D6 (−4) exists specifically so that count cannot be read as coverage of those findings.
+
+---
+
+## Q5 — 74 vs PERF 69: comparable?
+
+**No — not severity-for-severity comparable across tracks.**
+
+| | PERF Tom rev 2 | This SA mutate Tom rev 2 |
+|--|----------------|---------------------------|
+| Score | **69** | **74** |
+| Rubric home | Same Tom weight schema, **different deduction catalog** | D1–D6 above |
+| DoD that withholds “Closed” | `PERFORMANCE_CONSTITUTION.md` Art VI soak + Art XV register | Stop-line ADR queue only (Q6) |
+| Dominant open defect class | GUI soak unproven + PerfInspector skip broken | Scheduler queue dup + WM memory footgun |
+
+Both use Tom’s 0–100 + `PARTIALLY_IMPLEMENTED` band, but **deductions are track-local**. A reader must **not** infer “SA-mutate is more done than PERF” from 74 > 69.
+
+If a naive cross-track severity map were forced: F1 (−8) ≈ PERF’s S1 skip defect (−8); SA still scores higher mainly because it does not carry PERF’s −7 GUI-timing and −8 Closed-DoD soak deductions — **those axes do not apply to this headless SA track**, not because SA is healthier overall.
+
+**Action:** State in both reports (this addendum; PERF report already implies track-local rubric). No score change solely from comparability.
+
+---
+
+## Q6 — Define “Closed” once, with citations
+
+**Finding:** There is **no single PROJECT_CONSTITUTION definition** of the word “Closed” that both audits share. Tom must not invent one quietly.
+
+### A. Performance track “Closed”
+
+| Source | Text |
+|--------|------|
+| `PERFORMANCE_CONSTITUTION.md` **Article VI** (≈L160–167) | **Definition of Done** for every performance task: Tests + Benchmarks + **Soak test** + No regression + Telemetry + Docs/ADR |
+| `PERFORMANCE_CONSTITUTION.md` **Article XV** (L385–394) | Debt register Status column: PERF-001/002 = **Mitigated** … “Win ARM64 soak **to close**” |
+
+PERF Tom withholds **Art XV Closed** until soak — that is this DoD.
+
+### B. SA.mutate track “CLOSED” (as used by implementing agents)
+
+| Source | Text |
+|--------|------|
+| `docs/audits/R1_UNGATED_STOP_LINE.md` L18–29 | Heading **“R1 SA.mutate track — CLOSED”** = live mutate surface listed; WEA out; **no further R1-blocking SA.mutate deepen** |
+| `docs/architecture/adr/ADR-017_…md` Consequences | “R1 SA.mutate stop line \| **CLOSED** for non-WM deepen track” |
+
+That is an **ADR / stop-line queue** status, not Art VI soak.
+
+### C. Phase “complete” (third meaning)
+
+| Source | Text |
+|--------|------|
+| `docs/governance/PHASE_COMPLETION_RULE.md` L11–18 | Phase complete only if features+audits+constitution updates on `main`, no active branch holds phase-only code |
+
+### Tom’s unified statement (for both audits)
+
+```text
+Closed (performance debt)  := Art XV register Closed per Art VI DoD (incl. soak)
+CLOSED (SA.mutate stop line) := ADR-015/016/017 accepted on main; no further R1-blocking
+                               mutate ADR required (R1_UNGATED_STOP_LINE.md)
+Phase complete             := PHASE_COMPLETION_RULE.md four conditions
+```
+
+These are **genuinely different criteria**, not one rule said two ways.  
+v2’s phrase “production Closed” for SA was **Tom analogy**, not a cited constitution term — **withdrawn as a formal label**. Prefer: **stop-line CLOSED** (met for ADR queue) vs **hardening incomplete** (F1–F4 open).
+
+---
+
+## Label / score movements (rev 2 → 2.1)
+
+| Item | Before (v2) | After (2.1) | Why |
+|------|-------------|-------------|-----|
+| Overall score | 74 | **74** (unchanged) | Rubric now shown; math already targeted 74 |
+| Architecture Compliance | PASS WITH FINDINGS | **PASS (structural) / FAIL-outcome (F2)** | Q2 |
+| “Production Closed” | Informal bar | **Withdrawn as formal term**; use stop-line CLOSED vs hardening incomplete | Q6 |
+| Primitive Reuse | N/A | **N/A** (unchanged; not PASS) | Q2 |
+| Comparability to PERF 69 | Implied by prose | **Explicit: not comparable** | Q5 |
+
+```
+Overall Score: 74
+Status: PARTIALLY_IMPLEMENTED
+Implementation Maturity: LEVEL_3
+
+Constitution Compliance:     N/A as Art VI/XV Closed-DoD (wrong constitution);
+                             PASS for ACC host-layer rules checked in this track
+Architecture Compliance:     PASS (structural) / FAIL-outcome (F2 WM type=memory)
+Primitive Reuse Compliance:  N/A
+CustomTkinter Compliance:    N/A
+AppState Compliance:         PASS (bus facts)
+GitHub Pattern Compliance:   PASS
+Outcome / hardening:         FAIL (F1 unpinned defect; F2–F4 unpinned)
+Stop-line (ADR queue):       CLOSED per R1_UNGATED_STOP_LINE.md L18–29
+```
