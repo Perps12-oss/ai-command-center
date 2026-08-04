@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
@@ -11,6 +13,7 @@ from ai_command_center.core.event_bus import (
 )
 from ai_command_center.core.events.topics import ENTITY_CREATED
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.inspector_refresh import record_inspector_refresh
 from ai_command_center.ui.ui_queue import UIQueue
 from ai_command_center.ui.workspace_os_controller import WorkspaceOsUIController
 
@@ -41,6 +44,8 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self._ui_queue = ui_queue
         self._controller = WorkspaceOsUIController(bus)
         self._unsubs: list = []
+        self._refresh_pending = False
+        self._last_fingerprint: tuple | None = None
 
         self.title("Workspace OS Inspector")
         self.geometry(f"{self.WIDTH}x{self.HEIGHT}")
@@ -142,7 +147,10 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         )
 
     def _schedule_refresh(self) -> None:
-        """Marshal UI refresh onto the Tk main thread via UIQueue."""
+        """Marshal UI refresh onto the Tk main thread via UIQueue (coalesced)."""
+        if self._refresh_pending:
+            return
+        self._refresh_pending = True
         self._ui_queue.enqueue(self._refresh)
 
     def _on_close(self) -> None:
@@ -152,9 +160,31 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
         self._unsubs.clear()
         self.destroy()
 
+    @staticmethod
+    def _fingerprint(snapshot) -> tuple:
+        """Content identity for Workspace OS inspector panes (PERF-002)."""
+        return (
+            snapshot.entity_count,
+            snapshot.relationship_count,
+            snapshot.action_count,
+            snapshot.event_count,
+            snapshot.recent_events,
+            tuple(
+                (e.entity_id, e.entity_type, e.title, e.metadata)
+                for e in snapshot.entities
+            ),
+        )
+
     def _refresh(self) -> None:
         """Refresh all inspector state from AppState."""
+        self._refresh_pending = False
+        started = time.perf_counter()
         snapshot = self._state_store.snapshot.workspace_os
+        fp = self._fingerprint(snapshot)
+        if fp == self._last_fingerprint:
+            record_inspector_refresh("workspace_os", 0.0, skipped=True)
+            return
+        self._last_fingerprint = fp
 
         self._entities_label.configure(text=f"Entities: {snapshot.entity_count}")
         self._relationships_label.configure(
@@ -165,6 +195,9 @@ class WorkspaceOsInspector(ctk.CTkToplevel):
 
         self._render_activity(snapshot.recent_events)
         self._render_entities(snapshot.entities)
+        record_inspector_refresh(
+            "workspace_os", (time.perf_counter() - started) * 1000.0
+        )
 
     def _render_entities(self, entities: list) -> None:
         """Render the entities list with launch buttons."""

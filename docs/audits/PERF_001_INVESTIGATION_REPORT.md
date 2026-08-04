@@ -72,7 +72,7 @@ Same storm with default coalesce:
 
 - `SYNC_CRITICAL` membership
 - `EVENTBUS_DISPATCH_QUEUE` / async adapters defaults
-- PERF-002/003/004
+- PERF-002 (see `PERF_002_INVESTIGATION_REPORT.md`) / PERF-003 / PERF-004
 
 ## Rollback
 

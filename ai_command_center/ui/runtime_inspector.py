@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 import webbrowser
 
 import customtkinter as ctk
@@ -17,6 +18,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.domain.orchestration_run_snapshot import OrchestrationRunSnapshot
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.inspector_refresh import record_inspector_refresh
 from ai_command_center.ui.ui_queue import UIQueue
 
 _MCP_INSPECTOR_URL = "https://modelcontextprotocol.io/docs/tools/inspector"
@@ -138,17 +140,46 @@ class RuntimeInspector(ctk.CTkToplevel):
         self._refresh_pending = True
         self._ui_queue.enqueue(self._refresh)
 
-    def _fingerprint(self, state) -> tuple:
+    @staticmethod
+    def _fingerprint(state, filter_request_id: str = "") -> tuple:
+        """Content-identity fingerprint (PERF-002 — not length-only)."""
         run = state.orchestration_run
         return (
             run.request_id,
             run.receipt_id,
+            run.query,
+            run.intent,
+            run.provider_id,
             run.execution_success,
+            run.execution_error,
+            run.execution_facts,
             run.truth_valid,
+            run.truth_detail,
+            run.response_source,
             run.response_text,
-            len(state.execution_runs),
-            len(state.provider_health_map),
-            self._filter_request_id,
+            run.trace_id,
+            run.span_id,
+            tuple(
+                (item.run_id, item.request_id, item.source, item.summary)
+                for item in state.execution_runs
+            ),
+            tuple(
+                (p.provider_id, p.status, p.detail, p.source, p.kind, p.display_name)
+                for p in state.provider_health_map
+            ),
+            tuple(
+                (
+                    p.provider_id,
+                    p.name,
+                    p.version,
+                    p.capabilities,
+                    p.permissions,
+                    p.health_state,
+                    p.health_detail,
+                )
+                for p in state.runtime_capability_providers
+            ),
+            filter_request_id,
         )
 
     def _run(self, snap: OrchestrationRunSnapshot) -> OrchestrationRunSnapshot:
@@ -170,9 +201,11 @@ class RuntimeInspector(ctk.CTkToplevel):
 
     def _refresh(self) -> None:
         self._refresh_pending = False
+        started = time.perf_counter()
         state = self._state_store.snapshot
-        fp = self._fingerprint(state)
+        fp = self._fingerprint(state, self._filter_request_id)
         if fp == self._last_fingerprint:
+            record_inspector_refresh("runtime", 0.0, skipped=True)
             return
         self._last_fingerprint = fp
         run = self._run(state.orchestration_run)
@@ -235,6 +268,7 @@ class RuntimeInspector(ctk.CTkToplevel):
         )
         self._set_text("Response", run.response_text or "-")
         self._set_text("Capability Explorer", self._format_capability_explorer(state))
+        record_inspector_refresh("runtime", (time.perf_counter() - started) * 1000.0)
 
     @staticmethod
     def _format_provider_health(health_map: tuple[ProviderHealthSnapshot, ...]) -> str:

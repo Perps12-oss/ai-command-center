@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import time
+
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.perf.metrics import get_perf_metrics
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.inspector_refresh import record_inspector_refresh
 from ai_command_center.ui.ui_queue import UIQueue
 
 
@@ -30,6 +33,7 @@ class PerformanceInspector(ctk.CTkToplevel):
         self._state_store = state_store
         self._ui_queue = ui_queue
         self._refresh_pending = False
+        self._last_fingerprint: tuple | None = None
 
         self.title("Performance Inspector (dev)")
         self.geometry(f"{self.WIDTH}x{self.HEIGHT}")
@@ -57,7 +61,8 @@ class PerformanceInspector(ctk.CTkToplevel):
             side="left", padx=4
         )
 
-        self._unsub = self._state_store.subscribe(lambda _s: self._schedule_refresh())
+        # PERF-002: metrics live in PerfMetrics / EventBus — do not fan out on
+        # AppState notifies (timer + manual Refresh are sufficient).
         self._schedule_refresh()
         self.after(1000, self._tick)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -76,14 +81,63 @@ class PerformanceInspector(ctk.CTkToplevel):
         self._refresh_pending = True
         self._ui_queue.enqueue(self._refresh)
 
+    @staticmethod
+    def _fingerprint(
+        *,
+        uptime_s: object,
+        bus_metrics: dict,
+        navigate_dropped: int,
+        timings: dict,
+        counters: dict,
+        top_topics: list[tuple[str, int]],
+    ) -> tuple:
+        """Stable display fingerprint (excludes nothing the dump shows)."""
+        timing_fp = tuple(
+            (
+                name,
+                round(float(t.get("avg_ms", 0.0)), 2),
+                round(float(t.get("max_ms", 0.0)), 2),
+                round(float(t.get("last_ms", 0.0)), 2),
+                int(t.get("n", 0)),
+            )
+            for name, t in sorted(timings.items())
+        )
+        counter_fp = tuple(sorted((k, int(v)) for k, v in counters.items()))
+        return (
+            uptime_s,
+            bus_metrics.get("queue_depth"),
+            bus_metrics.get("dropped_events"),
+            bus_metrics.get("handler_invocations"),
+            round(float(bus_metrics.get("handler_duration_avg_ms") or 0.0), 3),
+            navigate_dropped,
+            timing_fp,
+            counter_fp,
+            tuple(top_topics),
+        )
+
     def _refresh(self) -> None:
         self._refresh_pending = False
+        started = time.perf_counter()
         metrics = get_perf_metrics().snapshot()
         bus_metrics = self._bus.get_handler_metrics()
         topic_counts = self._bus.get_topic_counts()
         top_topics = sorted(topic_counts.items(), key=lambda kv: -kv[1])[:12]
         timings = metrics.get("timings") or {}
         counters = metrics.get("counters") or {}
+        navigate_dropped = int(getattr(self._bus, "_navigate_dropped_reentrant", 0))
+
+        fp = self._fingerprint(
+            uptime_s=metrics.get("uptime_s"),
+            bus_metrics=bus_metrics,
+            navigate_dropped=navigate_dropped,
+            timings=timings,  # type: ignore[arg-type]
+            counters=counters,  # type: ignore[arg-type]
+            top_topics=top_topics,
+        )
+        if fp == self._last_fingerprint:
+            record_inspector_refresh("performance", 0.0, skipped=True)
+            return
+        self._last_fingerprint = fp
 
         lines = [
             f"uptime_s: {metrics.get('uptime_s')}",
@@ -91,7 +145,7 @@ class PerformanceInspector(ctk.CTkToplevel):
             f"eventbus dropped: {bus_metrics.get('dropped_events')}",
             f"eventbus handler_invocations: {bus_metrics.get('handler_invocations')}",
             f"eventbus handler_avg_ms: {bus_metrics.get('handler_duration_avg_ms'):.3f}",
-            f"navigate_reentrant_drops: {getattr(self._bus, '_navigate_dropped_reentrant', 0)}",
+            f"navigate_reentrant_drops: {navigate_dropped}",
             "",
             "Timing samples (avg / max / last ms):",
         ]
@@ -117,6 +171,7 @@ class PerformanceInspector(ctk.CTkToplevel):
         lines.append("  appstate.reduce < 0.5ms (constitution) / <2ms CI")
         lines.append("  appstate.notify < 1ms (listener fan-out; PERF-001)")
         lines.append("  chat.chunk coalesce 40ms (APPSTATE_NOTIFY_COALESCE_MS)")
+        lines.append("  inspector.refresh < 5ms (PERF-002)")
         lines.append("  sqlite.telemetry_batch (async worker only)")
 
         content = "\n".join(lines)
@@ -124,10 +179,9 @@ class PerformanceInspector(ctk.CTkToplevel):
         self._text.delete("1.0", "end")
         self._text.insert("1.0", content)
         self._text.configure(state="disabled")
+        record_inspector_refresh(
+            "performance", (time.perf_counter() - started) * 1000.0
+        )
 
     def _on_close(self) -> None:
-        try:
-            self._unsub()
-        except Exception:
-            pass
         self.destroy()

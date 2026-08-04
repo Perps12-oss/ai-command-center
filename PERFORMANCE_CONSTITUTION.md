@@ -391,7 +391,7 @@ Living register (update when items open/close; IDs are stable):
 | ID | Issue | Severity | Owner | Status | Baseline | Target |
 |---|---|---|---|---|---|---|
 | PERF-001 | AppState notification storms | S1 | Runtime | **Mitigated** (`chat.chunk` coalesce) | Before: 100 chunk notifies / 100 chunks. After: 1 notify + 100 coalesced. Report: `PERF_001_INVESTIGATION_REPORT.md` | &lt;25 UI stream notifies/s; notify avg &lt;1 ms — **met headless**; Win ARM64 soak to close |
-| PERF-002 | Inspector rebuilds | S2 | Runtime | Open | N/A headless | &lt;5 ms refresh |
+| PERF-002 | Inspector rebuilds | S2 | Runtime | **Mitigated** (fingerprint + drop Perf AppState fan-out). Report: `PERF_002_INVESTIGATION_REPORT.md` | N/A headless | &lt;5 ms refresh — **met headless skip path**; Win ARM64 soak to close |
 | PERF-003 | `settings.snapshot` handler over budget | S1 | Runtime | Open | max 82 ms (`OpenAIHttpService`) | &lt;5 ms |
 | PERF-004 | Navigation Tk `_show_view` cost | S2 | Runtime | Open | N/A headless | &lt;16 ms view switch |
 | PERF-005 | SQLite lock contention under workers | S2 | Runtime | Open | write max ~7.7 ms microbench; WAL on | No UI-thread wait; retain async telemetry |
