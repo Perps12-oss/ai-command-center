@@ -48,6 +48,7 @@ class ExecutionsView(ctk.CTkFrame):
         self._on_navigate = on_navigate
         self._selected_request_id = ""
         self._last_snap: AppState | None = None
+        self._apply_fingerprint: tuple = ()
         self._build()
 
     def _build(self) -> None:
@@ -167,10 +168,15 @@ class ExecutionsView(ctk.CTkFrame):
             )
             self._hero_target_id = ""
             self._hero_action.configure(text="No Executions", state="disabled")
+            self._apply_fingerprint = ()
             return
         if not isinstance(snapshot, AppState):
             return
         self._last_snap = snapshot
+        fingerprint = self._fingerprint(snapshot, self._selected_request_id)
+        if fingerprint == self._apply_fingerprint:
+            return
+        self._apply_fingerprint = fingerprint
         lib = snapshot.execution_library
         history = list(lib.run_history)
         total = lib.total_runs or len(history) or len(snapshot.execution_runs)
@@ -238,6 +244,62 @@ class ExecutionsView(ctk.CTkFrame):
         self._detail.apply_snapshot(snapshot, selected_request_id=selected)
         self._receipt.apply_snapshot(snapshot, selected_request_id=selected)
         self._truth.apply_snapshot(snapshot, selected_request_id=selected)
+
+    @staticmethod
+    def _fingerprint(snapshot: AppState, selected: str) -> tuple:
+        """Stable identity for apply_state — excludes live wall-clock duration text."""
+        lib = snapshot.execution_library
+        history = tuple(
+            (
+                str(r.run_id or ""),
+                str(r.request_id or ""),
+                str(r.status or ""),
+                str(r.source or ""),
+                float(r.created_at or 0.0),
+                str(r.summary or ""),
+            )
+            for r in lib.run_history
+        )
+        runs = tuple(
+            (
+                str(getattr(r, "run_id", "") or ""),
+                str(getattr(r, "request_id", "") or ""),
+                str(getattr(r, "summary", "") or ""),
+                float(getattr(r, "created_at", 0.0) or 0.0),
+            )
+            for r in snapshot.execution_runs
+        )
+        plan = lib.active_plan
+        step = plan.current_step
+        plan_key = (
+            bool(plan.is_active),
+            str(plan.request_id or ""),
+            str(plan.run_id or ""),
+            str(plan.goal or ""),
+            str(getattr(step, "step_id", "") or "") if step else "",
+            str(getattr(step, "capability", "") or "") if step else "",
+            str(getattr(plan, "error", "") or ""),
+        )
+        orch = snapshot.orchestration_run
+        orch_key = (
+            str(orch.request_id or ""),
+            str(orch.receipt_id or ""),
+            bool(orch.execution_success),
+            bool(orch.truth_valid),
+            str(orch.truth_detail or ""),
+            str(orch.execution_error or ""),
+            str(orch.response_source or ""),
+            tuple(orch.execution_facts or ()),
+            int(orch.total_runs or 0),
+        )
+        return (
+            str(selected or ""),
+            int(lib.total_runs or 0),
+            history,
+            runs,
+            plan_key,
+            orch_key,
+        )
 
     def apply_timeline(
         self,

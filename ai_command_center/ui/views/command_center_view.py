@@ -62,6 +62,7 @@ class CommandCenterView(ctk.CTkFrame):
         self._exec_window_offset = 0
         self._exec_window_ids: tuple[str, ...] = ()
         self._local_scrub_index: int | None = None
+        self._apply_fingerprint: tuple = ()
         self._build()
 
     def _build(self) -> None:
@@ -407,7 +408,13 @@ class CommandCenterView(ctk.CTkFrame):
             self._world.apply_state(None)
             self._timeline.update_from_snap(None)
             self._exec_dock.render([])
+            self._apply_fingerprint = ()
             return
+
+        fingerprint = self._state_fingerprint(snap)
+        if fingerprint == self._apply_fingerprint:
+            return
+        self._apply_fingerprint = fingerprint
 
         mode = self._hero_panel.apply_state(snap)
         self._action_view = self._hero_panel._action_view
@@ -523,6 +530,59 @@ class CommandCenterView(ctk.CTkFrame):
         }
         self._recommend.configure(
             text=mode_hints.get(mode.value if hasattr(mode, "value") else str(mode), mode_hints["idle"])
+        )
+
+    def _state_fingerprint(self, snap: Any) -> tuple:
+        """Cheap identity for Mission Control — skip identical AppState ticks."""
+        timeline = getattr(snap, "execution_timeline", None)
+        timeline_events = list(getattr(timeline, "events", ()) if timeline else ())
+        if timeline_events:
+            events = timeline_events
+        else:
+            recent = list(getattr(snap, "recent_execution_events", ()) or ())
+            events = list(reversed(recent))
+        window_ids = tuple(
+            str(getattr(ev, "event_id", "") or "") for ev in list(events)[-24:]
+        )
+        scrub = getattr(snap, "execution_scrubber", None)
+        scrub_key = (
+            str(getattr(scrub, "request_id", "") or ""),
+            int(getattr(scrub, "scrub_index", 0) or 0),
+            self._local_scrub_index,
+        )
+        brain_state = getattr(snap, "brain_state", None)
+        goals = tuple(
+            (str(getattr(g, "goal_id", "") or ""), str(getattr(g, "status", "") or ""))
+            for g in list(getattr(brain_state, "recent_goals", ()) if brain_state else ())
+        )
+        execution_lib = getattr(snap, "execution_library", None)
+        active_plan = getattr(execution_lib, "active_plan", None) if execution_lib else None
+        plan_key = (
+            bool(getattr(active_plan, "is_active", False)),
+            str(getattr(active_plan, "request_id", "") or ""),
+            int(getattr(execution_lib, "total_runs", 0) or 0) if execution_lib else 0,
+        )
+        agent_pipeline = getattr(snap, "agent_pipeline", None)
+        agent_key = (
+            tuple(getattr(agent_pipeline, "active_run_ids", ()) if agent_pipeline else ()),
+            len(getattr(agent_pipeline, "runs", ()) if agent_pipeline else ()),
+        )
+        permission = getattr(snap, "permission_snapshot", None)
+        provider_registry = getattr(snap, "provider_registry", None)
+        world_model = getattr(snap, "world_model", None)
+        return (
+            window_ids,
+            scrub_key,
+            goals,
+            plan_key,
+            agent_key,
+            bool(permission and getattr(permission, "has_pending", False)),
+            int(getattr(provider_registry, "healthy_count", 0) or 0) if provider_registry else 0,
+            int(getattr(provider_registry, "total_count", 0) or 0) if provider_registry else 0,
+            int(getattr(world_model, "node_count", 0) or 0) if world_model else 0,
+            int(getattr(world_model, "mutation_count", 0) or 0) if world_model else 0,
+            str(getattr(snap, "phase", "") or ""),
+            float(getattr(snap, "last_event_timestamp", 0.0) or 0.0),
         )
 
     def _handle_exec_scrub(self, local_index: int) -> None:

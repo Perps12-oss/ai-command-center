@@ -100,9 +100,16 @@ class ExecutionTimelineScrubber(ctk.CTkFrame):
         CustomTkinter ``CTkSlider.set`` divides by ``number_of_steps`` — never
         configure 0 steps (empty or single-event timelines).
         """
-        self._labels = list(labels)
-        self._count = len(self._labels)
-        self._index = max(0, min(int(active_index), max(0, self._count - 1)))
+        label_list = list(labels)
+        count = len(label_list)
+        index = max(0, min(int(active_index), max(0, count - 1)))
+        fingerprint = (tuple(label_list), int(index))
+        if fingerprint == getattr(self, "_timeline_fingerprint", None):
+            return
+        self._timeline_fingerprint = fingerprint
+        self._labels = label_list
+        self._count = count
+        self._index = index
         if self._count <= 1:
             # Degenerate range: keep steps >= 1 so set() cannot ZeroDivisionError.
             self._slider.configure(from_=0, to=1, number_of_steps=1)
