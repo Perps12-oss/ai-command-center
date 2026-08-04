@@ -121,7 +121,7 @@ This prevents **research creep** and **external-project creep**.
 
 Incoming information is triaged into three classes:
 
-- **Class A — Repository Truth (Authoritative):** comes from the repo; the implementation agent trusts it. (e.g. Phase B CONDITIONS cleared on `main` (#105); Stage 2 soft-shadow + R1 P1–P4 + ADR-014 on `main`; Memory `SA.mutate` via ADR-015; Goals `SA.mutate` via ADR-016; Phase 5 Async EventBus incomplete and **approval-gated**; OperatorKernel / Predictive / Undo **retired from live**; next hard gate = workflows/executions/agents SA.mutate via new ADRs.)
+- **Class A — Repository Truth (Authoritative):** comes from the repo; the implementation agent trusts it. (e.g. Phase B CONDITIONS cleared on `main` (#105); Stage 2 soft-shadow + R1 P1–P4 + ADR-014–017 on `main`; SA.mutate track **CLOSED**; Phase 5 Async EventBus incomplete and **approval-gated**; OperatorKernel / Predictive / Undo **retired from live**.)
 - **Class B — Engineering Intelligence (Reference):** e.g. Goose provider abstraction / extension system / runtime / desktop architecture. Reference material, **not** implementation instructions.
 - **Class C — Future Opportunities (Backlog):** e.g. potential provider registry, plugin registry, runtime improvements. Backlog, **not** current work.
 
@@ -135,7 +135,7 @@ Source: EPOCH A audit + `PHASE_R1_RUNTIME_RECONCILIATION.md`. Ordered:
 
 1. **Phase B remediation (close program conditions):** ✅ **on `main`** via [#105](https://github.com/Perps12-oss/ai-command-center/pull/105) (`f03a4fa`, 2026-07-29). Phase B UI program CONDITIONS cleared.
 2. **PHASE R1 — Runtime Reconciliation** — P1–P4 **passed**; P5 Predictive/Undo **disposition closed (ADR-014 research-only)**. Composition retire rows: ADR-006/012/013/014. Soft-shadow Stage 2 **closed**.
-3. **State Authority Contract** — soft-shadow inventories complete; Memory `store_memory` (**ADR-015**) and Goals `submit_goal` (**ADR-016**) mutate live; **workflows/executions/agents mutate only with new ADRs**.
+3. **State Authority Contract** — soft-shadow complete; live mutate = WM + Memory + Goals; workflows/executions/agents **remain outside (ADR-017)** — R1 SA.mutate track **CLOSED**.
 4. **Phase 5 — Async EventBus** — implement `tiered_dispatch_policy.py` + `async_dispatch_queue.py` (currently only policy-only `dispatch_policy.py` exists); meet exit 5.4. *Gated by PERFORMANCE_CONSTITUTION Art. VII/XII — Performance Investigation Report + human approval before implementation.*
 5. **Verification** — gates green on `main` per `PHASE_COMPLETION_RULE.md`.
 
@@ -154,7 +154,7 @@ Pattern registry, plugin marketplace, advanced runtime, new UI ideas, performanc
 ## Immediate roadmap
 
 1. **Stage 1 — Stabilization:** Phase B rem + truth matrix **done on `main` (#105)**. R1 P2 wire-or-retire **closed** (ADR-006/012/013/014). EventBus only after approval. **No Goose integration.**
-2. **Stage 2 — State Authority / R1 closeout:** **soft-shadow closed**; **P4 closed**; **P5 Predictive/Undo research-only (ADR-014)**; **Memory SA.mutate (ADR-015)**; **Goals SA.mutate (ADR-016)**. Living docs honesty closed (`R1_UNGATED_STOP_LINE.md`). **NEXT GATE:** workflows/executions/agents SA.mutate (each needs ADR). Also gated: Goose = Stage 3; Async EventBus = Phase 5 + approval; live-wire Predictive/Undo only with ADR superseding 014.
+2. **Stage 2 — State Authority / R1 closeout:** **soft-shadow closed**; **P4/P5 closed**; **ADR-015/016 mutate live**; **ADR-017 WEA disposition** — **SA.mutate track CLOSED** (`R1_UNGATED_STOP_LINE.md`). Parallel other tracks: Goose = Stage 3; Async EventBus = Phase 5 + approval; live-wire Predictive/Undo only with ADR superseding 014.
 3. **Stage 3 — Goose Review:** only after the canonical roadmap reaches a stable checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"*
 
 ---

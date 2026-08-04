@@ -1,10 +1,10 @@
 # Shadow Source-of-Truth Inventory
 
-**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents); Predictive/Undo ADR-014; Memory mutate ADR-015; Goals mutate ADR-016  
+**Status:** ACTIVE — Stage 2 soft-shadow closed; ADR-014/015/016/017 (SA.mutate track **CLOSED**)  
 **Authority:** `docs/architecture/STATE_AUTHORITY_CONTRACT.md` (item 4)  
-**Verified:** ADR-016 acceptance tip (2026-08-04)  
+**Verified:** ADR-017 acceptance tip (2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative. Transient caches are allowed; durable truth outside State Authority is not.
-**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md` — next gate = workflows/executions/agents SA.mutate (each needs ADR).
+**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md` — R1 SA.mutate track **CLOSED**.
 
 ---
 
@@ -22,9 +22,9 @@ List every store or service that can be mistaken for authoritative workspace rea
 | Goals (live) | `GoalRepository` + `SingleGoalScheduler` | ✅ | ✅ `goal_lookup` + **mutate `submit_goal` (ADR-016)** | Soft dual intake | **Canonical live goals path** |
 | Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Retired (ADR-012 A)** | Tree may remain for unit tests; **not** product SoT; cleanup optional |
 | Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ✅ SA lookup + Assembler 4b + **mutate `store_memory` (ADR-015)** | Soft tools | **4a–4d** — tools `memory.*` stay capability (same SoT) |
-| Executions | `ExecutionRun` / `ExecutionEvent` / `ExecutionQuery` → repos | ✅ append-only | ❌ | Soft | **6a+6b** — append-only; correlate via `correlation_id` |
-| Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **5a+5b** — keep execution-scoped outside SA |
-| Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; `AgentCoordinator` RETIRED-from-live (ADR-013) |
+| Executions | `ExecutionRun` / `ExecutionEvent` / `ExecutionQuery` → repos | ✅ append-only | ❌ | Soft | **6a+6b + ADR-017** — append-only; **out of SA.mutate** |
+| Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **5a+5b + ADR-017** — execution-scoped; **out of SA.mutate** |
+| Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; Coordinator ADR-013; **mutate out (ADR-017)** |
 | Predictive / Undo packages | `PredictiveEngine` / `undo_replay.Timeline` | ❌ | ❌ | Research | **RETIRED from live (ADR-014)** — live = TimelineService / SnapshotService / WM recover |
 | AppState / UI | reducers / views | ❌ | Projection | No | Never authoritative |
 
@@ -77,9 +77,12 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | **4d ✅** | Memory | `SA.mutate` `store_memory` (no WM dual-write) | **ADR-015** |
 | **5a ✅** | Workflows | Soft-shadow inventory + factory/SA pins | `WORKFLOWS_SOFT_SHADOW_INVENTORY.md` + tests |
 | **5b ✅** | Workflows | **Keep execution-scoped** — no SA workflow hooks | Closeout |
+| **5c ✅** | Workflows | Remain outside `SA.mutate` | **ADR-017** |
 | **6a ✅** | Executions | Soft-shadow inventory; keep append-only | `EXECUTIONS_SOFT_SHADOW_INVENTORY.md` + tests |
 | **6b ✅** | Executions | Correlate receipts via `correlation_id` / `get_by_correlation` | Closeout + pin |
+| **6c ✅** | Executions | Remain outside `SA.mutate` | **ADR-017** |
 | **Agents ✅** | Agents | Inventory + ADR-013 research-only PlanningEngine/AgentCoordinator | `AGENTS_SOFT_SHADOW_INVENTORY.md` |
+| **Agents mutate ✅** | Agents | Remain outside `SA.mutate` | **ADR-017** |
 | **7 ✅** | All | Reconstruction: mutate→recover→query (nodes+edges, no chat) | Contract item 5 |
 | **8 ✅** | WM | Unify `mutate()` for nodes + edges with `MutationReceipt` | Contract item 6 (goals/workflows deferred) |
 

@@ -38,6 +38,7 @@ def test_state_authority_has_no_agent_lookup() -> None:
 
 
 def test_sa_mutate_does_not_support_agent_ops() -> None:
+    """ADR-017: agents remain outside SA.mutate."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_database(conn)
