@@ -1,28 +1,34 @@
-# Constitutional Pre-Flight — Chat trust & feel (C5–C8)
+# Constitutional Pre-Flight — runtime identity (stale-launch detection)
 
-**Branch:** `cursor/ui-c5-c8-chat-trust-4fb7`  
+**Branch:** `cursor/runtime-identity-loud-30d3`  
 **Authority:** PROJECT_CONSTITUTION_V4.md
 
 ## Intent
 
-1. **C5/C6** — New Chat creates a persisted conversation (no destructive
-   `clear_messages` on the active id); conversation rail reads from
-   `ConversationRepository` via EventBus → AppState (not UI-only SessionStore).
-2. **C7+C3** — Fix assistant height cutoff (displaylines + scrollbar when capped);
-   remove dead `AssistantBubble`/`UserBubble` path (docking/v2 blocks only).
-3. **C8** — Shared `MSG_*` spacing constants for chat message packing.
+Make launch identity impossible to miss so freeze reports from the legacy
+OneDrive tree (or any pre-#106/#110 binary) are rejected before further
+perf investigation. Print `main` path, cwd, package root, git HEAD, and
+`freeze_fix=v6`; add `scripts/verify_runtime_identity.py`.
 
 ## Invariants checked
 
 | Invariant | Status |
 |---|---|
-| UI → AppState → EventBus → Services → Repositories → Storage | Preserved; New Chat / select via EventBus |
-| UI isolation | Preserved; ConversationList remains display-only |
-| Host supremacy | N/A |
-| Contracts | New topics `chat.conversations_loaded`, `ui.chat.select_conversation` |
+| UI → AppState → EventBus → Services → Repositories → Storage | Preserved |
+| UI isolation | Preserved — identity is launch diagnostics only |
+| No new EventBus topics | N/A |
+| Host platform supremacy (Inv 13) | N/A |
+
+## Protected assets / sources of truth
+
+- None modified.
 
 ## Behaviour preservation
 
-- Entity-scoped chats (`entity:…`) unchanged for open-chat
-- Free-floating New Chat leaves prior conversation messages intact
-- StreamTextBuffer / EmptyState / SystemStrip retained
+- App still starts; identity lines are additive stdout/stderr.
+- No change to Ollama, EventBus dispatch, or UI apply paths.
+
+## Out of scope
+
+- Fixing freezes on stale binaries (impossible until the correct tree is launched)
+- Deleting the OneDrive legacy copy (operator action)

@@ -8,6 +8,28 @@ Local AI command surface for **Windows ARM64** — canonical repository.
 
 Legacy OneDrive copy is kept as a read-only backup until the unified app is proven stable.
 
+### Freeze triage — wrong tree is the #1 false alarm
+
+If the console shows this banner **without** `Ctrl+Shift+P for Performance Inspector`
+and **without** `ACC_UI_RUNTIME freeze_fix=v6`, you are **not** running this repo
+(usually the OneDrive legacy copy or an old shortcut). Syncing GitHub Desktop does
+not update a different folder you still launch from.
+
+```powershell
+# 1) Fully quit ACC (tray icon → Exit)
+# 2) Verify the canonical tree
+cd c:\Users\S8633\Documents\GITHUB\ai-command-center
+git fetch origin
+git checkout main
+git pull origin main
+C:\Users\S8633\AppData\Local\Python\bin\python.exe scripts\verify_runtime_identity.py
+# 3) Launch ONLY from that folder
+C:\Users\S8633\AppData\Local\Python\bin\python.exe main.py
+```
+
+Good launch must print `freeze_fix=v6 status=OK` and `main=...\Documents\GITHUB\ai-command-center\main.py`.
+Budget warnings must include `handler=` and `source=`. Anything else is a stale process.
+
 ## Target hardware
 
 - Lenovo 83N3, Snapdragon X, 16 GB RAM
