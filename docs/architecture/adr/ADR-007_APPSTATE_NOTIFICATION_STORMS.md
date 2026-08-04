@@ -1,11 +1,11 @@
 # ADR-007: AppState Notification Storms — First Program 1 Investigation
 
-**Status:** Proposed / Investigation (Phase 2 instrumentation approved)  
-**Date:** 2026-07-26  
-**Deciders:** Project owner (approval required before behavior-changing implementation)  
-**Related:** `PERFORMANCE_CONSTITUTION.md`, `docs/audits/PERF_BASELINE_REPORT_2026-07-26.md`, `docs/audits/PERFORMANCE_RCA_UI_FREEZE_2026-07-24.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`
+**Status:** Accepted — Phase 3 fix landed (`chat.chunk` notify coalesce)  
+**Date:** 2026-07-26 (updated 2026-08-04)  
+**Deciders:** Project owner  
+**Related:** `PERFORMANCE_CONSTITUTION.md`, `docs/audits/PERF_001_INVESTIGATION_REPORT.md`, `docs/audits/PERF_BASELINE_REPORT_2026-07-26.md`, `docs/audits/PERFORMANCE_RCA_UI_FREEZE_2026-07-24.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`
 
-### Phase 2 metric keys (observation only — no behavior change)
+### Phase 2 metric keys (observation)
 
 | Key | Meaning |
 |---|---|
@@ -15,8 +15,17 @@
 | `appstate.notify.listener_invocations` | Sum of listeners called |
 | `appstate.notify.skipped.metrics_only` | Dirty `system.snapshot` skipped (metrics-only delta) |
 | `appstate.notify.skipped.no_listeners` | Dirty update with zero subscribers |
+| `appstate.notify.coalesced` | Stream chunks absorbed into pending coalesce window |
+| `appstate.notify.flush` | Coalesce timer delivered a fan-out |
 
-Phase 3 fix remains **blocked** until an Investigation Report with these metrics is approved.
+### Phase 3 fix (2026-08-04)
+
+Trailing-edge coalesce for `chat.chunk` notifies only (default 40 ms;
+`APPSTATE_NOTIFY_COALESCE_MS=0` disables). Evidence:
+`docs/audits/PERF_001_INVESTIGATION_REPORT.md` (100 chunk notifies → 1).
+
+Phase 2 instrumentation remains required for any further PERF-001 work.
+
 
 ---
 
@@ -104,26 +113,22 @@ Alternative Causes
 
 Chosen Fix
 ----------
-Deferred. This ADR authorizes investigation + instrumentation proposal only.
-Likely Optimization Ladder entry points (post-approval):
-  1) Delete unnecessary notifies
-  2) Avoid duplicate listener work
-  3) Coalesce notifies / UI apply
-— not “new abstraction” or SYNC_CRITICAL reclassification.
+Phase 3 (2026-08-04): trailing-edge coalesce of `chat.chunk` AppState listener
+notifies (40 ms; `APPSTATE_NOTIFY_COALESCE_MS`). Reducers unchanged.
+See `docs/audits/PERF_001_INVESTIGATION_REPORT.md` for before/after.
 
 Why this fix?
 -------------
-N/A until Phase 2 measurements confirm notify fan-out as the bottleneck.
-Ladder forbids jumping to parallelize/micro-optimize first.
+Phase 2 storm showed 100/100 notifies from `chat.chunk` while notify avg ≪1 ms.
+Ladder step: coalesce notifies (not SYNC_CRITICAL changes, not new abstractions).
 
 Blast Radius
 ------------
-If a future fix is approved, expected touch set (estimate only):
-  - ai_command_center/core/app_state.py
-  - ai_command_center/core/perf/metrics.py (notify counters)
-  - possibly ai_command_center/ui/shell/state_applier.py
-  - possibly inspectors (PERF-002 — separate PR)
-Out of bounds for this investigation’s eventual fix PR:
+Touch set:
+  - ai_command_center/core/app_state.py (coalesce)
+  - ai_command_center/core/perf/metrics.py (counters already generic)
+  - docs/audits/PERF_001_INVESTIGATION_REPORT.md
+Out of bounds (honored):
   - dispatch_policy SYNC_CRITICAL set
   - ExecutionAuthority intake redesign
   - SQLite schema
@@ -131,14 +136,9 @@ Out of bounds for this investigation’s eventual fix PR:
 
 Success Criteria
 ----------------
-Before any fix merges:
-  - appstate.notify count + timing exist in PerfMetrics (Phase 2)
-  - Reproduced storm under controlled workload with before numbers
-After fix (Phase 3, separate PR):
-  - Notify rate and/or listener cost reduced vs baseline
-  - AppState reduce/notify/UI apply budgets held
-  - Headless perf tests green
-  - Win ARM64 soak with freeze_fix=v5 shows no regression
+Before fix: appstate.notify* metrics + storm numbers recorded.
+After fix: chat.chunk notifies 100 → 1 in same storm; coalesce counters live;
+headless tests green. Win ARM64 soak remains operator closeout.
 
 Rollback
 --------
@@ -163,15 +163,15 @@ Future code fix: revert that single-purpose PR; feature flags preferred if risk 
 
 ### Stop
 
-- Implementing AppState notify coalescing / listener changes before Investigation Report approval and Phase 2 metrics
 - Broad “AppState refactor” PRs
 - Combining PERF-001 with PERF-002/003/004 in one PR
+- Changing SYNC_CRITICAL membership or enabling async EventBus flags by default
 
 ### Continue
 
-1. Land `PERFORMANCE_CONSTITUTION.md` + this ADR + baseline report (docs PR)
-2. Phase 2: instrumentation only (`appstate.notify` etc.) — separate PR after approval
-3. Phase 3: one approved bottleneck fix with before/after
+1. Win ARM64 soak to fully close PERF-001 debt register row
+2. PERF-002 Inspector rebuilds (next in Program 1 order)
+3. Keep `APPSTATE_NOTIFY_COALESCE_MS=0` as rollback
 
 ---
 

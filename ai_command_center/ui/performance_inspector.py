@@ -116,6 +116,7 @@ class PerformanceInspector(ctk.CTkToplevel):
         lines.append("  ui.apply_state.stream < 4ms")
         lines.append("  appstate.reduce < 0.5ms (constitution) / <2ms CI")
         lines.append("  appstate.notify < 1ms (listener fan-out; PERF-001)")
+        lines.append("  chat.chunk coalesce 40ms (APPSTATE_NOTIFY_COALESCE_MS)")
         lines.append("  sqlite.telemetry_batch (async worker only)")
 
         content = "\n".join(lines)
