@@ -112,7 +112,7 @@ class UserMessageBlock(ctk.CTkFrame):
             border_width=1,
             border_color=T.MSG_USER_BORDER,
         )
-        bubble.pack(side="right", anchor="e", pady=2)
+        bubble.pack(side="right", anchor="e", pady=T.MSG_BUBBLE_OUTER_PAD_Y)
 
         txt_lbl = ctk.CTkLabel(
             bubble,
@@ -201,7 +201,7 @@ class AssistantMessageBlock(ctk.CTkFrame):
             border_width=1,
             border_color=T.MSG_ASSISTANT_BORDER,
         )
-        self._bubble.pack(side="left", anchor="w", pady=2)
+        self._bubble.pack(side="left", anchor="w", pady=T.MSG_BUBBLE_OUTER_PAD_Y)
         ctk.CTkFrame(brow, fg_color="transparent").pack(
             side="right", fill="x", expand=True
         )
@@ -292,7 +292,9 @@ class AssistantMessageBlock(ctk.CTkFrame):
                 self,
                 on_action=self._on_artifact_action,
             )
-            self._artifact_list.pack(fill="x", padx=14, pady=(0, 4))
+            self._artifact_list.pack(
+                fill="x", padx=T.MSG_INNER_PAD, pady=(0, T.MSG_ROW_GAP)
+            )
         self._artifact_list.set_artifacts(catalog)
         if count != self._artifact_count:
             self._artifact_count = count
@@ -323,7 +325,9 @@ class AssistantMessageBlock(ctk.CTkFrame):
             on_inspect_select=self._on_inspect_select,
             on_inspect_navigate=self._on_inspect_navigate,
         )
-        self._action_strip.pack(fill="x", padx=14, pady=(0, 6))
+        self._action_strip.pack(
+            fill="x", padx=T.MSG_INNER_PAD, pady=(0, T.MSG_ROW_GAP)
+        )
 
     def get_raw_text(self) -> str:
         return self._raw_text
@@ -446,7 +450,9 @@ class AssistantMessageBlock(ctk.CTkFrame):
             return
         self._footer_visible = not self._footer_visible
         if self._footer_visible:
-            self._footer_frame.pack(fill="x", padx=14, pady=(0, 6))
+            self._footer_frame.pack(
+                fill="x", padx=T.MSG_INNER_PAD, pady=(0, T.MSG_ROW_GAP)
+            )
         else:
             self._footer_frame.pack_forget()
 
