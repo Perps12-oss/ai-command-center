@@ -1,30 +1,35 @@
-# Constitutional Pre-Flight — Performance Architecture
+# Constitutional Pre-Flight — UI Freeze P1 (v6)
 
-**Branch:** `cursor/perf-architecture-freeze-f2e9`  
-**Authority:** PROJECT_CONSTITUTION_V4.md
+**Branch:** `cursor/ui-freeze-p1-budget-4fb7`  
+**Authority:** PROJECT_CONSTITUTION_V4.md · PERFORMANCE_CONSTITUTION.md
 
 ## Intent
 
-Eliminate UI freezes and sync bottlenecks without changing user-visible behaviour or APIs.
+Reduce UI-thread starvation during chat streaming and event storms by budgeting
+UIQueue drain work, phasing AppState→widget projection, throttling stream
+appends, governing refresh rate, and deferring non-visible catalog rebuilds —
+without changing user-visible behaviour or EventBus contracts.
 
 ## Invariants checked
 
 | Invariant | Status |
 |---|---|
 | UI → AppState → EventBus → Services → Repositories → Storage | Preserved |
-| UI isolation (no direct storage/Ollama/tools) | Preserved; Performance Inspector reads AppState/EventBus metrics only |
+| UI isolation (no direct storage/Ollama/tools) | Preserved |
 | No service-to-service calls | Preserved |
 | Host supremacy | N/A |
-| Contracts / topics | No topic removals; behaviour-preserving handlers |
+| Contracts / topics | No topic or payload changes |
 
 ## Behaviour preservation
 
 - Same EventBus topics and payloads
-- Same navigation outcomes (one click → one navigate → one render)
-- Same settings semantics (one logical change → one snapshot)
-- Telemetry still persisted (async batch)
-- Inspectors show the same data (dirty update, not full wipe when unchanged)
+- Same navigation outcomes
+- Same chat lifecycle (begin / stream / complete / cancel / error)
+- Catalog views still refresh when visible or after deferred dirty apply
+- `ACC_UI_FREEZE_FIX` bumped to `v6` for runtime fingerprint
 
 ## Risk
 
-Medium — AppState reducer indexing and identity-based dirty detection must not drop updates. Covered by existing AppState projection tests + new perf benchmarks.
+Medium — phased `_apply_state` and deferred catalogs must not drop lifecycle or
+settings projection. Covered by UIQueue unit tests + state-applier unit tests +
+existing shell projection tests.
