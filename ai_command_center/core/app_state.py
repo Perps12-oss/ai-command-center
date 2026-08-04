@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -259,6 +260,22 @@ from ai_command_center.domain.chat_session_snapshot import (
 )
 
 logger = logging.getLogger(__name__)
+
+# PERF-001: coalesce listener fan-out for high-frequency stream topics only.
+# Reducers still run every event; only notify rate is bounded (target ≤25/s).
+_NOTIFY_COALESCE_TOPICS: frozenset[str] = frozenset({CHAT_CHUNK})
+_DEFAULT_NOTIFY_COALESCE_MS = 40.0
+
+
+def notify_coalesce_ms_from_env() -> float:
+    """Return coalesce window in ms. ``0`` disables coalescing (rollback)."""
+    raw = os.environ.get("APPSTATE_NOTIFY_COALESCE_MS", "").strip()
+    if not raw:
+        return _DEFAULT_NOTIFY_COALESCE_MS
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return _DEFAULT_NOTIFY_COALESCE_MS
 
 APP_STATE_TOPICS: tuple[str, ...] = (
     SERVICE_STATE_CHANGED,
@@ -3644,6 +3661,11 @@ class AppStateStore:
         self._state = AppState()
         self._listeners: list[Callable[[AppState], None]] = []
         self._unsubscribers: list[Callable[[], None]] = []
+        self._coalesce_ms = notify_coalesce_ms_from_env()
+        self._coalesce_lock = threading.Lock()
+        self._coalesce_timer: threading.Timer | None = None
+        self._pending_notify_state: AppState | None = None
+        self._pending_notify_topic: str = ""
         from ai_command_center.core.state.reducer_index import build_topic_reducer_index
 
         self._reducer_index = build_topic_reducer_index(
@@ -3725,18 +3747,71 @@ class AppStateStore:
         if not listeners:
             return
 
+        if event.topic in _NOTIFY_COALESCE_TOPICS and self._coalesce_ms > 0:
+            self._schedule_coalesced_notify(new_state, event.topic)
+            return
+
+        self._fanout_notify(new_state, event.topic, listeners)
+
+    def _schedule_coalesced_notify(self, state: AppState, topic: str) -> None:
+        """Trailing-edge coalesce for stream topics (PERF-001)."""
+        with self._coalesce_lock:
+            self._pending_notify_state = state
+            self._pending_notify_topic = topic
+            try:
+                from ai_command_center.core.perf.metrics import get_perf_metrics
+
+                get_perf_metrics().incr("appstate.notify.coalesced")
+            except Exception:
+                pass
+            if self._coalesce_timer is not None:
+                return
+            timer = threading.Timer(
+                self._coalesce_ms / 1000.0, self._flush_coalesced_notify
+            )
+            timer.daemon = True
+            self._coalesce_timer = timer
+            timer.start()
+
+    def _flush_coalesced_notify(self) -> None:
+        with self._coalesce_lock:
+            state = self._pending_notify_state
+            topic = self._pending_notify_topic or CHAT_CHUNK
+            self._pending_notify_state = None
+            self._pending_notify_topic = ""
+            self._coalesce_timer = None
+        if state is None:
+            return
+        with self._lock:
+            listeners = list(self._listeners)
+        if not listeners:
+            return
+        self._fanout_notify(state, topic, listeners)
+        try:
+            from ai_command_center.core.perf.metrics import get_perf_metrics
+
+            get_perf_metrics().incr("appstate.notify.flush")
+        except Exception:
+            pass
+
+    def _fanout_notify(
+        self,
+        new_state: AppState,
+        topic: str,
+        listeners: list[Callable[[AppState], None]],
+    ) -> None:
         notify_started = time.perf_counter()
         for listener in listeners:
             try:
                 listener(new_state)
             except Exception as exc:
-                logger.exception("AppState listener failed for topic=%s", event.topic)
+                logger.exception("AppState listener failed for topic=%s", topic)
                 try:
                     self._bus.publish(
                         APP_ERROR,
                         {
                             "message": f"AppState listener failed: {exc}",
-                            "topic": event.topic,
+                            "topic": topic,
                         },
                         source="app_state",
                     )
@@ -3751,12 +3826,18 @@ class AppStateStore:
                 (time.perf_counter() - notify_started) * 1000.0,
             )
             metrics.incr("appstate.notify")
-            metrics.incr(f"appstate.notify.topic.{event.topic}")
+            metrics.incr(f"appstate.notify.topic.{topic}")
             metrics.incr("appstate.notify.listener_invocations", len(listeners))
         except Exception:
             pass
 
     def close(self) -> None:
+        with self._coalesce_lock:
+            timer = self._coalesce_timer
+            self._coalesce_timer = None
+        if timer is not None:
+            timer.cancel()
+        self._flush_coalesced_notify()
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
