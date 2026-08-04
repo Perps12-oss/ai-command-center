@@ -134,8 +134,8 @@ Incoming information is triaged into three classes:
 Source: EPOCH A audit + `PHASE_R1_RUNTIME_RECONCILIATION.md`. Ordered:
 
 1. **Phase B remediation (close program conditions):** ✅ **on `main`** via [#105](https://github.com/Perps12-oss/ai-command-center/pull/105) (`f03a4fa`, 2026-07-29). Phase B UI program CONDITIONS cleared.
-2. **PHASE R1 — Runtime Reconciliation** (priority order: Runtime authority → Composition → State → UI → Features; no Priority N+1 before N's gate passes). P1 **passed**. P2 registry updated; PlanningEngine/AgentCoordinator still unwired; GoalEngine **RETIRED (ADR-012 A)**. **P3 Stage 2:** Slices 1–4 + Goals 3b on path; next Memory/Workflows soft-shadow.
-3. **State Authority Contract** (R1 Priority 3) — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`. **Stage 2 in progress** — next: Memory → SA (SHADOW step 4), then Workflows.
+2. **PHASE R1 — Runtime Reconciliation** (priority order: Runtime authority → Composition → State → UI → Features; no Priority N+1 before N's gate passes). P1 **passed**. P2 registry updated; PlanningEngine/AgentCoordinator still unwired; GoalEngine **RETIRED (ADR-012 A)**. **P3 Stage 2:** Slices 1–4 + Goals 3b done; **Memory 4a inventory** next/in flight; then Workflows.
+3. **State Authority Contract** (R1 Priority 3) — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`. **Stage 2 in progress** — Memory soft-shadow (`MEMORY_SOFT_SHADOW_INVENTORY.md`); then Workflows.
 4. **Phase 5 — Async EventBus** — implement `tiered_dispatch_policy.py` + `async_dispatch_queue.py` (currently only policy-only `dispatch_policy.py` exists); meet exit 5.4. *Gated by PERFORMANCE_CONSTITUTION Art. VII/XII — Performance Investigation Report + human approval before implementation.*
 5. **Verification** — gates green on `main` per `PHASE_COMPLETION_RULE.md`.
 
@@ -154,7 +154,7 @@ Pattern registry, plugin marketplace, advanced runtime, new UI ideas, performanc
 ## Immediate roadmap
 
 1. **Stage 1 — Stabilization:** Phase B rem + truth matrix **done on `main` (#105)**. Remaining: R1 P2 wire-or-retire; EventBus only after approval. **No Goose integration.**
-2. **Stage 2 — State Authority:** **in progress** — WM node+edge mutate on `main`; Goals 3b **ADR-012 Accepted Option A**; next Memory/Workflows soft-shadow. No Goose unless it directly supports this work.
+2. **Stage 2 — State Authority:** **in progress** — Goals **ADR-012 Accepted Option A** on `main`; Memory soft-shadow inventory (step 4a); then Assembler routing (4b) / Workflows. No Goose unless it directly supports this work.
 3. **Stage 3 — Goose Review:** only after the canonical roadmap reaches a stable checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"*
 
 ---

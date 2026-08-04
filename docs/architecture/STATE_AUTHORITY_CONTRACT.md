@@ -89,7 +89,7 @@ State Authority **may aggregate** internally; callers must not care which store 
 |--------|--------------------------------------|----------------|---------------------|
 | World Model | `WorldModel` + SQLite repo | ✅ primary (ADR-005) | Aggregate via `query` / `project` |
 | Goals | `GoalRepository` + `SingleGoalScheduler` (live); `GoalEngine` **RETIRED (ADR-012 A)** | ✅ live / ❌ Phase-9 | Live via `goal_lookup`; Phase-9 off product path — see `SHADOW_SOT_INVENTORY.md` / ADR-012 |
-| Memory | `MemoryGraphService` | ⚠️ lookup hook only | Aggregate via optional `memory_lookup` |
+| Memory | `MemoryGraphService` | ⚠️ lookup hook + soft dual (Assembler/tools) | Inventory — `state_authority/MEMORY_SOFT_SHADOW_INVENTORY.md`; no silent merge; mutate deferred |
 | Timeline / executions | `ExecutionRunRepository`, events | ⚠️ partial | Out of Slice 1 mutate |
 | Workflows | `WorkflowRunRepository` | ⚠️ risk of shadow SoT | Inventory; no silent merge |
 | Agent runtime | `AgentRuntimeService` pipeline state | ⚠️ partial | Inventory; no silent merge |
@@ -191,7 +191,7 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 | World Model edges | ✅ authoritative via `SA.mutate` (`create_edge` / `delete_edge`) |
 | Goals (`GoalEngine` vs `GoalRepository`) | ✅ live = `GoalRepository`; GoalEngine quarantined from factory |
 | Workflows / executions / agents | ⚠️ outside SA mutate |
-| Memory | ⚠️ lookup hook on query; not mutate |
+| Memory | ⚠️ lookup on query; soft dual Assembler/tools; **not** mutate — see MEMORY_SOFT_SHADOW_INVENTORY |
 
 ---
 
