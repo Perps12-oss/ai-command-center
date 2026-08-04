@@ -1,4 +1,9 @@
-"""GoalEngine — manages goal lifecycle and execution.
+"""GoalEngine — Phase-9 goal lifecycle (RETIRED from live path).
+
+**ADR-012 Accepted Option A:** not constructed in ``service_factory``; not on
+``GOAL_SUBMIT_REQUEST`` intake. Live goals use ``GoalRepository`` +
+``SingleGoalScheduler``. This module may remain for unit tests until an
+optional cleanup PR.
 
 Reference: docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md Section 9.1
 """

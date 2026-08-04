@@ -19,7 +19,7 @@ List every store or service that can be mistaken for authoritative workspace rea
 |--------|-------------|:--------:|:-----------:|:-------:|-------------|
 | World Model | `WorldModel` + SQLite repo | ✅ | ✅ primary `query` | No | Keep — ADR-005 |
 | Goals (live) | `GoalRepository` + `SingleGoalScheduler` | ✅ | ✅ `goal_lookup` read | Soft dual (was) | **Canonical live goals path** |
-| Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Yes — orphaned** | **Quarantined from live factory (Slice 3)** |
+| Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Retired (ADR-012 A)** | Tree may remain for unit tests; **not** product SoT; cleanup optional |
 | Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ⚠️ `memory_lookup` | Soft | Aggregate later via SA; no silent merge |
 | Executions | `ExecutionRunRepository` (+ query service) | ✅ append-only | ❌ | Soft | Diagnostic → AppState; SA mutate later |
 | Workflows | `WorkflowRunRepository` | ✅ | ❌ | Soft | Inventory only; no silent merge |
@@ -66,7 +66,7 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | Step | Domain | Action | Gate |
 |------|--------|--------|------|
 | **3a ✅** | Goals | Inventory + quarantine GoalEngine from live composition | This doc + factory + tests |
-| **3b ⏳** | Goals | Decide: retire Phase-9 schema **or** merge into scheduler model | **ADR-012 Proposed** — human choice required; **no schema delete until Accepted** |
+| **3b ✅** | Goals | **ADR-012 Accepted — Option A (retire)** Phase-9 from product path | No live re-wire without new ADR; schema cleanup optional later |
 | 4 | Memory | Route decision reads exclusively through SA `query` / lookup | Contract R1 |
 | 5 | Workflows | Document owner; SA project hooks or keep execution-scoped | No silent merge |
 | 6 | Executions | Keep append-only; correlate via receipts when `mutate()` unifies | Contract item 6 |

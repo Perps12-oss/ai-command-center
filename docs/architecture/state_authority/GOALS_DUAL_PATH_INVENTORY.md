@@ -1,22 +1,22 @@
 # Goals Dual-Path Shadow SoT Inventory
 
-**Status:** ACTIVE inventory (Stage 2) — complements `SHADOW_SOT_INVENTORY.md`  
-**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, R1.3, **ADR-012 (Proposed)**  
-**Date:** 2026-07-30 (updated 2026-08-03)  
-**Baseline:** `origin/main` @ `e9d0c15` (#125 quarantine + edge mutate)  
-**3b decision:** `docs/architecture/adr/ADR-012_GOALS_PHASE9_DISPOSITION.md` — **do not delete schema until Accepted**
+**Status:** CLOSED for 3b — Path A sole product SoT; Path B **RETIRED** (ADR-012 A)  
+**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, R1.3, **ADR-012 Accepted Option A**  
+**Date:** 2026-07-30 (updated 2026-08-04)  
+**Baseline:** `origin/main` @ `328e942`+  
+**3b decision:** ADR-012 **Accepted — Option A (retire)**; schema/module cleanup optional later
 
 ## Verdict
 
 Goals had **two parallel persistence stacks**. Only Path A is live. Path B
-(`GoalEngine`) is **quarantined from the composition root** (Slice 3 / #125).
-State Authority reads Path A only. **Do not re-wire GoalEngine into intake
-without an ADR.**
+(`GoalEngine`) is **retired from the product path** (ADR-012 A). State Authority
+reads Path A only. **Do not re-wire GoalEngine into intake without a new ADR
+that supersedes ADR-012.**
 
 | Path | Stack | Live intake? | SA `goal_lookup`? | Disposition |
 |------|-------|:------------:|:-----------------:|-------------|
 | **A — Scheduler (canonical)** | `ExecutionAuthority` → `GOAL_SUBMIT_REQUEST` → `SingleGoalScheduler` → `GoalRepository` (`goals` table) | ✅ | ✅ | **keep** — sole live SoT for UI goals |
-| **B — GoalEngine (shadow)** | `GoalEngine` + `SQLiteGoalEngineRepository` (`goal_engine_goals` table) | ❌ | ❌ | **QUARANTINED** — not constructed in factory; research/tests only |
+| **B — GoalEngine (retired)** | `GoalEngine` + `SQLiteGoalEngineRepository` (`goal_engine_goals` table) | ❌ | ❌ | **RETIRED (ADR-012 A)** — not constructed; unit-test tree only until cleanup |
 
 ## Path A — Live (authoritative for UI / intake)
 
@@ -76,11 +76,11 @@ Exists ≠ Wired ≠ Authoritative. Path B is **tree-only / unit-testable**.
 |------|--------|------|
 | 1 | ✅ Inventory published | Doc honesty |
 | 2 | ✅ Quarantine GoalEngine from live factory (#125) | R1.3 |
-| 3 | ⏳ **ADR-012 Proposed** — retire (A) vs merge (B) vs research flag (C) | **Human decision** |
-| 4 | If B: single repository + one-time migration; never dual-write | Migration tests |
-| 5 | Optional: `SA.mutate` goal ops only after single SoT exists | Contract R1 |
+| 3 | ✅ **ADR-012 Accepted — Option A (retire)** | Human 2026-08-04 |
+| 4 | Optional cleanup: archive/delete Phase-9 modules + `goal_engine_goals` | Separate PR |
+| 5 | Optional: `SA.mutate` goal ops only via live SoT | Contract R1 |
 
-**Hard rule until ADR-012 Accepted:** no factory construction of GoalEngine onto intake; no schema drop; no SA mutate for goals.
+**Hard rule (ADR-012 A):** no factory construction of GoalEngine onto intake; re-wire requires a new ADR. Schema drop is optional cleanup, not required for acceptance.
 
 ## Related shadow SoT
 

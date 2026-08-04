@@ -124,9 +124,9 @@ class WiredServices:
     ollama: OllamaHttpService
     provider_registry: ProviderRegistry = field(default_factory=build_default_registry)
     workspace_os: WorkspaceOsService | None = field(default=None)
-    # GoalEngine intentionally omitted — Stage 2 Slice 3 quarantines Phase-9
-    # GoalEngine from the live composition root. Live goals = GoalRepository +
-    # SingleGoalScheduler. See docs/architecture/SHADOW_SOT_INVENTORY.md.
+    # GoalEngine intentionally omitted — ADR-012 Accepted Option A (retire).
+    # Phase-9 GoalEngine is not on the live composition root. Live goals =
+    # GoalRepository + SingleGoalScheduler. See SHADOW_SOT_INVENTORY.md / ADR-012.
 
 
 def build_services(
@@ -197,7 +197,7 @@ def build_services(
     brain_runtime = BrainRuntimeService(bus, world_model)
     brain_kernel = BrainKernelService(bus, world_model)
     # Live goals SoT: GoalRepository + SingleGoalScheduler only.
-    # GoalEngine (Phase-9 parallel store) is quarantined — see SHADOW_SOT_INVENTORY.md.
+    # GoalEngine (Phase-9) retired from live path — ADR-012 Option A.
     goal_scheduler = SingleGoalScheduler(bus, goal_repo)
     observer = ObserverService(
         bus,

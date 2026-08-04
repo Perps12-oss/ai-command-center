@@ -127,9 +127,9 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 ### R1.3 exit criteria
 
 - [x] State ownership table published *(contract § Backing systems — 2026-07-30)*  
-- [ ] No UI or service maintains shadow SoT for listed domains *(Goals quarantined; **3b ADR-012 Proposed**; Memory/Workflows soft remain)*  
+- [ ] No UI or service maintains shadow SoT for listed domains *(Goals **ADR-012 A retired**; Memory/Workflows soft remain)*  
 - [x] Event topics documented for cross-subsystem flows *(contract § Event topics — SA surface; mutate node+edge)*
-- [x] Goals dual-path inventory *(SHADOW_SOT_INVENTORY + GOALS_DUAL_PATH_INVENTORY; disposition ADR-012)*
+- [x] Goals dual-path inventory + disposition *(ADR-012 Accepted Option A)*
 
 ---
 

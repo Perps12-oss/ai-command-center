@@ -1,8 +1,8 @@
 # Goal Engine
 
-**Status:** Proposed Phase 0 contract — **not live intake**  
+**Status:** Historical / research — **not live intake** (ADR-012 Accepted Option A)  
 **Live goals path:** `SingleGoalScheduler` + `GoalRepository` (ADR-006)  
-**Phase-9 `GoalEngine` stack:** quarantined from factory (Slice 3a); disposition **ADR-012** (Proposed)  
+**Phase-9 `GoalEngine` stack:** **retired from product path**; may remain in tree for unit tests until cleanup  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `docs/architecture/VNEXT_STATE_DRIVEN_BLUEPRINT.md`, ADR-012
 
 ## Purpose

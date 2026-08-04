@@ -88,7 +88,7 @@ State Authority **may aggregate** internally; callers must not care which store 
 | Domain | Current backing (evidence on `main`) | Authoritative? | Stage 2 disposition |
 |--------|--------------------------------------|----------------|---------------------|
 | World Model | `WorldModel` + SQLite repo | ✅ primary (ADR-005) | Aggregate via `query` / `project` |
-| Goals | `GoalRepository` + `SingleGoalScheduler` (live); `GoalEngine` quarantined | ✅ live / ❌ Phase-9 | Live via `goal_lookup`; Phase-9 off composition root — see `SHADOW_SOT_INVENTORY.md` |
+| Goals | `GoalRepository` + `SingleGoalScheduler` (live); `GoalEngine` **RETIRED (ADR-012 A)** | ✅ live / ❌ Phase-9 | Live via `goal_lookup`; Phase-9 off product path — see `SHADOW_SOT_INVENTORY.md` / ADR-012 |
 | Memory | `MemoryGraphService` | ⚠️ lookup hook only | Aggregate via optional `memory_lookup` |
 | Timeline / executions | `ExecutionRunRepository`, events | ⚠️ partial | Out of Slice 1 mutate |
 | Workflows | `WorkflowRunRepository` | ⚠️ risk of shadow SoT | Inventory; no silent merge |
@@ -147,7 +147,7 @@ The system must be able to reconstruct workspace reality after deleting all chat
 | `query()` with structured `StateQuery` | ✅ Stage 2 Slice 1 | Keep; deepen filters |
 | `mutate()` with `StateDelta` | ✅ WM node + edge ops + receipt (Slice 3–4); goals/workflows still shadow | Deepen remaining domains |
 | Planner reads state | ✅ every `PLAN_REQUEST` resolves `StateContext` (payload or `SA.query`) | Keep; deepen |
-| Goals / agents / workflows query WM | ✅ goals via `goal_lookup`; GoalEngine quarantined | Memory/workflows still soft shadow |
+| Goals / agents / workflows query WM | ✅ goals via `goal_lookup`; GoalEngine **RETIRED (ADR-012 A)** | Memory/workflows still soft shadow |
 | Shadow SoT elimination | ⚠️ inventory + Goals quarantine (Slice 3) | Memory/workflows/executions next; mutate later |
 | Domain types | ✅ `domain/state_authority.py` | Evolve without breaking bus dicts |
 
