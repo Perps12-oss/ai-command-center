@@ -1,7 +1,7 @@
 # R1 Ungated Docs Closeout — Stop Line
 
 **Date:** 2026-08-04  
-**Tip baseline:** `origin/main` @ `426c6b7`
+**Tip baseline:** ADR-015 acceptance (Memory `SA.mutate`)
 
 ## Ungated queue status
 
@@ -10,11 +10,12 @@
 | Stage 2 soft-shadow (3a–6b + agents) | ✅ closed |
 | R1 P1–P4 | ✅ closed |
 | R1 P5 Predictive/Undo (ADR-014) | ✅ research-only closed |
-| Living-doc honesty (this PR) | ✅ closes remaining ungated docs debt |
+| Living-doc honesty | ✅ closed (#145) |
+| ADR-015 Memory `SA.mutate` (`store_memory`) | ✅ this gate |
 
 ## NEXT GATE
 
-**SA.mutate for non-WM domains — requires a new ADR**
+**SA.mutate for remaining non-WM domains (goals / workflows / executions / agents) — each requires its own ADR**
 
 Parallel hard stops (do not start without their gates):
 
@@ -30,3 +31,4 @@ Parallel hard stops (do not start without their gates):
 
 - GoalEngine schema / package cleanup (ADR-012 allows; not R1-blocking)
 - Research-tree package deletes (test churn)
+- Memory delete via SA (would need ADR extending 015)

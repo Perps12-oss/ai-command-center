@@ -263,6 +263,7 @@ def build_services(
         bus,
         world_model,
         memory_lookup=memory_graph.lookup_for_state,
+        memory_store=memory_graph.store_memory,
         goal_lookup=_goal_lookup,
     )
     context_assembler.bind_state_authority(state_authority)
