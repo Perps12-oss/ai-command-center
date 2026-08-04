@@ -64,6 +64,7 @@ class CommandPaletteApp(
         self._frame_governor_scheduled: bool = False
         self._catalog_refresh_deferred: bool = False
         self._last_snapshot_for_apply = None
+        self._apply_pipeline_started: float | None = None
         self._last_chat_history_revision: int = 0
         self._last_inspector_revision: int = -1
         self._last_workflow_graph_revision: int = -1
