@@ -95,15 +95,21 @@ class ExecutionTimelineScrubber(ctk.CTkFrame):
         *,
         active_index: int = 0,
     ) -> None:
-        """Configure scrubber range and labels from execution event types."""
+        """Configure scrubber range and labels from execution event types.
+
+        CustomTkinter ``CTkSlider.set`` divides by ``number_of_steps`` — never
+        configure 0 steps (empty or single-event timelines).
+        """
         self._labels = list(labels)
-        self._count = len(labels)
+        self._count = len(self._labels)
+        self._index = max(0, min(int(active_index), max(0, self._count - 1)))
         if self._count <= 1:
-            self._slider.configure(to=max(1, self._count), number_of_steps=max(0, self._count - 1))
+            # Degenerate range: keep steps >= 1 so set() cannot ZeroDivisionError.
+            self._slider.configure(from_=0, to=1, number_of_steps=1)
+            self._slider.set(0)
         else:
-            self._slider.configure(to=self._count - 1, number_of_steps=self._count - 1)
-        self._index = max(0, min(active_index, max(0, self._count - 1)))
-        if self._count:
+            last = self._count - 1
+            self._slider.configure(from_=0, to=last, number_of_steps=last)
             self._slider.set(self._index)
         self._refresh_label()
         self._update_controls()
@@ -118,17 +124,15 @@ class ExecutionTimelineScrubber(ctk.CTkFrame):
         )
 
     def _update_controls(self) -> None:
-        enabled = self._count > 0
+        # Need at least two events before scrubbing is meaningful.
+        enabled = self._count > 1
         state = "normal" if enabled else "disabled"
         self._prev_btn.configure(state=state)
         self._next_btn.configure(state=state)
-        if not enabled:
-            self._slider.configure(state="disabled")
-        else:
-            self._slider.configure(state="normal")
+        self._slider.configure(state=state)
 
     def _emit_scrub(self, index: int) -> None:
-        if not self._count:
+        if self._count <= 1:
             return
         self._index = max(0, min(index, self._count - 1))
         self._slider.set(self._index)

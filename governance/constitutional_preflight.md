@@ -1,31 +1,27 @@
-# Constitutional Pre-Flight — chat Phase 3 jank + ConversationRow click
+# Constitutional Pre-Flight — execution scrubber ZeroDivisionError
 
-**Branch:** `cursor/chat-phase3-row-fix-30d3`  
+**Branch:** `cursor/exec-scrubber-zerodiv-30d3`  
 **Authority:** PROJECT_CONSTITUTION_V4.md
 
 ## Intent
 
-1. Fix `_ConversationRow` click binding (`TypeError: lambda() missing '_'`) so
-   conversation rail selection works under Tk/CustomTkinter on Python 3.14.
-2. Stop chat Phase 3 from re-projecting inspector/timeline/chrome on every
-   AppState tick — fingerprint-gate cosmetic chat updates (user logs:
-   `Phase 3 (chat view) took 9994ms` then sustained ~1–1.5s).
+Fix `ZeroDivisionError` in `ExecutionTimelineScrubber.set_timeline` when
+`labels` has 0 or 1 entries: CustomTkinter's `CTkSlider.set` divides by
+`number_of_steps`, and the scrubber previously configured `number_of_steps=0`.
 
 ## Invariants checked
 
 | Invariant | Status |
 |---|---|
 | UI → AppState → EventBus → Services → Repositories → Storage | Preserved |
-| UI isolation | Preserved — display/projection only |
+| UI isolation | Preserved — display widget only |
 | No new EventBus topics | N/A |
 
 ## Behaviour preservation
 
-- Chat still projects history/conversations on revision change
-- Inspector still updates when execution context / timeline revision changes
-- Click-to-select still calls the same `on_select(session_id)` callback
+- Multi-event scrubbing unchanged (`number_of_steps = count - 1`)
+- Empty / single-event timelines show a safe disabled/degenerate slider
 
 ## Out of scope
 
-- Broader AppState notify reduction
-- Markdown/message-block virtualization
+- Executions view Phase 3 ~1.7s rebuild cost
