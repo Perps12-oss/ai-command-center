@@ -137,7 +137,7 @@ Until a new plan is written against this canon:
 1. **Baseline = `origin/main` only.** Do not plan from `phase-11a-command-center`.  
 2. **Mandatory reuse**
    - Graph → `BaseGraphCanvas` (adapters OK; no second engine / no `WorldGraphCanvas` engine)  
-   - Timeline → `TimelineRenderer` + `ExecutionTimelineDock` (no parallel `run_timeline` engine)  
+   - Timeline → `TimelineRenderer` + `ExecutionTimelineDock` (no parallel `run_timeline` / scrubber engine). Mission Control `ActivityTimeline` is a multi-domain **activity feed**, not a second execution timeline engine — see `docs/audits/R1_P4_TIMELINE_DISPOSITION.md`.  
    - Inspector → extend `InspectorHost`/`InspectorDock`; reconcile `SelectionInspectorPanel` by composition, not a third inspector OS  
 3. **Evolve** `GoalView` / `AgentsView` / `ExecutionsView` / `WorldExplorerView` and their panel packages — do not treat them as greenfield.  
 4. **AppState policy** must be stated explicitly (composition-only vs amendment) before coding.  

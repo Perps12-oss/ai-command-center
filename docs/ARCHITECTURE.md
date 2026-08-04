@@ -249,6 +249,24 @@ Tray icon remains fallback if global hook registration fails.
 
 ## Command routing
 
+**Canonical live intake (ADR-006)** — do not treat OperatorKernel as product intake:
+
+```text
+UI → ui.command (UI_COMMAND)
+  → ExecutionAuthorityService
+  → StateAuthority.project (optional)
+  → PlannerService / SingleGoalScheduler / execution pipeline
+  → AppState → UI
+```
+
+Legacy / research-only paper path (not factory-wired):
+
+```text
+OperatorKernel → PlanningEngine → AgentCoordinator → …   # ADR-006 / ADR-013 research
+```
+
+Historical Phase-3 topic shape (still present for some handlers):
+
 ```text
 UI → ui.command → CommandRouterService → command.routed → Phase 3 handlers
 ```

@@ -217,3 +217,19 @@ def test_hero_action_publishes_navigate_event() -> None:
 
     assert len(navigated) == 1
     assert navigated[0] == view._action_view
+
+
+def test_exec_dock_steps_use_timeline_renderer_name_key() -> None:
+    """R1 P4 hygiene: Mission Control dock must pass `name`, not `label`."""
+    view = CommandCenterView(
+        None,
+        on_command=lambda _x: None,
+        on_navigate=lambda _x: None,
+    )
+    snap = _sample_snap()
+    view.apply_state(snap)
+    steps = list(getattr(view._exec_dock, "_steps", []) or [])
+    assert steps, "expected fallback run_history steps on dock"
+    assert all("name" in step for step in steps)
+    assert all("label" not in step for step in steps)
+    assert any(step.get("name") == "run" for step in steps)

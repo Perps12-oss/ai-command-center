@@ -559,20 +559,22 @@ class CommandCenterView(ctk.CTkFrame):
             )
             steps.append(
                 {
-                    "label": label.replace("_", " "),
+                    "name": label.replace("_", " "),
                     "status": str(getattr(ev, "status", "") or "ready"),
+                    "duration_ms": float(getattr(ev, "duration_ms", 0.0) or 0.0),
                     "timestamp": getattr(ev, "timestamp", 0.0) or 0.0,
                     "event_id": str(getattr(ev, "event_id", "") or ""),
                 }
             )
         if not steps:
-            # Fall back to ActivityTimeline-derived execution/run history
+            # Fall back to execution library run history (still scrubber-shaped)
             lib = getattr(snap, "execution_library", None)
             for run in list(getattr(lib, "run_history", ()) if lib else ())[:8]:
                 steps.append(
                     {
-                        "label": str(getattr(run, "summary", "") or "Execution"),
+                        "name": str(getattr(run, "summary", "") or "Execution"),
                         "status": str(getattr(run, "status", "") or "complete"),
+                        "duration_ms": float(getattr(run, "duration_ms", 0.0) or 0.0),
                         "timestamp": getattr(run, "created_at", 0.0) or 0.0,
                         "event_id": "",
                     }

@@ -23,7 +23,6 @@ from ai_command_center.ui.views.chat.session_store import SessionStore, session_
 from ai_command_center.ui.views.chat.conversation_metadata import ConversationMetadata
 from ai_command_center.ui.views.chat.stream_renderer import (
     CLR_META,
-    SIDE_PAD,
     EmptyState,
     SystemStrip,
 )
@@ -224,7 +223,7 @@ class ChatView(ctk.CTkFrame):
         self._scroll.columnconfigure(0, weight=1)
 
         ctx_frame = ctk.CTkFrame(center, fg_color="transparent")
-        ctx_frame.pack(fill="x", side="bottom", padx=16, pady=(0, 4))
+        ctx_frame.pack(fill="x", side="bottom", padx=T.MSG_SIDE_PAD, pady=(0, 4))
         self._context_bar = ctk.CTkLabel(
             ctx_frame,
             text="Sources: — · Tokens: —",
@@ -308,7 +307,7 @@ class ChatView(ctk.CTkFrame):
         self._session_bar.pack(fill="x", side="top")
 
         ctx_frame = ctk.CTkFrame(self, fg_color="transparent")
-        ctx_frame.pack(fill="x", side="bottom", padx=16, pady=(0, 4))
+        ctx_frame.pack(fill="x", side="bottom", padx=T.MSG_SIDE_PAD, pady=(0, 4))
 
         self._context_bar = ctk.CTkLabel(
             ctx_frame,
@@ -626,7 +625,7 @@ class ChatView(ctk.CTkFrame):
             inspect_ref=ref,
             on_inspect_select=self._on_inspect_select,
             on_inspect_navigate=self._on_inspect_navigate,
-        ).pack(fill="x", padx=SIDE_PAD, pady=(0, 8))
+        ).pack(fill="x", padx=T.MSG_SIDE_PAD, pady=(0, T.MSG_ROW_GAP))
 
     def _assistant_row(self, *, message_index: int | None = None) -> AssistantMessageBlock:
         self._hide_empty()
@@ -648,7 +647,7 @@ class ChatView(ctk.CTkFrame):
         block._on_rate = lambda rating, rated_block=block: self._rate_specific_block(
             rated_block, rating
         )
-        block.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
+        block.pack(fill="x", padx=T.MSG_SIDE_PAD, pady=(0, T.MSG_ROW_GAP))
         if self._request_id:
             self._blocks_by_request[self._request_id] = block
         return block
@@ -834,7 +833,7 @@ class ChatView(ctk.CTkFrame):
 
     def _add_strip(self, kind: str, label: str, body: str) -> None:
         SystemStrip(self._scroll, kind, label, body).pack(
-            fill="x", padx=SIDE_PAD + 4, pady=(0, 4)
+            fill="x", padx=T.MSG_SIDE_PAD, pady=(0, T.MSG_ROW_GAP)
         )
 
     def _clear_ui(self) -> None:

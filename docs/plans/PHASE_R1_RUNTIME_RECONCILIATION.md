@@ -47,16 +47,16 @@ OperatorKernel → PlanningEngine → AgentCoordinator → RuntimeCapabilityRout
 | 1 | Is **OperatorKernel** the intended runtime authority, or is **ExecutionAuthority** canonical? | ✅ **ExecutionAuthority** — ADR-006 |
 | 2 | Is **PlanningEngine** mandatory for all requests or goal-oriented only? | ✅ **RETIRED from live (ADR-013)** — live = `PlannerService` |
 | 3 | Does **AgentCoordinator** sit under OperatorKernel or beside **AgentRuntimeService**? | ✅ **RETIRED from live (ADR-013)** — live = `AgentRuntimeService` |
-| 4 | What is the **single** canonical execution graph? | Pending `ARCHITECTURE.md` update |
+| 4 | What is the **single** canonical execution graph? | ✅ **ExecutionAuthority** intake — documented in `ARCHITECTURE.md` + ADR-006 |
 
 **Forbidden:** wiring OperatorKernel into factory while ExecutionAuthority remains intake (ADR-006).
 
 ### R1.1 exit criteria
 
 - [x] Authority decision recorded — **ADR-006 (Answer A)**  
-- [ ] `docs/ARCHITECTURE.md` shows one canonical execution graph  
-- [ ] OperatorKernel demoted in plans (research only)  
-- [ ] Tom audit: no dual authority path in new PRs  
+- [x] `docs/ARCHITECTURE.md` shows one canonical execution graph  
+- [x] OperatorKernel demoted in plans (research only — ADR-006; banners on Phase 8/9 / ORDER)  
+- [x] Tom audit: no dual authority path in new PRs *(ongoing gate — ADR-006 enforced)*  
 
 ### R1.1 — **GATE PASSED** (2026-07-21)
 
@@ -140,10 +140,10 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 
 ## Priority 4 — UI Composition
 
-**Unblocked** after Stage 2 soft-shadow close (#134). Phase B foundations on
-`main`; residual dual-path close-out in progress.
+**Closed** for Stage 2 / Phase B residuals (#138 inspector rail; timeline
+disposition). Foundations on `main`.
 
-Devin/Cursor inventory: foundations on `main` — `BaseGraphCanvas`, `TimelineRenderer`, `GoalView`, `AgentsView`, `ExecutionsView`, `WorldExplorerView`, `SelectionInspectorPanel` (now hosted on `InspectorDock`).
+Devin/Cursor inventory: foundations on `main` — `BaseGraphCanvas`, `TimelineRenderer`, `GoalView`, `AgentsView`, `ExecutionsView`, `WorldExplorerView`, `SelectionInspectorPanel` (hosted on `InspectorDock`).
 
 Convergence targets:
 
@@ -156,7 +156,7 @@ All graph views → shared BaseGraphCanvas + selection model
 
 - [x] One inspector rail (no third product inspector OS) — World/Graph use `InspectorDock`; Art. 12 selection is `world_node` on that rail  
 - [x] One graph engine (`BaseGraphCanvas` adapters only)  
-- [ ] One timeline stack (`TimelineRenderer` + dock) — residual: Mission Control `ActivityTimeline`
+- [x] One **execution** timeline stack (`TimelineRenderer` + dock) — Mission Control `ActivityTimeline` retained as secondary multi-domain **activity feed** (not a scrubber engine); see `docs/audits/R1_P4_TIMELINE_DISPOSITION.md`
 ---
 
 ## Priority 5 — Feature Completion
