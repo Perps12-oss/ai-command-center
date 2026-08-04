@@ -131,6 +131,7 @@ class ViewManagerMixin:
             on_regenerate=self._on_chat_regenerate,
             on_send=self._on_chat_send,
             on_new_session=self._on_chat_new_session,
+            on_select_conversation=self._on_chat_select_conversation,
             on_inspect_select=self._on_chat_inspect_select,
             on_inspect_navigate=self._on_chat_inspect_navigate,
             on_artifact_action=self._controller.publish_artifact_action,
@@ -483,6 +484,9 @@ class ViewManagerMixin:
         chat = self._chat_view()
         if chat:
             chat.reset_local_session()
+
+    def _on_chat_select_conversation(self, conversation_id: str) -> None:
+        self._controller.publish_chat_select_conversation(conversation_id)
 
     def _on_chat_send(self, text: str) -> None:
         self._on_command(text, workspace_entity=self._controller.active_chat_workspace_entity())

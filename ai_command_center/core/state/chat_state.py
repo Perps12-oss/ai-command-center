@@ -10,6 +10,7 @@ from ai_command_center.core.events.topics import (
     CHAT_CANCELLED,
     CHAT_CHUNK,
     CHAT_COMPLETE,
+    CHAT_CONVERSATIONS_LOADED,
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
     CHAT_STARTED,
@@ -18,6 +19,7 @@ from ai_command_center.core.events.topics import (
     UI_CHAT_NEW_SESSION,
     UI_OPEN_CHAT,
 )
+from ai_command_center.domain.conversation import ConversationCatalogItem
 
 
 def _coerce_int(value: Any, default: int) -> int:
@@ -205,14 +207,53 @@ def _reduce_chat_history_loaded(state: Any, event: Event) -> Any:
                     content=str(item.get("content", "")),
                 )
             )
-    return replace(
-        state,
-        chat_history_count=len(items),
-        chat_history_messages=tuple(items),
-        chat_history_revision=state.chat_history_revision + 1,
-        last_event_topic=event.topic,
-        last_event_source=event.source,
-    )
+    cid = str(event.payload.get("conversation_id", "") or "").strip()
+    kwargs: dict[str, Any] = {
+        "chat_history_count": len(items),
+        "chat_history_messages": tuple(items),
+        "chat_history_revision": state.chat_history_revision + 1,
+        "last_event_topic": event.topic,
+        "last_event_source": event.source,
+    }
+    if cid:
+        kwargs["active_conversation_id"] = cid
+        kwargs["chat_active_session_key"] = cid
+    return replace(state, **kwargs)
+
+
+def _reduce_chat_conversations_loaded(state: Any, event: Event) -> Any:
+    if event.topic != CHAT_CONVERSATIONS_LOADED:
+        return state
+    raw = event.payload.get("conversations")
+    items: list[ConversationCatalogItem] = []
+    if isinstance(raw, list):
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            cid = str(entry.get("conversation_id", "") or "").strip()
+            if not cid:
+                continue
+            items.append(
+                ConversationCatalogItem(
+                    conversation_id=cid,
+                    title=str(entry.get("title", "") or "New Chat"),
+                    created_at=float(entry.get("created_at", 0.0) or 0.0),
+                    last_activity=float(entry.get("last_activity", 0.0) or 0.0),
+                    message_count=int(entry.get("message_count", 0) or 0),
+                    model=str(entry.get("model", "") or ""),
+                )
+            )
+    active = str(event.payload.get("active_conversation_id", "") or "").strip()
+    kwargs: dict[str, Any] = {
+        "chat_conversations": tuple(items),
+        "chat_conversations_revision": state.chat_conversations_revision + 1,
+        "last_event_topic": event.topic,
+        "last_event_source": event.source,
+    }
+    if active:
+        kwargs["active_conversation_id"] = active
+        kwargs["chat_active_session_key"] = active
+    return replace(state, **kwargs)
 
 
 def _reduce_context_snapshot(state: Any, event: Event) -> Any:
@@ -295,6 +336,7 @@ CHAT_REDUCERS = (
     _reduce_chat_cancelled,
     _reduce_chat_error,
     _reduce_chat_history_loaded,
+    _reduce_chat_conversations_loaded,
     _reduce_context_snapshot,
     _reduce_chat_workspace_entity,
     _reduce_ui_chat_new_session,

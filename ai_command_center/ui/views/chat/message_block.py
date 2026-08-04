@@ -123,11 +123,11 @@ class UserMessageBlock(ctk.CTkFrame):
             justify="left",
             anchor="w",
         )
-        txt_lbl.pack(padx=14, pady=10)
+        txt_lbl.pack(padx=T.MSG_BUBBLE_PAD_X, pady=T.MSG_BUBBLE_PAD_Y)
 
         # Meta row
         mrow = ctk.CTkFrame(self, fg_color="transparent")
-        mrow.pack(fill="x", pady=(2, 8))
+        mrow.pack(fill="x", pady=T.MSG_META_PAD_Y)
         ctk.CTkFrame(mrow, fg_color="transparent").pack(
             side="left", fill="x", expand=True
         )
@@ -214,10 +214,11 @@ class AssistantMessageBlock(ctk.CTkFrame):
             fg_color=T.MSG_ASSISTANT_BG,
             text_color=T.MSG_ASSISTANT_TEXT,
             border_width=0,
-            activate_scrollbars=False,
+            # C7: keep scrollbars available so capped-height messages remain readable.
+            activate_scrollbars=True,
             height=40,
         )
-        self._textbox.pack(padx=12, pady=10, fill="x")
+        self._textbox.pack(padx=T.MSG_BUBBLE_PAD_X, pady=T.MSG_BUBBLE_PAD_Y, fill="x")
         self._textbox.configure(state="normal")
         self._textbox.insert("end", _STREAMING_INDICATOR)
         self._textbox.configure(state="disabled")
@@ -342,19 +343,23 @@ class AssistantMessageBlock(ctk.CTkFrame):
         )
 
     def _resize_textbox(self) -> None:
-        """Expand textbox height to fit content (no scrollbar needed)."""
+        """Fit height to wrapped display lines; cap height so scrollbars can work (C7)."""
         try:
-            lines = int(self._textbox.index("end-1c").split(".")[0])
-            h = max(40, min(lines * 20 + 10, 600))
-            self._textbox.configure(height=h)
+            tk_text = self._textbox._textbox  # underlying tk Text
+            self._textbox.update_idletasks()
+            counted = tk_text.count("1.0", "end-1c", "displaylines")
+            lines = int(counted[0]) if counted else 1
+            needed = max(40, lines * T.MSG_TEXTBOX_LINE_PX + 10)
+            self._textbox.configure(height=min(needed, T.MSG_TEXTBOX_MAX_H))
         except Exception:
-            pass
+            logger = __import__("logging").getLogger(__name__)
+            logger.debug("AssistantMessageBlock resize failed", exc_info=True)
 
     def _build_meta_row(
         self, *, model: str, duration_ms: int, tokens: int
     ) -> None:
         mrow = ctk.CTkFrame(self, fg_color="transparent")
-        mrow.pack(fill="x", pady=(2, 4))
+        mrow.pack(fill="x", pady=T.MSG_META_PAD_Y)
 
         _CopyBtn(mrow, self.get_raw_text).pack(side="left")
         ctk.CTkLabel(

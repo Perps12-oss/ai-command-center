@@ -71,6 +71,7 @@ UI_PALETTE_ACTION = "ui.palette.action"
 PALETTE_PROVIDER_REGISTER = "palette.provider.register"
 UI_CHAT_CANCEL = "ui.chat_cancel"
 UI_CHAT_NEW_SESSION = "ui.chat.new_session"
+UI_CHAT_SELECT_CONVERSATION = "ui.chat.select_conversation"
 OVERLAY_SHOW = "overlay.show"
 OVERLAY_HIDE = "overlay.hide"
 OVERLAY_ANCHOR = "overlay.anchor"
@@ -133,6 +134,7 @@ CHAT_COMPLETE = "chat.complete"
 CHAT_CANCELLED = "chat.cancelled"
 CHAT_ERROR = "chat.error"
 CHAT_HISTORY_LOADED = "chat.history_loaded"
+CHAT_CONVERSATIONS_LOADED = "chat.conversations_loaded"
 CHAT_REQUEST = "chat.request"
 CHAT_EXPORT_REQUEST = "chat.export_request"
 CHAT_EXPORT_RESULT = "chat.export_result"
@@ -490,6 +492,7 @@ __all__ = [
     "PALETTE_PROVIDER_REGISTER",
     "UI_CHAT_CANCEL",
     "UI_CHAT_NEW_SESSION",
+    "UI_CHAT_SELECT_CONVERSATION",
     "OVERLAY_SHOW",
     "OVERLAY_HIDE",
     "OVERLAY_ANCHOR",
@@ -529,6 +532,7 @@ __all__ = [
     "CHAT_CANCELLED",
     "CHAT_ERROR",
     "CHAT_HISTORY_LOADED",
+    "CHAT_CONVERSATIONS_LOADED",
     "CHAT_REQUEST",
     "CHAT_EXPORT_REQUEST",
     "CHAT_EXPORT_RESULT",

@@ -19,16 +19,13 @@ from ai_command_center.ui.views.chat.chat_search import ChatSearchController
 from ai_command_center.ui.views.chat.chat_workspace_layout import make_chat_workspace_layout
 from ai_command_center.ui.views.chat.conversation_list import ConversationList
 from ai_command_center.ui.views.chat.message_block import AssistantMessageBlock, UserMessageBlock
-from ai_command_center.ui.views.chat.session_store import SessionStore, hhmm, session_title
+from ai_command_center.ui.views.chat.session_store import SessionStore, session_title
+from ai_command_center.ui.views.chat.conversation_metadata import ConversationMetadata
 from ai_command_center.ui.views.chat.stream_renderer import (
     CLR_META,
-    CLR_REGEN,
     SIDE_PAD,
-    AssistantBubble,
-    CopyBtn,
     EmptyState,
     SystemStrip,
-    UserBubble,
 )
 from ai_command_center.ui.widget_utils import clear_children
 
@@ -137,6 +134,7 @@ class ChatView(ctk.CTkFrame):
         on_regenerate: Callable[[], None]            | None = None,
         on_send:       Callable[[str], None]         | None = None,
         on_new_session: Callable[[], None]           | None = None,
+        on_select_conversation: Callable[[str], None] | None = None,
         on_inspect_select: Callable[[InspectableRef], None] | None = None,
         on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
         on_artifact_action: Callable[[str, str], None] | None = None,
@@ -148,13 +146,14 @@ class ChatView(ctk.CTkFrame):
         self._on_regenerate = on_regenerate
         self._on_send       = on_send
         self._on_new_session = on_new_session
+        self._on_select_conversation = on_select_conversation
         self._on_inspect_select = on_inspect_select
         self._on_inspect_navigate = on_inspect_navigate
         self._on_artifact_action = on_artifact_action or (lambda _a, _k: None)
 
         self._request_id:       str | None              = None
         self._streaming:        bool                    = False
-        self._streaming_bubble: AssistantBubble | None = None
+        self._streaming_bubble: AssistantMessageBlock | None = None
         self._chunk_buffer:     str                     = ""
         self._flush_pending:    bool                    = False
         self._model:            str                     = ""
@@ -187,7 +186,8 @@ class ChatView(ctk.CTkFrame):
     def _build(self) -> None:
         self._workspace = make_chat_workspace_layout(self)
         self._docking = self._workspace._docking_enabled
-        self._use_v2_blocks = self._docking
+        # C3: AssistantMessageBlock / UserMessageBlock are the only live renderers.
+        self._use_v2_blocks = True
 
         if self._docking:
             self._build_docked()
@@ -488,13 +488,44 @@ class ChatView(ctk.CTkFrame):
         self._refresh_session_bar()
 
     def reset_local_session(self) -> None:
-        """Reset in-memory session UI after bus-driven new-session events."""
-        self._save_current_session()
+        """Clear the message pane after bus-driven New Chat (C5).
+
+        Does not invent a SessionStore id for the rail — AppState / repository
+        projection owns the conversation list.
+        """
         self._store.start_new_session()
         self._clear_ui()
         self._refresh_session_bar()
 
+    def apply_conversations(self, items, active_id: str = "") -> None:
+        """Project repo-backed conversations into the left rail (C6)."""
+        if self._conversation_list is None:
+            return
+        metas: list[ConversationMetadata] = []
+        for item in items or ():
+            cid = str(getattr(item, "conversation_id", "") or "")
+            if not cid:
+                continue
+            metas.append(
+                ConversationMetadata(
+                    session_id=cid,
+                    title=str(getattr(item, "title", "") or "New Chat"),
+                    provider_badge=str(getattr(item, "model", "") or ""),
+                    last_activity=float(getattr(item, "last_activity", 0.0) or 0.0),
+                    message_count=int(getattr(item, "message_count", 0) or 0),
+                )
+            )
+        self._conversation_list.set_conversations(metas)
+        if active_id:
+            self._conversation_list.set_active(str(active_id))
+
     def _load_session(self, sid: str) -> None:
+        """Select a conversation — prefer bus/repo path over SessionStore (C6)."""
+        if self._on_select_conversation is not None:
+            self._on_select_conversation(sid)
+            if self._conversation_list is not None:
+                self._conversation_list.set_active(sid)
+            return
         self._save_current_session()
         messages = self._store.load_session(sid)
         if self._conversation_list is not None:
@@ -588,147 +619,58 @@ class ChatView(ctk.CTkFrame):
 
     def _user_row(self, text: str, *, message_index: int | None = None) -> None:
         self._hide_empty()
-        if self._use_v2_blocks:
-            ref = self._make_message_ref("user", text, message_index=message_index)
-            UserMessageBlock(
-                self._scroll,
-                text,
-                inspect_ref=ref,
-                on_inspect_select=self._on_inspect_select,
-                on_inspect_navigate=self._on_inspect_navigate,
-            ).pack(
-                fill="x", padx=SIDE_PAD, pady=(0, 8)
-            )
-            return
-        outer = ctk.CTkFrame(self._scroll, fg_color="transparent")
-        outer.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
+        ref = self._make_message_ref("user", text, message_index=message_index)
+        UserMessageBlock(
+            self._scroll,
+            text,
+            inspect_ref=ref,
+            on_inspect_select=self._on_inspect_select,
+            on_inspect_navigate=self._on_inspect_navigate,
+        ).pack(fill="x", padx=SIDE_PAD, pady=(0, 8))
 
-        brow = ctk.CTkFrame(outer, fg_color="transparent")
-        brow.pack(fill="x")
-        ctk.CTkFrame(brow, fg_color="transparent").pack(side="left", fill="x", expand=True)
-        UserBubble(brow, text).pack(side="right", anchor="e")
-
-        mrow = ctk.CTkFrame(outer, fg_color="transparent")
-        mrow.pack(fill="x", pady=(3, 10))
-        ctk.CTkFrame(mrow, fg_color="transparent").pack(side="left", fill="x", expand=True)
-        ctk.CTkLabel(
-            mrow,
-            text=hhmm(),
-            font=(T.FONT_FAMILY, 9),
-            text_color=CLR_META,
-        ).pack(side="right", padx=(0, 4))
-        CopyBtn(mrow, lambda t=text: t).pack(side="right")
-
-    def _assistant_row(self, *, message_index: int | None = None) -> AssistantBubble | AssistantMessageBlock:
+    def _assistant_row(self, *, message_index: int | None = None) -> AssistantMessageBlock:
         self._hide_empty()
-        if self._use_v2_blocks:
-            ref = self._make_message_ref(
-                "assistant",
-                self._chunk_buffer or "",
-                request_id=self._request_id or "",
-                message_index=message_index,
+        ref = self._make_message_ref(
+            "assistant",
+            self._chunk_buffer or "",
+            request_id=self._request_id or "",
+            message_index=message_index,
+        )
+        block = AssistantMessageBlock(
+            self._scroll,
+            on_regenerate=self._on_regenerate,
+            on_rate=None,
+            inspect_ref=ref,
+            on_inspect_select=self._on_inspect_select,
+            on_inspect_navigate=self._on_inspect_navigate,
+            on_artifact_action=self._on_artifact_action,
+        )
+        block._on_rate = lambda rating, rated_block=block: self._rate_specific_block(
+            rated_block, rating
+        )
+        block.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
+        if self._request_id:
+            self._blocks_by_request[self._request_id] = block
+        return block
+
+    def _finalize_meta(self, bubble: AssistantMessageBlock) -> None:
+        execution_id = self._request_id or ""
+        artifact_count = 0
+        decision_count = 0
+        if self._execution_context is not None:
+            artifact_count = len(
+                getattr(self._execution_context, "artifacts", ()) or ()
             )
-            block = AssistantMessageBlock(
-                self._scroll,
-                on_regenerate=self._on_regenerate,
-                on_rate=None,
-                inspect_ref=ref,
-                on_inspect_select=self._on_inspect_select,
-                on_inspect_navigate=self._on_inspect_navigate,
-                on_artifact_action=self._on_artifact_action,
-            )
-            block._on_rate = lambda rating, rated_block=block: self._rate_specific_block(
-                rated_block, rating
-            )
-            block.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
-            if self._request_id:
-                self._blocks_by_request[self._request_id] = block
-            return block
-        outer = ctk.CTkFrame(self._scroll, fg_color="transparent")
-        outer.pack(fill="x", padx=SIDE_PAD, pady=(0, 4))
-
-        brow = ctk.CTkFrame(outer, fg_color="transparent")
-        brow.pack(fill="x")
-        bubble = AssistantBubble(brow)
-        bubble.pack(side="left", anchor="w")
-        bubble._outer = outer
-        bubble._timestamp = hhmm()
-        ctk.CTkFrame(brow, fg_color="transparent").pack(side="right", fill="x", expand=True)
-
-        return bubble
-
-    def _finalize_meta(self, bubble: AssistantBubble | AssistantMessageBlock) -> None:
-        if isinstance(bubble, AssistantMessageBlock):
-            execution_id = self._request_id or ""
-            artifact_count = 0
-            decision_count = 0
-            if self._execution_context is not None:
-                artifact_count = len(
-                    getattr(self._execution_context, "artifacts", ()) or ()
-                )
-            if execution_id in self._artifact_fingerprints:
-                artifact_count = len(self._artifact_fingerprints[execution_id])
-            bubble.finalize(
-                bubble.get_raw_text(),
-                model=self._model,
-                tokens=int(len(bubble.get_raw_text()) / 4),
-                execution_id=execution_id,
-                artifact_count=artifact_count,
-                decision_count=decision_count,
-            )
-            return
-        outer = getattr(bubble, "_outer", None)
-        if outer is None:
-            return
-        timestamp = getattr(bubble, "_timestamp", hhmm())
-
-        mrow = ctk.CTkFrame(outer, fg_color="transparent")
-        mrow.pack(fill="x", pady=(3, 10))
-
-        CopyBtn(mrow, bubble.get_raw_text).pack(side="left")
-        ctk.CTkLabel(
-            mrow,
-            text=timestamp,
-            font=(T.FONT_FAMILY, 9),
-            text_color=CLR_META,
-        ).pack(side="left", padx=(4, 0))
-
-        if self._on_regenerate:
-            ctk.CTkButton(
-                mrow,
-                text="↺ Regenerate",
-                width=82, height=18,
-                font=(T.FONT_FAMILY, 9),
-                fg_color="transparent",
-                hover_color=T.BG_GLASS,
-                text_color=CLR_REGEN,
-                corner_radius=4,
-                command=self._on_regenerate,
-            ).pack(side="left", padx=(10, 0))
-
-        for emoji, rating in (("👍", "up"), ("👎", "down")):
-            btn = ctk.CTkButton(
-                mrow,
-                text=emoji,
-                width=24, height=18,
-                font=(T.FONT_FAMILY, 10),
-                fg_color="transparent",
-                hover_color=T.BG_GLASS,
-                text_color=CLR_META,
-                corner_radius=4,
-                command=lambda r=rating, b=bubble: self._rate_message(b, r),
-            )
-            btn.pack(side="right", padx=(2, 0))
-
-    def _rate_message(self, bubble: AssistantBubble, rating: str) -> None:
-        color = T.STATUS_READY if rating == "up" else T.STATUS_ERROR
-        try:
-            bubble.configure(border_width=1, border_color=color)
-        except Exception:
-            pass
-        if self._on_send:
-            snippet = bubble.get_raw_text()[:60].replace("\n", " ")
-            self._on_send(f".rating:{rating} \"{snippet}\"")
+        if execution_id in self._artifact_fingerprints:
+            artifact_count = len(self._artifact_fingerprints[execution_id])
+        bubble.finalize(
+            bubble.get_raw_text(),
+            model=self._model,
+            tokens=int(len(bubble.get_raw_text()) / 4),
+            execution_id=execution_id,
+            artifact_count=artifact_count,
+            decision_count=decision_count,
+        )
 
     def _rate_specific_block(self, block: AssistantMessageBlock, rating: str) -> None:
         color = T.STATUS_READY if rating == "up" else T.STATUS_ERROR
@@ -757,7 +699,7 @@ class ChatView(ctk.CTkFrame):
         block = self._blocks_by_request.get(rid)
         if block is None and self._streaming_bubble is not None and self._request_id == rid:
             block = self._streaming_bubble
-        if block is None or not isinstance(block, AssistantMessageBlock):
+        if block is None:
             return
         block.set_artifacts(artifacts)
         self._scroll_to_bottom()

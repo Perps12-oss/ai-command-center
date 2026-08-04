@@ -14,6 +14,18 @@ class ConversationMessage:
 
 
 @dataclass(frozen=True, slots=True)
+class ConversationCatalogItem:
+    """Rail projection of a persisted free-floating conversation (C6)."""
+
+    conversation_id: str
+    title: str = "New Chat"
+    created_at: float = 0.0
+    last_activity: float = 0.0
+    message_count: int = 0
+    model: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class Conversation:
     conversation_id: str
     title: str = ""

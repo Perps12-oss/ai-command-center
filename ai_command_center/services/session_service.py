@@ -7,6 +7,7 @@ from typing import Callable
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     CHAT_COMPLETE,
+    CHAT_CONVERSATIONS_LOADED,
     CHAT_HISTORY_LOADED,
     SETTINGS_SNAPSHOT,
     SESSION_HISTORY_REQUEST,
@@ -14,6 +15,7 @@ from ai_command_center.core.events.topics import (
     SESSION_UPDATE_REQUEST,
     SESSION_UPDATE_RESULT,
     UI_CHAT_NEW_SESSION,
+    UI_CHAT_SELECT_CONVERSATION,
     UI_OPEN_CHAT,
     WORKSPACE_ACTIVE,
     WORKSPACE_DEACTIVATED,
@@ -46,6 +48,7 @@ class SessionService(BaseService):
     def _on_load(self) -> None:
         self._repo.ensure_default(model=self._default_model)
         self._publish_history()
+        self._publish_conversations()
         self._unsubscribers.append(
             self._bus.subscribe(SETTINGS_SNAPSHOT, self._on_settings_snapshot)
         )
@@ -63,6 +66,9 @@ class SessionService(BaseService):
         )
         self._unsubscribers.append(
             self._bus.subscribe(UI_CHAT_NEW_SESSION, self._on_new_session)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(UI_CHAT_SELECT_CONVERSATION, self._on_select_conversation)
         )
         self._unsubscribers.append(
             self._bus.subscribe(WORKSPACE_ACTIVE, self._on_workspace_active)
@@ -157,6 +163,7 @@ class SessionService(BaseService):
                 self._switch_conversation(cid, title=title[:80] or "Workspace")
             else:
                 self._switch_conversation(DEFAULT_CONVERSATION_ID)
+            self._publish_conversations()
             return
         entity_type = str(event.payload.get("entity_type", "entity"))
         title = str(event.payload.get("title", entity_id))
@@ -165,12 +172,30 @@ class SessionService(BaseService):
         self._scope_entity_title = title
         cid = entity_conversation_id(entity_type, entity_id)
         self._switch_conversation(cid, title=title[:80] or "Entity chat")
+        self._publish_conversations()
 
     def _on_new_session(self, _event: Event) -> None:
-        cid = self._resolve_conversation_id()
-        self._switch_conversation(cid)
-        self._repo.clear_messages(cid)
+        """C5: create a new persisted conversation — do not clear the prior one."""
+        self._scope_entity_id = ""
+        self._scope_entity_type = ""
+        self._scope_entity_title = ""
+        cid = self._repo.create_conversation(
+            title="New Chat",
+            model=self._default_model,
+        )
+        self._active_conversation_id = cid
         self._publish_history()
+        self._publish_conversations()
+
+    def _on_select_conversation(self, event: Event) -> None:
+        cid = str(event.payload.get("conversation_id", "")).strip()
+        if not cid:
+            return
+        self._scope_entity_id = ""
+        self._scope_entity_type = ""
+        self._scope_entity_title = ""
+        self._switch_conversation(cid, title="Session")
+        self._publish_conversations()
 
     def _on_history_request(self, event: Event) -> None:
         self._ensure_active_conversation(event.payload)
@@ -204,6 +229,7 @@ class SessionService(BaseService):
                 },
                 source=self.name,
             )
+            self._publish_conversations()
 
     def _on_chat_complete(self, event: Event) -> None:
         self._ensure_active_conversation(event.payload)
@@ -216,6 +242,7 @@ class SessionService(BaseService):
             conversation_id=self._active_conversation_id,
         )
         self._publish_history()
+        self._publish_conversations()
 
     def _publish_history(self) -> None:
         messages = [
@@ -227,6 +254,16 @@ class SessionService(BaseService):
             {
                 "messages": messages,
                 "conversation_id": self._active_conversation_id,
+            },
+            source=self.name,
+        )
+
+    def _publish_conversations(self) -> None:
+        self._bus.publish(
+            CHAT_CONVERSATIONS_LOADED,
+            {
+                "conversations": self._repo.list_conversations(limit=50),
+                "active_conversation_id": self._active_conversation_id,
             },
             source=self.name,
         )

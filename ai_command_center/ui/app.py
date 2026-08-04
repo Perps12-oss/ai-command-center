@@ -66,6 +66,7 @@ class CommandPaletteApp(
         self._last_snapshot_for_apply = None
         self._apply_pipeline_started: float | None = None
         self._last_chat_history_revision: int = 0
+        self._last_chat_conversations_revision: int = -1
         self._last_inspector_revision: int = -1
         self._last_workflow_graph_revision: int = -1
         self._last_automation_workspace_revision: int = -1

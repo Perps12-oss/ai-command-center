@@ -43,6 +43,7 @@ from ai_command_center.core.events.topics import (
     CHAT_COMPLETE,
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
+    CHAT_CONVERSATIONS_LOADED,
     CHAT_STARTED,
     CONTEXT_SNAPSHOT_CREATED,
     ENTITY_CREATED,
@@ -249,6 +250,7 @@ from ai_command_center.domain.brain_state_snapshot import (
     RuntimeActionSnapshot as BrainRuntimeActionSnapshot,
     PlanSnapshot as BrainPlanSnapshot,
 )
+from ai_command_center.domain.conversation import ConversationCatalogItem
 from ai_command_center.domain.chat_session_snapshot import (
     ChatSessionSnapshot,
     ChatMessageSnapshot,
@@ -273,6 +275,7 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     CHAT_CANCELLED,
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
+    CHAT_CONVERSATIONS_LOADED,
     CONTEXT_SNAPSHOT_CREATED,
     APP_ERROR,
     APP_PHASE,
@@ -580,6 +583,9 @@ class AppState:
     selected_entity_type: str = ""
     selected_entity_title: str = ""
     chat_active_session_key: str = "default"
+    active_conversation_id: str = "default"
+    chat_conversations: tuple[ConversationCatalogItem, ...] = ()
+    chat_conversations_revision: int = 0
     # Blueprint Phase 12 — Chat Session consolidated snapshot
     chat_session: ChatSessionSnapshot = field(default_factory=ChatSessionSnapshot)
     errors: tuple[str, ...] = ()
@@ -1851,6 +1857,7 @@ from ai_command_center.core.state.chat_state import (  # noqa: E402
     _reduce_chat_complete,
     _reduce_chat_error,
     _reduce_chat_history_loaded,
+    _reduce_chat_conversations_loaded,
     _reduce_chat_started,
     _reduce_chat_workspace_entity,
     _reduce_context_snapshot,
@@ -1866,6 +1873,7 @@ _CHAT_SNAPSHOT_TOPICS: frozenset[str] = frozenset({
     CHAT_CANCELLED,
     CHAT_ERROR,
     CHAT_HISTORY_LOADED,
+    CHAT_CONVERSATIONS_LOADED,
     UI_OPEN_CHAT,
     UI_CHAT_NEW_SESSION,
 })
@@ -3554,6 +3562,7 @@ _DEFAULT_REDUCERS: tuple[Reducer, ...] = (
     _reduce_chat_cancelled,
     _reduce_chat_error,
     _reduce_chat_history_loaded,
+    _reduce_chat_conversations_loaded,
     _reduce_context_snapshot,
     reduce_global_context_state,
     reduce_insights_state,

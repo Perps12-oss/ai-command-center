@@ -13,7 +13,7 @@ Architecture contract
 ─────────────────────
 • Pure display widget — no EventBus, no service imports.
 • Receives ConversationMetadata items and calls back on selection / deletion.
-• Extends SessionStore metadata without replacing it.
+• Receives ConversationMetadata from AppState (repo-backed); SessionStore is not the SoT.
 """
 from __future__ import annotations
 
@@ -272,6 +272,11 @@ class ConversationList(ctk.CTkFrame):
     def remove_conversation(self, session_id: str) -> None:
         """Remove a conversation item by session_id."""
         self._items.pop(session_id, None)
+        self._rebuild_list()
+
+    def set_conversations(self, items: list[ConversationMetadata]) -> None:
+        """Replace the rail contents from AppState / repository projection (C6)."""
+        self._items = {m.session_id: m for m in items if m.session_id}
         self._rebuild_list()
 
     def set_active(self, session_id: str) -> None:

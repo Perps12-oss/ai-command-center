@@ -411,6 +411,17 @@ class StateApplierMixin:
                 chat.load_history(messages)
                 self._last_chat_history_revision = snap.chat_history_revision
 
+            conv_rev = int(getattr(snap, "chat_conversations_revision", 0) or 0)
+            if (
+                hasattr(chat, "apply_conversations")
+                and conv_rev != getattr(self, "_last_chat_conversations_revision", -1)
+            ):
+                chat.apply_conversations(
+                    getattr(snap, "chat_conversations", ()) or (),
+                    str(getattr(snap, "active_conversation_id", "") or ""),
+                )
+                self._last_chat_conversations_revision = conv_rev
+
             if chat and hasattr(chat, "update_artifact_stream"):
                 req_id = snap.active_chat_request_id or snap.last_chat_request_id
                 if req_id:
