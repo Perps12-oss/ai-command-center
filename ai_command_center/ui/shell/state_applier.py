@@ -402,40 +402,60 @@ class StateApplierMixin:
         chat = self._chat_view()
         # In-view cosmetic projections only when chat is visible.
         if chat and current_view == "chat":
-            chat.set_model(snap.settings.default_model)
-            chat.update_entity_context(
-                snap.chat_workspace_entity_id,
-                snap.chat_workspace_entity_type,
-                snap.chat_workspace_entity_title,
+            exec_ctx = diag.execution_context if diag is not None else snap.execution_context
+            execution_timeline = (
+                diag.execution_timeline if diag is not None else snap.execution_timeline
             )
-            chat.update_context_bar(list(snap.chat_context_sources), int(snap.chat_token_estimate))
-            if hasattr(chat, "update_inspector"):
-                chat.update_inspector(
-                    diag.execution_context if diag is not None else snap.execution_context
+            chrome_fp = (
+                str(snap.settings.default_model),
+                str(snap.settings.provider),
+                str(snap.chat_workspace_entity_id or ""),
+                str(snap.chat_workspace_entity_type or ""),
+                str(snap.chat_workspace_entity_title or ""),
+                tuple(snap.chat_context_sources),
+                int(snap.chat_token_estimate),
+                str(getattr(exec_ctx, "request_id", "") or ""),
+                str(getattr(exec_ctx, "provider_id", "") or ""),
+                str(getattr(exec_ctx, "model", "") or ""),
+                int(getattr(execution_timeline, "revision", 0) or 0),
+                int(getattr(snap.inspector, "revision", 0) or 0),
+                "streaming" if snap.chat_streaming else str(snap.chat_status or "idle"),
+            )
+            if chrome_fp != getattr(self, "_last_chat_chrome_fingerprint", None):
+                self._last_chat_chrome_fingerprint = chrome_fp
+                chat.set_model(snap.settings.default_model)
+                chat.update_entity_context(
+                    snap.chat_workspace_entity_id,
+                    snap.chat_workspace_entity_type,
+                    snap.chat_workspace_entity_title,
                 )
-            if hasattr(chat, "update_timeline"):
-                execution_timeline = (
-                    diag.execution_timeline if diag is not None else snap.execution_timeline
+                chat.update_context_bar(
+                    list(snap.chat_context_sources), int(snap.chat_token_estimate)
                 )
-                if execution_timeline.revision != getattr(
-                    self, "_last_execution_timeline_revision", 0
-                ):
-                    chat.update_timeline(list(execution_timeline.events))
-                    self._last_execution_timeline_revision = execution_timeline.revision
-            if hasattr(chat, "show_inspector") and hasattr(chat, "clear_inspector"):
-                if snap.inspector.revision != getattr(self, "_last_inspector_revision", 0):
-                    if snap.inspector.selected is not None:
-                        chat.show_inspector(snap.inspector.selected)
-                    else:
-                        chat.clear_inspector()
-                    self._last_inspector_revision = snap.inspector.revision
-            if hasattr(chat, "update_chat_execution_status"):
-                status = "streaming" if snap.chat_streaming else str(snap.chat_status or "idle")
-                chat.update_chat_execution_status(
-                    status,
-                    snap.settings.provider,
-                    snap.settings.default_model,
-                )
+                if hasattr(chat, "update_inspector"):
+                    chat.update_inspector(exec_ctx)
+                if hasattr(chat, "update_timeline"):
+                    if execution_timeline.revision != getattr(
+                        self, "_last_execution_timeline_revision", 0
+                    ):
+                        chat.update_timeline(list(execution_timeline.events))
+                        self._last_execution_timeline_revision = execution_timeline.revision
+                if hasattr(chat, "show_inspector") and hasattr(chat, "clear_inspector"):
+                    if snap.inspector.revision != getattr(self, "_last_inspector_revision", 0):
+                        if snap.inspector.selected is not None:
+                            chat.show_inspector(snap.inspector.selected)
+                        else:
+                            chat.clear_inspector()
+                        self._last_inspector_revision = snap.inspector.revision
+                if hasattr(chat, "update_chat_execution_status"):
+                    status = (
+                        "streaming" if snap.chat_streaming else str(snap.chat_status or "idle")
+                    )
+                    chat.update_chat_execution_status(
+                        status,
+                        snap.settings.provider,
+                        snap.settings.default_model,
+                    )
 
             if snap.chat_history_revision != self._last_chat_history_revision:
                 messages = [
@@ -466,7 +486,10 @@ class StateApplierMixin:
                         else snap.recent_artifacts
                     )
                     scoped = artifacts_for_request(artifact_catalog, str(req_id))
-                    chat.update_artifact_stream(str(req_id), scoped)
+                    art_fp = (str(req_id), tuple(getattr(a, "artifact_id", id(a)) for a in scoped))
+                    if art_fp != getattr(self, "_last_chat_artifact_fingerprint", None):
+                        self._last_chat_artifact_fingerprint = art_fp
+                        chat.update_artifact_stream(str(req_id), scoped)
 
         # Streaming lifecycle must run from any view (command box is global).
         if (

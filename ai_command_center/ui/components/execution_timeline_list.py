@@ -140,7 +140,13 @@ class ExecutionTimelineList(ctk.CTkScrollableFrame):
         self._events: tuple[ExecutionEvent, ...] = ()
 
     def set_events(self, events: Sequence[ExecutionEvent]) -> None:
-        self._events = tuple(events)
+        new_events = tuple(events)
+        new_key = tuple(event.event_id for event in new_events)
+        old_key = tuple(event.event_id for event in self._events)
+        if new_key == old_key and len(new_events) == len(self._events):
+            self._events = new_events
+            return
+        self._events = new_events
         self._render()
 
     def _render(self) -> None:

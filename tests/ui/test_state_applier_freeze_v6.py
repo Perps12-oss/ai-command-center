@@ -156,6 +156,9 @@ def _stream_snap(*, buffer: str = "abc", streaming: bool = True) -> SimpleNamesp
         phase="ready",
         chat_history_revision=0,
         chat_history_messages=(),
+        chat_conversations_revision=0,
+        chat_conversations=(),
+        active_conversation_id="",
         chat_workspace_entity_id=None,
         chat_workspace_entity_type=None,
         chat_workspace_entity_title=None,
@@ -244,6 +247,25 @@ def test_frame_governor_defers_rapid_refresh() -> None:
     assert h._state_refresh_pending is True
     assert h._state_refresh_enqueued is False
     assert len(h._scheduled) == 1
+
+
+def test_chat_chrome_fingerprint_skips_duplicate_inspector() -> None:
+    """Idle AppState ticks must not re-project chat chrome/inspector every time."""
+    h = _Harness()
+    h._current_view = "chat"
+    snap = _stream_snap(streaming=False)
+    snap.chat_status = "idle"
+    snap.active_chat_request_id = None
+    h._controller.snapshot.return_value = snap
+    h._last_apply_state_time = 0.0
+    h._queue_state_refresh()
+    assert h._chat.update_inspector.call_count == 1
+    h._chat.update_inspector.reset_mock()
+    h._chat.update_context_bar.reset_mock()
+    h._last_apply_state_time = 0.0
+    h._queue_state_refresh()
+    assert h._chat.update_inspector.call_count == 0
+    assert h._chat.update_context_bar.call_count == 0
 
 
 def test_catalog_deferred_while_on_chat() -> None:

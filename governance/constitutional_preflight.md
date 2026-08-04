@@ -1,14 +1,31 @@
-# Constitutional Pre-Flight — C8 chat density (real spacing fix)
+# Constitutional Pre-Flight — chat Phase 3 jank + ConversationRow click
 
-**Branch:** `cursor/ui-c8-chat-density-4fb7`  
+**Branch:** `cursor/chat-phase3-row-fix-30d3`  
 **Authority:** PROJECT_CONSTITUTION_V4.md
 
 ## Intent
 
-Finish C8 properly: shared `MSG_*` tokens must (1) be referenced by
-`chat_view` outer-row packs and (2) encode a denser scale than the pre-fix
-16/14/10 wash — not merely rename literals.
+1. Fix `_ConversationRow` click binding (`TypeError: lambda() missing '_'`) so
+   conversation rail selection works under Tk/CustomTkinter on Python 3.14.
+2. Stop chat Phase 3 from re-projecting inspector/timeline/chrome on every
+   AppState tick — fingerprint-gate cosmetic chat updates (user logs:
+   `Phase 3 (chat view) took 9994ms` then sustained ~1–1.5s).
 
-## Invariants
+## Invariants checked
 
-UI isolation preserved; cosmetic spacing only; no EventBus/contract changes.
+| Invariant | Status |
+|---|---|
+| UI → AppState → EventBus → Services → Repositories → Storage | Preserved |
+| UI isolation | Preserved — display/projection only |
+| No new EventBus topics | N/A |
+
+## Behaviour preservation
+
+- Chat still projects history/conversations on revision change
+- Inspector still updates when execution context / timeline revision changes
+- Click-to-select still calls the same `on_select(session_id)` callback
+
+## Out of scope
+
+- Broader AppState notify reduction
+- Markdown/message-block virtualization

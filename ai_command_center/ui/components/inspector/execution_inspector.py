@@ -88,15 +88,30 @@ class ExecutionInspector(BaseInspector):
 
     def update_context(self, context: ExecutionContext | Any) -> None:
         """Project the active ExecutionContext into the four section widgets."""
-        self._last_context = context
-        self._timeline_request_id = str(getattr(context, "request_id", "") or "").strip()
-
         spans = tuple(getattr(context, "trace_spans", ()))
+        artifacts = tuple(getattr(context, "artifacts", ()))
+        metrics = dict(getattr(context, "metrics", {}) or {})
+        request_id = str(getattr(context, "request_id", "") or "").strip()
+        provider_id = str(getattr(context, "provider_id", "") or "")
+        model = str(getattr(context, "model", "") or "")
+        fingerprint = (
+            request_id,
+            provider_id,
+            model,
+            tuple(getattr(span, "span_id", "") for span in spans),
+            tuple(getattr(a, "artifact_id", getattr(a, "id", id(a))) for a in artifacts),
+            tuple(sorted((str(k), str(v)) for k, v in metrics.items())),
+        )
+        if fingerprint == getattr(self, "_context_fingerprint", None):
+            self._last_context = context
+            return
+        self._context_fingerprint = fingerprint
+        self._last_context = context
+        self._timeline_request_id = request_id
+
         self._trace_tab.update(spans)
         self.trace_section.set_title(f"Trace ({len(spans)})" if spans else "Trace")
 
-        provider_id = str(getattr(context, "provider_id", "") or "")
-        model = str(getattr(context, "model", "") or "")
         provider_health: tuple[ProviderHealthSnapshot, ...] = ()
         if provider_id:
             provider_health = (
@@ -117,13 +132,11 @@ class ExecutionInspector(BaseInspector):
         )
         self.provider_section.set_title(provider_title)
 
-        artifacts = tuple(getattr(context, "artifacts", ()))
         self._artifacts_tab.update(artifacts)
         self.artifacts_section.set_title(
             f"Artifacts ({len(artifacts)})" if artifacts else "Artifacts"
         )
 
-        metrics = dict(getattr(context, "metrics", {}) or {})
         self._metrics_tab.update(metrics)
         self.metrics_section.set_title(
             f"Metrics ({len(metrics)})" if metrics else "Metrics"
