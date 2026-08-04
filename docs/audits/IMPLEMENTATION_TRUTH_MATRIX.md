@@ -1,7 +1,7 @@
 # Implementation Truth Matrix
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
-**Baseline:** `origin/main` @ `97e3c80` (verified 2026-08-04 — #129 ADR-012 A)  
+**Baseline:** `origin/main` @ `e7732b9` (verified 2026-08-04 — #130 Memory 4a)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
 **Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
@@ -66,7 +66,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired |
-| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Goals 3b **ADR-012 A**; Memory step **4a inventory**; Workflows soft remain |
+| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Goals ADR-012 A; Memory **4a**; Workflows **5a**; next 4b/5b or executions |
 | P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P3 close |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
@@ -112,7 +112,7 @@ OperatorKernel remains **exists-but-not-wired**. Matrix status stays PARTIAL unt
 |-------|----------|
 | UI surfaces / primitives | Ahead — Phase B E00–E13 WIRED at UI layer |
 | Runtime authority services | Mixed (Goal/Brain/Authority WIRED; OperatorKernel/Coordinator/Predictive/Undo PARTIAL) |
-| State Authority | WM node/edge mutate WIRED; Goals ADR-012 A; Memory soft-shadow inventoried (4a) |
+| State Authority | WM mutate WIRED; Goals A; Memory 4a + Workflows 5a inventoried |
 | Documentation / plan COMPLETE claims | Must follow code on `main` — this matrix is the Exists/Wired probe |
 
 ---

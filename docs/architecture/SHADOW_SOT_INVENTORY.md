@@ -1,6 +1,6 @@
 # Shadow Source-of-Truth Inventory
 
-**Status:** ACTIVE (Stage 2 — Goals 3b closed; Memory step 4 in progress)  
+**Status:** ACTIVE (Stage 2 — Goals 3b closed; Memory 4a + Workflows 5a inventories)  
 **Authority:** `docs/architecture/STATE_AUTHORITY_CONTRACT.md` (item 4)  
 **Verified:** `main` @ `97e3c80`+ (2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative. Transient caches are allowed; durable truth outside State Authority is not.
@@ -22,7 +22,7 @@ List every store or service that can be mistaken for authoritative workspace rea
 | Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Retired (ADR-012 A)** | Tree may remain for unit tests; **not** product SoT; cleanup optional |
 | Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ⚠️ `memory_lookup` + soft dual | Soft | **Step 4 inventory** — see `MEMORY_SOFT_SHADOW_INVENTORY.md`; no silent merge |
 | Executions | `ExecutionRunRepository` (+ query service) | ✅ append-only | ❌ | Soft | Diagnostic → AppState; SA mutate later |
-| Workflows | `WorkflowRunRepository` | ✅ | ❌ | Soft | Inventory only; no silent merge |
+| Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **Step 5a inventory** — see `WORKFLOWS_SOFT_SHADOW_INVENTORY.md`; no silent merge |
 | Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; not durable SoT |
 | AppState / UI | reducers / views | ❌ | Projection | No | Never authoritative |
 
@@ -69,7 +69,8 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | **3b ✅** | Goals | **ADR-012 Accepted — Option A (retire)** Phase-9 from product path | No live re-wire without new ADR; schema cleanup optional later |
 | **4a ✅** | Memory | Soft-shadow inventory + SA lookup pins | `MEMORY_SOFT_SHADOW_INVENTORY.md` + tests |
 | 4b | Memory | Route Assembler decision reads through SA (tools remain capability) | Follow-up; no silent merge |
-| 5 | Workflows | Document owner; SA project hooks or keep execution-scoped | No silent merge |
+| **5a ✅** | Workflows | Soft-shadow inventory + factory/SA pins | `WORKFLOWS_SOFT_SHADOW_INVENTORY.md` + tests |
+| 5b | Workflows | Decide: SA project hooks **or** keep execution-scoped | Human / follow-up |
 | 6 | Executions | Keep append-only; correlate via receipts when `mutate()` unifies | Contract item 6 |
 | **7 ✅** | All | Reconstruction: mutate→recover→query (nodes+edges, no chat) | Contract item 5 |
 | **8 ✅** | WM | Unify `mutate()` for nodes + edges with `MutationReceipt` | Contract item 6 (goals/workflows deferred) |
@@ -92,6 +93,7 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 - `docs/architecture/adr/ADR-012_GOALS_PHASE9_DISPOSITION.md` ← **3b decision vehicle**
 - `docs/architecture/state_authority/GOALS_DUAL_PATH_INVENTORY.md`
 - `docs/architecture/state_authority/MEMORY_SOFT_SHADOW_INVENTORY.md` ← **step 4**
+- `docs/architecture/state_authority/WORKFLOWS_SOFT_SHADOW_INVENTORY.md` ← **step 5a**
 - `docs/architecture/STATE_AUTHORITY_CONTRACT.md`
 - `docs/audits/RUNTIME_AUTHORITY_MAP.md` §C
 - `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md`
