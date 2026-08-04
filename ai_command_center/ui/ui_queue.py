@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,10 @@ _IDLE_FALLBACK_INTERVAL_MS = 200
 # Streaming interval for UI updates (verified by Phase 2 gate)
 UI_STREAM_INTERVAL_MS = 50
 
+# Drain budget: keep Tk responsive (~60fps). Cap items as a safety valve.
+_DRAIN_BUDGET_S = 0.016
+_DRAIN_MAX_ITEMS = 64
+
 
 class UIQueue:
     """
@@ -26,6 +31,10 @@ class UIQueue:
     thread that constructed the queue. Background publishers rely on the
     fallback ``after`` poll (≤50 ms when work is pending) so they never block
     the EventBus waiting on the Tcl interpreter lock.
+
+    ``_drain`` executes callbacks interleaved with a wall-clock budget so a
+    burst of expensive work cannot starve the Tk event loop for an entire
+    fixed-size batch.
     """
 
     def __init__(self, root, interval_ms: int = _FALLBACK_INTERVAL_MS) -> None:
@@ -51,17 +60,34 @@ class UIQueue:
             self._wake_pending = True
 
     def _drain(self) -> None:
-        batch: list[Callable[[], None]] = []
-        for _ in range(64):
+        """Execute queued callbacks until empty, max items, or time budget."""
+        start = time.perf_counter()
+        count = 0
+        while count < _DRAIN_MAX_ITEMS:
+            # Always run at least one callback when work exists; then respect budget.
+            if count > 0 and (time.perf_counter() - start) >= _DRAIN_BUDGET_S:
+                break
             try:
-                batch.append(self._inbound.get_nowait())
+                fn = self._inbound.get_nowait()
             except queue.Empty:
                 break
-        for fn in batch:
+            count += 1
             try:
                 fn()
             except Exception:
                 logger.exception("UIQueue callback failed")
+
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        if elapsed_ms > _DRAIN_BUDGET_S * 1000.0:
+            logger.warning(
+                "UIQueue drain took %.1fms (over %.0fms budget), callbacks=%s",
+                elapsed_ms,
+                _DRAIN_BUDGET_S * 1000.0,
+                count,
+            )
+        # Leftover work: ensure the fallback poll stays in the fast path.
+        if not self._inbound.empty():
+            self._wake_pending = True
 
     def _on_virtual_event(self, _event=None) -> None:
         self._wake_pending = False

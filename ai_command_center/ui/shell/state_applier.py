@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import time
+
 from ai_command_center.core.state.inspector_state import resolve_inspect_navigate_view
 from ai_command_center.core.state.artifact_state import artifacts_for_request
 from ai_command_center.platform.secret_store import openai_api_key_configured
@@ -9,18 +12,63 @@ from ai_command_center.ui.components.permission_dialog import PermissionDialog
 from ai_command_center.ui.design_system import theme_manager
 from ai_command_center.ui.views.settings_view import SettingsView
 
+logger = logging.getLogger(__name__)
+
+# Views whose projection is owned by `_apply_catalog_views`.
+_CATALOG_VIEWS = frozenset(
+    {
+        "memory",
+        "notes",
+        "plugins",
+        "system",
+        "workspace",
+        "providers",
+        "capabilities",
+        "artifacts",
+    }
+)
+
 
 class StateApplierMixin:
     """Applies AppState snapshots to shell widgets and catalog views."""
 
     def _queue_state_refresh(self) -> None:
-        """Enqueue a single state application; coalesce overlapping requests."""
+        """Enqueue a single state application; coalesce + frame-govern overlapping requests."""
+        now = time.monotonic()
+        min_interval = float(getattr(self, "_min_frame_interval", 0.033) or 0.033)
+        last = float(getattr(self, "_last_apply_state_time", 0.0) or 0.0)
+        if last > 0.0 and (now - last) < min_interval:
+            self._state_refresh_pending = True
+            self._schedule_frame_governor_retry(min_interval - (now - last))
+            return
+
         if getattr(self, "_state_refresh_enqueued", False):
             self._state_refresh_pending = True
             return
         self._state_refresh_enqueued = True
         self._state_refresh_pending = False
-        self._ui_queue.enqueue(self._apply_state)
+        self._last_apply_state_time = now
+        self._ui_queue.enqueue(self._apply_state_phase_1)
+
+    def _schedule_frame_governor_retry(self, delay_s: float) -> None:
+        """Ensure a deferred refresh runs after the frame interval elapses."""
+        if getattr(self, "_frame_governor_scheduled", False):
+            return
+        after = getattr(self, "after", None)
+        if not callable(after):
+            return
+        self._frame_governor_scheduled = True
+        delay_ms = max(1, int(delay_s * 1000.0))
+
+        def _retry() -> None:
+            self._frame_governor_scheduled = False
+            if getattr(self, "_state_refresh_pending", False):
+                self._queue_state_refresh()
+
+        try:
+            after(delay_ms, _retry)
+        except Exception:
+            self._frame_governor_scheduled = False
 
     def _maybe_show_permission_dialog(self, snap) -> None:
         pending = getattr(snap, "pending_permission_check", None)
@@ -69,6 +117,35 @@ class StateApplierMixin:
             str(snap.settings.default_model),
         )
 
+    def _flush_stream_chunk_buffer(self, chat) -> None:
+        """Push any throttled stream text still held in the UI buffer."""
+        buf = getattr(self, "_stream_chunk_buffer", "") or ""
+        if not buf or chat is None:
+            self._stream_chunk_buffer = ""
+            self._stream_chunks_since_update = 0
+            return
+        chat.append_chunk(buf)
+        self._stream_chunk_buffer = ""
+        self._stream_chunks_since_update = 0
+
+    def _append_stream_throttled(self, chat, new_chunk: str) -> None:
+        """Batch stream appends (every N chunks or ~200 chars) to cut text reflows."""
+        if not new_chunk:
+            return
+        self._stream_chunk_buffer = (getattr(self, "_stream_chunk_buffer", "") or "") + new_chunk
+        self._stream_chunks_since_update = int(
+            getattr(self, "_stream_chunks_since_update", 0) or 0
+        ) + 1
+        threshold = int(getattr(self, "_stream_batch_threshold", 3) or 3)
+        should_update = (
+            self._stream_chunks_since_update >= threshold
+            or len(self._stream_chunk_buffer) > 200
+        )
+        if should_update:
+            chat.append_chunk(self._stream_chunk_buffer)
+            self._stream_chunk_buffer = ""
+            self._stream_chunks_since_update = 0
+
     def _try_apply_stream_only(self, snap) -> bool:
         """Update only the live assistant stream — skip full shell rebuild."""
         if not snap.chat_streaming:
@@ -83,8 +160,9 @@ class StateApplierMixin:
             return False
         buffer_len = len(snap.chat_stream_buffer)
         if buffer_len > self._last_stream_buffer_len:
-            chat.append_chunk(snap.chat_stream_buffer[self._last_stream_buffer_len :])
+            new_chunk = snap.chat_stream_buffer[self._last_stream_buffer_len :]
             self._last_stream_buffer_len = buffer_len
+            self._append_stream_throttled(chat, new_chunk)
         if hasattr(chat, "update_chat_execution_status"):
             chat.update_chat_execution_status(
                 "streaming",
@@ -93,31 +171,38 @@ class StateApplierMixin:
             )
         return True
 
-    def _apply_state(self) -> None:
-        """Project the latest AppState into the shell. Re-enqueues if state changed while applying."""
-        import time
-
-        started = time.perf_counter()
+    def _finish_state_apply(self, started: float, *, metric: str = "ui.apply_state") -> None:
+        """Clear apply bookkeeping and re-enqueue if another refresh arrived."""
+        self._last_snapshot_for_apply = None
         self._state_refresh_enqueued = False
-        self._state_refresh_pending = False
+        try:
+            from ai_command_center.core.perf.metrics import get_perf_metrics
 
-        current_view = getattr(self, "_current_view", "")
+            get_perf_metrics().record(metric, (time.perf_counter() - started) * 1000.0)
+        except Exception:
+            pass
+        if self._state_refresh_pending:
+            self._state_refresh_pending = False
+            self._queue_state_refresh()
+
+    def _apply_state_phase_1(self) -> None:
+        """Phase 1: snapshot + stream-only fast path (~few ms)."""
+        started = time.perf_counter()
         snap = self._controller.snapshot()
+        self._last_snapshot_for_apply = snap
         if self._try_apply_stream_only(snap):
-            try:
-                from ai_command_center.core.perf.metrics import get_perf_metrics
-
-                get_perf_metrics().record(
-                    "ui.apply_state.stream",
-                    (time.perf_counter() - started) * 1000.0,
-                )
-            except Exception:
-                pass
-            if self._state_refresh_pending:
-                self._queue_state_refresh()
+            self._finish_state_apply(started, metric="ui.apply_state.stream")
             return
+        self._ui_queue.enqueue(self._apply_state_phase_2)
 
-        diag = getattr(snap, "execution_inspector", None)
+    def _apply_state_phase_2(self) -> None:
+        """Phase 2: shell chrome (permission dialog, top bar, context bar)."""
+        snap = getattr(self, "_last_snapshot_for_apply", None)
+        if snap is None:
+            snap = self._controller.snapshot()
+            self._last_snapshot_for_apply = snap
+
+        phase2_started = time.perf_counter()
         self._maybe_show_permission_dialog(snap)
         extra = dict(snap.system_snapshot.extra)
         openai_online = bool(extra.get("openai_online", False))
@@ -133,6 +218,32 @@ class StateApplierMixin:
         self._top.update_top_bar(snap)
         if hasattr(self, "_context_bar") and self._context_bar is not None:
             self._context_bar.update(snap)
+
+        elapsed_ms = (time.perf_counter() - phase2_started) * 1000.0
+        if elapsed_ms > 5.0:
+            logger.warning("Phase 2 (chrome) took %.1fms", elapsed_ms)
+
+        self._ui_queue.enqueue(self._apply_state_phase_3)
+
+    def _apply_state(self) -> None:
+        """Compatibility entry: run the full projection pipeline via phase 1."""
+        if getattr(self, "_state_refresh_enqueued", False):
+            self._state_refresh_pending = True
+            return
+        self._state_refresh_enqueued = True
+        self._state_refresh_pending = False
+        self._last_apply_state_time = time.monotonic()
+        self._apply_state_phase_1()
+
+    def _apply_state_phase_3(self) -> None:
+        """Phase 3: visible view, chat lifecycle, deferred catalogs, tray."""
+        started = time.perf_counter()
+        snap = getattr(self, "_last_snapshot_for_apply", None)
+        if snap is None:
+            snap = self._controller.snapshot()
+
+        current_view = getattr(self, "_current_view", "")
+        diag = getattr(snap, "execution_inspector", None)
 
         command_center = self._command_center_view()
         if command_center and hasattr(command_center, "apply_state") and current_view == "command_center":
@@ -222,7 +333,6 @@ class StateApplierMixin:
         except ValueError:
             pass
 
-
         chat = self._chat_view()
         # In-view cosmetic projections only when chat is visible.
         if chat and current_view == "chat":
@@ -295,6 +405,8 @@ class StateApplierMixin:
                 chat.begin_assistant(snap.active_chat_request_id)
                 self._last_started_request_id = snap.active_chat_request_id
                 self._last_stream_buffer_len = 0
+                self._stream_chunk_buffer = ""
+                self._stream_chunks_since_update = 0
 
         if (
             snap.chat_streaming
@@ -304,41 +416,50 @@ class StateApplierMixin:
             buffer_len = len(snap.chat_stream_buffer)
             if buffer_len > self._last_stream_buffer_len:
                 delta = snap.chat_stream_buffer[self._last_stream_buffer_len :]
-                chat.append_chunk(delta)
                 self._last_stream_buffer_len = buffer_len
+                self._append_stream_throttled(chat, delta)
 
         terminal_key = (str(snap.chat_status), str(snap.last_chat_request_id))
         if snap.chat_status == "complete":
             if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
                 chat = chat or self._chat_view()
                 if chat:
+                    self._flush_stream_chunk_buffer(chat)
                     chat.finish_assistant(str(snap.last_assistant_message))
                 if snap.last_chat_request_id not in self._completed_request_ids:
                     self._completed_request_ids.append(snap.last_chat_request_id)
                 self._last_started_request_id = None
                 self._last_stream_buffer_len = 0
+                self._stream_chunk_buffer = ""
+                self._stream_chunks_since_update = 0
                 self._top.update_status("ready", snap.settings.default_model)
                 self._last_terminal_chat_key = terminal_key
         elif snap.chat_status == "cancelled":
             if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
                 chat = chat or self._chat_view()
                 if chat:
+                    self._flush_stream_chunk_buffer(chat)
                     chat.show_cancelled()
                 if snap.last_chat_request_id not in self._completed_request_ids:
                     self._completed_request_ids.append(snap.last_chat_request_id)
                 self._last_started_request_id = None
                 self._last_stream_buffer_len = 0
+                self._stream_chunk_buffer = ""
+                self._stream_chunks_since_update = 0
                 self._last_terminal_chat_key = terminal_key
         elif snap.chat_status == "error":
             if terminal_key != self._last_terminal_chat_key and snap.last_chat_request_id:
                 self._show_view("chat")
                 chat = self._chat_view()
                 if chat:
+                    self._flush_stream_chunk_buffer(chat)
                     chat.show_error(str(snap.last_chat_error or "Unknown error"))
                 if snap.last_chat_request_id not in self._completed_request_ids:
                     self._completed_request_ids.append(snap.last_chat_request_id)
                 self._last_started_request_id = None
                 self._last_stream_buffer_len = 0
+                self._stream_chunk_buffer = ""
+                self._stream_chunks_since_update = 0
                 self._top.update_status("error", snap.settings.default_model)
                 self._last_terminal_chat_key = terminal_key
 
@@ -386,15 +507,7 @@ class StateApplierMixin:
         self._apply_automation_workspace(snap)
 
         self._last_stream_fingerprint = self._stream_fingerprint(snap)
-        try:
-            from ai_command_center.core.perf.metrics import get_perf_metrics
 
-            get_perf_metrics().record(
-                "ui.apply_state",
-                (time.perf_counter() - started) * 1000.0,
-            )
-        except Exception:
-            pass
         # Keep tray tooltip/icon in sync with AppState (throttled).
         tray = getattr(self, "_tray_controller", None)
         if tray is not None and hasattr(tray, "refresh"):
@@ -406,8 +519,12 @@ class StateApplierMixin:
                     tray.refresh()
                 except Exception:
                     pass
-        if self._state_refresh_pending:
-            self._queue_state_refresh()
+
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        if elapsed_ms > 30.0:
+            logger.warning("Phase 3 (%s view) took %.1fms", current_view, elapsed_ms)
+
+        self._finish_state_apply(started, metric="ui.apply_state")
 
     def _apply_settings_projection(self, snap) -> None:
         """Keep SettingsView in sync when settings change off-page."""
@@ -550,13 +667,31 @@ class StateApplierMixin:
         )
 
     def _apply_catalog_views(self, snap) -> None:
-        """Render Memory, Notes, Plugins, and System views from AppState."""
+        """Render Memory, Notes, Plugins, and System views from AppState.
+
+        Defer heavy rebuilds while chat is streaming or the user is on a
+        non-catalog view. When a catalog view is visible, apply the full
+        catalog set (same as pre-v6) so sibling pages stay warm.
+        """
+        current_view = getattr(self, "_current_view", "")
+        streaming = bool(getattr(snap, "chat_streaming", False))
+        on_catalog = current_view in _CATALOG_VIEWS
+
+        if streaming and not on_catalog:
+            self._catalog_refresh_deferred = True
+            return
+
+        if not on_catalog:
+            self._catalog_refresh_deferred = True
+            return
+
         fingerprint = self._catalog_fingerprint(snap)
         if fingerprint == getattr(self, "_last_catalog_fingerprint", None):
             system = self._system_view()
             if system:
                 system.apply_system_snapshot(snap.system_snapshot)
             return
+        self._catalog_refresh_deferred = False
         self._last_catalog_fingerprint = fingerprint
         memory = self._memory_view()
         if memory:
@@ -607,4 +742,3 @@ class StateApplierMixin:
                 else snap.recent_artifacts
             )
             artifacts.apply_state(artifact_catalog)
-

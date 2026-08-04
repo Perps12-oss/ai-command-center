@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Gate-visible topic literals for Phase 5A verification: tool.result, model.selected, memory.stored.
 # Bump when shipping UI freeze remediation so runtime logs prove the build.
-ACC_UI_FREEZE_FIX = "v5"
+ACC_UI_FREEZE_FIX = "v6"
 
 
 class CommandPaletteApp(
@@ -56,6 +56,14 @@ class CommandPaletteApp(
         self._last_terminal_chat_key: tuple[str, str] | None = None
         self._last_started_request_id: str | None = None
         self._last_stream_buffer_len: int = 0
+        self._stream_chunk_buffer: str = ""
+        self._stream_chunks_since_update: int = 0
+        self._stream_batch_threshold: int = 3
+        self._last_apply_state_time: float = 0.0
+        self._min_frame_interval: float = 0.033  # 30fps governor
+        self._frame_governor_scheduled: bool = False
+        self._catalog_refresh_deferred: bool = False
+        self._last_snapshot_for_apply = None
         self._last_chat_history_revision: int = 0
         self._last_inspector_revision: int = -1
         self._last_workflow_graph_revision: int = -1
@@ -99,7 +107,9 @@ class CommandPaletteApp(
             "ACC_UI_RUNTIME freeze_fix=%s handler_budget_includes_name=1 "
             "navigate_reentry_guard=1 uiqueue_threadsafe=1 "
             "telemetry_async_batch=1 appstate_slice_reduce=1 "
-            "settings_single_snapshot=1 keyring_cache=1 bus_reentrant_navigate_drop=1",
+            "settings_single_snapshot=1 keyring_cache=1 bus_reentrant_navigate_drop=1 "
+            "uiqueue_time_budget=1 apply_state_phased=1 stream_chunk_throttle=1 "
+            "frame_governor_30fps=1 catalog_defer_nonvisible=1",
             ACC_UI_FREEZE_FIX,
         )
 
