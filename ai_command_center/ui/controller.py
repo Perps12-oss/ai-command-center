@@ -64,6 +64,7 @@ from ai_command_center.core.events.topics import (
     SETTINGS_SET_REQUEST,
     UI_CHAT_CANCEL,
     UI_CHAT_NEW_SESSION,
+    UI_CHAT_SELECT_CONVERSATION,
     UI_COMMAND,
     UI_LAUNCH_RESOURCE,
     UI_NAVIGATE,
@@ -522,6 +523,17 @@ class UIController:
     def publish_chat_new_session(self) -> None:
         """Start a fresh generic chat session and clear entity attach."""
         self._bus.publish(UI_CHAT_NEW_SESSION, {}, source="ui")
+
+    def publish_chat_select_conversation(self, conversation_id: str) -> None:
+        """Switch the active free-floating conversation (C6)."""
+        cid = str(conversation_id).strip()
+        if not cid:
+            return
+        self._bus.publish(
+            UI_CHAT_SELECT_CONVERSATION,
+            {"conversation_id": cid},
+            source="ui",
+        )
 
     def publish_note_select(self, path: str) -> None:
         self._bus.publish(

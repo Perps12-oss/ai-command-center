@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
+import uuid
 
 from ai_command_center.db.conn_sync import connection_lock
 from ai_command_center.domain.conversation import ConversationMessage
@@ -53,6 +54,76 @@ class ConversationRepository:
                 self._conn.commit()
         return conversation_id
 
+    def create_conversation(
+        self,
+        *,
+        title: str = "New Chat",
+        model: str = "",
+    ) -> str:
+        """Insert a new free-floating conversation and return its id (C5)."""
+        cid = uuid.uuid4().hex
+        with connection_lock(self._conn):
+            self._conn.execute(
+                "INSERT INTO conversations (id, title, model, created_at) VALUES (?, ?, ?, ?)",
+                (cid, title[:80] or "New Chat", model, time.time()),
+            )
+            self._conn.commit()
+        return cid
+
+    def list_conversations(self, *, limit: int = 50) -> list[dict[str, object]]:
+        """List free-floating conversations for the chat rail (excludes entity:*)."""
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                """
+                SELECT
+                    c.id AS id,
+                    c.title AS title,
+                    c.model AS model,
+                    c.created_at AS created_at,
+                    COALESCE(MAX(m.created_at), c.created_at) AS last_activity,
+                    COUNT(m.id) AS message_count
+                FROM conversations c
+                LEFT JOIN messages m ON m.conversation_id = c.id
+                WHERE c.id NOT LIKE \'entity:%\'
+                GROUP BY c.id
+                ORDER BY last_activity DESC
+                LIMIT ?
+                """,
+                (max(1, int(limit)),),
+            ).fetchall()
+        return [
+            {
+                "conversation_id": str(r["id"]),
+                "title": str(r["title"] or "New Chat"),
+                "model": str(r["model"] or ""),
+                "created_at": float(r["created_at"] or 0.0),
+                "last_activity": float(r["last_activity"] or 0.0),
+                "message_count": int(r["message_count"] or 0),
+            }
+            for r in rows
+        ]
+
+    def update_title(self, conversation_id: str, title: str) -> None:
+        clean = (title or "").strip()[:80] or "New Chat"
+        with connection_lock(self._conn):
+            self._conn.execute(
+                "UPDATE conversations SET title = ? WHERE id = ?",
+                (clean, conversation_id),
+            )
+            self._conn.commit()
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        """Delete a conversation and its messages (CASCADE)."""
+        if conversation_id == DEFAULT_CONVERSATION_ID:
+            self.clear_messages(conversation_id)
+            return
+        with connection_lock(self._conn):
+            self._conn.execute(
+                "DELETE FROM conversations WHERE id = ?",
+                (conversation_id,),
+            )
+            self._conn.commit()
+
     def ensure_default(self, *, model: str = "") -> str:
         return self.ensure_conversation(DEFAULT_CONVERSATION_ID, model=model)
 
@@ -66,7 +137,7 @@ class ConversationRepository:
         cid = conversation_id or DEFAULT_CONVERSATION_ID
         with connection_lock(self._conn):
             row = self._conn.execute(
-                "SELECT id FROM conversations WHERE id = ?",
+                "SELECT id, title FROM conversations WHERE id = ?",
                 (cid,),
             ).fetchone()
             if row is None:
@@ -74,6 +145,9 @@ class ConversationRepository:
                     "INSERT INTO conversations (id, title, model, created_at) VALUES (?, ?, ?, ?)",
                     (cid, "Session", "", time.time()),
                 )
+                title = "Session"
+            else:
+                title = str(row["title"] or "")
             self._conn.execute(
                 """
                 INSERT INTO messages (conversation_id, role, content, created_at)
@@ -81,6 +155,13 @@ class ConversationRepository:
                 """,
                 (cid, role, content.strip(), time.time()),
             )
+            if role == "user" and title in ("", "Session", "New Chat", "Workspace", "Entity chat"):
+                derived = content.strip().splitlines()[0][:60] if content.strip() else title
+                if derived:
+                    self._conn.execute(
+                        "UPDATE conversations SET title = ? WHERE id = ?",
+                        (derived, cid),
+                    )
             self._conn.commit()
 
     def list_messages(
