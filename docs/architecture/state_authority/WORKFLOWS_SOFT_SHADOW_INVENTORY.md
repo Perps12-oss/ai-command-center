@@ -1,9 +1,9 @@
 # Workflows Soft-Shadow Inventory (State Authority)
 
-**Status:** ACTIVE — Stage 2 SHADOW step 5a (inventory + pins)  
+**Status:** ACTIVE — Stage 2 SHADOW steps 5a+5b closed  
 **Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, `SHADOW_SOT_INVENTORY.md` step 5  
 **Date:** 2026-08-04  
-**Baseline:** `origin/main` @ `e7732b9` (#130)
+**Baseline:** `origin/main` @ `01ed04c` (#133)
 
 ## Verdict
 
@@ -12,6 +12,11 @@ SoT is `WorkflowRunRepository` via `WorkflowPersistenceService`. Adjacent
 execution timeline / UI graph / frozen ABC are soft duals — **document, do not
 silent-merge** into State Authority or World Model. **No `SA.mutate` for
 workflows** in this slice. **Do not retire** `WorkflowEngineService`.
+
+**5b decision (Accepted):** **Keep workflows execution-scoped outside State
+Authority.** Do **not** add `workflow_lookup` / SA `project` hooks for run
+summaries in Stage 2. Optional later SA read-only projection requires a new
+contract slice — not this closeout.
 
 | Path | Stack | On SA path? | Disposition |
 |------|-------|:-----------:|-------------|
@@ -49,7 +54,7 @@ Evidence:
 | Surface | Role | Risk if mistaken for SoT |
 |---------|------|--------------------------|
 | `ExecutionAuthority` + `_project_state` | WM/decision context when fulfilling `WORKFLOW_EXECUTION_REQUEST` | Medium — looks like SA owns workflows; it only projects WM |
-| `ExecutionRunRepository` / execution timeline | Append-only execution twin | Soft — correlate later (SHADOW step 6); do not merge tables |
+| `ExecutionRunRepository` / execution timeline | Append-only execution twin | Soft — correlate via `correlation_id` (SHADOW 6b); do not merge tables |
 | AppState `workflow_graph` / library | UI projection (+ possible demo seed) | Projection only (R4) |
 | `core/workflow/workflow_service.py` | Frozen ABC, **not** factory-wired | Paper path — ignore for live authority |
 
@@ -62,7 +67,7 @@ No capability tools named `workflow.*` found on the live path.
 | Capability | Workflows |
 |------------|-----------|
 | `StateQuery` include flag | ❌ none |
-| Factory `workflow_lookup` | ❌ not wired |
+| Factory `workflow_lookup` | ❌ not wired (**5b: intentional**) |
 | `SA.query` / `project` | WM + optional memory/goals only |
 | `SA.mutate` | WM nodes/edges only — workflow ops **unsupported** |
 
@@ -72,9 +77,9 @@ No capability tools named `workflow.*` found on the live path.
 
 | Step | Action | Gate |
 |------|--------|------|
-| **5a ✅** | Publish this inventory + factory/SA pins | This PR |
-| 5b | Decide: add SA `project` hooks for run summaries **or** keep workflows execution-scoped outside SA | Human / follow-up |
-| 5c | If hooks: read-only `workflow_lookup` → Persistence/repo (never Engine private `_runs`) | Contract R1 |
+| **5a ✅** | Publish this inventory + factory/SA pins | #131 |
+| **5b ✅** | **Keep execution-scoped** — no SA `workflow_lookup` / project hooks | Closeout PR |
+| 5c | Deferred: read-only `workflow_lookup` only if a future contract slice requires it | New ADR / contract |
 | ❌ | Silent-merge `workflow_runs` ↔ WM / execution_runs | Forbidden |
 | ❌ | Kill WorkflowEngine or dual-write runs | Forbidden without ADR |
 
@@ -86,9 +91,10 @@ No capability tools named `workflow.*` found on the live path.
 |--------|--------|
 | WM nodes/edges | ✅ SA mutate/query |
 | Goals | ✅ scheduler; Phase-9 **RETIRED (ADR-012 A)** |
-| Memory | ⚠️ soft dual — 4a inventory; 4b Assembler later |
-| Workflows | ⚠️ this document (5a) |
-| Executions | ⚠️ soft dual — this document (6a); keep append-only |
+| Memory | ✅ 4a+4b; tools dual **4c** |
+| Workflows | ✅ 5a+5b (execution-scoped) |
+| Executions | ✅ 6a+6b (append-only + correlation) |
+| Agents | ✅ ADR-013 + inventory |
 
 ---
 
@@ -97,6 +103,7 @@ No capability tools named `workflow.*` found on the live path.
 - `docs/architecture/SHADOW_SOT_INVENTORY.md`  
 - `docs/architecture/STATE_AUTHORITY_CONTRACT.md`  
 - `docs/architecture/state_authority/MEMORY_SOFT_SHADOW_INVENTORY.md`  
+- `docs/architecture/state_authority/EXECUTIONS_SOFT_SHADOW_INVENTORY.md`  
 - `ai_command_center/services/workflow_engine_service.py`  
 - `ai_command_center/services/workflow_persistence_service.py`  
 - `ai_command_center/repositories/workflow_run_repository.py`  

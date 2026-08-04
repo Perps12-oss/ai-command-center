@@ -45,8 +45,8 @@ OperatorKernel → PlanningEngine → AgentCoordinator → RuntimeCapabilityRout
 | # | Question | Status |
 |---|----------|--------|
 | 1 | Is **OperatorKernel** the intended runtime authority, or is **ExecutionAuthority** canonical? | ✅ **ExecutionAuthority** — ADR-006 |
-| 2 | Is **PlanningEngine** mandatory for all requests or goal-oriented only? | Deferred — live: `PlannerService` + synthetic skip |
-| 3 | Does **AgentCoordinator** sit under OperatorKernel or beside **AgentRuntimeService**? | Deferred — neither wired; `AgentRuntimeService` is live |
+| 2 | Is **PlanningEngine** mandatory for all requests or goal-oriented only? | ✅ **RETIRED from live (ADR-013)** — live = `PlannerService` |
+| 3 | Does **AgentCoordinator** sit under OperatorKernel or beside **AgentRuntimeService**? | ✅ **RETIRED from live (ADR-013)** — live = `AgentRuntimeService` |
 | 4 | What is the **single** canonical execution graph? | Pending `ARCHITECTURE.md` update |
 
 **Forbidden:** wiring OperatorKernel into factory while ExecutionAuthority remains intake (ADR-006).
@@ -86,8 +86,8 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 | ExecutionOrchestrator | ✅ | keep |
 | PlannerService | ✅ | keep or merge per P1 |
 | OperatorKernel | ❌ | wire **or** retire |
-| PlanningEngine | ❌ | wire **or** retire |
-| AgentCoordinator | ❌ | wire **or** retire |
+| PlanningEngine | ❌ | **RETIRED from live (ADR-013)** |
+| AgentCoordinator | ❌ | **RETIRED from live (ADR-013)** |
 | PredictiveEngine | ❌ | P5 unless P1 mandates |
 | UndoReplay | ❌ | P5 unless P1 mandates |
 
@@ -97,9 +97,9 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 
 - [x] Registry complete for all authority + orchestration components *(truth matrix 2026-07-29)*  
 - [x] Every “keep” row is factory-registered  
-- [ ] Every “retire” row removed or marked deprecated with migration note — OperatorKernel marked research-only (ADR-006); PlanningEngine / AgentCoordinator still **exist-unwired** (defer wire-or-retire decision; not silent feature work)
+- [x] Every “retire” row removed or marked deprecated with migration note — OperatorKernel (ADR-006); GoalEngine (ADR-012 A); PlanningEngine / AgentCoordinator (ADR-013). Predictive/Undo remain **P5** (not R1.2 retire-or-wire for Stage 2).
 
-**P2 status:** IN PROGRESS — composition registry maintained; no Priority 3 coding until Phase B remediation on `main` and explicit P2 close (retire or wire remaining rows).
+**P2 status:** **CLOSED** for Stage 2 authority rows (ADR-006/012/013). PredictiveEngine / UndoReplay stay P5.
 
 ---
 
@@ -127,13 +127,15 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 ### R1.3 exit criteria
 
 - [x] State ownership table published *(contract § Backing systems — 2026-07-30)*  
-- [ ] No UI or service maintains shadow SoT for listed domains *(Goals ADR-012 A; Memory 4a + Workflows 5a inventoried; soft duals remain)*  
+- [x] No UI or service maintains *undocumented* shadow SoT for listed domains *(Stage 2 inventories closed: Goals ADR-012 A; Memory 4a–4c; Workflows 5a+5b; Executions 6a+6b; Agents ADR-013 — soft duals documented, not silent-merged)*  
 - [x] Event topics documented for cross-subsystem flows *(contract § Event topics — SA surface; mutate node+edge)*
 - [x] Goals dual-path inventory + disposition *(ADR-012 Accepted Option A)*
-- [x] Memory soft-shadow inventory *(MEMORY_SOFT_SHADOW_INVENTORY.md — step 4a)*
-- [x] Workflows soft-shadow inventory *(WORKFLOWS_SOFT_SHADOW_INVENTORY.md — step 5a)*
-- [x] Executions soft-shadow inventory *(EXECUTIONS_SOFT_SHADOW_INVENTORY.md — step 6a)*
+- [x] Memory soft-shadow inventory *(4a–4c)*
+- [x] Workflows soft-shadow inventory *(5a+5b keep execution-scoped)*
+- [x] Executions soft-shadow inventory *(6a+6b correlation)*
+- [x] Agents soft-shadow + PlanningEngine/AgentCoordinator disposition *(ADR-013)*
 
+**P3 Stage 2 soft-shadow status:** **CLOSED** (ungated). Remaining: optional SA mutate for non-WM domains (gated by ADR); Goose = Stage 3.
 ---
 
 ## Priority 4 — UI Composition

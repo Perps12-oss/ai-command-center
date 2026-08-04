@@ -1,14 +1,19 @@
 # Implementation Order Recommendation
 
-**Status:** RECOMMENDATION  
-**Authority:** `MASTER_ROADMAP_2026.md`  
-**Purpose:** Optimal phase implementation order based on dependencies
+**Status:** RECOMMENDATION — **HISTORICAL / STALE relative to ADR-006**  
+**Authority:** `MASTER_ROADMAP_2026.md` (planning-era); live authority = ADR-006 + R1  
+**Purpose:** Optimal phase implementation order based on dependencies  
+**Banner (2026-08-04):** Do **not** treat this document as a completion record or as
+current composition truth. OperatorKernel is **not** the live intake (ADR-006 →
+ExecutionAuthority). Prefer `IMPLEMENTATION_GUIDE.md`, `SHADOW_SOT_INVENTORY.md`,
+and `IMPLEMENTATION_TRUTH_MATRIX.md`.
 
 ---
 
 ## Executive Summary
 
-Based on dependency analysis, here's the recommended implementation order:
+Based on dependency analysis, here's the recommended implementation order
+**(planning-era; superseded for intake by ADR-006):**
 
 ```
 Phase 5-6 → Phase 8 → Phase 9 → Phase 10 → Phase 11
