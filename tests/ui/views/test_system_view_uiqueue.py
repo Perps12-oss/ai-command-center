@@ -5,8 +5,21 @@ from __future__ import annotations
 import threading
 from types import SimpleNamespace
 
-import customtkinter as ctk
 import pytest
+
+try:
+    import tkinter as tk
+except Exception as exc:  # pragma: no cover - environment specific
+    pytest.skip(f"tkinter unavailable: {exc}", allow_module_level=True)
+
+try:
+    _probe = tk.Tk()
+    _probe.withdraw()
+    _probe.destroy()
+except Exception as exc:  # pragma: no cover - environment specific
+    pytest.skip(f"tkinter display unavailable: {exc}", allow_module_level=True)
+
+import customtkinter as ctk
 
 from ai_command_center.ui.views import system_view as system_view_mod
 from ai_command_center.ui.views.system_view import SystemView

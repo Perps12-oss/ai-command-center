@@ -65,7 +65,8 @@ AppState Compliance:           PASS
 
 ## Notes
 
-- SelectionInspectorPanel remains the in-workspace Art. 12 inspector; universal rail gets `world_node` inspect select.
+- SelectionInspectorPanel is composed onto InspectorDock / InspectorHost as the
+  `world_node` inspector (R1 P4 single rail; residual dual-panel path retired).
 - Filters are UI-local projection + `UI_WORLD_FILTER` intent; AppState selection still driven by `WORLD_MODEL_NODE_SELECTED`.
 
 ## Verdict

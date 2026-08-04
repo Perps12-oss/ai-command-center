@@ -5,6 +5,7 @@ Architecture contract:
 - No mutable state listeners, repositories, or services.
 - Publishes intents through callbacks (UI_WORLD_* / WORLD_MODEL_NODE_SELECTED /
   ENTITY_CREATE_REQUEST / inspect).
+- Selection detail hosted on InspectorDock (R1 P4 single rail).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import customtkinter as ctk
 from ai_command_center.core.app_state import AppState
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.domain.world_model_snapshot import WorldModelSnapshot
+from ai_command_center.ui.components.docks.inspector_dock import InspectorDock
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.components.world_model.node_filters import (
     NodeFilterState,
@@ -36,6 +38,10 @@ from ai_command_center.ui.views.world_model import (
     MutationJournalPanel,
     RelationshipExplorerPanel,
     SelectionInspectorPanel,
+)
+from ai_command_center.ui.views.world_model.selection_inspector_panel import (
+    inspectable_ref_for_node,
+    inspectable_ref_from_world_model,
 )
 
 
@@ -141,8 +147,12 @@ class WorldExplorerView(ctk.CTkFrame):
         right.grid_rowconfigure(1, weight=1)
         right.grid_columnconfigure(0, weight=1)
 
-        self._inspector = SelectionInspectorPanel(right)
-        self._inspector.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+        self._inspector_dock = InspectorDock(right)
+        self._selection_inspector = SelectionInspectorPanel(self._inspector_dock.host)
+        self._inspector_dock.register("world_node", self._selection_inspector)
+        self._inspector_dock.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+        # Compat alias: projection tests read `_inspector._body` (Art. 12 panel).
+        self._inspector = self._selection_inspector
 
         self._relationships = RelationshipExplorerPanel(right, on_select=self._select)
         self._relationships.grid(row=1, column=0, sticky="nsew")
@@ -203,9 +213,19 @@ class WorldExplorerView(ctk.CTkFrame):
         visible = filter_nodes(wm.nodes, self._filter)
         self._graph.apply_snapshot(wm, visible_nodes=visible)
         self._explorer.apply_snapshot(wm, filter_state=self._filter)
-        self._inspector.apply_snapshot(wm)
+        ref = inspectable_ref_from_world_model(wm)
+        if ref is not None:
+            self.show_inspector(ref)
+        else:
+            self.clear_inspector()
         self._relationships.apply_snapshot(wm)
         self._journal.apply_snapshot(wm)
+
+    def show_inspector(self, ref: InspectableRef) -> None:
+        self._inspector_dock.show(ref)
+
+    def clear_inspector(self) -> None:
+        self._inspector_dock.clear()
 
     def _on_filters(self, state: NodeFilterState) -> None:
         self._filter = state
@@ -218,23 +238,18 @@ class WorldExplorerView(ctk.CTkFrame):
         nid = str(node_id)
         if self._on_select:
             self._on_select(nid)
-        label = nid
-        node_type = ""
-        if self._last_wm is not None:
-            for node in self._last_wm.nodes:
-                if node.node_id == nid:
-                    label = node.label or nid
-                    node_type = node.node_type
-                    break
         if self._on_inspect_select is not None:
-            self._on_inspect_select(
-                InspectableRef(
+            ref: InspectableRef | None = None
+            if self._last_wm is not None:
+                ref = inspectable_ref_for_node(self._last_wm, nid)
+            if ref is None:
+                ref = InspectableRef(
                     kind="world_node",
                     ref_id=nid,
-                    label=label,
-                    payload=(("node_id", nid), ("node_type", node_type)),
+                    label=nid,
+                    payload=(("node_id", nid),),
                 )
-            )
+            self._on_inspect_select(ref)
 
     def _create_entity(self) -> None:
         if self._on_create_entity:

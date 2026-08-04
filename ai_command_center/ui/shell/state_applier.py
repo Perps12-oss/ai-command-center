@@ -313,6 +313,23 @@ class StateApplierMixin:
             and current_view == "world_explorer"
         ):
             world_explorer.apply_state(snap)
+            if hasattr(world_explorer, "show_inspector") and hasattr(
+                world_explorer, "clear_inspector"
+            ):
+                if snap.inspector.revision != getattr(
+                    self, "_last_world_explorer_inspector_revision", 0
+                ):
+                    selected = snap.inspector.selected
+                    if selected is not None and selected.kind == "world_node":
+                        from ai_command_center.ui.views.world_model.selection_inspector_panel import (
+                            inspectable_ref_for_node,
+                        )
+
+                        rich = inspectable_ref_for_node(snap.world_model, selected.ref_id)
+                        world_explorer.show_inspector(rich or selected)
+                    elif selected is None:
+                        world_explorer.clear_inspector()
+                    self._last_world_explorer_inspector_revision = snap.inspector.revision
 
         graph_workspace = self._graph_workspace_view()
         if (
@@ -321,6 +338,23 @@ class StateApplierMixin:
             and current_view == "graph_workspace"
         ):
             graph_workspace.apply_state(snap)
+            if hasattr(graph_workspace, "show_inspector") and hasattr(
+                graph_workspace, "clear_inspector"
+            ):
+                if snap.inspector.revision != getattr(
+                    self, "_last_graph_workspace_inspector_revision", 0
+                ):
+                    selected = snap.inspector.selected
+                    if selected is not None and selected.kind == "world_node":
+                        from ai_command_center.ui.views.world_model.selection_inspector_panel import (
+                            inspectable_ref_for_node,
+                        )
+
+                        rich = inspectable_ref_for_node(snap.world_model, selected.ref_id)
+                        graph_workspace.show_inspector(rich or selected)
+                    elif selected is None:
+                        graph_workspace.clear_inspector()
+                    self._last_graph_workspace_inspector_revision = snap.inspector.revision
 
         insights = self._insights_view()
         if insights and hasattr(insights, "apply_state") and current_view == "insights":

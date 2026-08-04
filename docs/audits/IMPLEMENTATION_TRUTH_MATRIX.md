@@ -67,7 +67,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 | P1 Runtime authority | ADR-006 | **PASSED** |
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **PASSED** for GoalEngine/PlanningEngine/AgentCoordinator/OperatorKernel (ADR-006/012/013); Predictive/Undo remain P5 |
 | P3 Event & state unification | State Authority Contract | **SOFT-SHADOW CLOSED** — 3a–6b + agents inventories; deepen SA mutate only with new ADR |
-| P4 UI composition | Inspector/Graph/Timeline unify | **UNBLOCKED** from Stage 2 soft-shadow (P5 still blocked on broader R1) |
+| P4 UI composition | Inspector/Graph/Timeline unify | **IN PROGRESS** — inspector rail + graph unified; timeline residual (`ActivityTimeline`) |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
 ---
