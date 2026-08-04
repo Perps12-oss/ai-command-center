@@ -358,15 +358,13 @@ Same shape as PERF Tom rev 2 (`docs/audits/TOM_AUDIT_PERF_001_002_FREEZE_CLOSEOU
 
 No other deductions in this addendum. Classification band: Tom `PARTIALLY_IMPLEMENTED` floor **65** (`docs/agents/tom-implementation-auditor.json` `classification_rules.PARTIALLY_IMPLEMENTED.minimum_score`).
 
-### Weighted dimensions (forced to match 74 — not a second independent verdict)
+### Weighted dimensions (same 74, shown two ways — not independent corroboration)
 
 Weights from `tom-implementation-auditor.json` `audit_dimensions`.  
-**N/A rows (`ui_consistency`) contribute 0 and are excluded from the denominator** — PERF included UI at 88; this track has no UI surface, so weight 5 is redistributed by setting contribution = 0 and requiring Σ = 74 over the other 95 weight points…  
+Scores below were **chosen so** `Σ(score×weight)/100 = 74` to match the deduction rubric above. They are **not** a second measurement that independently landed on 74.
 
-**Correction (honest):** Tom config expects Σ(score×weight)/100. To keep a single number:
-
-| Dimension | Weight | Score | Contribution |
-|-----------|-------:|------:|-------------:|
+| Dimension | Weight | Score | Contribution (`w×s/100`) |
+|-----------|-------:|------:|-------------------------:|
 | architecture_compliance | 20 | 79 | 15.80 |
 | plan_adherence | 15 | 81 | 12.15 |
 | implementation_completeness | 15 | 70 | 10.50 |
@@ -374,13 +372,19 @@ Weights from `tom-implementation-auditor.json` `audit_dimensions`.
 | maintainability | 10 | 72 | 7.20 |
 | scalability | 5 | 74 | 3.70 |
 | testability | 5 | 60 | 3.00 |
-| ui_consistency | 5 | **N/A → scored 74 neutral*** | 3.70 |
+| ui_consistency | 5 | 74† | 3.70 |
 | performance | 5 | 74 | 3.70 |
 | technical_debt | 5 | 60 | 3.00 |
+| **Σ** | **100** | — | **74.00** |
 
-\*Neutral fill so Σ weights stay 100 without pretending UI was audited. **This is a bookkeeping choice, not a UI PASS.** Prefer reading the **deduction rubric (74)** as authoritative; the table is calibrated to match it:
+† `ui_consistency` was **not evaluated** for this headless SA track. Score 74 is a **neutral fill** so weights still sum to 100 (Tom config assumes all ten dimensions). Do **not** read as UI PASS. Prefer the **deduction rubric** as the authoritative 74.
 
-`Σ(score×weight)/100 = (1580+1215+1050+1125+720+370+300+370+370+300)/100 = 7400/100 = **74.00**`.
+Arithmetic check:  
+`20×79 + 15×81 + 15×70 + 15×75 + 10×72 + 5×74 + 5×60 + 5×74 + 5×74 + 5×60`  
+`= 1580 + 1215 + 1050 + 1125 + 720 + 370 + 300 + 370 + 370 + 300 = 7400`  
+`7400 / 100 = 74`.
+
+**Errata:** An earlier draft of this weighted table summed to **69** (wrong scores). That draft is superseded by the table above. Same class of slip as mis-counting a pytest suite when omitting a file (see Q3 errata).
 
 **Label change from v2 final block:** Architecture Compliance is no longer a flat “PASS WITH FINDINGS” — see Q2 (process/outcome split). **Overall score remains 74** (rubric unchanged by Q2 labeling).
 
@@ -472,7 +476,9 @@ python3 -m pytest \
 | 22 | `tests/test_shadow_sot_goals.py::test_build_services_does_not_wire_goal_engine` |
 | 23 | `…::test_state_authority_goal_lookup_projects_goal_repository` |
 
-### PERF files named in the challenge — collected here
+### PERF files named in the challenge — first collect (incomplete vs PERF Tom)
+
+Challenge listed four globs (omitting metrics). Collecting only those four paths:
 
 ```bash
 python3 -m pytest \
@@ -481,28 +487,74 @@ python3 -m pytest \
   tests/test_ui_freeze_closeout_fingerprints.py \
   tests/test_runtime_identity.py \
   --collect-only -q --no-cov
-# → 20 tests collected (not 23)
+# → 20 tests collected
 ```
 
-**Overlap of node ids (SA 23 ∩ PERF 20): empty set** (`comm` / set intersection in audit session).
+**Overlap of node ids (SA 23 ∩ that 20): empty set.**
 
-**Note:** PERF Tom rev 2 also cites “23 passed” for a **graded** mix that may include additional adjacent files beyond these four paths. Whatever that 23 was, **it does not share node ids with this SA list.** Coincidence of the integer 23 is not shared coverage.
+### Errata — PERF Tom’s “23” does reproduce when the command is copied verbatim
 
-**What this SA 23 proves:** factory wires, happy-path memory/goals mutate round-trips, empty title/body rejects, WEA op **names** unsupported, GoalEngine absent.  
-**What it does not prove:** F1–F4 (Q4).
+PERF Tom rev 2 Evidence block (`origin/cursor/tom-audit-perf001-002-30d3`,
+`docs/audits/TOM_AUDIT_PERF_001_002_FREEZE_CLOSEOUT_2026-08-04.md` ≈L272–278) runs **five** files:
+
+```bash
+APPDATA=/tmp/aicc_appdata python3 -m pytest \
+  tests/test_perf002_inspector_fingerprints.py \
+  tests/test_appstate_notify_coalesce.py \
+  tests/test_appstate_notify_metrics.py \   # ← omitted from the challenge list / SA Q3 first pass
+  tests/test_ui_freeze_closeout_fingerprints.py \
+  tests/test_runtime_identity.py -q --no-cov
+```
+
+Re-run verbatim in this environment (2026-08-04): **23 tests collected / 23 passed.**
+
+The 3-test gap was exactly `tests/test_appstate_notify_metrics.py`:
+
+| Node id |
+|---------|
+| `…::test_notify_metrics_record_listener_fanout` |
+| `…::test_notify_skipped_no_listeners_counter` |
+| `…::test_notify_skipped_metrics_only_system_snapshot` |
+
+**20 + 3 = 23.** Not an arithmetic slip in the PERF audit count; a **file-list omission** in the cross-check. SA addendum Q3 first pass was wrong to imply PERF’s 23 failed to reproduce.
+
+**SA 23 ∩ PERF exact 23: still empty** (recomputed after including metrics file). Both integers are real; they remain **disjoint suites**.
+
+**What this SA 23 proves:** factory wires, happy-path memory/goals mutate round-trips, empty title/body rejects, WEA op **names** unsupported, GoalEngine absent, and (via ADR-017 pin) that `create_node` remains a supported **op name**.  
+**What it does not prove:** F1, F3, F4; and it **anti-covers** F2 outcome (Q4).
 
 ---
 
 ## Q4 — Pin status of F1–F4
 
-| Finding | Pinned? | Evidence |
-|---------|---------|----------|
-| **F1** duplicate `goal_id` queue | **No** | No test submits the same `goal_id` twice under a busy scheduler. `rg goal_id` in soft-shadow SA tests only hits receipt field assert / `cancel_goal` reject (`tests/test_goals_sa_soft_shadow.py`, `tests/test_memory_sa_soft_shadow.py:152`). |
-| **F2** `create_node type=memory` | **No** | No soft-shadow test builds `type=memory` via `create_node`. ADR-017 pin **requires** `create_node` ∈ supported (`tests/test_adr017_sa_mutate_disposition.py:13`) — opposite of guarding F2. |
-| **F3** plan cascade | **No** | No assert on `PLAN_REQUEST` / `goal.activated` in the 23. Round-trip only checks receipt + `query` title (`test_sa_mutate_submit_goal_round_trip`). |
-| **F4** workspace stamp | **No** | `test_state_authority_goal_lookup_projects_goal_repository` uses a hand-built lookup; factory `_goal_lookup` workspace filter never asserted. |
+| Finding | Pin status | Evidence |
+|---------|------------|----------|
+| **F1** duplicate `goal_id` queue | **Unpinned** | No test submits the same `goal_id` twice under a busy scheduler. `rg goal_id` in soft-shadow SA tests only hits receipt field assert / `cancel_goal` reject (`tests/test_goals_sa_soft_shadow.py`, `tests/test_memory_sa_soft_shadow.py:152`). |
+| **F2** `create_node type=memory` | **Anti-pinned (locked-in)** — worse than unpinned | See below. |
+| **F3** plan cascade | **Unpinned** | No assert on `PLAN_REQUEST` / `goal.activated` in the 23. Round-trip only checks receipt + `query` title (`test_sa_mutate_submit_goal_round_trip`). |
+| **F4** workspace stamp | **Unpinned** | `test_state_authority_goal_lookup_projects_goal_repository` uses a hand-built lookup; factory `_goal_lookup` workspace filter never asserted. |
 
-**Therefore:** **23/23 passed does not exercise F1–F4.** Deduction D6 (−4) exists specifically so that count cannot be read as coverage of those findings.
+### F2 anti-pin and migration risk (must resolve before “fix F2”)
+
+1. **Green pin encodes the opposite of an F2 fix:**  
+   `tests/test_adr017_sa_mutate_disposition.py:13`  
+   `assert "create_node" in supported`  
+   Any change that removes `create_node` from `_SUPPORTED_OPS` **breaks this currently-green test by design**.
+
+2. **F2 is not “ban create_node”** — it is “unguarded `type=memory` on WM node writes.” A correct fix is likely a **type guard** (reject or remap `type=memory` on SA node ops) while keeping generic `create_node` for other types. That still requires a **new** pin (and updating ADR-017’s intent text if it implied unrestricted node ops).
+
+3. **Production dependency on WM `type=memory` echoes today:**  
+   `ai_command_center/services/orchestration_service.py:404–431` builds WM node dicts with `"type": "memory"` for capability `memory.store` / `memory.query` (tool-completion echo path). Soft-shadow inventory documents this as echo, not `memory_nodes` SoT (`MEMORY_SOFT_SHADOW_INVENTORY.md` Path B).  
+   Those echoes are **not** necessarily written via `SA.mutate` today (orchestration / runtime path), but they prove the codebase **already relies on WM nodes typed `memory` as a live shape**. Banning that type only inside SA without an inventory of writers risks:
+   - splitting “allowed via orchestration, forbidden via SA” without docs, or
+   - breaking callers that later route the same echo through SA.
+
+4. **Required before touching F2:**  
+   - Inventory all writers of WM `type=memory` (at least orchestration `:404–431`; SA `create_node`; any BrainRuntime path).  
+   - Choose disposition: (a) keep WM echo, document+pin that SA `query` must not treat WM memory as `memory_nodes` SoT; or (b) type-guard SA node ops + migrate orchestration off SA if needed; or (c) superseding ADR.  
+   - Update/replace the ADR-017 supported-ops pin so it cannot greenwash an SoT contradiction.
+
+**Therefore:** **23/23 passed does not exercise F1, F3, F4**, and for **F2 it actively protects the status quo** that F2 calls an outcome failure. Deduction D6 (−4) covers the coverage gap; F2’s anti-pin is an additional migration hazard, not scored as a separate numeric deduction in 2.1.
 
 ---
 
@@ -589,6 +641,39 @@ Primitive Reuse Compliance:  N/A
 CustomTkinter Compliance:    N/A
 AppState Compliance:         PASS (bus facts)
 GitHub Pattern Compliance:   PASS
-Outcome / hardening:         FAIL (F1 unpinned defect; F2–F4 unpinned)
+Outcome / hardening:         FAIL (F1 unpinned; F2 anti-pinned; F3–F4 unpinned)
 Stop-line (ADR queue):       CLOSED per R1_UNGATED_STOP_LINE.md L18–29
 ```
+
+---
+
+# Follow-up (rev 2.2) — challenge on addendum
+
+## A. Governance follow-up (from Q6) — flag upward
+
+Three local “Closed/complete” definitions remain unreconciled:
+
+| Doc | Local meaning |
+|-----|----------------|
+| `PERFORMANCE_CONSTITUTION.md` Art VI + XV | Perf debt Closed only after soak DoD |
+| `docs/audits/R1_UNGATED_STOP_LINE.md` | ADR/stop-line queue CLOSED |
+| `docs/governance/PHASE_COMPLETION_RULE.md` | Phase complete on `main` |
+
+**Recommended org follow-up (not in this audit’s score):** one governance doc that defines **Closed** once (or a typed vocabulary: `debt_closed` / `stop_line_closed` / `phase_complete`), with the others deferring by reference. Until then, audits must **name which Closed** they mean.
+
+## B. PERF 20 vs 23 — resolved
+
+| Collect | Files | Count |
+|---------|-------|------:|
+| Challenge list (4 files, no metrics) | perf002, coalesce, ui_freeze, runtime_identity | **20** |
+| PERF Tom verbatim (`…FREEZE_CLOSEOUT…` ≈L272–278) | + `tests/test_appstate_notify_metrics.py` | **23** |
+
+Gap = exactly the three metrics tests. **PERF’s 23 reproduces.** SA Q3’s first “20” was an incomplete file list, not a PERF arithmetic error. Both suites remain node-id disjoint.
+
+## C. Dimension table — shown and verified
+
+See **Q1 weighted table** above (rev 2.1, with Σ line and expanded arithmetic). That table **is** the recalibrated one (79/81/70/75/72/74/60/74/74/60 → 7400/100=74). It is the same 74 as the deduction rubric, shown two ways — **not** independent corroboration.
+
+## D. F2 status upgrade: anti-pinned + migration gate
+
+F2 is **not** merely unpinned. `tests/test_adr017_sa_mutate_disposition.py:13` green-asserts `create_node ∈ supported`. Live echo writer: `orchestration_service.py:404–431` (`type: memory`). **Do not “fix F2” by deleting `create_node` support** without writer inventory + pin rewrite (Q4).
