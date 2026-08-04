@@ -125,7 +125,7 @@ GAP = 16
 # Chat message spacing (C8) — single density scale for outer rows + bubbles.
 # Outer row (chat_view) owns gap-between-messages; bubble owns internal inset.
 MSG_SIDE_PAD = 12          # scroll edge → message row
-MSG_ROW_GAP = 6            # vertical gap between consecutive message rows
+MSG_ROW_GAP = 4            # vertical gap between consecutive message rows
 MSG_BUBBLE_PAD_X = 12      # text inset inside bubble
 MSG_BUBBLE_PAD_Y = 8
 MSG_BUBBLE_OUTER_PAD_Y = 0 # bubble vs its row (avoid stacking with MSG_ROW_GAP)

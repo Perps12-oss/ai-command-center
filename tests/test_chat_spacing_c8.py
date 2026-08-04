@@ -15,7 +15,7 @@ def test_msg_density_scale_is_tighter_than_pre_c8_wash() -> None:
     assert T.MSG_BUBBLE_PAD_X < 14
     assert T.MSG_BUBBLE_PAD_Y < 10
     assert T.MSG_META_PAD_Y[1] < 6
-    assert T.MSG_ROW_GAP > 0
+    assert 0 < T.MSG_ROW_GAP <= 4
     assert T.MSG_BUBBLE_OUTER_PAD_Y == 0
 
 
