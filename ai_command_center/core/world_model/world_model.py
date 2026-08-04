@@ -99,8 +99,16 @@ def mutation_for_edge(
     mutation_id: str,
     edge: Edge,
     correlation: CorrelationContext,
+    mutation_type: MutationType = MutationType.CREATE_EDGE,
 ) -> Mutation:
-    """Build a CREATE_EDGE mutation for State Authority / BrainRuntime callers."""
+    """Build a CREATE_EDGE or DELETE_EDGE mutation for State Authority / BrainRuntime."""
+    if mutation_type == MutationType.DELETE_EDGE:
+        return Mutation(
+            id=mutation_id,
+            correlation=correlation,
+            type=MutationType.DELETE_EDGE,
+            payload={"edge_id": edge.id},
+        )
     return Mutation(
         id=mutation_id,
         correlation=correlation,
