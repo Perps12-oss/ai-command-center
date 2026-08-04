@@ -88,7 +88,7 @@ No capability tools named `workflow.*` found on the live path.
 | Goals | ✅ scheduler; Phase-9 **RETIRED (ADR-012 A)** |
 | Memory | ⚠️ soft dual — 4a inventory; 4b Assembler later |
 | Workflows | ⚠️ this document (5a) |
-| Executions | Soft append-only — SHADOW step 6 |
+| Executions | ⚠️ soft dual — this document (6a); keep append-only |
 
 ---
 

@@ -154,7 +154,7 @@ Pattern registry, plugin marketplace, advanced runtime, new UI ideas, performanc
 ## Immediate roadmap
 
 1. **Stage 1 — Stabilization:** Phase B rem + truth matrix **done on `main` (#105)**. Remaining: R1 P2 wire-or-retire; EventBus only after approval. **No Goose integration.**
-2. **Stage 2 — State Authority:** **in progress** — Goals A; Memory 4a+4b (Assembler→SA); Workflows 5a; next Workflows 5b or executions. No Goose unless it directly supports this work.
+2. **Stage 2 — State Authority:** **in progress** — Goals A; Memory 4a+4b; Workflows 5a; Executions 6a; next Workflows 5b (hooks decision) or agents inventory. No Goose unless it directly supports this work.
 3. **Stage 3 — Goose Review:** only after the canonical roadmap reaches a stable checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"*
 
 ---
