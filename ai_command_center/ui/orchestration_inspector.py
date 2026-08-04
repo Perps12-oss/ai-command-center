@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import time
+
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppStateStore
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.ui.design_system import theme_v2 as T
+from ai_command_center.ui.inspector_refresh import record_inspector_refresh
 from ai_command_center.ui.ui_queue import UIQueue
 
 
@@ -30,6 +33,7 @@ class OrchestrationInspector(ctk.CTkToplevel):
         self._ui_queue = ui_queue
         self._unsubs: list = []
         self._last_fingerprint: tuple | None = None
+        self._last_content: str | None = None
         self._refresh_pending = False
 
         self.title("Orchestration Inspector (dev)")
@@ -72,20 +76,30 @@ class OrchestrationInspector(ctk.CTkToplevel):
         self._refresh_pending = True
         self._ui_queue.enqueue(self._refresh)
 
-    def _refresh(self) -> None:
-        self._refresh_pending = False
-        run = self._state_store.snapshot.orchestration_run
-        fp = (
+    @staticmethod
+    def _fingerprint(run) -> tuple:
+        return (
             run.intent,
             run.provider_id,
             run.request_id,
             run.receipt_id,
+            run.query,
             run.execution_success,
-            run.truth_valid,
-            run.response_text,
+            run.execution_facts,
             run.execution_error,
+            run.truth_valid,
+            run.truth_detail,
+            run.response_source,
+            run.response_text,
         )
+
+    def _refresh(self) -> None:
+        self._refresh_pending = False
+        started = time.perf_counter()
+        run = self._state_store.snapshot.orchestration_run
+        fp = self._fingerprint(run)
         if fp == self._last_fingerprint:
+            record_inspector_refresh("orchestration", 0.0, skipped=True)
             return
         self._last_fingerprint = fp
         lines = [
@@ -113,10 +127,17 @@ class OrchestrationInspector(ctk.CTkToplevel):
             run.response_text or "-",
         ]
         content = "\n".join(lines)
+        if content == self._last_content:
+            record_inspector_refresh("orchestration", 0.0, skipped=True)
+            return
+        self._last_content = content
         self._text.configure(state="normal")
         self._text.delete("1.0", "end")
         self._text.insert("1.0", content)
         self._text.configure(state="disabled")
+        record_inspector_refresh(
+            "orchestration", (time.perf_counter() - started) * 1000.0
+        )
 
     def _on_close(self) -> None:
         for unsub in self._unsubs:
