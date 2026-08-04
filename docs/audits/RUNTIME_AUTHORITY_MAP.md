@@ -1,21 +1,23 @@
 # Runtime Authority Map
 
 **Milestone:** PHASE R1 — Runtime Reconciliation  
-**Baseline:** `origin/main` @ `e128a72`  
+**Baseline:** `origin/main` @ `426c6b7`  
 **Method:** Source + `service_factory.py` wiring only (not plan claims)
 
 ---
 
 ## Executive finding
 
-The repository has **two authority stories**, not one:
+**Settled (ADR-006):** one live intake story. OperatorKernel / Phase-9 research
+packages remain tests-only (ADR-012/013/014).
 
 | Story | Status on `main` |
 |-------|------------------|
-| **A — Execution Authority path** | **LIVE** (wired in factory, EventBus-driven) |
-| **B — OperatorKernel path** | **PAPER** (library + tests; not in factory) |
+| **A — Execution Authority path** | **LIVE** (wired in factory, EventBus-driven) — **canonical** |
+| **B — OperatorKernel / research tree** | **PAPER** (library + tests; not in factory) |
 
-Bridging gaps before choosing between A and B risks a **third bypass path**.
+Do **not** bridge A and B without an ADR that supersedes the retire decisions.
+Bridging risks a **third bypass path**.
 
 ---
 

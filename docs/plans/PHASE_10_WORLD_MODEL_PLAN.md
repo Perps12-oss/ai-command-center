@@ -1,11 +1,14 @@
 # Phase 10: Workspace OS Intelligence & World Model Expansion
 
-**Status:** PARTIAL (code-verified 2026-07-20 — core/UI present; predictive/undo not in factory)  
-**Priority:** MEDIUM  
-**Estimated Effort:** 10-12 weeks  
-**Dependencies:** Phase 9 Goals (PARTIAL)  
+**Status:** PARTIAL — **research / plan archive** (not live composition truth)  
+**Live truth (2026-08-04):** World Model + SA mutate/query live; PredictiveEngine /
+UndoReplay **RETIRED from live (ADR-014)** — research/unit-test tree only; live
+timeline undo / snapshots = TimelineService / SnapshotService / WM recover.  
+**Priority:** MEDIUM (historical)  
+**Estimated Effort:** 10-12 weeks (plan-era estimate; ignore for agent scheduling)  
+**Dependencies:** Phase 9 Goals (PARTIAL / ADR-012 A)  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `VNEXT_STATE_DRIVEN_BLUEPRINT.md`  
-**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`
+**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`, ADR-014
 
 ---
 

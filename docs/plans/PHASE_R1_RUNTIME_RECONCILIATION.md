@@ -85,11 +85,12 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 | ExecutionAuthority | ✅ | keep |
 | ExecutionOrchestrator | ✅ | keep |
 | PlannerService | ✅ | keep or merge per P1 |
-| OperatorKernel | ❌ | wire **or** retire |
+| OperatorKernel | ❌ | **RETIRED from live (ADR-006)** — research/tests only |
 | PlanningEngine | ❌ | **RETIRED from live (ADR-013)** |
 | AgentCoordinator | ❌ | **RETIRED from live (ADR-013)** |
 | PredictiveEngine | ❌ | **RETIRED from live (ADR-014)** |
 | UndoReplay | ❌ | **RETIRED from live (ADR-014)** |
+| GoalEngine | ❌ | **RETIRED from live (ADR-012 A)** |
 
 **Rule:** No subsystem may exist only outside the composition root after R1.2.
 
@@ -105,7 +106,8 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 
 ## Priority 3 — Event & State Unification
 
-**Active next workstream** after ADR-006 (authority decided).
+**Soft-shadow CLOSED** on `main` (3a–6b + agents). Deepen SA.mutate for non-WM
+domains only with a **new ADR** — see `docs/audits/R1_UNGATED_STOP_LINE.md`.
 
 Subsystems: Goals, Agents, Executions, World Model, Timeline, Approvals.
 
@@ -164,23 +166,25 @@ All graph views → shared BaseGraphCanvas + selection model
 **PredictiveEngine / UndoReplay:** inventory closed — **ADR-014 Accepted (research-only)**.
 Do not factory-wire without a new ADR (would dual TimelineService / SnapshotService / SA).
 
-Remaining P5-ish platform items (still open, not ADR-014):
+Remaining items (not ADR-014; **not R1 blockers**):
 
-- Cross-platform hotkeys / tray  
-- Advanced agent workflows (beyond live `AgentRuntimeService`)
+- Cross-platform hotkeys / tray — Phase 11 / platform backlog; dual getter vs `macos|linux/*Impl` honesty in truth matrix
+- Advanced agent workflows beyond live `AgentRuntimeService` — gated by ADR superseding 013
 
 Runtime authority is settled (P1–P4); feature wire of retired research packages stays gated.
 ---
 
 ## R1 program exit (merge-ready)
 
-| Area | Criterion |
-|------|-----------|
-| **Authority** | OperatorKernel **adopted or officially retired**; exactly one intake/execution story |
-| **Composition** | All core services registered through composition root |
-| **State** | Workspace / World Model / AppState model authoritative |
-| **UI** | Inspector, Timeline, Graph unified |
-| **Documentation** | Every active plan reflects runtime reality |
+| Area | Criterion | Status |
+|------|-----------|--------|
+| **Authority** | OperatorKernel **adopted or officially retired**; exactly one intake/execution story | ✅ ADR-006 |
+| **Composition** | All core services registered through composition root; retire rows marked | ✅ ADR-006/012/013/014 |
+| **State** | Workspace / World Model / AppState model authoritative (soft-shadow closed) | ✅; mutate deepen gated |
+| **UI** | Inspector, Timeline, Graph unified | ✅ P4 |
+| **Documentation** | Every active plan reflects runtime reality | ✅ this closeout + stop line |
+
+See `docs/audits/R1_UNGATED_STOP_LINE.md` for the next hard gate.
 
 ---
 
