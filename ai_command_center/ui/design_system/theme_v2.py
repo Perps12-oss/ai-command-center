@@ -122,12 +122,15 @@ TOAST_RADIUS = 8
 PAD = 16
 GAP = 16
 
-# Chat message spacing (C8) — shared across message_block / chat_view packs.
-MSG_SIDE_PAD = 16
-MSG_BUBBLE_PAD_X = 14
-MSG_BUBBLE_PAD_Y = 10
-MSG_META_PAD_Y = (2, 6)
-MSG_ROW_GAP = 4
+# Chat message spacing (C8) — single density scale for outer rows + bubbles.
+# Outer row (chat_view) owns gap-between-messages; bubble owns internal inset.
+MSG_SIDE_PAD = 12          # scroll edge → message row
+MSG_ROW_GAP = 6            # vertical gap between consecutive message rows
+MSG_BUBBLE_PAD_X = 12      # text inset inside bubble
+MSG_BUBBLE_PAD_Y = 8
+MSG_BUBBLE_OUTER_PAD_Y = 0 # bubble vs its row (avoid stacking with MSG_ROW_GAP)
+MSG_META_PAD_Y = (0, 2)    # timestamp / actions under the bubble
+MSG_INNER_PAD = 12         # artifacts / action strip / footer align with text
 MSG_TEXTBOX_MAX_H = 600
 MSG_TEXTBOX_LINE_PX = 20
 CARD_RADIUS = CORNER_RADIUS
