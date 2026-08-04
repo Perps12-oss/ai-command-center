@@ -2,7 +2,8 @@
 
 Architecture contract:
 - Pure renderer. Reads AppState.world_model via apply_state only.
-- Reuses KnowledgeGraphPanel / WorldGraphCanvas / NodeFiltersBar / SelectionInspectorPanel.
+- Reuses KnowledgeGraphPanel / WorldGraphCanvas / NodeFiltersBar.
+- Selection detail hosted on InspectorDock (R1 P4 single rail).
 - No mutable WorldModelState listeners. No second graph engine.
 """
 
@@ -16,6 +17,7 @@ import customtkinter as ctk
 from ai_command_center.core.app_state import AppState
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.domain.world_model_snapshot import WorldModelSnapshot
+from ai_command_center.ui.components.docks.inspector_dock import InspectorDock
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.components.world_model.graph_renderer import (
     filtered_graph,
@@ -36,6 +38,10 @@ from ai_command_center.ui.views.world_model import (
     KnowledgeGraphPanel,
     RelationshipExplorerPanel,
     SelectionInspectorPanel,
+)
+from ai_command_center.ui.views.world_model.selection_inspector_panel import (
+    inspectable_ref_for_node,
+    inspectable_ref_from_world_model,
 )
 
 
@@ -140,8 +146,11 @@ class GraphWorkspaceView(ctk.CTkFrame):
         right.grid_rowconfigure(1, weight=1)
         right.grid_columnconfigure(0, weight=1)
 
-        self._inspector = SelectionInspectorPanel(right)
-        self._inspector.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+        self._inspector_dock = InspectorDock(right)
+        self._selection_inspector = SelectionInspectorPanel(self._inspector_dock.host)
+        self._inspector_dock.register("world_node", self._selection_inspector)
+        self._inspector_dock.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+        self._inspector = self._inspector_dock
 
         self._relationships = RelationshipExplorerPanel(right, on_select=self._select)
         self._relationships.grid(row=1, column=0, sticky="nsew")
@@ -189,10 +198,22 @@ class GraphWorkspaceView(ctk.CTkFrame):
 
         selected = wm.selected_node_id
         if selected:
-            self._hint.configure(text=f"Selected: {selected} · double-click to open World Explorer")
+            self._hint.configure(
+                text=f"Selected: {selected} · double-click to open World Explorer"
+            )
         self._graph.apply_snapshot(wm, visible_nodes=visible)
-        self._inspector.apply_snapshot(wm)
+        ref = inspectable_ref_from_world_model(wm)
+        if ref is not None:
+            self.show_inspector(ref)
+        else:
+            self.clear_inspector()
         self._relationships.apply_snapshot(wm)
+
+    def show_inspector(self, ref: InspectableRef) -> None:
+        self._inspector_dock.show(ref)
+
+    def clear_inspector(self) -> None:
+        self._inspector_dock.clear()
 
     def _on_filters(self, state: NodeFilterState) -> None:
         self._filter = state
@@ -205,23 +226,18 @@ class GraphWorkspaceView(ctk.CTkFrame):
         nid = str(node_id)
         if self._on_select is not None:
             self._on_select(nid)
-        label = nid
-        node_type = ""
-        if self._last_wm is not None:
-            for node in self._last_wm.nodes:
-                if node.node_id == nid:
-                    label = node.label or nid
-                    node_type = node.node_type
-                    break
         if self._on_inspect_select is not None:
-            self._on_inspect_select(
-                InspectableRef(
+            ref: InspectableRef | None = None
+            if self._last_wm is not None:
+                ref = inspectable_ref_for_node(self._last_wm, nid)
+            if ref is None:
+                ref = InspectableRef(
                     kind="world_node",
                     ref_id=nid,
-                    label=label,
-                    payload=(("node_id", nid), ("node_type", node_type)),
+                    label=nid,
+                    payload=(("node_id", nid),),
                 )
-            )
+            self._on_inspect_select(ref)
 
     def _activate(self, node_id: str) -> None:
         """Double-click: select then navigate to owning World Explorer workspace."""

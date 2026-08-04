@@ -140,9 +140,10 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 
 ## Priority 4 — UI Composition
 
-**Blocked until P1–P3 decision gates pass** (UI must not mask runtime bypass).
+**Unblocked** after Stage 2 soft-shadow close (#134). Phase B foundations on
+`main`; residual dual-path close-out in progress.
 
-Devin/Cursor inventory: foundations on `main` — `BaseGraphCanvas`, `TimelineRenderer`, `GoalView`, `AgentsView`, `ExecutionsView`, `WorldExplorerView`, `SelectionInspectorPanel`.
+Devin/Cursor inventory: foundations on `main` — `BaseGraphCanvas`, `TimelineRenderer`, `GoalView`, `AgentsView`, `ExecutionsView`, `WorldExplorerView`, `SelectionInspectorPanel` (now hosted on `InspectorDock`).
 
 Convergence targets:
 
@@ -153,10 +154,9 @@ All graph views → shared BaseGraphCanvas + selection model
 
 ### R1.4 exit criteria
 
-- [ ] One inspector rail (no third inspector OS)  
-- [ ] One graph engine (`BaseGraphCanvas` adapters only)  
-- [ ] One timeline stack (`TimelineRenderer` + dock)  
-
+- [x] One inspector rail (no third product inspector OS) — World/Graph use `InspectorDock`; Art. 12 selection is `world_node` on that rail  
+- [x] One graph engine (`BaseGraphCanvas` adapters only)  
+- [ ] One timeline stack (`TimelineRenderer` + dock) — residual: Mission Control `ActivityTimeline`
 ---
 
 ## Priority 5 — Feature Completion
