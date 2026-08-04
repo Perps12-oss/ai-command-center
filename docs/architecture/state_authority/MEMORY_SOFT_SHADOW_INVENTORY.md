@@ -14,8 +14,8 @@ for memory** in this slice.
 
 | Path | Stack | Decision reads? | Disposition |
 |------|-------|:---------------:|-------------|
-| **A — SA lookup (canonical for intake/planner)** | `SA.query` / `project` → `memory_lookup` → `MemoryGraphService.lookup_for_state` → `MemoryRepository.search` | ✅ EA / Planner | **keep / deepen** |
-| **B — Parallel soft dual** | Assembler `MEMORY_LOOKUP_REQUEST` → MGS → `MEMORY_LOOKUP_RESULT`; tools `memory.query` / `memory.store` | ⚠️ chat/tools | Document; rewire later — **no silent kill** |
+| **A — SA lookup (canonical for intake/planner/chat assembly)** | `SA.query` / `project` → `memory_lookup` → `MemoryGraphService.lookup_for_state` → `MemoryRepository.search`; Assembler uses SA when bound (4b) | ✅ EA / Planner / Assembler | **keep / deepen** |
+| **B — Parallel soft dual** | Unbound Assembler `MEMORY_LOOKUP_REQUEST` → MGS; tools `memory.query` / `memory.store` | ⚠️ tools / unbound tests | Tools stay capability; bus lookup = fallback only |
 
 ---
 
@@ -75,8 +75,8 @@ they were one store.
 
 | Step | Action | Gate |
 |------|--------|------|
-| **4a ✅** | Publish this inventory; pin SA lookup tests | This PR |
-| 4b | Route Assembler decision snippets through SA `query` (or deprecate parallel lookup for decision class) | Follow-up slice |
+| **4a ✅** | Publish this inventory; pin SA lookup tests | #130 |
+| **4b ✅** | Route Assembler memory snippets through SA `query` | Factory binds SA; bus lookup fallback when unbound |
 | 4c | Keep tool `memory.query` as capability fulfillment; document it is not SA | Doc honesty |
 | 4d | Optional later: `SA.mutate` memory ops with receipts — only after R1 clarity | Contract R3 |
 | ❌ | Silent-merge `memory_nodes` ↔ WM entities | Forbidden |
