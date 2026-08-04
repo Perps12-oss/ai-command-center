@@ -136,7 +136,8 @@ def test_sa_mutate_store_memory_rejects_empty_body() -> None:
     sa.stop()
 
 
-def test_sa_mutate_still_rejects_goal_ops() -> None:
+def test_sa_mutate_still_rejects_workflow_style_goal_lifecycle() -> None:
+    """Lifecycle goal ops stay outside SA (ADR-016 = submit_goal only)."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_database(conn)
@@ -148,7 +149,7 @@ def test_sa_mutate_still_rejects_goal_ops() -> None:
     receipt = sa.mutate(
         StateDelta(
             workspace_id="ws-g",
-            operations=({"op": "create_goal", "title": "nope"},),
+            operations=({"op": "cancel_goal", "goal_id": "g-1"},),
         )
     )
     assert receipt.ok is False

@@ -1,10 +1,10 @@
 # Shadow Source-of-Truth Inventory
 
-**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents); Predictive/Undo ADR-014; Memory mutate ADR-015  
+**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents); Predictive/Undo ADR-014; Memory mutate ADR-015; Goals mutate ADR-016  
 **Authority:** `docs/architecture/STATE_AUTHORITY_CONTRACT.md` (item 4)  
-**Verified:** ADR-015 acceptance tip (2026-08-04)  
+**Verified:** ADR-016 acceptance tip (2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative. Transient caches are allowed; durable truth outside State Authority is not.
-**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md` — next gate = remaining non-WM SA.mutate domains (each needs ADR).
+**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md` — next gate = workflows/executions/agents SA.mutate (each needs ADR).
 
 ---
 
@@ -19,7 +19,7 @@ List every store or service that can be mistaken for authoritative workspace rea
 | Domain | Owner today | Durable? | On SA path? | Shadow? | Disposition |
 |--------|-------------|:--------:|:-----------:|:-------:|-------------|
 | World Model | `WorldModel` + SQLite repo | ✅ | ✅ primary `query` | No | Keep — ADR-005 |
-| Goals (live) | `GoalRepository` + `SingleGoalScheduler` | ✅ | ✅ `goal_lookup` read | Soft dual (was) | **Canonical live goals path** |
+| Goals (live) | `GoalRepository` + `SingleGoalScheduler` | ✅ | ✅ `goal_lookup` + **mutate `submit_goal` (ADR-016)** | Soft dual intake | **Canonical live goals path** |
 | Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Retired (ADR-012 A)** | Tree may remain for unit tests; **not** product SoT; cleanup optional |
 | Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ✅ SA lookup + Assembler 4b + **mutate `store_memory` (ADR-015)** | Soft tools | **4a–4d** — tools `memory.*` stay capability (same SoT) |
 | Executions | `ExecutionRun` / `ExecutionEvent` / `ExecutionQuery` → repos | ✅ append-only | ❌ | Soft | **6a+6b** — append-only; correlate via `correlation_id` |
@@ -43,7 +43,8 @@ UI / ExecutionAuthority
   → AppState.brain_state.recent_goals
 ```
 
-State Authority reads goals **only** via factory `_goal_lookup` → `goal_repo.list_goals()`.
+State Authority reads goals via factory `_goal_lookup` → `goal_repo.list_goals()`.
+State Authority may submit goals via `goal_submit` → `submit_goal_for_state` (ADR-016).
 
 ### Orphan path (quarantined)
 
@@ -69,6 +70,7 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 |------|--------|--------|------|
 | **3a ✅** | Goals | Inventory + quarantine GoalEngine from live composition | This doc + factory + tests |
 | **3b ✅** | Goals | **ADR-012 Accepted — Option A (retire)** Phase-9 from product path | No live re-wire without new ADR; schema cleanup optional later |
+| **3c ✅** | Goals | `SA.mutate` `submit_goal` via scheduler (no repo-direct) | **ADR-016** |
 | **4a ✅** | Memory | Soft-shadow inventory + SA lookup pins | `MEMORY_SOFT_SHADOW_INVENTORY.md` + tests |
 | **4b ✅** | Memory | Assembler decision memory via SA `query` | `CapabilityContextAssembler.bind_state_authority` |
 | **4c ✅** | Memory | Tool `memory.query` remains capability (not SA) | Doc honesty |

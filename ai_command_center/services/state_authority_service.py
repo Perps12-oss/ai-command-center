@@ -5,11 +5,11 @@ Implements the Stage 2 contract surface:
 * ``query(StateQuery) -> StateProjection`` — structured read (no side effects
   beyond publishing ``STATE_CONTEXT_BUILT`` for observability)
 * ``project(...)`` — convenience wrapper used by ExecutionAuthority today
-* ``mutate(StateDelta)`` — World Model node + edge mutations and Memory
-  ``store_memory`` (ADR-015) with ``MutationReceipt``
-  (goals/workflows/executions/agents still outside this surface)
+* ``mutate(StateDelta)`` — World Model node + edge mutations, Memory
+  ``store_memory`` (ADR-015), and Goals ``submit_goal`` (ADR-016) with
+  ``MutationReceipt`` (workflows/executions/agents still outside this surface)
 
-See ``docs/architecture/STATE_AUTHORITY_CONTRACT.md`` and ADR-015.
+See ``docs/architecture/STATE_AUTHORITY_CONTRACT.md``, ADR-015, and ADR-016.
 """
 
 from __future__ import annotations
@@ -65,12 +65,14 @@ _NODE_DELETE_OPS = frozenset({"delete_node"})
 _EDGE_WRITE_OPS = frozenset({"create_edge"})
 _EDGE_DELETE_OPS = frozenset({"delete_edge"})
 _MEMORY_WRITE_OPS = frozenset({"store_memory"})
+_GOAL_WRITE_OPS = frozenset({"submit_goal"})
 _SUPPORTED_OPS = (
     _NODE_WRITE_OPS
     | _NODE_DELETE_OPS
     | _EDGE_WRITE_OPS
     | _EDGE_DELETE_OPS
     | _MEMORY_WRITE_OPS
+    | _GOAL_WRITE_OPS
 )
 
 
@@ -150,12 +152,14 @@ class StateAuthorityService(BaseService):
         memory_lookup: Callable[..., list[dict[str, Any]]] | None = None,
         memory_store: Callable[..., tuple[bool, str, dict]] | None = None,
         goal_lookup: Callable[..., list[dict[str, Any]]] | None = None,
+        goal_submit: Callable[..., tuple[bool, str, dict]] | None = None,
     ) -> None:
         super().__init__(bus)
         self._world_model = world_model
         self._memory_lookup = memory_lookup
         self._memory_store = memory_store
         self._goal_lookup = goal_lookup
+        self._goal_submit = goal_submit
         self._unsubscribers: list[Callable[[], None]] = []
         self._active_workspace_id: str = ""
 
@@ -298,7 +302,7 @@ class StateAuthorityService(BaseService):
         )
 
     def mutate(self, delta: StateDelta) -> MutationReceipt:
-        """Apply authoritative mutations (WM nodes/edges + Memory store).
+        """Apply authoritative mutations (WM nodes/edges + Memory + Goals).
 
         Supported ``StateDelta.operations``:
 
@@ -308,8 +312,10 @@ class StateAuthorityService(BaseService):
         * ``{"op": "delete_edge", "edge_id": "..."}``
         * ``{"op": "store_memory", "body": "label | content", "entity_id": optional}``
           (ADR-015 — writes ``memory_nodes`` via MemoryGraph; never dual-writes WM)
+        * ``{"op": "submit_goal", "title": "...", ...}``
+          (ADR-016 — via SingleGoalScheduler; never GoalRepository-direct / GoalEngine)
 
-        Goals / workflows / executions / agents remain outside this surface.
+        Workflows / executions / agents remain outside this surface.
         Orchestration may still use ``RUNTIME_ACTION_REQUEST`` → BrainRuntime;
         callers that go through State Authority must not invent a parallel store.
         """
@@ -339,7 +345,41 @@ class StateAuthorityService(BaseService):
 
             mutation_id = str(raw.get("mutation_id") or f"sa-{uuid.uuid4().hex[:12]}")
             try:
-                if op in _MEMORY_WRITE_OPS:
+                if op in _GOAL_WRITE_OPS:
+                    if self._goal_submit is None:
+                        errors.append(
+                            f"op[{index}]: submit_goal unavailable "
+                            "(goal_submit not bound)"
+                        )
+                        continue
+                    title = str(raw.get("title") or "").strip()
+                    if not title:
+                        errors.append(f"op[{index}]: title required")
+                        continue
+                    ok_submit, submit_msg, meta = self._goal_submit(
+                        title,
+                        workspace_id=delta.workspace_id,
+                        description=str(raw.get("description") or "").strip(),
+                        priority=str(raw.get("priority") or "").strip(),
+                        goal_id=str(raw.get("goal_id") or "").strip(),
+                        correlation_id=correlation.correlation_id,
+                    )
+                    if not ok_submit:
+                        errors.append(f"op[{index}]: {submit_msg}")
+                        continue
+                    meta_dict = dict(meta or {})
+                    applied.append(
+                        {
+                            "op": op,
+                            "mutation_id": mutation_id,
+                            "goal_id": meta_dict.get("id"),
+                            "title": meta_dict.get("title"),
+                            "status": meta_dict.get("status"),
+                            "workspace_id": meta_dict.get("workspace_id")
+                            or delta.workspace_id,
+                        }
+                    )
+                elif op in _MEMORY_WRITE_OPS:
                     if self._memory_store is None:
                         errors.append(
                             f"op[{index}]: store_memory unavailable "

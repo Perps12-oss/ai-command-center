@@ -1,7 +1,7 @@
 # R1 Ungated Docs Closeout — Stop Line
 
 **Date:** 2026-08-04  
-**Tip baseline:** ADR-015 acceptance (Memory `SA.mutate`)
+**Tip baseline:** ADR-016 acceptance (Goals `SA.mutate`)
 
 ## Ungated queue status
 
@@ -11,11 +11,14 @@
 | R1 P1–P4 | ✅ closed |
 | R1 P5 Predictive/Undo (ADR-014) | ✅ research-only closed |
 | Living-doc honesty | ✅ closed (#145) |
-| ADR-015 Memory `SA.mutate` (`store_memory`) | ✅ this gate |
+| ADR-015 Memory `SA.mutate` (`store_memory`) | ✅ closed (#146) |
+| ADR-016 Goals `SA.mutate` (`submit_goal`) | ✅ this gate |
 
 ## NEXT GATE
 
-**SA.mutate for remaining non-WM domains (goals / workflows / executions / agents) — each requires its own ADR**
+**SA.mutate for remaining non-WM domains (workflows / executions / agents) — each requires its own ADR**
+
+(Or optional: Memory delete extending ADR-015; GoalEngine schema cleanup — not R1-blocking.)
 
 Parallel hard stops (do not start without their gates):
 
@@ -32,3 +35,4 @@ Parallel hard stops (do not start without their gates):
 - GoalEngine schema / package cleanup (ADR-012 allows; not R1-blocking)
 - Research-tree package deletes (test churn)
 - Memory delete via SA (would need ADR extending 015)
+- Goals lifecycle (pause/resume/cancel) via SA (would need ADR extending 016)
