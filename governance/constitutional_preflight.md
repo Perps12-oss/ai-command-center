@@ -1,28 +1,31 @@
-# Constitutional Pre-Flight — Chat trust & feel (C5–C8)
+# Constitutional Pre-Flight — chat Phase 3 jank + ConversationRow click
 
-**Branch:** `cursor/ui-c5-c8-chat-trust-4fb7`  
+**Branch:** `cursor/chat-phase3-row-fix-30d3`  
 **Authority:** PROJECT_CONSTITUTION_V4.md
 
 ## Intent
 
-1. **C5/C6** — New Chat creates a persisted conversation (no destructive
-   `clear_messages` on the active id); conversation rail reads from
-   `ConversationRepository` via EventBus → AppState (not UI-only SessionStore).
-2. **C7+C3** — Fix assistant height cutoff (displaylines + scrollbar when capped);
-   remove dead `AssistantBubble`/`UserBubble` path (docking/v2 blocks only).
-3. **C8** — Shared `MSG_*` spacing constants for chat message packing.
+1. Fix `_ConversationRow` click binding (`TypeError: lambda() missing '_'`) so
+   conversation rail selection works under Tk/CustomTkinter on Python 3.14.
+2. Stop chat Phase 3 from re-projecting inspector/timeline/chrome on every
+   AppState tick — fingerprint-gate cosmetic chat updates (user logs:
+   `Phase 3 (chat view) took 9994ms` then sustained ~1–1.5s).
 
 ## Invariants checked
 
 | Invariant | Status |
 |---|---|
-| UI → AppState → EventBus → Services → Repositories → Storage | Preserved; New Chat / select via EventBus |
-| UI isolation | Preserved; ConversationList remains display-only |
-| Host supremacy | N/A |
-| Contracts | New topics `chat.conversations_loaded`, `ui.chat.select_conversation` |
+| UI → AppState → EventBus → Services → Repositories → Storage | Preserved |
+| UI isolation | Preserved — display/projection only |
+| No new EventBus topics | N/A |
 
 ## Behaviour preservation
 
-- Entity-scoped chats (`entity:…`) unchanged for open-chat
-- Free-floating New Chat leaves prior conversation messages intact
-- StreamTextBuffer / EmptyState / SystemStrip retained
+- Chat still projects history/conversations on revision change
+- Inspector still updates when execution context / timeline revision changes
+- Click-to-select still calls the same `on_select(session_id)` callback
+
+## Out of scope
+
+- Broader AppState notify reduction
+- Markdown/message-block virtualization

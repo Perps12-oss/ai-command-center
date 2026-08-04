@@ -107,10 +107,14 @@ class _ConversationRow(ctk.CTkFrame):
             text_color=T.TEXT_MUTED,
         ).pack(side="right")
 
-        # click to select
-        self.bind("<Button-1>", lambda _: on_select(self._sid))
+        # click to select — *args so Tk/CTk may call with or without an Event
+        # (Python 3.14 / CustomTkinter sometimes invokes bind callbacks with 0 args).
+        def _on_click(*_args: Any, sid: str = self._sid) -> None:
+            on_select(sid)
+
+        self.bind("<Button-1>", _on_click)
         for child in self.winfo_children():
-            _bind_recursive(child, "<Button-1>", lambda _, s=self._sid: on_select(s))
+            _bind_recursive(child, "<Button-1>", _on_click)
 
         self.bind("<Enter>", self._on_hover_enter)
         self.bind("<Leave>", self._on_hover_leave)
@@ -207,6 +211,7 @@ class ConversationList(ctk.CTkFrame):
         self._active_sid: str = ""
         self._rows: dict[str, _ConversationRow] = {}
         self._items: dict[str, ConversationMetadata] = {}
+        self._list_fingerprint: tuple = ()
 
         self._build()
 
@@ -276,7 +281,12 @@ class ConversationList(ctk.CTkFrame):
 
     def set_conversations(self, items: list[ConversationMetadata]) -> None:
         """Replace the rail contents from AppState / repository projection (C6)."""
-        self._items = {m.session_id: m for m in items if m.session_id}
+        new_items = {m.session_id: m for m in items if m.session_id}
+        fingerprint = self._items_fingerprint(new_items)
+        if fingerprint == self._list_fingerprint and new_items.keys() == self._items.keys():
+            self._items = new_items
+            return
+        self._items = new_items
         self._rebuild_list()
 
     def set_active(self, session_id: str) -> None:
@@ -311,6 +321,24 @@ class ConversationList(ctk.CTkFrame):
         if self._on_search:
             self._on_search(query)
         self._rebuild_list(query=query)
+
+    @staticmethod
+    def _items_fingerprint(items: dict[str, ConversationMetadata]) -> tuple:
+        return tuple(
+            sorted(
+                (
+                    m.session_id,
+                    m.title,
+                    bool(m.pinned),
+                    bool(m.archived),
+                    float(m.last_activity or 0.0),
+                    int(m.message_count or 0),
+                    str(m.provider_badge or ""),
+                    int(m.unread or 0),
+                )
+                for m in items.values()
+            )
+        )
 
     def _rebuild_list(self, *, query: str = "") -> None:
         """Destroy and recreate all row widgets from current _items state."""
@@ -364,3 +392,8 @@ class ConversationList(ctk.CTkFrame):
             )
             row.pack(fill="x", pady=1)
             self._rows[meta.session_id] = row
+
+        # Only cache the unfiltered rail; search rebuilds must not suppress later
+        # full projections that match the underlying item set.
+        if not q:
+            self._list_fingerprint = self._items_fingerprint(self._items)

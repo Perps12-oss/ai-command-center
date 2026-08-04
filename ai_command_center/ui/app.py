@@ -113,7 +113,8 @@ class CommandPaletteApp(
             "settings_single_snapshot=1 keyring_cache=1 bus_reentrant_navigate_drop=1 "
             "uiqueue_time_budget=1 apply_state_phased=1 stream_chunk_throttle=1 "
             "frame_governor_30fps=1 catalog_defer_nonvisible=1 "
-            "tk_report_callback_exception=1 systemview_uiqueue=1",
+            "tk_report_callback_exception=1 systemview_uiqueue=1 "
+            "chat_chrome_fingerprint=1 conversation_row_star_args=1",
             ACC_UI_FREEZE_FIX,
         )
 
