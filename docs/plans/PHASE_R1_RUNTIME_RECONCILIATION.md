@@ -88,8 +88,8 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 | OperatorKernel | ❌ | wire **or** retire |
 | PlanningEngine | ❌ | **RETIRED from live (ADR-013)** |
 | AgentCoordinator | ❌ | **RETIRED from live (ADR-013)** |
-| PredictiveEngine | ❌ | P5 unless P1 mandates |
-| UndoReplay | ❌ | P5 unless P1 mandates |
+| PredictiveEngine | ❌ | **RETIRED from live (ADR-014)** |
+| UndoReplay | ❌ | **RETIRED from live (ADR-014)** |
 
 **Rule:** No subsystem may exist only outside the composition root after R1.2.
 
@@ -97,9 +97,9 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 
 - [x] Registry complete for all authority + orchestration components *(truth matrix 2026-07-29)*  
 - [x] Every “keep” row is factory-registered  
-- [x] Every “retire” row removed or marked deprecated with migration note — OperatorKernel (ADR-006); GoalEngine (ADR-012 A); PlanningEngine / AgentCoordinator (ADR-013). Predictive/Undo remain **P5** (not R1.2 retire-or-wire for Stage 2).
+- [x] Every “retire” row removed or marked deprecated with migration note — OperatorKernel (ADR-006); GoalEngine (ADR-012 A); PlanningEngine / AgentCoordinator (ADR-013); PredictiveEngine / UndoReplay (ADR-014).
 
-**P2 status:** **CLOSED** for Stage 2 authority rows (ADR-006/012/013). PredictiveEngine / UndoReplay stay P5.
+**P2 status:** **CLOSED** for Stage 2 + P5 research rows (ADR-006/012/013/014).
 
 ---
 
@@ -161,15 +161,15 @@ All graph views → shared BaseGraphCanvas + selection model
 
 ## Priority 5 — Feature Completion
 
-Only after runtime authority is settled:
+**PredictiveEngine / UndoReplay:** inventory closed — **ADR-014 Accepted (research-only)**.
+Do not factory-wire without a new ADR (would dual TimelineService / SnapshotService / SA).
 
-- PredictiveEngine  
-- UndoReplay  
+Remaining P5-ish platform items (still open, not ADR-014):
+
 - Cross-platform hotkeys / tray  
-- Advanced agent workflows  
+- Advanced agent workflows (beyond live `AgentRuntimeService`)
 
-Otherwise features complete off the wrong execution path.
-
+Runtime authority is settled (P1–P4); feature wire of retired research packages stays gated.
 ---
 
 ## R1 program exit (merge-ready)

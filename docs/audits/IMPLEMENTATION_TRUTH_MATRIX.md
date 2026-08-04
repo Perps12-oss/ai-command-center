@@ -1,7 +1,7 @@
 # Implementation Truth Matrix
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
-**Baseline:** `origin/main` @ `eca4a15`+ (R1 P4 timeline disposition — 2026-08-04)  
+**Baseline:** `origin/main` @ `7d1065b`+ (R1 P5 Predictive/Undo ADR-014 — 2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
 **Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
@@ -18,8 +18,8 @@
 | PlanningEngine | ✅ | ❌ | ⚠️ tests | ❌ | **RETIRED** | ADR-013 Accepted; research/tests only; live = `PlannerService` |
 | ExternalCapabilityBridge | ✅ | ✅ | ✅ | ✅ | **WIRED** | `ExternalCapabilityBridgeService(bus)` in factory |
 | BrainRuntime + WorldModel core | ✅ | ✅ | ✅ | ✅ | **WIRED** | `BrainRuntimeService(bus, world_model)` in factory |
-| Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
-| Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
+| Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **RETIRED** | ADR-014 Accepted; research only; live blockers = Brain heuristics / SA-WM |
+| Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **RETIRED** | ADR-014 Accepted; research only; live = TimelineService / SnapshotService / WM recover |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
 | StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM node/edge mutate; goals SoT = scheduler | **PARTIAL** | Stage 2 soft-shadow closed (3a–6b + agents); WM mutate only; see `SHADOW_SOT_INVENTORY.md` |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
@@ -55,8 +55,8 @@ Registered = constructed in factory and started with other services.
 | OperatorKernel | ✅ | ❌ | — | **retire from live path** (ADR-006; research/tests only) |
 | PlanningEngine | ✅ | ❌ | — | **RETIRED from live (ADR-013)** — research/tests only |
 | AgentCoordinator | ✅ | ❌ | — | **RETIRED from live (ADR-013)** — live path = `AgentRuntimeService` |
-| PredictiveEngine | ✅ | ❌ | — | **P5** |
-| UndoReplay | ✅ | ❌ | — | **P5** |
+| PredictiveEngine | ✅ | ❌ | — | **RETIRED from live (ADR-014)** — research/tests only |
+| UndoReplay | ✅ | ❌ | — | **RETIRED from live (ADR-014)** — live = TimelineService / SnapshotService |
 
 See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 
@@ -65,10 +65,10 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 | Priority | Gate | Status |
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
-| P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **PASSED** for GoalEngine/PlanningEngine/AgentCoordinator/OperatorKernel (ADR-006/012/013); Predictive/Undo remain P5 |
+| P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **PASSED** (ADR-006/012/013/014 — Predictive/Undo retired from live) |
 | P3 Event & state unification | State Authority Contract | **SOFT-SHADOW CLOSED** — 3a–6b + agents inventories; deepen SA mutate only with new ADR |
-| P4 UI composition | Inspector/Graph/Timeline unify | **PASSED** — inspector rail (#138); graph unified; execution timeline stack = `TimelineRenderer`+dock; `ActivityTimeline` = secondary feed (`R1_P4_TIMELINE_DISPOSITION.md`) |
-| P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
+| P4 UI composition | Inspector/Graph/Timeline unify | **PASSED** — inspector rail (#138); graph unified; execution timeline disposition (#141) |
+| P5 Feature completion | Predictive/Undo/platform | **INVENTORY CLOSED (ADR-014)** — packages research-only; live wire gated on new ADR; platform hotkey/tray still open |
 
 ---
 

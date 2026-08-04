@@ -154,7 +154,7 @@ Pattern registry, plugin marketplace, advanced runtime, new UI ideas, performanc
 ## Immediate roadmap
 
 1. **Stage 1 — Stabilization:** Phase B rem + truth matrix **done on `main` (#105)**. Remaining: R1 P2 wire-or-retire; EventBus only after approval. **No Goose integration.**
-2. **Stage 2 — State Authority:** **soft-shadow closed** (Goals A; Memory 4a–4c; Workflows 5a+5b execution-scoped; Executions 6a+6b; Agents ADR-013). **R1 P4 closed** (inspector rail + graph + execution timeline disposition). Gated: SA mutate non-WM (ADR); Goose = Stage 3; Async EventBus = Phase 5 + approval.
+2. **Stage 2 — State Authority:** **soft-shadow closed**; **R1 P4 closed**; **R1 P5 Predictive/Undo disposition closed (ADR-014 research-only)**. Gated: SA mutate non-WM (ADR); Goose = Stage 3; Async EventBus = Phase 5 + approval; live-wire Predictive/Undo only with ADR superseding 014.
 3. **Stage 3 — Goose Review:** only after the canonical roadmap reaches a stable checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"*
 
 ---

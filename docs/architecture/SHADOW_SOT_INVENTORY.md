@@ -24,6 +24,7 @@ List every store or service that can be mistaken for authoritative workspace rea
 | Executions | `ExecutionRun` / `ExecutionEvent` / `ExecutionQuery` → repos | ✅ append-only | ❌ | Soft | **6a+6b** — append-only; correlate via `correlation_id` |
 | Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **5a+5b** — keep execution-scoped outside SA |
 | Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; `AgentCoordinator` RETIRED-from-live (ADR-013) |
+| Predictive / Undo packages | `PredictiveEngine` / `undo_replay.Timeline` | ❌ | ❌ | Research | **RETIRED from live (ADR-014)** — live = TimelineService / SnapshotService / WM recover |
 | AppState / UI | reducers / views | ❌ | Projection | No | Never authoritative |
 
 ---
