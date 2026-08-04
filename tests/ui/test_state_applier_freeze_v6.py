@@ -38,6 +38,7 @@ class _Harness(StateApplierMixin):
         self._last_started_request_id = "req-1"
         self._last_stream_fingerprint = None
         self._last_snapshot_for_apply = None
+        self._apply_pipeline_started = None
         self._catalog_refresh_deferred = False
         self._last_catalog_fingerprint = None
         self._completed_request_ids = []
@@ -206,6 +207,36 @@ def test_stream_throttle_batches_appends() -> None:
     assert h._chat.append_chunk.call_args[0][0] == "abcdefgh"
 
 
+def test_terminal_flush_drains_throttled_tail_before_finish() -> None:
+    """Below-threshold buffered chunks must still reach the widget on complete."""
+    h = _Harness()
+    snap = _stream_snap(buffer="ab")
+    h._last_stream_fingerprint = h._stream_fingerprint(snap)
+    h._controller.snapshot.return_value = snap
+
+    assert h._try_apply_stream_only(snap) is True
+    snap.chat_stream_buffer = "abcd"
+    assert h._try_apply_stream_only(snap) is True
+    # 2 chunks < threshold 3 → still buffered, no widget append yet
+    assert h._chat.append_chunk.call_count == 0
+    assert h._stream_chunk_buffer == "abcd"
+
+    done = _stream_snap(buffer="abcd", streaming=False)
+    done.chat_status = "complete"
+    done.last_chat_request_id = "req-1"
+    done.last_assistant_message = "abcd"
+    done.active_chat_request_id = None
+    h._controller.snapshot.return_value = done
+    h._last_apply_state_time = 0.0
+    h._queue_state_refresh()
+
+    flushed = "".join(c.args[0] for c in h._chat.append_chunk.call_args_list)
+    assert flushed == "abcd"
+    h._chat.finish_assistant.assert_called_once_with("abcd")
+    assert h._stream_chunk_buffer == ""
+    assert h._stream_chunks_since_update == 0
+
+
 def test_frame_governor_defers_rapid_refresh() -> None:
     h = _Harness()
     h._last_apply_state_time = __import__("time").monotonic()
@@ -222,6 +253,27 @@ def test_catalog_deferred_while_on_chat() -> None:
     h._apply_catalog_views(snap)
     assert h._catalog_refresh_deferred is True
     assert "chat" not in _CATALOG_VIEWS
+
+
+def test_catalog_deferred_when_idle_off_catalog() -> None:
+    """G4: deferral is off-catalog policy, not stream-storm-only."""
+    h = _Harness()
+    h._current_view = "command_center"
+    snap = _stream_snap(streaming=False)
+    snap.chat_status = "idle"
+    h._apply_catalog_views(snap)
+    assert h._catalog_refresh_deferred is True
+
+
+def test_apply_state_shim_delegates_to_queue_refresh() -> None:
+    """G3: direct _apply_state() must use the same coalesce path."""
+    h = _Harness()
+    snap = _stream_snap(buffer="hello")
+    h._last_stream_fingerprint = h._stream_fingerprint(snap)
+    h._controller.snapshot.return_value = snap
+    h._apply_state()
+    assert h._top.update_top_bar.call_count == 0
+    assert h._state_refresh_enqueued is False
 
 
 def test_phased_apply_stream_only_skips_phase_2() -> None:
