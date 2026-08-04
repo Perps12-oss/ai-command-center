@@ -1,16 +1,20 @@
 """Shared sync-bus context assembly for chat and external capability invoke.
 
-Sync cascade contract: ``assemble_for_command`` publishes ``MEMORY_LOOKUP_REQUEST``,
-``SESSION_HISTORY_REQUEST``, optional ``MODEL_RESOLVE_REQUEST``,
-``WORKSPACE_CONTEXT_REQUEST``, and ``ENTITY_CONTEXT_REQUEST`` synchronously. Handlers for those topics must populate
+Sync cascade contract: ``assemble_for_command`` publishes ``SESSION_HISTORY_REQUEST``,
+optional ``MODEL_RESOLVE_REQUEST``, ``WORKSPACE_CONTEXT_REQUEST``, and
+``ENTITY_CONTEXT_REQUEST`` synchronously. Handlers for those topics must populate
 results before ``publish`` returns so assembly can read notes, history, model,
-and entity scope inline. Do not defer those lookups without changing this contract.
+and entity scope inline.
+
+Memory for chat/capability assembly prefers State Authority ``query`` when a
+``state_authority`` is bound (Stage 2 Memory 4b). Otherwise it falls back to
+publishing ``MEMORY_LOOKUP_REQUEST`` (tests / unbound assembler).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 from ai_command_center.core.clipboard_intent import wants_clipboard
 from ai_command_center.core.context_manager import ContextBundle, ContextManager
@@ -29,6 +33,13 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CONTEXT_REQUEST,
     WORKSPACE_CONTEXT_RESULT,
 )
+from ai_command_center.domain.state_authority import StateQuery
+from ai_command_center.domain.state_context import StateContext
+
+
+class _StateAuthorityMemory(Protocol):
+    def query(self, query: StateQuery) -> StateContext:
+        """Read authoritative projection including optional memories."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +63,19 @@ def context_bundle_to_dict(bundle: ContextBundle) -> dict[str, object]:
     }
 
 
+def _memory_snippets_from_projection(projection: StateContext) -> list[str]:
+    snippets: list[str] = []
+    for raw in projection.memories[:3]:
+        if not isinstance(raw, dict):
+            continue
+        label = str(raw.get("label") or raw.get("id") or "memory").strip() or "memory"
+        content = str(raw.get("content") or "").strip()
+        if not content:
+            continue
+        snippets.append(f"[memory:{label}]\n{content}")
+    return snippets
+
+
 class CapabilityContextAssembler:
     """Builds ContextBundle via synchronous EventBus cascade (Invariant 6)."""
 
@@ -63,12 +87,18 @@ class CapabilityContextAssembler:
         obsidian: Any | None = None,
         default_model: str = "llama3.2:3b",
         default_provider: str = "ollama",
+        state_authority: _StateAuthorityMemory | None = None,
     ) -> None:
         self._bus = bus
         self._context_manager = context_manager
         self._obsidian = obsidian
         self._default_model = default_model
         self._default_provider = default_provider
+        self._state_authority = state_authority
+
+    def bind_state_authority(self, state_authority: _StateAuthorityMemory | None) -> None:
+        """Wire State Authority after composition-root construction (Memory 4b)."""
+        self._state_authority = state_authority
 
     @staticmethod
     def session_scope_from_payload(event_payload: dict, args: dict) -> dict[str, str]:
@@ -140,6 +170,7 @@ class CapabilityContextAssembler:
         clipboard: str | None = None,
     ) -> AssembledContext:
         pending: dict[str, object] = {}
+        sa_memory_snippets: list[str] = []
 
         def _on_memory_result(event) -> None:
             rid = str(event.payload.get("request_id", ""))
@@ -169,13 +200,15 @@ class CapabilityContextAssembler:
             if rid == request_id:
                 pending["workspace_snippets"] = list(event.payload.get("snippets", []))
 
+        use_sa_memory = self._state_authority is not None and bool(query.strip())
         unsubs = [
-            self._bus.subscribe(MEMORY_LOOKUP_RESULT, _on_memory_result),
             self._bus.subscribe(SESSION_HISTORY_RESULT, _on_session_result),
             self._bus.subscribe(MODEL_RESOLVE_RESULT, _on_model_result),
             self._bus.subscribe(ENTITY_CONTEXT_RESULT, _on_entity_result),
             self._bus.subscribe(WORKSPACE_CONTEXT_RESULT, _on_workspace_result),
         ]
+        if not use_sa_memory:
+            unsubs.append(self._bus.subscribe(MEMORY_LOOKUP_RESULT, _on_memory_result))
         try:
             clip_intent = wants_clipboard(query)
             notes_raw = args.get("notes")
@@ -210,11 +243,22 @@ class CapabilityContextAssembler:
                 if "workspace_id" not in session_scope:
                     session_scope = {**session_scope, "workspace_id": workspace_id}
 
-            self._bus.publish(
-                MEMORY_LOOKUP_REQUEST,
-                {"request_id": request_id, **memory_scope},
-                source=source,
-            )
+            if use_sa_memory:
+                assert self._state_authority is not None
+                projection = self._state_authority.query(
+                    StateQuery(
+                        text=query,
+                        workspace_id=workspace_id,
+                        include_memories=True,
+                    )
+                )
+                sa_memory_snippets = _memory_snippets_from_projection(projection)
+            else:
+                self._bus.publish(
+                    MEMORY_LOOKUP_REQUEST,
+                    {"request_id": request_id, **memory_scope},
+                    source=source,
+                )
             self._bus.publish(
                 SESSION_HISTORY_REQUEST,
                 {"request_id": request_id, **session_scope},
@@ -245,9 +289,12 @@ class CapabilityContextAssembler:
                     source=source,
                 )
 
-            graph_snippets = [
-                str(n) for n in pending.get("graph_snippets", []) if str(n).strip()
-            ]
+            if sa_memory_snippets:
+                graph_snippets = list(sa_memory_snippets)
+            else:
+                graph_snippets = [
+                    str(n) for n in pending.get("graph_snippets", []) if str(n).strip()
+                ]
             workspace_snippets = [
                 str(n) for n in pending.get("workspace_snippets", []) if str(n).strip()
             ]

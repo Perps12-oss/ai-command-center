@@ -20,7 +20,7 @@ List every store or service that can be mistaken for authoritative workspace rea
 | World Model | `WorldModel` + SQLite repo | ✅ | ✅ primary `query` | No | Keep — ADR-005 |
 | Goals (live) | `GoalRepository` + `SingleGoalScheduler` | ✅ | ✅ `goal_lookup` read | Soft dual (was) | **Canonical live goals path** |
 | Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Retired (ADR-012 A)** | Tree may remain for unit tests; **not** product SoT; cleanup optional |
-| Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ⚠️ `memory_lookup` + soft dual | Soft | **Step 4 inventory** — see `MEMORY_SOFT_SHADOW_INVENTORY.md`; no silent merge |
+| Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ✅ SA lookup + Assembler 4b | Soft tools | **4a+4b** — see `MEMORY_SOFT_SHADOW_INVENTORY.md`; tools dual remains |
 | Executions | `ExecutionRunRepository` (+ query service) | ✅ append-only | ❌ | Soft | Diagnostic → AppState; SA mutate later |
 | Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **Step 5a inventory** — see `WORKFLOWS_SOFT_SHADOW_INVENTORY.md`; no silent merge |
 | Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; not durable SoT |
@@ -68,7 +68,8 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | **3a ✅** | Goals | Inventory + quarantine GoalEngine from live composition | This doc + factory + tests |
 | **3b ✅** | Goals | **ADR-012 Accepted — Option A (retire)** Phase-9 from product path | No live re-wire without new ADR; schema cleanup optional later |
 | **4a ✅** | Memory | Soft-shadow inventory + SA lookup pins | `MEMORY_SOFT_SHADOW_INVENTORY.md` + tests |
-| 4b | Memory | Route Assembler decision reads through SA (tools remain capability) | Follow-up; no silent merge |
+| **4b ✅** | Memory | Assembler decision memory via SA `query` | `CapabilityContextAssembler.bind_state_authority` |
+| 4c | Memory | Tool `memory.query` remains capability (not SA) | Doc honesty |
 | **5a ✅** | Workflows | Soft-shadow inventory + factory/SA pins | `WORKFLOWS_SOFT_SHADOW_INVENTORY.md` + tests |
 | 5b | Workflows | Decide: SA project hooks **or** keep execution-scoped | Human / follow-up |
 | 6 | Executions | Keep append-only; correlate via receipts when `mutate()` unifies | Contract item 6 |
