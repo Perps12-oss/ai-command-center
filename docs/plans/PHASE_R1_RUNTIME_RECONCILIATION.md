@@ -106,8 +106,9 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 
 ## Priority 3 — Event & State Unification
 
-**Soft-shadow CLOSED** on `main` (3a–6b + agents). Deepen SA.mutate for non-WM
-domains only with a **new ADR** — see `docs/audits/R1_UNGATED_STOP_LINE.md`.
+**Soft-shadow CLOSED** on `main` (3a–6b + agents). Memory `SA.mutate(store_memory)`
+live via **ADR-015**. Remaining non-WM mutate domains still ADR-gated —
+see `docs/audits/R1_UNGATED_STOP_LINE.md`.
 
 Subsystems: Goals, Agents, Executions, World Model, Timeline, Approvals.
 
@@ -129,15 +130,15 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 ### R1.3 exit criteria
 
 - [x] State ownership table published *(contract § Backing systems — 2026-07-30)*  
-- [x] No UI or service maintains *undocumented* shadow SoT for listed domains *(Stage 2 inventories closed: Goals ADR-012 A; Memory 4a–4c; Workflows 5a+5b; Executions 6a+6b; Agents ADR-013 — soft duals documented, not silent-merged)*  
+- [x] No UI or service maintains *undocumented* shadow SoT for listed domains *(Stage 2 inventories closed: Goals ADR-012 A; Memory 4a–4d + ADR-015; Workflows 5a+5b; Executions 6a+6b; Agents ADR-013 — soft duals documented, not silent-merged)*  
 - [x] Event topics documented for cross-subsystem flows *(contract § Event topics — SA surface; mutate node+edge)*
 - [x] Goals dual-path inventory + disposition *(ADR-012 Accepted Option A)*
-- [x] Memory soft-shadow inventory *(4a–4c)*
+- [x] Memory soft-shadow inventory *(4a–4d; SA.mutate store_memory via ADR-015)*
 - [x] Workflows soft-shadow inventory *(5a+5b keep execution-scoped)*
 - [x] Executions soft-shadow inventory *(6a+6b correlation)*
 - [x] Agents soft-shadow + PlanningEngine/AgentCoordinator disposition *(ADR-013)*
 
-**P3 Stage 2 soft-shadow status:** **CLOSED** (ungated). Remaining: optional SA mutate for non-WM domains (gated by ADR); Goose = Stage 3.
+**P3 Stage 2 soft-shadow status:** **CLOSED** (ungated). Memory mutate live (ADR-015). Remaining: goals/workflows/executions/agents SA mutate (each ADR-gated); Goose = Stage 3.
 ---
 
 ## Priority 4 — UI Composition

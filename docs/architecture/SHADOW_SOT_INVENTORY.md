@@ -1,10 +1,10 @@
 # Shadow Source-of-Truth Inventory
 
-**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents); Predictive/Undo ADR-014  
+**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents); Predictive/Undo ADR-014; Memory mutate ADR-015  
 **Authority:** `docs/architecture/STATE_AUTHORITY_CONTRACT.md` (item 4)  
-**Verified:** `main` @ `426c6b7` (2026-08-04)  
+**Verified:** ADR-015 acceptance tip (2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative. Transient caches are allowed; durable truth outside State Authority is not.
-**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md` — next gate = SA.mutate non-WM (new ADR).
+**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md` — next gate = remaining non-WM SA.mutate domains (each needs ADR).
 
 ---
 
@@ -21,7 +21,7 @@ List every store or service that can be mistaken for authoritative workspace rea
 | World Model | `WorldModel` + SQLite repo | ✅ | ✅ primary `query` | No | Keep — ADR-005 |
 | Goals (live) | `GoalRepository` + `SingleGoalScheduler` | ✅ | ✅ `goal_lookup` read | Soft dual (was) | **Canonical live goals path** |
 | Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Retired (ADR-012 A)** | Tree may remain for unit tests; **not** product SoT; cleanup optional |
-| Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ✅ SA lookup + Assembler 4b | Soft tools | **4a–4c** — tools `memory.query` stay capability (not SA) |
+| Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ✅ SA lookup + Assembler 4b + **mutate `store_memory` (ADR-015)** | Soft tools | **4a–4d** — tools `memory.*` stay capability (same SoT) |
 | Executions | `ExecutionRun` / `ExecutionEvent` / `ExecutionQuery` → repos | ✅ append-only | ❌ | Soft | **6a+6b** — append-only; correlate via `correlation_id` |
 | Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **5a+5b** — keep execution-scoped outside SA |
 | Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; `AgentCoordinator` RETIRED-from-live (ADR-013) |
@@ -72,6 +72,7 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | **4a ✅** | Memory | Soft-shadow inventory + SA lookup pins | `MEMORY_SOFT_SHADOW_INVENTORY.md` + tests |
 | **4b ✅** | Memory | Assembler decision memory via SA `query` | `CapabilityContextAssembler.bind_state_authority` |
 | **4c ✅** | Memory | Tool `memory.query` remains capability (not SA) | Doc honesty |
+| **4d ✅** | Memory | `SA.mutate` `store_memory` (no WM dual-write) | **ADR-015** |
 | **5a ✅** | Workflows | Soft-shadow inventory + factory/SA pins | `WORKFLOWS_SOFT_SHADOW_INVENTORY.md` + tests |
 | **5b ✅** | Workflows | **Keep execution-scoped** — no SA workflow hooks | Closeout |
 | **6a ✅** | Executions | Soft-shadow inventory; keep append-only | `EXECUTIONS_SOFT_SHADOW_INVENTORY.md` + tests |

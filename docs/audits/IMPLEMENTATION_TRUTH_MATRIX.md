@@ -66,7 +66,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **PASSED** (ADR-006/012/013/014 — Predictive/Undo retired from live) |
-| P3 Event & state unification | State Authority Contract | **SOFT-SHADOW CLOSED** — 3a–6b + agents inventories; deepen SA mutate only with new ADR |
+| P3 Event & state unification | State Authority Contract | **SOFT-SHADOW CLOSED** — 3a–6b + agents; Memory `SA.mutate` via **ADR-015**; other non-WM mutate still ADR-gated |
 | P4 UI composition | Inspector/Graph/Timeline unify | **PASSED** — inspector rail (#138); graph unified; execution timeline disposition (#141) |
 | P5 Feature completion | Predictive/Undo/platform | **Predictive/Undo CLOSED (ADR-014)**; platform hotkey/tray = Phase 11 backlog (not R1 blocker) |
 
@@ -112,7 +112,7 @@ OperatorKernel remains **exists-but-not-wired** (ADR-006 research-only). Matrix 
 |-------|----------|
 | UI surfaces / primitives | Ahead — Phase B E00–E13 WIRED at UI layer; R1 P4 inspector/timeline disposition closed |
 | Runtime authority services | Live EA/Planner/Scheduler WIRED; OperatorKernel / Coordinator / PlanningEngine / Predictive / Undo **RETIRED from live** (ADR-006/012/013/014) |
-| State Authority | Soft-shadow Stage 2 **closed**; WM mutate WIRED; non-WM mutate **ADR-gated** |
+| State Authority | Soft-shadow Stage 2 **closed**; WM mutate WIRED; Memory `store_memory` WIRED (**ADR-015**); other non-WM mutate **ADR-gated** |
 | Documentation / plan COMPLETE claims | Must follow code on `main` — this matrix is the Exists/Wired probe; see `R1_UNGATED_STOP_LINE.md` |
 
 ---

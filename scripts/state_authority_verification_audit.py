@@ -135,7 +135,10 @@ def _wire(bus: EventBus) -> WorldModel:
     wm = WorldModel(SQLiteWorldModelRepository(_conn()))
     BrainRuntimeService(bus, wm).start()
     StateAuthority = StateAuthorityService(
-        bus, wm, memory_lookup=memory.lookup_for_state
+        bus,
+        wm,
+        memory_lookup=memory.lookup_for_state,
+        memory_store=memory.store_memory,
     )
     StateAuthority.start()
     SingleGoalScheduler(bus, GoalRepository(_conn())).start()
