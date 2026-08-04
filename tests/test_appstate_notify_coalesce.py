@@ -45,18 +45,17 @@ def test_chat_chunk_notifies_are_coalesced(monkeypatch) -> None:
                 {"request_id": "r1", "text": "x", "index": i},
                 source="test",
             )
-        # Before flush window elapses, at most zero stream notifies delivered
-        # (chat.started may have notified once immediately).
+        # Before flush window elapses, stream notifies are pending (not delivered).
+        # chat.started may have notified once immediately.
         immediate = seen["n"]
-        time.sleep(0.05)
+        time.sleep(0.08)  # > coalesce window (30 ms)
         after = seen["n"]
         snap = get_perf_metrics().snapshot()
         assert snap["counters"].get("appstate.notify.coalesced", 0) >= 50
-        assert snap["counters"].get("appstate.notify.flush", 0) >= 1
-        assert after >= immediate
-        # 50 chunks must not produce 50 listener notifies.
-        assert after - immediate <= 3
-        assert snap["counters"].get(f"appstate.notify.topic.{CHAT_CHUNK}", 0) <= 3
+        # Contract (PERF_001 report): one flush / one chunk-topic notify for the storm.
+        assert snap["counters"].get("appstate.notify.flush", 0) == 1
+        assert after - immediate == 1
+        assert snap["counters"].get(f"appstate.notify.topic.{CHAT_CHUNK}", 0) == 1
     finally:
         store.close()
 

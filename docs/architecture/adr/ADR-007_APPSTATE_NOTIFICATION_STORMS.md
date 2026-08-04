@@ -46,7 +46,9 @@ Residual risk:
 - Dual projection (AppState listener + EventCoordinator) can amplify refresh
 - Headless baseline shows high-frequency reduce sources (`chat.chunk`, `service.*`, `system.snapshot`) but **UI notify rate is not yet a first-class metric** (0 listeners without Tk shell)
 
-This ADR locks the **first investigation target**. It does **not** authorize a code fix.
+This ADR locked the first investigation target and (updated 2026-08-04)
+records the Phase 3 coalesce fix. Further PERF-001 work still requires
+soak evidence before Art XV **Closed**.
 
 ---
 
@@ -54,10 +56,10 @@ This ADR locks the **first investigation target**. It does **not** authorize a c
 
 1. The first Program 1 investigation is **AppState notification storms** (PERF-001).
 2. Investigation order remains: AppState storms → Inspector rebuilds → Navigation → SQLite contention → SYNC_CRITICAL *work* reduction.
-3. Work stays analysis / documentation until an Investigation Report is approved.
-4. Do **not** change `SYNC_CRITICAL` topic membership in this investigation.
+3. Phase 3 coalesce fix landed 2026-08-04 (`chat.chunk` only; see Phase 3 section).
+4. Do **not** change `SYNC_CRITICAL` topic membership in PERF-001 follow-ups without a new investigation.
 5. Do **not** enable `EVENTBUS_DISPATCH_QUEUE` / `EVENTBUS_ASYNC_ADAPTERS` by default.
-6. Future fix PRs fix **exactly one** bottleneck and include before/after measurements.
+6. Future fix PRs fix **exactly one** bottleneck and include before/after measurements (GUI soak remains operator-owned for Closed).
 
 ---
 
@@ -142,8 +144,9 @@ headless tests green. Win ARM64 soak remains operator closeout.
 
 Rollback
 --------
-This docs-only ADR: revert the markdown commit.
-Future code fix: revert that single-purpose PR; feature flags preferred if risk high.
+``APPSTATE_NOTIFY_COALESCE_MS=0`` disables coalesce, or revert the Phase 3
+coalesce commit. This ADR file documents investigation + accepted fix; it is
+not docs-only anymore.
 ```
 
 ---
@@ -169,12 +172,14 @@ Future code fix: revert that single-purpose PR; feature flags preferred if risk 
 
 ### Continue
 
-1. Win ARM64 soak to fully close PERF-001 debt register row
-2. PERF-002 Inspector rebuilds (next in Program 1 order)
+1. Win ARM64 soak to fully close PERF-001 debt register row (operator; D1/D2)
+2. PERF-002 S1 skip-path remediation on PerfInspector (see follow-up PR) then soak
 3. Keep `APPSTATE_NOTIFY_COALESCE_MS=0` as rollback
+4. PERF-003 only after S1 gate — see `PERF_003_SEQUENCING_GATE.md`
 
 ---
 
 ## Rollback
 
-Revert this ADR file / mark Status superseded if investigation redirects. No runtime behavior is changed by accepting this ADR in Proposed/Investigation status.
+``APPSTATE_NOTIFY_COALESCE_MS=0`` or revert the Phase 3 coalesce commit.
+Supersede this ADR only if investigation redirects.

@@ -1,4 +1,4 @@
-"""Performance Inspector — read-only EventBus / AppState / SQLite timings."""
+"""Performance Inspector — read-only EventBus / PerfMetrics / SQLite timings."""
 
 from __future__ import annotations
 
@@ -29,8 +29,10 @@ class PerformanceInspector(ctk.CTkToplevel):
         ui_queue: UIQueue,
     ) -> None:
         super().__init__(master)
+        # state_store retained in signature for call-site parity with other
+        # inspectors; Perf metrics are not AppState projections (PERF-002).
+        _ = state_store
         self._bus = bus
-        self._state_store = state_store
         self._ui_queue = ui_queue
         self._refresh_pending = False
         self._last_fingerprint: tuple | None = None
@@ -51,6 +53,16 @@ class PerformanceInspector(ctk.CTkToplevel):
             font=T.FONT_SMALL,
             text_color=T.TEXT_MUTED,
         ).pack()
+
+        # Cheap live uptime — updated every tick without rebuilding the dump.
+        self._uptime_label = ctk.CTkLabel(
+            self,
+            text="uptime_s: -",
+            font=("Consolas", 11),
+            text_color=T.TEXT_MUTED,
+            anchor="w",
+        )
+        self._uptime_label.pack(fill="x", padx=12, pady=(4, 0))
 
         self._text = ctk.CTkTextbox(self, font=("Consolas", 11))
         self._text.pack(fill="both", expand=True, padx=12, pady=12)
@@ -84,14 +96,18 @@ class PerformanceInspector(ctk.CTkToplevel):
     @staticmethod
     def _fingerprint(
         *,
-        uptime_s: object,
         bus_metrics: dict,
         navigate_dropped: int,
         timings: dict,
         counters: dict,
         top_topics: list[tuple[str, int]],
     ) -> tuple:
-        """Stable display fingerprint (excludes nothing the dump shows)."""
+        """Equality fingerprint for skip vs rebuild.
+
+        Excludes monotonic ``uptime_s`` (and any always-changing clock field).
+        Live uptime is shown via ``_uptime_label`` so the 1 Hz tick does not
+        force a full textbox rewrite when metrics identity is stable (Tom S1).
+        """
         timing_fp = tuple(
             (
                 name,
@@ -104,7 +120,6 @@ class PerformanceInspector(ctk.CTkToplevel):
         )
         counter_fp = tuple(sorted((k, int(v)) for k, v in counters.items()))
         return (
-            uptime_s,
             bus_metrics.get("queue_depth"),
             bus_metrics.get("dropped_events"),
             bus_metrics.get("handler_invocations"),
@@ -114,6 +129,9 @@ class PerformanceInspector(ctk.CTkToplevel):
             counter_fp,
             tuple(top_topics),
         )
+
+    def _set_uptime_label(self, uptime_s: object) -> None:
+        self._uptime_label.configure(text=f"uptime_s: {uptime_s}")
 
     def _refresh(self) -> None:
         self._refresh_pending = False
@@ -125,9 +143,12 @@ class PerformanceInspector(ctk.CTkToplevel):
         timings = metrics.get("timings") or {}
         counters = metrics.get("counters") or {}
         navigate_dropped = int(getattr(self._bus, "_navigate_dropped_reentrant", 0))
+        uptime_s = metrics.get("uptime_s")
+
+        # Always cheap-update the clock label (Tom S1).
+        self._set_uptime_label(uptime_s)
 
         fp = self._fingerprint(
-            uptime_s=metrics.get("uptime_s"),
             bus_metrics=bus_metrics,
             navigate_dropped=navigate_dropped,
             timings=timings,  # type: ignore[arg-type]
@@ -140,7 +161,6 @@ class PerformanceInspector(ctk.CTkToplevel):
         self._last_fingerprint = fp
 
         lines = [
-            f"uptime_s: {metrics.get('uptime_s')}",
             f"eventbus queue_depth: {bus_metrics.get('queue_depth')}",
             f"eventbus dropped: {bus_metrics.get('dropped_events')}",
             f"eventbus handler_invocations: {bus_metrics.get('handler_invocations')}",
