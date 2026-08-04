@@ -90,7 +90,7 @@ they were one store.
 | WM nodes/edges | ✅ SA mutate/query |
 | Goals | ✅ live scheduler; Phase-9 **RETIRED (ADR-012 A)** |
 | Memory | ⚠️ soft dual reads — this document |
-| Workflows | ⚠️ SHADOW step 5 next |
+| Workflows | ⚠️ soft dual — this document (5a); 5b decide SA hooks vs execution-scoped |
 
 ---
 
