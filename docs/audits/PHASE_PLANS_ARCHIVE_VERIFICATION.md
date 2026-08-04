@@ -71,12 +71,13 @@ Index already marked Superseded. Safe to archive as **SUPERSEDED**, not COMPLETE
 |---------|---------|
 | `services/federation_service.py`, World Model `knowledge_graph_panel.py` | `knowledge_query_service.py`, `knowledge_index_service.py`, `ui/views/knowledge_graph_view.py`, vector/query topics as planned |
 
-### Phase 9 — Goals & Multi-Agent — PARTIAL
+### Phase 9 — Goals & Multi-Agent — PARTIAL (research vs live)
 
-| Present | Gap |
-|---------|-----|
-| `GoalEngine` + `SQLiteGoalEngineRepository` in `service_factory.py`; `orchestration/goals/*`; UI `goal_dashboard/` | `AgentCoordinator` / `PlanningEngine` **not** in `service_factory.py` |
-| Tests under `tests/orchestration/` | Plan exit: plans survive restarts + live multi-agent collaboration as specified |
+| Present | Gap / disposition |
+|---------|-------------------|
+| Live goals = `GoalRepository` + `SingleGoalScheduler` in factory | Phase-9 `GoalEngine` **RETIRED from live (ADR-012 A)** — tree may remain for unit tests |
+| Live agents = `AgentRuntimeService`; live planning = `PlannerService` | `AgentCoordinator` / `PlanningEngine` **RETIRED from live (ADR-013)** |
+| UI `goal_dashboard/` | Plan exit: plans survive restarts + live multi-agent collaboration as specified — backlog |
 | | `agent_policy_engine.py` / `agent_spawner.py` / `agent_lifecycle.py` absent |
 
 ### Phase 9 Cross-Platform (roadmap “Phase 11 platform”) — NOT_COMPLETE
@@ -84,14 +85,16 @@ Index already marked Superseded. Safe to archive as **SUPERSEDED**, not COMPLETE
 | Present | Gap |
 |---------|-----|
 | `platform/platform_service.py`, `platform/macos/hotkey_provider.py` (`MacOSHotkeyProviderImpl`) | `get_hotkey_provider()` still returns **placeholder** `MacOSHotkeyProvider` (`hotkey_provider.py`) |
-| | Widespread `NotImplementedError` for tray/notifications/window APIs in `platform_service.py` |
+| Working `ui/tray.TrayController` + pystray path | Widespread `NotImplementedError` for tray/notifications/window APIs in `platform_service.py` |
+| | **Not an R1 blocker** — Phase 11 backlog (`R1_UNGATED_STOP_LINE.md`) |
 
-### Phase 10 — World Model — PARTIAL
+### Phase 10 — World Model — PARTIAL (core live; predictive/undo research)
 
-| Present | Gap |
-|---------|-----|
-| `core/world_model/`, Brain wiring, UI world explorer / panels | `predictive_engine/` and `undo_replay/` **not** referenced from `service_factory.py` |
-| Tests under `tests/core/world_model/` and `tests/ui/test_world_model_*` | Product wiring for predictive/undo exit criteria |
+| Present | Gap / disposition |
+|---------|-------------------|
+| `core/world_model/`, Brain wiring, UI world explorer / panels; SA WM mutate | PredictiveEngine / UndoReplay **RETIRED from live (ADR-014)** — research/unit tests only |
+| Live timeline undo / snapshots via TimelineService / SnapshotService / WM recover | Do not factory-wire predictive/undo without ADR superseding 014 |
+| Tests under `tests/core/world_model/` and `tests/ui/test_world_model_*` | Product wire of predictive/undo exit criteria — gated |
 
 ### `REMAINING_IMPLEMENTATION_PLAN.md` — STALE
 

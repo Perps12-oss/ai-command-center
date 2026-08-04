@@ -10,18 +10,20 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 ---
 
-## Active milestone (do this next)
+## Active milestone (current truth)
 
-| Milestone | Document | Blocks |
+| Milestone | Document | Status |
 |-----------|----------|--------|
-| **PHASE R1 — Runtime Reconciliation** | [`PHASE_R1_RUNTIME_RECONCILIATION.md`](PHASE_R1_RUNTIME_RECONCILIATION.md) | All feature work until authority + composition aligned |
+| **PHASE R1 — Runtime Reconciliation** | [`PHASE_R1_RUNTIME_RECONCILIATION.md`](PHASE_R1_RUNTIME_RECONCILIATION.md) | P1–P4 ✅; P5 Predictive/Undo ✅ ADR-014 research-only |
 | (superseded) PHASE 0R | [`PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md`](PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md) | — |
 
-**Priority order:** Runtime authority → Composition → State → UI → Features.
+**Priority order (historical):** Runtime authority → Composition → State → UI → Features.
 
-**Decision gate before coding:** ADR-006 ✅ ExecutionAuthority canonical. Next: State Authority contract (parallel); UI: **Devin** per [`docs/agents/DEVIN_UI_HANDOVER.md`](../agents/DEVIN_UI_HANDOVER.md).
+**Ungated Stage 2 / R1 disposition work is closed.** See [`docs/audits/R1_UNGATED_STOP_LINE.md`](../audits/R1_UNGATED_STOP_LINE.md).
 
-Goal: make `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
+**NEXT GATE:** SA.mutate for non-WM domains (new ADR). Parallel: Async EventBus (perf approval); Goose = Stage 3.
+
+Goal: keep `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 
 ---
 
@@ -84,11 +86,11 @@ Do not treat frontend Phase 11 completeness as cross-platform Phase 11 completen
 ## Phase Dependencies (informational)
 
 ```
-Phase 5 ──► later phases (Async EventBus policy)
+Phase 5 ──► later phases (Async EventBus — **approval-gated**)
 Phase 6 ──► external capability aggregation
-Phase 8 ──► Operator Kernel (PARTIAL on main)
-Phase 9 ──► Goals (PARTIAL) + Multi-Agent wiring gaps
-Phase 10 ─► World Model core (PARTIAL; predictive/undo not in factory)
+Phase 8 ──► Operator Kernel (**RETIRED from live — ADR-006**)
+Phase 9 ──► Goals (**ADR-012 A**) + Multi-Agent (**ADR-013 research-only**)
+Phase 10 ─► World Model core; Predictive/Undo **RETIRED from live (ADR-014)**
 ```
 
 ---

@@ -1,20 +1,29 @@
 # State Authority Contract
 
-**Status:** ACTIVE (next architectural work after ADR-006)  
+**Status:** ACTIVE (soft-shadow Stage 2 closed; mutate deepen ADR-gated)  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-005_WORLD_MODEL_AUTHORITY.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`  
+**Verified:** `main` @ `426c6b7`+ (2026-08-04)  
 **Implementation today:** `ai_command_center/services/state_authority_service.py`  
 **Domain types:** `ai_command_center/domain/state_authority.py` (`StateQuery`, `StateProjection`, `StateDelta`, `MutationReceipt`, `ProjectionScope`)  
-**Milestone:** PHASE R1 Priority 3 / Stage 2 (Slices 1–4: query, planner, Goals quarantine, WM node+edge mutate, reconstruction)
+**Milestone:** PHASE R1 Priority 3 / Stage 2 (soft-shadow closed; WM mutate live)  
+**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md`
 
 ---
 
-## Purpose
+## Why this exists
 
-ACC has a **canonical execution path** (ADR-006). The next maturity gap is **authoritative state access**:
+ACC has a **canonical execution path** (ADR-006). Soft-shadow inventories for
+Goals / Memory / Workflows / Executions / Agents are closed. The remaining
+maturity gap is **deepening `SA.mutate` for non-WM domains** — gated by a new ADR.
+
+Without this contract, services and UI invent parallel “truth”:
+- World Model mutations without a receipt
+- Planner reading AppState or SQLite directly
+- Goals / memory / workflows silently dual-writing
 
 ```text
 Execution ownership  → mostly solved (ExecutionAuthority chain)
-State ownership      → not solved (many parallel stores, weak consumption)
+State ownership      → soft-shadow closed; non-WM mutate ADR-gated
 ```
 
 State Authority is **not** a giant god-service. It is a **contract** — the only approved way to **query**, **mutate**, and **project** workspace reality.
@@ -89,9 +98,9 @@ State Authority **may aggregate** internally; callers must not care which store 
 |--------|--------------------------------------|----------------|---------------------|
 | World Model | `WorldModel` + SQLite repo | ✅ primary (ADR-005) | Aggregate via `query` / `project` |
 | Goals | `GoalRepository` + `SingleGoalScheduler` (live); `GoalEngine` **RETIRED (ADR-012 A)** | ✅ live / ❌ Phase-9 | Live via `goal_lookup`; Phase-9 off product path — see `SHADOW_SOT_INVENTORY.md` / ADR-012 |
-| Memory | `MemoryGraphService` | ⚠️ lookup hook + soft dual (Assembler/tools) | Inventory — `state_authority/MEMORY_SOFT_SHADOW_INVENTORY.md`; no silent merge; mutate deferred |
-| Timeline / executions | `ExecutionRunRepository`, events | ⚠️ soft shadow — append-only, not on SA | Inventory — `EXECUTIONS_SOFT_SHADOW_INVENTORY.md`; correlate later; no silent merge |
-| Workflows | `WorkflowRunRepository` (+ Engine/Persistence) | ⚠️ soft shadow — not on SA | Inventory — `WORKFLOWS_SOFT_SHADOW_INVENTORY.md`; no silent merge; mutate deferred |
+| Memory | `MemoryGraphService` | ✅ SA lookup + Assembler 4b; tools soft dual (4c) | Soft dual documented — no silent merge; mutate deferred (ADR) |
+| Timeline / executions | `ExecutionRunRepository`, events | ✅ 6a+6b append-only + correlation | Keep append-only outside SA mutate |
+| Workflows | `WorkflowRunRepository` (+ Engine/Persistence) | ✅ 5a+5b execution-scoped | Keep outside SA; mutate deferred (ADR) |
 | Agent runtime | `AgentRuntimeService` pipeline state | ⚠️ partial | Inventory; no silent merge |
 | UI | `AppState` | projection only — **never** authoritative | Unchanged |
 
@@ -147,8 +156,8 @@ The system must be able to reconstruct workspace reality after deleting all chat
 | `query()` with structured `StateQuery` | ✅ Stage 2 Slice 1 | Keep; deepen filters |
 | `mutate()` with `StateDelta` | ✅ WM node + edge ops + receipt (Slice 3–4); goals/workflows still shadow | Deepen remaining domains |
 | Planner reads state | ✅ every `PLAN_REQUEST` resolves `StateContext` (payload or `SA.query`) | Keep; deepen |
-| Goals / agents / workflows query WM | ✅ goals via `goal_lookup`; GoalEngine **RETIRED (ADR-012 A)** | Memory/workflows still soft shadow |
-| Shadow SoT elimination | ⚠️ inventory + Goals quarantine (Slice 3) | Memory/workflows/executions next; mutate later |
+| Goals / agents / workflows query WM | ✅ goals via `goal_lookup`; GoalEngine **RETIRED (ADR-012 A)**; workflows/agents execution-scoped | Soft duals documented; mutate deepen ADR-gated |
+| Shadow SoT elimination | ✅ inventories closed (3a–6b + agents + ADR-014) | Non-WM `SA.mutate` later — new ADR |
 | Domain types | ✅ `domain/state_authority.py` | Evolve without breaking bus dicts |
 
 Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection DTO (`StateProjection` alias). Evolve toward richer projections without breaking AppState reducers.
@@ -189,9 +198,10 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 |--------|----------------------|
 | World Model nodes | ✅ authoritative via `SA.mutate` / `SA.query` |
 | World Model edges | ✅ authoritative via `SA.mutate` (`create_edge` / `delete_edge`) |
-| Goals (`GoalEngine` vs `GoalRepository`) | ✅ live = `GoalRepository`; GoalEngine quarantined from factory |
-| Workflows / executions / agents | ⚠️ workflows 5a + executions 6a inventoried; agents still outside SA mutate |
-| Memory | ⚠️ lookup on query; soft dual Assembler/tools; **not** mutate — see MEMORY_SOFT_SHADOW_INVENTORY |
+| Goals (`GoalEngine` vs `GoalRepository`) | ✅ live = `GoalRepository`; GoalEngine **RETIRED (ADR-012 A)** |
+| Workflows / executions / agents | ✅ 5a+5b / 6a+6b / ADR-013 inventories; keep outside SA mutate until new ADR |
+| Memory | ✅ 4a–4c; tools soft dual documented; **not** mutate until new ADR |
+| Predictive / Undo packages | ✅ **RETIRED from live (ADR-014)** |
 
 ---
 
@@ -199,6 +209,10 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 
 - `docs/architecture/adr/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`  
 - `docs/architecture/adr/ADR-005_WORLD_MODEL_AUTHORITY.md`  
+- `docs/architecture/adr/ADR-012_GOALS_PHASE9_DISPOSITION.md`  
+- `docs/architecture/adr/ADR-013_PLANNING_AGENT_COORDINATOR_DISPOSITION.md`  
+- `docs/architecture/adr/ADR-014_PREDICTIVE_UNDO_DISPOSITION.md`  
+- `docs/audits/R1_UNGATED_STOP_LINE.md`  
 - `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md`  
 - `docs/architecture/SHADOW_SOT_INVENTORY.md`  
 - `ai_command_center/services/state_authority_service.py`  

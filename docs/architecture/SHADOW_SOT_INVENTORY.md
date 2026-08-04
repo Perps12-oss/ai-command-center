@@ -1,9 +1,10 @@
 # Shadow Source-of-Truth Inventory
 
-**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents)  
+**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents); Predictive/Undo ADR-014  
 **Authority:** `docs/architecture/STATE_AUTHORITY_CONTRACT.md` (item 4)  
-**Verified:** `main` @ `01ed04c`+ (2026-08-04)  
+**Verified:** `main` @ `426c6b7` (2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative. Transient caches are allowed; durable truth outside State Authority is not.
+**Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md` — next gate = SA.mutate non-WM (new ADR).
 
 ---
 

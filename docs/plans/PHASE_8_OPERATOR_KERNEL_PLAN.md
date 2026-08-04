@@ -1,11 +1,13 @@
 # Phase 8: Operator Kernel & Model Independence
 
-**Status:** PARTIAL (code-verified 2026-07-20 — library/tests exist; not live intake)  
-**Priority:** HIGH  
-**Estimated Effort:** 6-8 weeks  
-**Dependencies:** Phase 5 (Async); Phase 7 multi-agent plan SUPERSEDED  
+**Status:** PARTIAL — **research / plan archive** (not live intake)  
+**Live truth (2026-08-04):** OperatorKernel **RETIRED from live (ADR-006)**;
+canonical intake = ExecutionAuthority.  
+**Priority:** HIGH (historical)  
+**Estimated Effort:** 6-8 weeks (plan-era estimate; ignore for agent scheduling)  
+**Dependencies:** Phase 5 (Async — approval-gated); Phase 7 multi-agent plan SUPERSEDED  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `AGENTS.md`  
-**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — `OperatorKernel` not in `service_factory`
+**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — `OperatorKernel` not in `service_factory`; ADR-006
 
 ---
 

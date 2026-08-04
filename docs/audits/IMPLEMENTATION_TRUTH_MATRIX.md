@@ -1,7 +1,7 @@
 # Implementation Truth Matrix
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
-**Baseline:** `origin/main` @ `7d1065b`+ (R1 P5 Predictive/Undo ADR-014 — 2026-08-04)  
+**Baseline:** `origin/main` @ `426c6b7` (R1 ungated docs closeout — 2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
 **Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
@@ -28,8 +28,8 @@
 | GlobalContextBar | ✅ | ✅ (UI shell) | ✅ | ✅ UI | **WIRED** (UI) | `global_context_bar.py` + `GlobalContextSnapshot` incl. active goal |
 | OSPalette + provider registry | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | `palette_provider.py`; Ctrl+K |
 | Brain / Evidence / Operations / Graph / Insights views | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Phase B E06–E13 on main; Insights placeholder by plan |
-| Cross-platform hotkey (macOS) | ✅ impl + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **PARTIAL** | `get_hotkey_provider()` placeholder |
-| Platform tray / notifications | ⚠️ stubs | ❌ | ❌ | ❌ | **MISSING/STUB** | `NotImplementedError` in `platform/platform_service.py` |
+| Cross-platform hotkey (macOS) | ✅ Impl packages + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **PARTIAL** | `get_hotkey_provider()` placeholder; Impl under `platform/macos|linux/` unwired — **Phase 11 backlog**, not R1 blocker |
+| Platform tray / notifications | ⚠️ stubs + working TrayController | ❌ platform_service | ❌ | ⚠️ partial | **PARTIAL** | `NotImplementedError` in `platform_service.py`; `ui/tray` pystray path exists — Phase 11 |
 | Phase 5 Async EventBus (tiered + async queue) | ⚠️ policy only | ❌ | ⚠️ | ❌ | **PARTIAL** | `dispatch_policy.py` only; `tiered_dispatch_policy.py` / `async_dispatch_queue.py` **not** implemented — gated by Performance Investigation Report + human approval |
 
 Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
@@ -68,7 +68,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **PASSED** (ADR-006/012/013/014 — Predictive/Undo retired from live) |
 | P3 Event & state unification | State Authority Contract | **SOFT-SHADOW CLOSED** — 3a–6b + agents inventories; deepen SA mutate only with new ADR |
 | P4 UI composition | Inspector/Graph/Timeline unify | **PASSED** — inspector rail (#138); graph unified; execution timeline disposition (#141) |
-| P5 Feature completion | Predictive/Undo/platform | **INVENTORY CLOSED (ADR-014)** — packages research-only; live wire gated on new ADR; platform hotkey/tray still open |
+| P5 Feature completion | Predictive/Undo/platform | **Predictive/Undo CLOSED (ADR-014)**; platform hotkey/tray = Phase 11 backlog (not R1 blocker) |
 
 ---
 
@@ -102,7 +102,7 @@ UI_COMMAND → ExecutionAuthority → GoalScheduler → [PlannerService] → Exe
            → ChatHandler / CapabilityRuntime / Tools → OrchestrationService → AppState
 ```
 
-OperatorKernel remains **exists-but-not-wired**. Matrix status stays PARTIAL until explicitly retired from the tree or an ADR supersedes 006.
+OperatorKernel remains **exists-but-not-wired** (ADR-006 research-only). Matrix status stays PARTIAL for tree retention until optional cleanup; live path is ExecutionAuthority only.
 
 ---
 
@@ -110,10 +110,10 @@ OperatorKernel remains **exists-but-not-wired**. Matrix status stays PARTIAL unt
 
 | Layer | Maturity |
 |-------|----------|
-| UI surfaces / primitives | Ahead — Phase B E00–E13 WIRED at UI layer |
-| Runtime authority services | Mixed (Goal/Brain/Authority WIRED; OperatorKernel/Coordinator/Predictive/Undo PARTIAL) |
-| State Authority | WM mutate WIRED; Goals A; Memory 4b; Workflows 5a; Executions 6a |
-| Documentation / plan COMPLETE claims | Must follow code on `main` — this matrix is the Exists/Wired probe |
+| UI surfaces / primitives | Ahead — Phase B E00–E13 WIRED at UI layer; R1 P4 inspector/timeline disposition closed |
+| Runtime authority services | Live EA/Planner/Scheduler WIRED; OperatorKernel / Coordinator / PlanningEngine / Predictive / Undo **RETIRED from live** (ADR-006/012/013/014) |
+| State Authority | Soft-shadow Stage 2 **closed**; WM mutate WIRED; non-WM mutate **ADR-gated** |
+| Documentation / plan COMPLETE claims | Must follow code on `main` — this matrix is the Exists/Wired probe; see `R1_UNGATED_STOP_LINE.md` |
 
 ---
 

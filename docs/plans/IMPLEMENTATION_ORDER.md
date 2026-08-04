@@ -236,10 +236,13 @@ EXIT CRITERIA:
 │   • Cross-platform testing                               │
 └─────────────────────────────────────────────────────────────┘
 
-EXIT CRITERIA:
-✓ macOS hotkey & tray working
-✓ Linux hotkey & tray working
-✓ Platform abstraction stable
+EXIT CRITERIA (plan-era aspirational — **NOT COMPLETE** on tip of main):
+✗ macOS hotkey & tray working (getter still placeholder; Impl packages exist unwired)
+✗ Linux hotkey & tray working (same)
+✗ Platform abstraction stable (`platform_service` tray/notifications still stubs)
+
+See `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` and `R1_UNGATED_STOP_LINE.md`
+(platform = Phase 11 backlog, not R1 blocker).
 ```
 
 ---
