@@ -64,6 +64,7 @@ class CommandPaletteApp(
         self._frame_governor_scheduled: bool = False
         self._catalog_refresh_deferred: bool = False
         self._last_snapshot_for_apply = None
+        self._apply_pipeline_started: float | None = None
         self._last_chat_history_revision: int = 0
         self._last_inspector_revision: int = -1
         self._last_workflow_graph_revision: int = -1
@@ -88,6 +89,7 @@ class CommandPaletteApp(
         self.withdraw()
         self._register_views()
         self._build_layout()
+        self.report_callback_exception = self._on_tk_callback_exception
         self._wire_all_events()
         self._wire_workspace_policy_events()
         self._setup_keybindings()
@@ -109,9 +111,24 @@ class CommandPaletteApp(
             "telemetry_async_batch=1 appstate_slice_reduce=1 "
             "settings_single_snapshot=1 keyring_cache=1 bus_reentrant_navigate_drop=1 "
             "uiqueue_time_budget=1 apply_state_phased=1 stream_chunk_throttle=1 "
-            "frame_governor_30fps=1 catalog_defer_nonvisible=1",
+            "frame_governor_30fps=1 catalog_defer_nonvisible=1 "
+            "tk_report_callback_exception=1 systemview_uiqueue=1",
             ACC_UI_FREEZE_FIX,
         )
+
+    def _on_tk_callback_exception(self, exc, val, tb) -> None:  # noqa: ANN001
+        """Log + toast unhandled Tk callback errors (C2 — silent failures)."""
+        logger.error("Unhandled Tk callback error", exc_info=(exc, val, tb))
+        toast = getattr(self, "_toast", None)
+        if toast is None or not hasattr(toast, "show"):
+            return
+        try:
+            detail = str(val) if val is not None else getattr(exc, "__name__", "error")
+            if len(detail) > 120:
+                detail = detail[:117] + "..."
+            toast.show(f"Something went wrong: {detail}", kind="error")
+        except Exception:
+            logger.exception("Failed to show Tk error toast")
 
     def _wire_workspace_policy_events(self) -> None:
         """Route deferred commands back to workspace (Phase 6c consumer policy)."""

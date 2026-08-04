@@ -1,35 +1,30 @@
-# Constitutional Pre-Flight — UI Freeze P1 (v6)
+# Constitutional Pre-Flight — C1/C2 UI crash + silent-error fixes
 
-**Branch:** `cursor/ui-freeze-p1-budget-4fb7`  
-**Authority:** PROJECT_CONSTITUTION_V4.md · PERFORMANCE_CONSTITUTION.md
+**Branch:** `cursor/ui-c1-c2-system-errors-4fb7`  
+**Authority:** PROJECT_CONSTITUTION_V4.md
 
 ## Intent
 
-Reduce UI-thread starvation during chat streaming and event storms by budgeting
-UIQueue drain work, phasing AppState→widget projection, throttling stream
-appends, governing refresh rate, and deferring non-visible catalog rebuilds —
-without changing user-visible behaviour or EventBus contracts.
+1. **C1** — Stop `SystemView` from calling Tk `.after()` on a psutil worker
+   thread; route UI hops through `UIQueue` (existing ownership path).
+2. **C2** — Install `report_callback_exception` so unhandled Tk callbacks log
+   and toast instead of vanishing to stderr.
 
 ## Invariants checked
 
 | Invariant | Status |
 |---|---|
 | UI → AppState → EventBus → Services → Repositories → Storage | Preserved |
-| UI isolation (no direct storage/Ollama/tools) | Preserved |
-| No service-to-service calls | Preserved |
-| Host supremacy | N/A |
-| Contracts / topics | No topic or payload changes |
+| UI isolation | Preserved; SystemView still does not touch storage/Ollama |
+| No new EventBus topics | N/A |
 
 ## Behaviour preservation
 
-- Same EventBus topics and payloads
-- Same navigation outcomes
-- Same chat lifecycle (begin / stream / complete / cancel / error)
-- Catalog views still refresh when visible or after deferred dirty apply
-- `ACC_UI_FREEZE_FIX` bumped to `v6` for runtime fingerprint
+- System monitor still polls ~2s; only the thread→UI handoff changes
+- Toast UI already supports `kind="error"`
 
-## Risk
+## Out of scope this PR
 
-Medium — phased `_apply_state` and deferred catalogs must not drop lifecycle or
-settings projection. Covered by UIQueue unit tests + state-applier unit tests +
-existing shell projection tests.
+- Repo-wide rewrite of ~50 `except Exception: pass` sites (follow-up; SystemView
+  collect path now logs)
+- C3–C8 chat/UX items

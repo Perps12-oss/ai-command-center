@@ -171,14 +171,34 @@ class StateApplierMixin:
             )
         return True
 
-    def _finish_state_apply(self, started: float, *, metric: str = "ui.apply_state") -> None:
-        """Clear apply bookkeeping and re-enqueue if another refresh arrived."""
+    def _finish_state_apply(
+        self,
+        started: float,
+        *,
+        metric: str = "ui.apply_state.phase3",
+        pipeline_started: float | None = None,
+    ) -> None:
+        """Clear apply bookkeeping and re-enqueue if another refresh arrived.
+
+        Metrics:
+        - ``metric`` — duration of the finishing phase (default phase 3 only).
+        - ``ui.apply_state`` — end-to-end pipeline wall time when
+          ``pipeline_started`` is provided (phase 1 start → finish), so
+          dashboards stay apples-to-apples with pre-v6.
+        """
         self._last_snapshot_for_apply = None
+        self._apply_pipeline_started = None
         self._state_refresh_enqueued = False
         try:
             from ai_command_center.core.perf.metrics import get_perf_metrics
 
-            get_perf_metrics().record(metric, (time.perf_counter() - started) * 1000.0)
+            now = time.perf_counter()
+            get_perf_metrics().record(metric, (now - started) * 1000.0)
+            if pipeline_started is not None:
+                get_perf_metrics().record(
+                    "ui.apply_state",
+                    (now - pipeline_started) * 1000.0,
+                )
         except Exception:
             pass
         if self._state_refresh_pending:
@@ -188,10 +208,15 @@ class StateApplierMixin:
     def _apply_state_phase_1(self) -> None:
         """Phase 1: snapshot + stream-only fast path (~few ms)."""
         started = time.perf_counter()
+        self._apply_pipeline_started = started
         snap = self._controller.snapshot()
         self._last_snapshot_for_apply = snap
         if self._try_apply_stream_only(snap):
-            self._finish_state_apply(started, metric="ui.apply_state.stream")
+            self._finish_state_apply(
+                started,
+                metric="ui.apply_state.stream",
+                pipeline_started=started,
+            )
             return
         self._ui_queue.enqueue(self._apply_state_phase_2)
 
@@ -222,22 +247,29 @@ class StateApplierMixin:
         elapsed_ms = (time.perf_counter() - phase2_started) * 1000.0
         if elapsed_ms > 5.0:
             logger.warning("Phase 2 (chrome) took %.1fms", elapsed_ms)
+        try:
+            from ai_command_center.core.perf.metrics import get_perf_metrics
+
+            get_perf_metrics().record("ui.apply_state.phase2", elapsed_ms)
+        except Exception:
+            pass
 
         self._ui_queue.enqueue(self._apply_state_phase_3)
 
     def _apply_state(self) -> None:
-        """Compatibility entry: run the full projection pipeline via phase 1."""
-        if getattr(self, "_state_refresh_enqueued", False):
-            self._state_refresh_pending = True
-            return
-        self._state_refresh_enqueued = True
-        self._state_refresh_pending = False
-        self._last_apply_state_time = time.monotonic()
-        self._apply_state_phase_1()
+        """Compatibility entry for direct callers (e.g. event coordinator).
+
+        Delegates to ``_queue_state_refresh`` so coalesce / frame-governor
+        gating lives in one place.
+        """
+        self._queue_state_refresh()
 
     def _apply_state_phase_3(self) -> None:
         """Phase 3: visible view, chat lifecycle, deferred catalogs, tray."""
         started = time.perf_counter()
+        pipeline_started = getattr(self, "_apply_pipeline_started", None)
+        if pipeline_started is None:
+            pipeline_started = started
         snap = getattr(self, "_last_snapshot_for_apply", None)
         if snap is None:
             snap = self._controller.snapshot()
@@ -548,7 +580,11 @@ class StateApplierMixin:
         if elapsed_ms > 30.0:
             logger.warning("Phase 3 (%s view) took %.1fms", current_view, elapsed_ms)
 
-        self._finish_state_apply(started, metric="ui.apply_state")
+        self._finish_state_apply(
+            started,
+            metric="ui.apply_state.phase3",
+            pipeline_started=pipeline_started,
+        )
 
     def _apply_settings_projection(self, snap) -> None:
         """Keep SettingsView in sync when settings change off-page."""
@@ -693,18 +729,18 @@ class StateApplierMixin:
     def _apply_catalog_views(self, snap) -> None:
         """Render Memory, Notes, Plugins, and System views from AppState.
 
-        Defer heavy rebuilds while chat is streaming or the user is on a
-        non-catalog view. When a catalog view is visible, apply the full
-        catalog set (same as pre-v6) so sibling pages stay warm.
+        Deliberate policy (not stream-only): skip heavy catalog rebuilds whenever
+        the user is **not** on a catalog view — idle or streaming. Hidden catalog
+        widgets do not need per-event projection; fingerprint identity is left
+        unchanged so the next visit to a catalog view refreshes correctly.
+
+        When any catalog view is visible, apply the full catalog set (siblings
+        stay warm for quick tab switches within the catalog group).
         """
         current_view = getattr(self, "_current_view", "")
-        streaming = bool(getattr(snap, "chat_streaming", False))
         on_catalog = current_view in _CATALOG_VIEWS
 
-        if streaming and not on_catalog:
-            self._catalog_refresh_deferred = True
-            return
-
+        # Defer whenever off-catalog (streaming is a common case, but idle too).
         if not on_catalog:
             self._catalog_refresh_deferred = True
             return
