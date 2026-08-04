@@ -1,7 +1,7 @@
 # Implementation Truth Matrix
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
-**Baseline:** `origin/main` @ `01ed04c`+ (Stage 2 ungated closeout — 2026-08-04)  
+**Baseline:** `origin/main` @ `eca4a15`+ (R1 P4 timeline disposition — 2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
 **Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
@@ -67,7 +67,7 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 | P1 Runtime authority | ADR-006 | **PASSED** |
 | P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **PASSED** for GoalEngine/PlanningEngine/AgentCoordinator/OperatorKernel (ADR-006/012/013); Predictive/Undo remain P5 |
 | P3 Event & state unification | State Authority Contract | **SOFT-SHADOW CLOSED** — 3a–6b + agents inventories; deepen SA mutate only with new ADR |
-| P4 UI composition | Inspector/Graph/Timeline unify | **IN PROGRESS** — inspector rail + graph unified; timeline residual (`ActivityTimeline`) |
+| P4 UI composition | Inspector/Graph/Timeline unify | **PASSED** — inspector rail (#138); graph unified; execution timeline stack = `TimelineRenderer`+dock; `ActivityTimeline` = secondary feed (`R1_P4_TIMELINE_DISPOSITION.md`) |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
 ---
