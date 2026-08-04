@@ -108,8 +108,8 @@ Every major subsystem: **Registered Yes/No** in `service_factory.py` + reachable
 
 **Soft-shadow CLOSED** on `main` (3a–6b + agents). Memory `SA.mutate(store_memory)`
 live via **ADR-015**. Goals `SA.mutate(submit_goal)` live via **ADR-016**.
-Remaining: workflows/executions/agents mutate still ADR-gated —
-see `docs/audits/R1_UNGATED_STOP_LINE.md`.
+Workflows/executions/agents **remain outside** via **ADR-017**.
+**R1 SA.mutate track CLOSED** — see `docs/audits/R1_UNGATED_STOP_LINE.md`.
 
 Subsystems: Goals, Agents, Executions, World Model, Timeline, Approvals.
 
@@ -135,11 +135,11 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 - [x] Event topics documented for cross-subsystem flows *(contract § Event topics — SA surface; mutate node+edge)*
 - [x] Goals dual-path inventory + disposition *(ADR-012 Accepted Option A; ADR-016 submit_goal)*
 - [x] Memory soft-shadow inventory *(4a–4d; SA.mutate store_memory via ADR-015)*
-- [x] Workflows soft-shadow inventory *(5a+5b keep execution-scoped)*
-- [x] Executions soft-shadow inventory *(6a+6b correlation)*
-- [x] Agents soft-shadow + PlanningEngine/AgentCoordinator disposition *(ADR-013)*
+- [x] Workflows soft-shadow inventory *(5a+5b keep execution-scoped; ADR-017 out of mutate)*
+- [x] Executions soft-shadow inventory *(6a+6b correlation; ADR-017 out of mutate)*
+- [x] Agents soft-shadow + PlanningEngine/AgentCoordinator disposition *(ADR-013; ADR-017 out of mutate)*
 
-**P3 Stage 2 soft-shadow status:** **CLOSED** (ungated). Memory + Goals submit mutate live (ADR-015/016). Remaining: workflows/executions/agents SA mutate (each ADR-gated); Goose = Stage 3.
+**P3 Stage 2 soft-shadow status:** **CLOSED**. **SA.mutate track CLOSED** (ADR-015/016/017). Goose = Stage 3 (separate track).
 ---
 
 ## Priority 4 — UI Composition

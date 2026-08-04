@@ -7,9 +7,10 @@ Implements the Stage 2 contract surface:
 * ``project(...)`` — convenience wrapper used by ExecutionAuthority today
 * ``mutate(StateDelta)`` — World Model node + edge mutations, Memory
   ``store_memory`` (ADR-015), and Goals ``submit_goal`` (ADR-016) with
-  ``MutationReceipt`` (workflows/executions/agents still outside this surface)
+  ``MutationReceipt``. Workflows / executions / agents remain outside
+  (ADR-017).
 
-See ``docs/architecture/STATE_AUTHORITY_CONTRACT.md``, ADR-015, and ADR-016.
+See ``docs/architecture/STATE_AUTHORITY_CONTRACT.md`` and ADR-015/016/017.
 """
 
 from __future__ import annotations
@@ -315,7 +316,7 @@ class StateAuthorityService(BaseService):
         * ``{"op": "submit_goal", "title": "...", ...}``
           (ADR-016 — via SingleGoalScheduler; never GoalRepository-direct / GoalEngine)
 
-        Workflows / executions / agents remain outside this surface.
+        Workflows / executions / agents remain outside this surface (ADR-017).
         Orchestration may still use ``RUNTIME_ACTION_REQUEST`` → BrainRuntime;
         callers that go through State Authority must not invent a parallel store.
         """

@@ -44,6 +44,7 @@ def test_state_authority_has_no_workflow_lookup() -> None:
 
 
 def test_sa_mutate_does_not_support_workflow_ops() -> None:
+    """ADR-017: workflows remain outside SA.mutate."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_database(conn)

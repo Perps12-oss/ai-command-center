@@ -1,11 +1,11 @@
 # State Authority Contract
 
-**Status:** ACTIVE (soft-shadow Stage 2 closed; Memory mutate ADR-015; Goals mutate ADR-016; other non-WM mutate ADR-gated)  
-**Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-005_WORLD_MODEL_AUTHORITY.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`, `ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md`, `ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md`  
-**Verified:** ADR-016 acceptance tip (2026-08-04)  
+**Status:** ACTIVE (soft-shadow closed; WM + Memory ADR-015 + Goals ADR-016 mutate live; workflows/executions/agents **remain outside** per ADR-017)  
+**Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-005_WORLD_MODEL_AUTHORITY.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`, `ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md`, `ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md`, `ADR-017_SA_MUTATE_WORKFLOWS_EXECUTIONS_AGENTS_DISPOSITION.md`  
+**Verified:** ADR-017 acceptance tip (2026-08-04)  
 **Implementation today:** `ai_command_center/services/state_authority_service.py`  
 **Domain types:** `ai_command_center/domain/state_authority.py` (`StateQuery`, `StateProjection`, `StateDelta`, `MutationReceipt`, `ProjectionScope`)  
-**Milestone:** PHASE R1 Priority 3 / Stage 2 (WM + Memory `store_memory` + Goals `submit_goal` mutate live)  
+**Milestone:** PHASE R1 Priority 3 / Stage 2 — **SA.mutate track CLOSED**  
 **Stop line:** `docs/audits/R1_UNGATED_STOP_LINE.md`
 
 ---
@@ -15,8 +15,8 @@
 ACC has a **canonical execution path** (ADR-006). Soft-shadow inventories for
 Goals / Memory / Workflows / Executions / Agents are closed. Memory writes may
 use **`SA.mutate(store_memory)`** (ADR-015). Goal submits may use
-**`SA.mutate(submit_goal)`** (ADR-016). Remaining maturity gap:
-**workflows / executions / agents mutate** — each still ADR-gated.
+**`SA.mutate(submit_goal)`** (ADR-016). Workflows / executions / agents
+**remain outside** `SA.mutate` (**ADR-017**).
 
 Without this contract, services and UI invent parallel “truth”:
 - World Model mutations without a receipt
@@ -25,7 +25,7 @@ Without this contract, services and UI invent parallel “truth”:
 
 ```text
 Execution ownership  → mostly solved (ExecutionAuthority chain)
-State ownership      → soft-shadow closed; WM + Memory + Goals submit mutate live
+State ownership      → soft-shadow closed; SA.mutate track CLOSED (ADR-015/016/017)
 ```
 
 State Authority is **not** a giant god-service. It is a **contract** — the only approved way to **query**, **mutate**, and **project** workspace reality.
@@ -101,9 +101,9 @@ State Authority **may aggregate** internally; callers must not care which store 
 | World Model | `WorldModel` + SQLite repo | ✅ primary (ADR-005) | Aggregate via `query` / `project` |
 | Goals | `GoalRepository` + `SingleGoalScheduler` (live); `GoalEngine` **RETIRED (ADR-012 A)** | ✅ live / ❌ Phase-9 | Live via `goal_lookup` + **SA.mutate `submit_goal` (ADR-016)**; Phase-9 off product path |
 | Memory | `MemoryGraphService` | ✅ SA lookup + Assembler 4b; **SA.mutate `store_memory` (ADR-015 / 4d)**; tools soft dual (4c) | Same SoT; no silent merge with WM |
-| Timeline / executions | `ExecutionRunRepository`, events | ✅ 6a+6b append-only + correlation | Keep append-only outside SA mutate |
-| Workflows | `WorkflowRunRepository` (+ Engine/Persistence) | ✅ 5a+5b execution-scoped | Keep outside SA; mutate deferred (ADR) |
-| Agent runtime | `AgentRuntimeService` pipeline state | ⚠️ partial | Inventory; no silent merge |
+| Timeline / executions | `ExecutionRunRepository`, events | ✅ 6a+6b append-only + correlation | **Remain outside SA.mutate (ADR-017)** |
+| Workflows | `WorkflowRunRepository` (+ Engine/Persistence) | ✅ 5a+5b execution-scoped | **Remain outside SA.mutate (ADR-017)** |
+| Agent runtime | `AgentRuntimeService` pipeline state | ⚠️ ephemeral | **Remain outside SA.mutate (ADR-017)**; Coordinator ADR-013 |
 | UI | `AppState` | projection only — **never** authoritative | Unchanged |
 
 **Objective:** one authoritative access layer — not “move everything into World Model overnight,” but **no durable truth outside the contract**.
@@ -156,10 +156,10 @@ The system must be able to reconstruct workspace reality after deleting all chat
 |------------|--------------------------------|-----------------|
 | `StateAuthorityService.project()` | ✅ wired into ExecutionAuthority; delegates to `query` | Keep; extend |
 | `query()` with structured `StateQuery` | ✅ Stage 2 Slice 1 | Keep; deepen filters |
-| `mutate()` with `StateDelta` | ✅ WM node + edge + Memory `store_memory` (ADR-015) + Goals `submit_goal` (ADR-016); workflows/executions/agents still shadow | Deepen remaining domains via ADR |
+| `mutate()` with `StateDelta` | ✅ WM + Memory `store_memory` (ADR-015) + Goals `submit_goal` (ADR-016); workflows/executions/agents **out (ADR-017)** | Keep; optional read-only projections later |
 | Planner reads state | ✅ every `PLAN_REQUEST` resolves `StateContext` (payload or `SA.query`) | Keep; deepen |
-| Goals / agents / workflows query WM | ✅ goals via `goal_lookup` + mutate submit; GoalEngine **RETIRED (ADR-012 A)**; workflows/agents execution-scoped | Soft duals documented; mutate deepen ADR-gated |
-| Shadow SoT elimination | ✅ inventories closed; Memory **ADR-015**; Goals submit **ADR-016** | Workflows/executions/agents mutate — new ADRs |
+| Goals / agents / workflows query WM | ✅ goals via `goal_lookup` + mutate submit; GoalEngine **RETIRED (ADR-012 A)**; workflows/agents execution-scoped | Soft duals documented; mutate out per ADR-017 |
+| Shadow SoT elimination | ✅ inventories closed; Memory **ADR-015**; Goals **ADR-016**; WEA disposition **ADR-017** | R1 SA.mutate track **CLOSED** |
 | Domain types | ✅ `domain/state_authority.py` | Evolve without breaking bus dicts |
 
 Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection DTO (`StateProjection` alias). Evolve toward richer projections without breaking AppState reducers.
@@ -201,7 +201,7 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 | World Model nodes | ✅ authoritative via `SA.mutate` / `SA.query` |
 | World Model edges | ✅ authoritative via `SA.mutate` (`create_edge` / `delete_edge`) |
 | Goals (`GoalEngine` vs `GoalRepository`) | ✅ live = `GoalRepository` + scheduler; GoalEngine **RETIRED (ADR-012 A)**; **SA.mutate `submit_goal` (ADR-016)** |
-| Workflows / executions / agents | ✅ 5a+5b / 6a+6b / ADR-013 inventories; keep outside SA mutate until new ADR |
+| Workflows / executions / agents | ✅ inventories + **ADR-017 remain outside SA.mutate** |
 | Memory | ✅ 4a–4d; **SA.mutate `store_memory` (ADR-015)**; tools soft dual to same SoT |
 | Predictive / Undo packages | ✅ **RETIRED from live (ADR-014)** |
 
@@ -216,6 +216,7 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 - `docs/architecture/adr/ADR-014_PREDICTIVE_UNDO_DISPOSITION.md`  
 - `docs/architecture/adr/ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md`  
 - `docs/architecture/adr/ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md`  
+- `docs/architecture/adr/ADR-017_SA_MUTATE_WORKFLOWS_EXECUTIONS_AGENTS_DISPOSITION.md`  
 - `docs/audits/R1_UNGATED_STOP_LINE.md`  
 - `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md`  
 - `docs/architecture/SHADOW_SOT_INVENTORY.md`  

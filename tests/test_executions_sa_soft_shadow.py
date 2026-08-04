@@ -46,6 +46,7 @@ def test_state_authority_has_no_execution_lookup() -> None:
 
 
 def test_sa_mutate_does_not_support_execution_ops() -> None:
+    """ADR-017: executions remain outside SA.mutate (append-only elsewhere)."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     init_database(conn)

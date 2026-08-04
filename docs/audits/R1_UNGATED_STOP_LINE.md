@@ -1,9 +1,9 @@
-# R1 Ungated Docs Closeout — Stop Line
+# R1 Ungated / SA.mutate Stop Line
 
 **Date:** 2026-08-04  
-**Tip baseline:** ADR-016 acceptance (Goals `SA.mutate`)
+**Tip baseline:** ADR-017 acceptance (workflows/executions/agents remain outside SA.mutate)
 
-## Ungated queue status
+## Ungated / SA.mutate queue status
 
 | Track | Status |
 |-------|--------|
@@ -12,15 +12,23 @@
 | R1 P5 Predictive/Undo (ADR-014) | ✅ research-only closed |
 | Living-doc honesty | ✅ closed (#145) |
 | ADR-015 Memory `SA.mutate` (`store_memory`) | ✅ closed (#146) |
-| ADR-016 Goals `SA.mutate` (`submit_goal`) | ✅ this gate |
+| ADR-016 Goals `SA.mutate` (`submit_goal`) | ✅ closed (#149) |
+| ADR-017 Workflows / Executions / Agents mutate disposition | ✅ **remain outside SA** (this gate) |
 
-## NEXT GATE
+## R1 SA.mutate track — CLOSED
 
-**SA.mutate for remaining non-WM domains (workflows / executions / agents) — each requires its own ADR**
+Live `SA.mutate` surface:
 
-(Or optional: Memory delete extending ADR-015; GoalEngine schema cleanup — not R1-blocking.)
+```text
+World Model nodes/edges + store_memory (ADR-015) + submit_goal (ADR-016)
+```
 
-Parallel hard stops (do not start without their gates):
+Explicitly **out** of SA.mutate (ADR-017): workflows, executions, agents.
+
+No further R1-blocking SA.mutate deepen. Optional extensions need new ADRs and
+are **not** required to close this stop line.
+
+## Parallel hard stops (other tracks — not this stop line)
 
 | Work | Gate |
 |------|------|
@@ -28,11 +36,12 @@ Parallel hard stops (do not start without their gates):
 | Goose / external patterns | Stage 3 + Integration Proposal + ADR |
 | Live-wire Predictive/Undo | ADR superseding ADR-014 |
 | OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator re-wire | ADR superseding 006 / 012 / 013 |
-| Platform hotkey/tray live wire | Phase 11 / plan dependency (not R1 blocker); optional code PR |
+| Platform hotkey/tray live wire | Phase 11 / plan dependency |
 
-## Optional ungated (not required — separate PRs)
+## Optional ungated (not required)
 
-- GoalEngine schema / package cleanup (ADR-012 allows; not R1-blocking)
-- Research-tree package deletes (test churn)
-- Memory delete via SA (would need ADR extending 015)
-- Goals lifecycle (pause/resume/cancel) via SA (would need ADR extending 016)
+- GoalEngine schema / package cleanup (ADR-012 allows)
+- Research-tree package deletes
+- Memory delete via SA (ADR extending 015)
+- Goals lifecycle via SA (ADR extending 016)
+- Read-only SA projection of workflow/execution/agent summaries (new ADR)

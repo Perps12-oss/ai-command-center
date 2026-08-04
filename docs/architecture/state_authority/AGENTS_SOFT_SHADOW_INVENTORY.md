@@ -1,9 +1,9 @@
 # Agents Soft-Shadow Inventory (State Authority)
 
-**Status:** ACTIVE — Stage 2 closeout (inventory + pins)  
-**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, ADR-013  
+**Status:** ACTIVE — Stage 2 closeout + **SA.mutate remain-outside (ADR-017)**  
+**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, ADR-013, ADR-017  
 **Date:** 2026-08-04  
-**Baseline:** `origin/main` @ `01ed04c`
+**Baseline:** ADR-017 acceptance tip
 
 ## Verdict
 
@@ -44,7 +44,7 @@ Factory: `AgentRuntimeService(bus)` registered as `"agent_runtime"`.
 | Capability | Agents |
 |------------|--------|
 | Query aggregate | ❌ no agent_lookup |
-| Mutate | ❌ unsupported |
+| Mutate | ❌ unsupported (**ADR-017** — remain outside) |
 | WM overlap | Agent actions may create WM nodes via other services — not agent SoT |
 
 ---
@@ -53,16 +53,18 @@ Factory: `AgentRuntimeService(bus)` registered as `"agent_runtime"`.
 
 | Step | Action | Gate |
 |------|--------|------|
-| **A ✅** | Inventory + pins + ADR-013 | This PR |
-| B | Optional SA read-only “active agents” projection from AppState/bus | Later |
+| **A ✅** | Inventory + pins + ADR-013 | Soft-shadow closeout |
+| **B ✅** | **Remain outside `SA.mutate`** (no agent pipeline mutate via SA) | **ADR-017** |
+| C | Optional SA read-only “active agents” projection from AppState/bus | Later ADR |
 | ❌ | Wire AgentCoordinator onto live bus | Forbidden without new ADR |
-| ❌ | SA.mutate agent pipeline state | Forbidden without ADR |
+| ❌ | SA.mutate agent pipeline state without superseding ADR | Forbidden |
 
 ---
 
 ## References
 
 - `docs/architecture/adr/ADR-013_PLANNING_AGENT_COORDINATOR_DISPOSITION.md`  
+- `docs/architecture/adr/ADR-017_SA_MUTATE_WORKFLOWS_EXECUTIONS_AGENTS_DISPOSITION.md`  
 - `docs/architecture/SHADOW_SOT_INVENTORY.md`  
 - `ai_command_center/services/agent_runtime_service.py`  
 - `ai_command_center/orchestration/agents/`  

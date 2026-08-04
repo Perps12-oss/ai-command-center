@@ -1,9 +1,9 @@
 # Workflows Soft-Shadow Inventory (State Authority)
 
-**Status:** ACTIVE — Stage 2 SHADOW steps 5a+5b closed  
-**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, `SHADOW_SOT_INVENTORY.md` step 5  
+**Status:** ACTIVE — Stage 2 SHADOW steps 5a+5b closed; **SA.mutate remain-outside (ADR-017)**  
+**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, ADR-017, `SHADOW_SOT_INVENTORY.md` step 5  
 **Date:** 2026-08-04  
-**Baseline:** `origin/main` @ `01ed04c` (#133)
+**Baseline:** ADR-017 acceptance tip
 
 ## Verdict
 
@@ -69,7 +69,7 @@ No capability tools named `workflow.*` found on the live path.
 | `StateQuery` include flag | ❌ none |
 | Factory `workflow_lookup` | ❌ not wired (**5b: intentional**) |
 | `SA.query` / `project` | WM + optional memory/goals only |
-| `SA.mutate` | WM nodes/edges only — workflow ops **unsupported** |
+| `SA.mutate` | WM + memory + goals only — workflow ops **unsupported (ADR-017)** |
 
 ---
 
@@ -79,7 +79,7 @@ No capability tools named `workflow.*` found on the live path.
 |------|--------|------|
 | **5a ✅** | Publish this inventory + factory/SA pins | #131 |
 | **5b ✅** | **Keep execution-scoped** — no SA `workflow_lookup` / project hooks | Closeout PR |
-| 5c | Deferred: read-only `workflow_lookup` only if a future contract slice requires it | New ADR / contract |
+| **5c ✅** | **Remain outside `SA.mutate`** (no start/complete workflow via SA) | **ADR-017** |
 | ❌ | Silent-merge `workflow_runs` ↔ WM / execution_runs | Forbidden |
 | ❌ | Kill WorkflowEngine or dual-write runs | Forbidden without ADR |
 

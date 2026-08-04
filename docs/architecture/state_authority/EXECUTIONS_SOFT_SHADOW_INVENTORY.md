@@ -1,9 +1,9 @@
 # Executions Soft-Shadow Inventory (State Authority)
 
-**Status:** ACTIVE — Stage 2 SHADOW steps 6a+6b closed  
-**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, `SHADOW_SOT_INVENTORY.md` step 6  
+**Status:** ACTIVE — Stage 2 SHADOW steps 6a+6b closed; **SA.mutate remain-outside (ADR-017)**  
+**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, ADR-017, `SHADOW_SOT_INVENTORY.md` step 6  
 **Date:** 2026-08-04  
-**Baseline:** `origin/main` @ `01ed04c` (#133)
+**Baseline:** ADR-017 acceptance tip
 
 ## Verdict
 
@@ -84,7 +84,7 @@ same correlation_id
 |------------|------------|
 | `StateQuery` include flag | ❌ none |
 | Factory lookup hook | ❌ none |
-| `SA.mutate` | WM only — execution ops **unsupported** |
+| `SA.mutate` | WM + memory + goals only — execution ops **unsupported (ADR-017)** |
 
 ---
 
@@ -94,9 +94,9 @@ same correlation_id
 |------|--------|------|
 | **6a ✅** | Publish this inventory + factory/SA pins | #133 |
 | **6b ✅** | Correlate execution receipts via `correlation_id` + pin test | Closeout PR |
-| 6c | Optional later: SA read-only project of recent runs — never dual-write | Contract R1 |
+| **6c ✅** | **Remain outside `SA.mutate`** (append-only via Execution* services only) | **ADR-017** |
 | ❌ | Silent-merge `execution_runs` ↔ `workflow_runs` ↔ WM | Forbidden |
-| ❌ | `SA.mutate` for executions without ADR | Forbidden |
+| ❌ | `SA.mutate` for executions without superseding ADR | Forbidden |
 
 ---
 
