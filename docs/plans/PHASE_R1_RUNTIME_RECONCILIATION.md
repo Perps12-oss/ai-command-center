@@ -132,6 +132,7 @@ Workspace State → State Authority (contract) → Context Projection → Planne
 - [x] Goals dual-path inventory + disposition *(ADR-012 Accepted Option A)*
 - [x] Memory soft-shadow inventory *(MEMORY_SOFT_SHADOW_INVENTORY.md — step 4a)*
 - [x] Workflows soft-shadow inventory *(WORKFLOWS_SOFT_SHADOW_INVENTORY.md — step 5a)*
+- [x] Executions soft-shadow inventory *(EXECUTIONS_SOFT_SHADOW_INVENTORY.md — step 6a)*
 
 ---
 

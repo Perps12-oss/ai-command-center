@@ -190,7 +190,7 @@ Existing types: `StateContext` (`domain/state_context.py`) is the v1 projection 
 | World Model nodes | ✅ authoritative via `SA.mutate` / `SA.query` |
 | World Model edges | ✅ authoritative via `SA.mutate` (`create_edge` / `delete_edge`) |
 | Goals (`GoalEngine` vs `GoalRepository`) | ✅ live = `GoalRepository`; GoalEngine quarantined from factory |
-| Workflows / executions / agents | ⚠️ workflows inventoried 5a; executions/agents still outside SA mutate |
+| Workflows / executions / agents | ⚠️ workflows 5a + executions 6a inventoried; agents still outside SA mutate |
 | Memory | ⚠️ lookup on query; soft dual Assembler/tools; **not** mutate — see MEMORY_SOFT_SHADOW_INVENTORY |
 
 ---
