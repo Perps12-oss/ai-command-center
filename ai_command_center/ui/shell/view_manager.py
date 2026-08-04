@@ -149,7 +149,9 @@ class ViewManagerMixin:
             on_inspect_select=self._on_chat_inspect_select,
             on_search=self._controller.publish_memory_search,
         )
-        self._view_registry["system"] = lambda: SystemView(self._content)
+        self._view_registry["system"] = lambda: SystemView(
+            self._content, ui_queue=self._ui_queue
+        )
         self._view_registry["settings"] = lambda: SettingsView(
             self._content,
             on_save=self._on_settings_save,

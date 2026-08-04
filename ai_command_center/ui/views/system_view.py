@@ -1,15 +1,23 @@
 """System monitor — CPU/RAM/Disk/Net meters, sparkline, top processes, tool log, error log."""
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.widget_utils import clear_children
 from ai_command_center.ui.design_system import theme_v2 as T
+
+if TYPE_CHECKING:
+    from ai_command_center.ui.ui_queue import UIQueue
+
+logger = logging.getLogger(__name__)
 
 _MAX_LOG_ROWS = 50
 
@@ -407,14 +415,21 @@ class _ProcessTable(ctk.CTkFrame):
 class SystemView(ctk.CTkFrame):
     """System resource monitor.
 
-    Polls psutil on a background thread; pushes results to the UI via after()
-    on the main thread. No EventBus interaction.
+    Polls psutil on a background thread; pushes results to the UI via
+    ``UIQueue`` (never ``.after()`` from the worker thread).
     """
 
     _POLL_MS = 2000
 
-    def __init__(self, master, **kwargs) -> None:
+    def __init__(
+        self,
+        master,
+        *,
+        ui_queue: UIQueue | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
+        self._ui_queue = ui_queue
         self._active        = False
         self._poll_in_flight = False
         self._poll_generation = 0
@@ -422,6 +437,15 @@ class SystemView(ctk.CTkFrame):
         self._prev_net      = None
         self._prev_ts       = None
         self._build()
+
+    def _schedule_on_ui(self, callback: Callable[[], None]) -> None:
+        """Hand work to the Tk thread without touching Tcl from a worker."""
+        if self._ui_queue is not None:
+            self._ui_queue.enqueue(callback)
+            return
+        # Fallback only when constructed without a queue (tests / legacy).
+        # Safe solely if the caller is already on the UI thread.
+        self.after(0, callback)
 
     def _build(self) -> None:
         header = ctk.CTkFrame(self, fg_color=T.BG_PANEL, corner_radius=0, height=44)
@@ -555,7 +579,7 @@ class SystemView(ctk.CTkFrame):
                         str(p.info["name"] or ""),
                     ))
                 except Exception:
-                    pass
+                    logger.debug("SystemView: skip process row", exc_info=True)
 
             # Disk I/O delta
             disk_delta = (None, None)
@@ -568,7 +592,7 @@ class SystemView(ctk.CTkFrame):
                     disk_delta = (read_s, write_s)
                 self._prev_disk = dk
             except Exception:
-                pass
+                logger.debug("SystemView: disk I/O sample failed", exc_info=True)
 
             # Net I/O delta
             net_delta = (None, None)
@@ -581,23 +605,25 @@ class SystemView(ctk.CTkFrame):
                     net_delta = (recv_s, sent_s)
                 self._prev_net = nt
             except Exception:
-                pass
+                logger.debug("SystemView: net I/O sample failed", exc_info=True)
 
             self._prev_ts = now
 
             if self._poll_live(generation):
-                self.after(
-                    0,
-                    lambda: self._update_ui_if_active(
-                        generation, cpu, vm, proc_cpu, proc_mem, procs, disk_delta, net_delta
-                    ),
+                self._schedule_on_ui(
+                    lambda g=generation, c=cpu, v=vm, pc=proc_cpu, pm=proc_mem, pr=procs, dd=disk_delta, nd=net_delta: self._update_ui_if_active(
+                        g, c, v, pc, pm, pr, dd, nd
+                    )
                 )
         except Exception:
-            pass
+            logger.exception("SystemView poll collect failed")
         finally:
             self._poll_in_flight = False
         if self._poll_live(generation):
-            self.after(self._POLL_MS, lambda: self._poll(generation))
+            # Never call Tk .after() from this worker thread — hop to UI first.
+            self._schedule_on_ui(
+                lambda g=generation: self.after(self._POLL_MS, lambda: self._poll(g))
+            )
 
     def _update_ui_if_active(
         self,
