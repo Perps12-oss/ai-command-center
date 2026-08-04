@@ -1,8 +1,8 @@
 # Shadow Source-of-Truth Inventory
 
-**Status:** ACTIVE (Stage 2 — Goals 3b closed; Memory 4a+4b; Workflows 5a; Executions 6a)  
+**Status:** ACTIVE — Stage 2 soft-shadow **ungated closeout complete** (3a–6b + agents)  
 **Authority:** `docs/architecture/STATE_AUTHORITY_CONTRACT.md` (item 4)  
-**Verified:** `main` @ `97e3c80`+ (2026-08-04)  
+**Verified:** `main` @ `01ed04c`+ (2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative. Transient caches are allowed; durable truth outside State Authority is not.
 
 ---
@@ -20,10 +20,10 @@ List every store or service that can be mistaken for authoritative workspace rea
 | World Model | `WorldModel` + SQLite repo | ✅ | ✅ primary `query` | No | Keep — ADR-005 |
 | Goals (live) | `GoalRepository` + `SingleGoalScheduler` | ✅ | ✅ `goal_lookup` read | Soft dual (was) | **Canonical live goals path** |
 | Goals (Phase-9) | `GoalEngine` + `goal_engine_goals` | ✅ schema | ❌ | **Retired (ADR-012 A)** | Tree may remain for unit tests; **not** product SoT; cleanup optional |
-| Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ✅ SA lookup + Assembler 4b | Soft tools | **4a+4b** — see `MEMORY_SOFT_SHADOW_INVENTORY.md`; tools dual remains |
-| Executions | `ExecutionRun` / `ExecutionEvent` / `ExecutionQuery` → repos | ✅ append-only | ❌ | Soft | **Step 6a inventory** — see `EXECUTIONS_SOFT_SHADOW_INVENTORY.md`; no silent merge |
-| Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **Step 5a inventory** — see `WORKFLOWS_SOFT_SHADOW_INVENTORY.md`; no silent merge |
-| Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; not durable SoT |
+| Memory | `MemoryGraphService` → `MemoryRepository` | ✅ | ✅ SA lookup + Assembler 4b | Soft tools | **4a–4c** — tools `memory.query` stay capability (not SA) |
+| Executions | `ExecutionRun` / `ExecutionEvent` / `ExecutionQuery` → repos | ✅ append-only | ❌ | Soft | **6a+6b** — append-only; correlate via `correlation_id` |
+| Workflows | `WorkflowEngine` + `WorkflowPersistence` → `WorkflowRunRepository` | ✅ | ❌ | Soft | **5a+5b** — keep execution-scoped outside SA |
+| Agent runtime | `AgentRuntimeService` in-memory | ❌ | ❌ | Transient | Keep ephemeral; `AgentCoordinator` RETIRED-from-live (ADR-013) |
 | AppState / UI | reducers / views | ❌ | Projection | No | Never authoritative |
 
 ---
@@ -69,11 +69,12 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | **3b ✅** | Goals | **ADR-012 Accepted — Option A (retire)** Phase-9 from product path | No live re-wire without new ADR; schema cleanup optional later |
 | **4a ✅** | Memory | Soft-shadow inventory + SA lookup pins | `MEMORY_SOFT_SHADOW_INVENTORY.md` + tests |
 | **4b ✅** | Memory | Assembler decision memory via SA `query` | `CapabilityContextAssembler.bind_state_authority` |
-| 4c | Memory | Tool `memory.query` remains capability (not SA) | Doc honesty |
+| **4c ✅** | Memory | Tool `memory.query` remains capability (not SA) | Doc honesty |
 | **5a ✅** | Workflows | Soft-shadow inventory + factory/SA pins | `WORKFLOWS_SOFT_SHADOW_INVENTORY.md` + tests |
-| 5b | Workflows | Decide: SA project hooks **or** keep execution-scoped | Human / follow-up |
+| **5b ✅** | Workflows | **Keep execution-scoped** — no SA workflow hooks | Closeout |
 | **6a ✅** | Executions | Soft-shadow inventory; keep append-only | `EXECUTIONS_SOFT_SHADOW_INVENTORY.md` + tests |
-| 6b | Executions | Correlate receipts with workflow/goal ids | Follow-up |
+| **6b ✅** | Executions | Correlate receipts via `correlation_id` / `get_by_correlation` | Closeout + pin |
+| **Agents ✅** | Agents | Inventory + ADR-013 research-only PlanningEngine/AgentCoordinator | `AGENTS_SOFT_SHADOW_INVENTORY.md` |
 | **7 ✅** | All | Reconstruction: mutate→recover→query (nodes+edges, no chat) | Contract item 5 |
 | **8 ✅** | WM | Unify `mutate()` for nodes + edges with `MutationReceipt` | Contract item 6 (goals/workflows deferred) |
 
@@ -87,16 +88,20 @@ Stop constructing `GoalEngine` / `SQLiteGoalEngineRepository` in `build_services
 | Live goals via GoalRepository | SA `query(include_goals=True)` with `goal_lookup` |
 | Truth matrix | GoalEngine = exists / not live-wired / retire-from-live-path |
 | Bypass | Planner/UI must not import GoalEngine or GoalRepository |
+| Workflows / executions off SA | no `_workflow_lookup` / `_execution_lookup`; 5b+6b docs |
+| Agents | `agent_runtime` registered; no PlanningEngine/AgentCoordinator in factory |
 
 ---
 
 ## References
 
 - `docs/architecture/adr/ADR-012_GOALS_PHASE9_DISPOSITION.md` ← **3b decision vehicle**
+- `docs/architecture/adr/ADR-013_PLANNING_AGENT_COORDINATOR_DISPOSITION.md` ← **agents / R1.2**
 - `docs/architecture/state_authority/GOALS_DUAL_PATH_INVENTORY.md`
 - `docs/architecture/state_authority/MEMORY_SOFT_SHADOW_INVENTORY.md` ← **step 4**
-- `docs/architecture/state_authority/WORKFLOWS_SOFT_SHADOW_INVENTORY.md` ← **step 5a**
-- `docs/architecture/state_authority/EXECUTIONS_SOFT_SHADOW_INVENTORY.md` ← **step 6a**
+- `docs/architecture/state_authority/WORKFLOWS_SOFT_SHADOW_INVENTORY.md` ← **step 5**
+- `docs/architecture/state_authority/EXECUTIONS_SOFT_SHADOW_INVENTORY.md` ← **step 6**
+- `docs/architecture/state_authority/AGENTS_SOFT_SHADOW_INVENTORY.md`
 - `docs/architecture/STATE_AUTHORITY_CONTRACT.md`
 - `docs/audits/RUNTIME_AUTHORITY_MAP.md` §C
 - `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md`

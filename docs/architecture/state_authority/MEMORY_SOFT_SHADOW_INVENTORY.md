@@ -1,9 +1,9 @@
 # Memory Soft-Shadow Inventory (State Authority)
 
-**Status:** ACTIVE — Stage 2 SHADOW step 4 (inventory + query-path pins)  
+**Status:** ACTIVE — Stage 2 SHADOW steps 4a–4c closed  
 **Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, `SHADOW_SOT_INVENTORY.md` step 4  
 **Date:** 2026-08-04  
-**Baseline:** `origin/main` @ `97e3c80` (#129)
+**Baseline:** `origin/main` @ `01ed04c`+ (closeout)
 
 ## Verdict
 
@@ -77,9 +77,16 @@ they were one store.
 |------|--------|------|
 | **4a ✅** | Publish this inventory; pin SA lookup tests | #130 |
 | **4b ✅** | Route Assembler memory snippets through SA `query` | Factory binds SA; bus lookup fallback when unbound |
-| 4c | Keep tool `memory.query` as capability fulfillment; document it is not SA | Doc honesty |
+| **4c ✅** | Keep tool `memory.query` as capability fulfillment; **not** SA | Doc honesty (closeout) |
 | 4d | Optional later: `SA.mutate` memory ops with receipts — only after R1 clarity | Contract R3 |
 | ❌ | Silent-merge `memory_nodes` ↔ WM entities | Forbidden |
+
+### 4c honesty — tools vs SA
+
+| Surface | Authority |
+|---------|-----------|
+| `SA.query(include_memories=True)` + Assembler bind | State Authority read path |
+| Capability / tool `memory.query` | **Capability fulfillment** — may hit MemoryGraph/bus; **must not** be treated as SA SoT or mutate WM |
 
 ---
 
@@ -89,8 +96,8 @@ they were one store.
 |--------|--------|
 | WM nodes/edges | ✅ SA mutate/query |
 | Goals | ✅ live scheduler; Phase-9 **RETIRED (ADR-012 A)** |
-| Memory | ⚠️ soft dual reads — this document |
-| Workflows | ⚠️ soft dual — this document (5a); 5b decide SA hooks vs execution-scoped |
+| Memory | ✅ 4a–4c — this document |
+| Workflows | ✅ 5a+5b execution-scoped |
 
 ---
 

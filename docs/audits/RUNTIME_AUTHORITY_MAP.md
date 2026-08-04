@@ -76,22 +76,22 @@ OrchestrationService             ← receipts, truth, orchestration snapshots
 ```text
 User
     ▼
-OperatorKernel                    ← operator/kernel.py (tests only)
+OperatorKernel                    ← operator/kernel.py (tests only; ADR-006)
     ▼
-PlanningEngine                    ← orchestration/goals/planning_engine.py (tests only)
+PlanningEngine                    ← orchestration/goals/planning_engine.py (tests only; ADR-013)
     ▼
-AgentCoordinator                  ← orchestration/agents/agent_coordinator.py (tests only)
+AgentCoordinator                  ← orchestration/agents/agent_coordinator.py (tests only; ADR-013)
     ▼
 RuntimeCapabilityRouterService
     ▼
 Provider / Tools
 ```
 
-| Component | Exists | In `service_factory` | On live EventBus path |
-|-----------|:------:|:--------------------:|:---------------------:|
-| OperatorKernel | ✅ | ❌ | ❌ |
-| PlanningEngine | ✅ | ❌ | ❌ |
-| AgentCoordinator | ✅ | ❌ | ❌ |
+| Component | Exists | In `service_factory` | On live EventBus path | Disposition |
+|-----------|:------:|:--------------------:|:---------------------:|-------------|
+| OperatorKernel | ✅ | ❌ | ❌ | Research-only (ADR-006) |
+| PlanningEngine | ✅ | ❌ | ❌ | **RETIRED from live (ADR-013)** |
+| AgentCoordinator | ✅ | ❌ | ❌ | **RETIRED from live (ADR-013)** |
 
 `rg OperatorKernel` outside `operator/` → **tests only**.
 
@@ -101,7 +101,7 @@ Provider / Tools
 
 | System | Wired | Notes |
 |--------|:-----:|-------|
-| `GoalEngine` + SQLite repo | ❌ | **Quarantined** (Stage 2 Slice 3) — not constructed in factory |
+| `GoalEngine` + SQLite repo | ❌ | **RETIRED (ADR-012 A)** — not constructed in factory |
 | `SingleGoalScheduler` + Goal repo | ✅ | **Canonical live goals path** |
 | UI `GOAL_SUBMIT_REQUEST` | ✅ | ExecutionAuthority + Goal Dashboard |
 

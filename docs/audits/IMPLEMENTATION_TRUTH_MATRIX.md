@@ -1,7 +1,7 @@
 # Implementation Truth Matrix
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
-**Baseline:** `origin/main` @ `96198bf` (verified 2026-08-04 — #132 Memory 4b)  
+**Baseline:** `origin/main` @ `01ed04c`+ (Stage 2 ungated closeout — 2026-08-04)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
 **Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
@@ -14,14 +14,14 @@
 |------------|:------:|:------------------------:|:------:|:----------:|--------|----------|
 | OperatorKernel | ✅ | ❌ | ⚠️ unit/golden only | ❌ bypassed | **PARTIAL** | `operator/kernel.py`; **not** in `service_factory.py` / `application.py`; ADR-006 → research only |
 | GoalEngine | ✅ tree | ❌ | ✅ unit | ❌ | **RETIRED** | ADR-012 Accepted Option A; not in factory; live = `GoalRepository` + scheduler; cleanup optional |
-| AgentCoordinator | ✅ | ❌ | ⚠️ orchestration tests | ❌ | **PARTIAL** | `orchestration/agents/`; **not** in `service_factory.py` |
-| PlanningEngine | ✅ | ❌ | ⚠️ tests | ❌ | **PARTIAL** | `orchestration/goals/planning_engine.py`; **not** in factory |
+| AgentCoordinator | ✅ | ❌ | ⚠️ orchestration tests | ❌ | **RETIRED** | ADR-013 Accepted; research/tests only; live = `AgentRuntimeService` |
+| PlanningEngine | ✅ | ❌ | ⚠️ tests | ❌ | **RETIRED** | ADR-013 Accepted; research/tests only; live = `PlannerService` |
 | ExternalCapabilityBridge | ✅ | ✅ | ✅ | ✅ | **WIRED** | `ExternalCapabilityBridgeService(bus)` in factory |
 | BrainRuntime + WorldModel core | ✅ | ✅ | ✅ | ✅ | **WIRED** | `BrainRuntimeService(bus, world_model)` in factory |
 | Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/predictive_engine/`; **not** in factory (R1 P5) |
 | Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **PARTIAL** | `core/world_model/undo_replay/`; **not** in factory (R1 P5) |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
-| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM node/edge mutate; goals SoT = scheduler | **PARTIAL** | Slices 1–4 + ADR-012 A; memory/workflows soft; see `SHADOW_SOT_INVENTORY.md` |
+| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM node/edge mutate; goals SoT = scheduler | **PARTIAL** | Stage 2 soft-shadow closed (3a–6b + agents); WM mutate only; see `SHADOW_SOT_INVENTORY.md` |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
 | TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
 | InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |
@@ -53,8 +53,8 @@ Registered = constructed in factory and started with other services.
 | AgentRuntimeService | ✅ | ✅ | Agent plans / pipeline | **keep** |
 | GoalEngine | ✅ | ❌ | — | **RETIRED (ADR-012 A)** — re-wire requires new ADR |
 | OperatorKernel | ✅ | ❌ | — | **retire from live path** (ADR-006; research/tests only) |
-| PlanningEngine | ✅ | ❌ | — | **defer** — wire or retire at R1.2 gate (not P1) |
-| AgentCoordinator | ✅ | ❌ | — | **defer** — live path uses `AgentRuntimeService` |
+| PlanningEngine | ✅ | ❌ | — | **RETIRED from live (ADR-013)** — research/tests only |
+| AgentCoordinator | ✅ | ❌ | — | **RETIRED from live (ADR-013)** — live path = `AgentRuntimeService` |
 | PredictiveEngine | ✅ | ❌ | — | **P5** |
 | UndoReplay | ✅ | ❌ | — | **P5** |
 
@@ -65,9 +65,9 @@ See `docs/audits/RUNTIME_AUTHORITY_MAP.md` for canonical vs paper paths.
 | Priority | Gate | Status |
 |----------|------|--------|
 | P1 Runtime authority | ADR-006 | **PASSED** |
-| P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **IN PROGRESS** — registry updated; PlanningEngine/AgentCoordinator still exist-unwired |
-| P3 Event & state unification | State Authority Contract | **IN PROGRESS** — Goals A; Memory 4a+4b; Workflows 5a; Executions **6a**; next 5b / agents |
-| P4 UI composition | Inspector/Graph/Timeline unify | **BLOCKED** on P3 close |
+| P2 Composition / DI | Registry complete; keep rows registered; retire rows marked | **PASSED** for GoalEngine/PlanningEngine/AgentCoordinator/OperatorKernel (ADR-006/012/013); Predictive/Undo remain P5 |
+| P3 Event & state unification | State Authority Contract | **SOFT-SHADOW CLOSED** — 3a–6b + agents inventories; deepen SA mutate only with new ADR |
+| P4 UI composition | Inspector/Graph/Timeline unify | **UNBLOCKED** from Stage 2 soft-shadow (P5 still blocked on broader R1) |
 | P5 Feature completion | Predictive/Undo/platform | **BLOCKED** on P1–P4 |
 
 ---
