@@ -126,6 +126,58 @@ class SingleGoalScheduler(BaseService):
         )
         self._activate_next_if_idle()
 
+    def submit_goal_for_state(
+        self,
+        title: str,
+        *,
+        workspace_id: str = "",
+        description: str = "",
+        priority: str = "",
+        goal_id: str = "",
+        correlation_id: str = "",
+    ) -> tuple[bool, str, dict]:
+        """SA mutate helper (ADR-016) — same SoT as GOAL_SUBMIT_REQUEST intake."""
+        clean_title = str(title or "").strip()
+        if not clean_title:
+            return False, "title required", {}
+        gid = str(goal_id or "").strip() or uuid.uuid4().hex
+        corr_id = str(correlation_id or "").strip()
+        if corr_id:
+            correlation = CorrelationContext(
+                correlation_id=corr_id,
+                goal_id=gid,
+                action_id="state_authority.mutate",
+            )
+        else:
+            correlation = CorrelationContext.new(
+                action_id="state_authority.mutate"
+            ).with_goal(gid)
+        goal = Goal(
+            id=gid,
+            title=clean_title,
+            description=str(description or "").strip(),
+            priority=_parse_priority(priority),
+            correlation=correlation.with_goal(gid),
+        )
+        ws = str(workspace_id or "").strip()
+        if ws:
+            options = dict(self._run_options.get(gid) or {})
+            options["workspace_id"] = ws
+            self._run_options[gid] = options
+        self.submit_goal(goal)
+        stored = self._repo.get_goal(gid)
+        if stored is None:
+            return False, "submit failed", {}
+        meta = {
+            "id": stored.id,
+            "title": stored.title,
+            "status": stored.status.value,
+            "workspace_id": ws,
+        }
+        if stored.status == GoalStatus.FAILED:
+            return False, "goal failed", meta
+        return True, f"submitted goal {stored.title}", meta
+
     def pause_goal(self, goal_id: str, correlation: CorrelationContext) -> None:
         if self._active_goal is None or self._active_goal.id != goal_id:
             return

@@ -265,6 +265,7 @@ def build_services(
         memory_lookup=memory_graph.lookup_for_state,
         memory_store=memory_graph.store_memory,
         goal_lookup=_goal_lookup,
+        goal_submit=goal_scheduler.submit_goal_for_state,
     )
     context_assembler.bind_state_authority(state_authority)
     planner = PlannerService(

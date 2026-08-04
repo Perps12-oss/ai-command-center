@@ -1,22 +1,25 @@
 # Goals Dual-Path Shadow SoT Inventory
 
-**Status:** CLOSED for 3b — Path A sole product SoT; Path B **RETIRED** (ADR-012 A)  
-**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, R1.3, **ADR-012 Accepted Option A**  
+**Status:** CLOSED for 3b (ADR-012 A) + **step 5 mutate submit** (ADR-016)  
+**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, R1.3, **ADR-012 A**, **ADR-016**  
 **Date:** 2026-07-30 (updated 2026-08-04)  
-**Baseline:** `origin/main` @ `328e942`+  
-**3b decision:** ADR-012 **Accepted — Option A (retire)**; schema/module cleanup optional later
+**Baseline:** ADR-016 acceptance tip  
+**3b decision:** ADR-012 **Accepted — Option A (retire)**; schema/module cleanup optional later  
+**5 decision:** ADR-016 **Accepted** — `SA.mutate(submit_goal)` via scheduler only
 
 ## Verdict
 
 Goals had **two parallel persistence stacks**. Only Path A is live. Path B
 (`GoalEngine`) is **retired from the product path** (ADR-012 A). State Authority
-reads Path A only. **Do not re-wire GoalEngine into intake without a new ADR
-that supersedes ADR-012.**
+reads Path A and may **submit** via Path A′ (ADR-016). **Do not re-wire GoalEngine
+into intake without a new ADR that supersedes ADR-012.** **Do not** let SA write
+`GoalRepository` directly.
 
-| Path | Stack | Live intake? | SA `goal_lookup`? | Disposition |
-|------|-------|:------------:|:-----------------:|-------------|
-| **A — Scheduler (canonical)** | `ExecutionAuthority` → `GOAL_SUBMIT_REQUEST` → `SingleGoalScheduler` → `GoalRepository` (`goals` table) | ✅ | ✅ | **keep** — sole live SoT for UI goals |
-| **B — GoalEngine (retired)** | `GoalEngine` + `SQLiteGoalEngineRepository` (`goal_engine_goals` table) | ❌ | ❌ | **RETIRED (ADR-012 A)** — not constructed; unit-test tree only until cleanup |
+| Path | Stack | Live intake? | SA? | Disposition |
+|------|-------|:------------:|:---:|-------------|
+| **A — Scheduler (canonical)** | `GOAL_SUBMIT_REQUEST` → `SingleGoalScheduler` → `GoalRepository` (`goals`) | ✅ | ✅ lookup | **keep** — sole live SoT |
+| **A′ — SA mutate (ADR-016)** | `SA.mutate(submit_goal)` → `submit_goal_for_state` → `submit_goal` | ✅ soft dual entry | ✅ mutate | **5 ✅** — same SoT as A |
+| **B — GoalEngine (retired)** | `GoalEngine` + `goal_engine_goals` | ❌ | ❌ | **RETIRED (ADR-012 A)** |
 
 ## Path A — Live (authoritative for UI / intake)
 
@@ -40,6 +43,22 @@ Evidence:
 | SA aggregation | `service_factory._goal_lookup` → `goal_repo.list_goals()` only |
 | Registered | `goal_scheduler` in `services.register(...)` loop |
 
+## Path A′ — SA mutate (ADR-016)
+
+```text
+Caller
+  → StateAuthorityService.mutate(StateDelta(operations=[{op: submit_goal, title, …}]))
+  → goal_submit → SingleGoalScheduler.submit_goal_for_state
+  → submit_goal → goals + GOAL_SUBMITTED (+ maybe activate / PLAN_REQUEST)
+  → MutationReceipt.applied[]   # never WorldModel.apply / GoalRepository from SA
+```
+
+Hard rules:
+
+- No SA → `GoalRepository` direct writes  
+- No GoalEngine path  
+- Lifecycle (pause/resume/cancel) stays on scheduler request topics — **not** SA  
+
 ## Path B — Quarantined (exists in tree, not constructed)
 
 ```text
@@ -51,16 +70,6 @@ service_factory (Slice 3+):
   → schema code remains under repositories/goal_engine_repository.py for tests
 ```
 
-Evidence:
-
-| Probe | Location |
-|-------|----------|
-| Quarantine | `service_factory.py` comments + omitted construct |
-| Schema | `goal_engine_repository.py` → `goal_engine_goals` |
-| Domain | `orchestration/goals/goal_engine.py` (Phase-9 richer model) |
-| Contract doc | `docs/architecture/GOAL_ENGINE.md` — **Proposed**, pending approval |
-| Inventory | `docs/architecture/SHADOW_SOT_INVENTORY.md` |
-
 Exists ≠ Wired ≠ Authoritative. Path B is **tree-only / unit-testable**.
 
 ## Divergence risks (mitigated)
@@ -69,6 +78,7 @@ Exists ≠ Wired ≠ Authoritative. Path B is **tree-only / unit-testable**.
 2. **Truth matrix** — GoalEngine marked **QUARANTINED** (not live WIRED).
 3. **SA blind spot** — if callers write Path B in tests/research, `SA.query(include_goals=True)` will not see those goals.
 4. **ADR-006** — OperatorKernel / alternate engines must not become intake; GoalEngine must not be quietly wired to `GOAL_SUBMIT_REQUEST`.
+5. **ADR-016** — SA mutate must enter via scheduler callback, not repo-direct.
 
 ## Migration plan (ordered)
 
@@ -78,23 +88,23 @@ Exists ≠ Wired ≠ Authoritative. Path B is **tree-only / unit-testable**.
 | 2 | ✅ Quarantine GoalEngine from live factory (#125) | R1.3 |
 | 3 | ✅ **ADR-012 Accepted — Option A (retire)** | Human 2026-08-04 |
 | 4 | Optional cleanup: archive/delete Phase-9 modules + `goal_engine_goals` | Separate PR |
-| 5 | Optional: `SA.mutate` goal ops only via live SoT | Contract R1 |
+| **5 ✅** | `SA.mutate` `submit_goal` via live SoT only | **ADR-016** |
 
 **Hard rule (ADR-012 A):** no factory construction of GoalEngine onto intake; re-wire requires a new ADR. Schema drop is optional cleanup, not required for acceptance.
 
 ## Related shadow SoT
 
-| Domain | Status after Slice 4 |
-|--------|----------------------|
-| WM nodes | ✅ via `SA.mutate` / `SA.query` |
-| WM edges | ✅ via `SA.mutate` create_edge / delete_edge |
-| Goals | ✅ live Path A; Path B quarantined |
+| Domain | Status |
+|--------|--------|
+| WM nodes/edges | ✅ SA mutate/query |
+| Goals | ✅ Path A + A′ (ADR-016); Path B retired |
+| Memory | ✅ 4a–4d (ADR-015) |
 | Workflows / executions / agents | ⚠️ outside SA mutate |
-| Memory | ⚠️ lookup on query only |
 
 ## References
 
 - `docs/architecture/adr/ADR-012_GOALS_PHASE9_DISPOSITION.md`
+- `docs/architecture/adr/ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md`
 - `docs/architecture/SHADOW_SOT_INVENTORY.md`
 - `docs/architecture/STATE_AUTHORITY_CONTRACT.md`
 - `docs/architecture/GOAL_ENGINE.md`

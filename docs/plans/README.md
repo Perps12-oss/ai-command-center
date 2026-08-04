@@ -21,7 +21,7 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 **Ungated Stage 2 / R1 disposition work is closed.** See [`docs/audits/R1_UNGATED_STOP_LINE.md`](../audits/R1_UNGATED_STOP_LINE.md).
 
-**NEXT GATE:** Remaining non-WM SA.mutate domains (goals/workflows/…) — each needs ADR. Parallel: Async EventBus (perf approval); Goose = Stage 3.
+**NEXT GATE:** Workflows/executions/agents SA.mutate (each needs ADR). Parallel: Async EventBus (perf approval); Goose = Stage 3.
 
 Goal: keep `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 
