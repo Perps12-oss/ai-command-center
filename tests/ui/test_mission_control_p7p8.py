@@ -272,8 +272,8 @@ def test_exec_dock_shows_most_recent_events() -> None:
     view.apply_state(snap)
     steps = view._exec_dock._steps
     assert len(steps) == 24
-    assert steps[0]["label"] == "step 6"
-    assert steps[-1]["label"] == "step 29"
+    assert steps[0]["name"] == "step 6"
+    assert steps[-1]["name"] == "step 29"
 
 
 def test_exec_dock_fallback_recent_events_are_newest_first() -> None:
@@ -294,8 +294,8 @@ def test_exec_dock_fallback_recent_events_are_newest_first() -> None:
     view.apply_state(AppState(recent_execution_events=recent))
     steps = view._exec_dock._steps
     assert len(steps) == 24
-    assert steps[0]["label"] == "step 6"
-    assert steps[-1]["label"] == "step 29"
+    assert steps[0]["name"] == "step 6"
+    assert steps[-1]["name"] == "step 29"
 
 
 def test_exec_dock_scrub_publishes_global_index_with_offset() -> None:
