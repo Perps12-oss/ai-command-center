@@ -71,15 +71,34 @@ class ExecutionTimelineDock(ctk.CTkFrame):
         scrub_index: int = 0,
     ) -> int:
         """Render timeline steps and sync the scrubber. Returns clamped index."""
-        self._steps = list(steps)
+        step_list = list(steps)
         active_index = scrub_index
+        if step_list:
+            active_index = max(0, min(scrub_index, len(step_list) - 1))
+        labels = list(
+            scrub_labels or [str(step.get("name", "")) for step in step_list]
+        )
+        fingerprint = (
+            tuple(
+                (
+                    str(step.get("event_id", "") or ""),
+                    str(step.get("name", "") or ""),
+                    str(step.get("status", "") or ""),
+                    float(step.get("duration_ms", 0.0) or 0.0),
+                )
+                for step in step_list
+            ),
+            tuple(labels),
+            int(active_index),
+        )
+        if fingerprint == getattr(self, "_render_fingerprint", None):
+            return active_index
+        self._render_fingerprint = fingerprint
+        self._steps = step_list
         if self._steps:
-            active_index = max(0, min(scrub_index, len(self._steps) - 1))
             self._timeline.render(self._steps, active_index=active_index)
         else:
             self._timeline.render([])
-
-        labels = list(scrub_labels or [str(step.get("name", "")) for step in self._steps])
         self._scrubber.set_timeline(labels, active_index=active_index)
         return active_index
 

@@ -216,17 +216,22 @@ def main() -> int:
         "Ctrl+Shift+W for Workspace OS Inspector. "
         "Ctrl+Shift+O for Orchestration Inspector. "
         "Ctrl+Shift+R for Runtime Inspector. "
-        "Ctrl+Shift+P for Performance Inspector. Tray icon active."
+        "Ctrl+Shift+P for Performance Inspector. Tray icon active.",
+        flush=True,
     )
-    # Must appear on stdout next to the line above — proves which package is live.
-    # If freeze_fix is missing or < v5, you are not running the perf-architecture fix.
-    import ai_command_center.core.event_bus as _event_bus_mod
-    from ai_command_center.ui.app import ACC_UI_FREEZE_FIX as _freeze_fix
+    # Identity lines prove which tree is live. Freeze reports without them
+    # (and without Ctrl+Shift+P above) are from a stale/legacy copy.
+    from ai_command_center.runtime_identity import print_runtime_identity
 
-    print(
-        f"ACC_UI_RUNTIME freeze_fix={_freeze_fix} "
-        f"event_bus={_event_bus_mod.__file__}"
-    )
+    identity = print_runtime_identity(main_file=__file__)
+    if not identity.is_current:
+        print(
+            "ERROR: ACC runtime identity is STALE — quit tray, launch from "
+            r"c:\Users\S8633\Documents\GITHUB\ai-command-center only "
+            "(not OneDrive legacy). See README 'Freeze triage'.",
+            file=sys.stderr,
+            flush=True,
+        )
     app.protocol("WM_DELETE_WINDOW", app.hide)
     app.show()
 

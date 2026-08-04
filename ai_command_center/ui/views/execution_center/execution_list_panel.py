@@ -45,12 +45,16 @@ class _RunRow:
     summary: str
 
 
-def _format_duration(created_at: float) -> str:
+def _format_duration(created_at: float, *, now: float | None = None) -> str:
+    """Human duration. Uses minute buckets so live ticks do not thrash row equality."""
     if not created_at:
         return "—"
-    elapsed = max(0.0, time.time() - float(created_at))
+    clock = float(now if now is not None else time.time())
+    elapsed = max(0.0, clock - float(created_at))
     if elapsed < 60:
-        return f"{int(elapsed)}s"
+        # Bucket to 5s so AppState ticks do not rebuild the whole list every second.
+        bucket = int(elapsed // 5) * 5
+        return f"{bucket}s"
     if elapsed < 3600:
         return f"{int(elapsed // 60)}m"
     return f"{elapsed / 3600:.1f}h"
@@ -187,7 +191,16 @@ class ExecutionListPanel(ctk.CTkFrame):
         self._list.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
     def apply_snapshot(self, snap: AppState, *, selected_request_id: str = "") -> None:
-        self._rows = _rows_from_snapshot(snap)
+        rows = _rows_from_snapshot(snap)
+        row_fp = tuple(
+            (r.run_id, r.request_id, r.goal, r.status, r.source, r.created_at, r.duration, r.summary)
+            for r in rows
+        )
+        key = (row_fp, str(selected_request_id or ""))
+        if key == getattr(self, "_snapshot_fingerprint", None):
+            return
+        self._snapshot_fingerprint = key
+        self._rows = rows
         self._selected_id = selected_request_id
         self._render()
 
