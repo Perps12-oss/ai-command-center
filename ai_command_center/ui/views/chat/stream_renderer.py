@@ -12,7 +12,7 @@ from ai_command_center.ui.design_system import theme_v2 as T
 BUBBLE_RADIUS = T.BUBBLE_RADIUS
 BUBBLE_WRAP = 520
 BUBBLE_TBX_W = 540
-SIDE_PAD = 16
+SIDE_PAD = T.MSG_SIDE_PAD  # alias — prefer T.MSG_SIDE_PAD at call sites
 _STREAM_DEBOUNCE_MS = 16
 _CURSOR_CHAR = "▌"
 # Intentional UX affordance shown while waiting for the first stream chunk.
