@@ -1,20 +1,22 @@
 # ADR-009: Tool Confirmation Router Pipeline
 
-**Status:** Proposed  
+**Status:** Proposed — **narrowed by ADR-018**  
 **Date:** 2026-07-27  
 **Deciders:** Architecture Review (Tom)  
 **Supersedes:** —  
-**Related:** `research/patterns/PAT-004.md`, `research/decisions/RD-001.md`, `docs/architecture/ADR-004_RUNTIME_APPROVAL_MODEL.md`, `docs/architecture/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`
+**Related:** `research/patterns/PAT-004.md`, `research/decisions/RD-001.md`, `docs/architecture/ADR-004_RUNTIME_APPROVAL_MODEL.md`, `docs/architecture/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`, **ADR-018_TOOL_INVOCATION_ARCHITECTURE.md**
+
+> **Narrowing (ADR-018, 2026-08-05):** ACC’s canonical tool path is **Planner intentions → Orchestrator → ToolExecutor**. The LLM must not own executable tool signatures. Any ToolConfirmationRouter implementation must gate **capability/intention** execution (align with `require_approval`, PermissionService, Brain SecurityTiers) — not assume a Goose-style model-emitted `tool_call_id` stream as the primary architecture. Denied results return to the planner/orchestrator path, not to a freeform model tool loop as SoT.
 
 ---
 
 ## Context
 
-LLM-generated tool calls can be destructive, leak data, or repeat. ACC already has a runtime approval model (ADR-004), but it lacks a standardized mechanism for suspending a tool call, asking the user for explicit approval, and resuming with the user's decision. `block/goose` uses a `ToolConfirmationRouter` that registers pending requests and emits `action_required` messages.
+Capability executions (and any future LLM *planner-assist* intentions) can be destructive, leak data, or repeat. ACC already has a runtime approval model (ADR-004), but it lacks a standardized mechanism for suspending a gated step, asking the user for explicit approval, and resuming with the user's decision. `block/goose` uses a `ToolConfirmationRouter` that registers pending requests and emits `action_required` messages — useful as **reference**, not as ACC’s ownership model (see ADR-018).
 
 ## Decision
 
-Introduce a **ToolConfirmationRouter** that is the single point for suspending tool execution and awaiting user approval. The router is invoked when an inspector or the permission service returns `RequireApproval`.
+Introduce a **ToolConfirmationRouter** (or equivalent EventBus confirmation flow) that is the single point for suspending **intention/capability** execution and awaiting user approval. The router is invoked when an inspector or the permission service returns `RequireApproval`. **Per ADR-018, this does not establish LLM→executor tool JSON as the live path.**
 
 ### Contract
 

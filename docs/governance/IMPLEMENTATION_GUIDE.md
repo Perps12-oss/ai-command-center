@@ -106,6 +106,13 @@ Does the Constitution, an ADR, or an architecture contract approve it?
    └─ YES → Implement.
    └─ NO ↓
 
+Is this a major architecture change (planning, tool invocation, memory SoT,
+autonomy, model coupling, dual authority, or “more like a generic AI agent”)?
+   └─ YES → Run docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md
+            (multi-council ADR). Do NOT implement until Council Decision
+            Accept / Hybrid and Section 9 plan exist.
+   └─ NO ↓
+
 Does research (6) recommend it?
    └─ YES → Create an Integration Proposal (for ADR / owner review). Do NOT implement.
    └─ NO ↓
@@ -114,6 +121,8 @@ Ignore / Defer.
 ```
 
 This prevents **research creep** and **external-project creep**.
+
+**Architecture Decision Framework:** Major architecture changes must survive structured opposition (Architect, Red Team, Alternative, Systems Board, Constitution Guardian) before an ADR is Accepted and before Section 9 implementation begins. See [`ARCHITECTURE_DECISION_FRAMEWORK.md`](ARCHITECTURE_DECISION_FRAMEWORK.md) and the ADR index [`docs/architecture/adr/README.md`](../architecture/adr/README.md).
 
 ---
 
@@ -165,7 +174,7 @@ These boundaries restate existing governance; they do not create new constitutio
 
 - Research **cannot** directly create implementation work.
 - External repositories **cannot** directly change the roadmap.
-- Every new architectural idea requires: (1) Integration Proposal, (2) Architecture approval (ADR if applicable), (3) Implementation plan, (4) Verification.
+- Every new architectural idea requires: (1) Integration Proposal, (2) Architecture approval (ADR if applicable — **multi-council framework** when major), (3) Implementation plan (ADR Section 9 after Council Decision), (4) Verification.
 
 ---
 
