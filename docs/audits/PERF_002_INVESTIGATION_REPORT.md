@@ -75,7 +75,9 @@ unchanged.
    manual Refresh only — metrics are not AppState projections).
 2. **Avoid duplicate:** Content / fingerprint early-outs on all four inspectors;
    strengthen `RuntimeInspector` fingerprint (runs, provider health, capability
-   providers, full orch display fields).
+   providers, full orch display fields). **Follow-up (Tom S1):** PerfInspector
+   equality fingerprint must **exclude** monotonic `uptime_s` so the 1 Hz tick
+   can skip full textbox rebuilds (`PERF_002_S1_SKIP_PATH_REMEDIATION.md`).
 3. **Coalesce:** `WorkspaceOsInspector` gains `_refresh_pending` (same pattern
    as other inspectors).
 4. **Measure:** Record `inspector.refresh.<name>` timings; incr
@@ -102,11 +104,22 @@ Smallest Program 1 repair matching constitution budgets (inspector refresh
 
 | Criterion | Status |
 |---|---|
-| PerformanceInspector not on AppState fan-out | Met (code) |
-| Fingerprint skips identical Runtime / Workspace / Perf dumps | Met (tests) |
+| PerformanceInspector not on AppState fan-out | Met (code) — **Mitigated scope: fan-out deletion** |
+| Fingerprint skips identical Runtime / Workspace dumps | Met (tests) |
+| PerfInspector equality excludes `uptime_s` (Tom S1) | See follow-up `PERF_002_S1_SKIP_PATH_REMEDIATION.md` |
 | `inspector.refresh.*` metrics exist | Met |
-| Headless tests green | Met |
-| Win ARM64 refresh avg &lt;5 ms with inspector open | **Operator soak** |
+| Win ARM64 refresh avg &lt;5 ms with inspector open | **Operator soak (D1/D2) — not Closed** |
+
+### Mitigation scope (honest)
+
+Art XV **Mitigated** for PERF-002 means:
+
+1. **AppState fan-out deletion** for PerformanceInspector (timer + manual Refresh only).
+2. Content fingerprints / pending coalesce for Runtime, Orchestration, Workspace.
+
+It does **not** mean GUI &lt;5 ms is proven. After the Tom S1 follow-up, PerfInspector
+skip under the 1 Hz timer is a headless contract (uptime excluded from equality);
+Win ARM64 soak remains operator-owned.
 
 ### Headless before / after (rebuild decision)
 
