@@ -78,6 +78,23 @@ gate in `PROGRAM4_GATE_STATUS.md` remains satisfied.
 
 ---
 
+## Degrade modes (ADR-023 Section 9 M1)
+
+Architecture is **brain-independent**. Model choice affects reasoning quality only.
+Runtime / orchestrator / World Model / policy contracts do **not** hard-require a vendor model.
+
+| Condition | Behavior |
+|-----------|----------|
+| **No model / provider down** | Fail closed on LLM steps; HITL for gated capabilities; deterministic planner still works |
+| **Weak local model** | Narrower plans; more `require_approval`; replan stays EventBus-visible (`plan.replan.*`) without cloud mandate |
+| **Provider error mid-run** | Tool/LLM step fails → observation + optional replan; no silent cloud failover as architecture |
+
+Settings may map `fast` / `balanced` / `reasoning` to different model IDs (including user-configured cloud IDs). There is **no** architectural `critical = gpt-4o` (or any fixed cloud) path for WRITE_DESTROY or replan.
+
+See [AGENT_RUNTIME_INTERFACE.md](AGENT_RUNTIME_INTERFACE.md) (Invariant 13) and ADR-023.
+
+---
+
 ## Risks
 
 | Risk | Mitigation |

@@ -31,6 +31,8 @@ from ai_command_center.core.events.topics import (
     PERMISSION_CHECK_RESULT,
     PLUGIN_DISABLE_REQUEST,
     PLUGIN_ENABLE_REQUEST,
+    TOOL_APPROVED,
+    TOOL_DENIED,
     UI_INSPECT_CLEAR,
     UI_INSPECT_NAVIGATE,
     UI_INSPECT_SELECT,
@@ -617,6 +619,33 @@ class UIController:
                 "permissions": list(permissions),
                 "actor_type": actor_type,
                 "actor_id": actor_id,
+            },
+            source="ui",
+        )
+
+    def publish_tool_confirmation(
+        self,
+        confirmation_id: str,
+        *,
+        approved: bool,
+        reason: str = "",
+    ) -> None:
+        """ADR-009: approve/deny intention confirmation (confirmation_id=run_id:step_id)."""
+        cid = str(confirmation_id or "").strip()
+        run_id = ""
+        step_id = ""
+        if ":" in cid:
+            run_id, step_id = cid.split(":", 1)
+        topic = TOOL_APPROVED if approved else TOOL_DENIED
+        self._bus.publish(
+            topic,
+            {
+                "confirmation_id": cid,
+                "run_id": run_id,
+                "step_id": step_id,
+                "approved": bool(approved),
+                "reason": reason
+                or ("approved" if approved else "denied by user"),
             },
             source="ui",
         )

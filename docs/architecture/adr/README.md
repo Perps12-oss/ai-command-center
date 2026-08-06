@@ -46,6 +46,13 @@
 | [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence |
 | [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent |
 
+### Section 9 implementation notes
+
+- Intention contract: [`docs/architecture/INTENTION_CONTRACT.md`](../INTENTION_CONTRACT.md)
+- Memory boundary: [`docs/architecture/MEMORY_BOUNDARY.md`](../MEMORY_BOUNDARY.md)
+- Degrade modes: [`docs/architecture/MODEL_ORCHESTRATION.md`](../MODEL_ORCHESTRATION.md)
+- Pre-flight: [`docs/audits/CONSTITUTIONAL_PRE_FLIGHT_SECTION9_FOLLOWONS.md`](../../audits/CONSTITUTIONAL_PRE_FLIGHT_SECTION9_FOLLOWONS.md)
+
 ### Number collision
 
 **ADR-007** was assigned twice historically (`APPSTATE_NOTIFICATION_STORMS` and `PROVIDER_REGISTRY`). Do not reuse numbers. Prefer explicit filenames; treat 007a/007b as index labels only.

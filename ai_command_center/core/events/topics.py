@@ -256,6 +256,10 @@ CAPABILITY_CATALOG_RESULT = "capability.catalog.result"
 PLAN_REQUEST = "plan.request"
 PLAN_GENERATED = "plan.generated"
 PLAN_FAILED = "plan.failed"
+# Explicit replan (ADR-019) — not a hidden ReAct loop inside the orchestrator
+PLAN_REPLAN_REQUEST = "plan.replan.request"
+PLAN_REPLAN_RESULT = "plan.replan.result"
+PLAN_REPLAN_STUCK = "plan.replan.stuck"
 
 # Execution orchestrator (vNext L5 — approved plan execution with gates)
 EXECUTION_RUN_REQUEST = "execution.run.request"
@@ -267,6 +271,21 @@ EXECUTION_STEP_AWAITING_APPROVAL = "execution.step.awaiting_approval"
 EXECUTION_STEP_APPROVED = "execution.step.approved"
 EXECUTION_STEP_COMPLETED = "execution.step.completed"
 EXECUTION_STEP_FAILED = "execution.step.failed"
+# Structured step facts for replan / Decision Records (ADR-019 / ADR-021)
+EXECUTION_OBSERVATION = "execution.observation"
+
+# Intention validation telemetry hooks (ADR-018) — observed by TelemetryService
+TOOL_PARSE_FAILURE = "tool.parse_failure"
+TOOL_VALIDATION_FAILURE = "tool.validation_failure"
+
+# ADR-009 confirmation (narrowed by ADR-018) — keyed by confirmation_id=run_id:step_id
+TOOL_CONFIRMATION_REQUIRED = "tool.confirmation_required"
+TOOL_APPROVED = "tool.approved"
+TOOL_DENIED = "tool.denied"
+
+# Decision Record / AutonomyScore projections (ADR-021 / ADR-022)
+DECISION_RECORD_UPDATED = "decision.record.updated"
+AUTONOMY_SCORE_UPDATED = "autonomy.score.updated"
 
 # Brain v1 goal scheduler (single-active-goal queue)
 GOAL_SUBMIT_REQUEST = "goal.submit.request"
@@ -630,6 +649,9 @@ __all__ = [
     "PLAN_REQUEST",
     "PLAN_GENERATED",
     "PLAN_FAILED",
+    "PLAN_REPLAN_REQUEST",
+    "PLAN_REPLAN_RESULT",
+    "PLAN_REPLAN_STUCK",
     "EXECUTION_RUN_REQUEST",
     "EXECUTION_RUN_STARTED",
     "EXECUTION_RUN_COMPLETE",
@@ -639,6 +661,14 @@ __all__ = [
     "EXECUTION_STEP_APPROVED",
     "EXECUTION_STEP_COMPLETED",
     "EXECUTION_STEP_FAILED",
+    "EXECUTION_OBSERVATION",
+    "TOOL_PARSE_FAILURE",
+    "TOOL_VALIDATION_FAILURE",
+    "TOOL_CONFIRMATION_REQUIRED",
+    "TOOL_APPROVED",
+    "TOOL_DENIED",
+    "DECISION_RECORD_UPDATED",
+    "AUTONOMY_SCORE_UPDATED",
     "GOAL_SUBMIT_REQUEST",
     "GOAL_PAUSE_REQUEST",
     "GOAL_RESUME_REQUEST",

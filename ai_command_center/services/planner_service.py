@@ -15,9 +15,15 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_CATALOG_RESULT,
     PLAN_FAILED,
     PLAN_GENERATED,
+    PLAN_REPLAN_REQUEST,
+    PLAN_REPLAN_RESULT,
     PLAN_REQUEST,
     WORKSPACE_CONTEXT_REQUEST,
     WORKSPACE_CONTEXT_RESULT,
+)
+from ai_command_center.core.wm_first_context import (
+    build_wm_first_context,
+    build_wm_first_snippets,
 )
 from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
@@ -232,6 +238,9 @@ class PlannerService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(PLAN_REQUEST, self._on_plan_request)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(PLAN_REPLAN_REQUEST, self._on_replan_request)
+        )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -357,6 +366,11 @@ class PlannerService(BaseService):
 
             specs = self._fetch_capability_specs(request_id, entity_types)
 
+            # ADR-020 M2: WM / state snippets first; ContextManager is budget-only.
+            workspace_snippets = build_wm_first_snippets(
+                state_context=state_context,
+                extra=workspace_snippets,
+            )
             bundle = self._context_manager.build_context(
                 goal,
                 workspace_snippets=workspace_snippets or None,
@@ -411,6 +425,132 @@ class PlannerService(BaseService):
                     "request_id": request_id,
                     "goal": goal,
                     "goal_id": goal_id,
+                    "error": str(exc),
+                    "correlation": correlation.to_payload(),
+                },
+                source=self.name,
+            )
+
+    def _on_replan_request(self, event: Event) -> None:
+        """Explicit replan (ADR-019): revise plan from observations — no orchestrator ReAct."""
+        run_id = str(event.payload.get("run_id", "")).strip()
+        request_id = str(event.payload.get("request_id") or uuid.uuid4().hex)
+        goal = str(event.payload.get("goal", "")).strip()
+        error = str(event.payload.get("error", "")).strip()
+        observations = event.payload.get("observations") or []
+        correlation = CorrelationContext.from_payload(event.payload)
+        workspace_context = event.payload.get("workspace_context")
+        workspace_id = ""
+        if isinstance(workspace_context, dict):
+            workspace_id = str(workspace_context.get("workspace_id", "")).strip()
+
+        if not goal:
+            self._bus.publish(
+                PLAN_REPLAN_RESULT,
+                {
+                    "run_id": run_id,
+                    "request_id": request_id,
+                    "error": "goal is required for replan",
+                    "correlation": correlation.to_payload(),
+                },
+                source=self.name,
+            )
+            return
+
+        obs_snippets: list[str] = [
+            f"Replan after failure: {error}" if error else "Replan requested"
+        ]
+        if isinstance(observations, list):
+            for item in observations[-8:]:
+                if isinstance(item, dict):
+                    obs_snippets.append(
+                        f"obs step={item.get('step_id')} cap={item.get('capability')} "
+                        f"ok={item.get('success')} err={item.get('error', '')}"
+                    )
+
+        try:
+            specs = self._fetch_capability_specs(request_id, ["task", "note", "card"])
+            state_context = self._resolve_state_context(
+                goal=goal,
+                workspace_id=workspace_id,
+                payload=dict(event.payload or {}),
+            )
+            wm_snippets = build_wm_first_snippets(
+                state_context=state_context,
+                observations=observations if isinstance(observations, list) else (),
+                extra=obs_snippets,
+            )
+            bundle = build_wm_first_context(
+                self._context_manager,
+                goal,
+                state_context=state_context,
+                observations=observations if isinstance(observations, list) else (),
+                extra_snippets=obs_snippets,
+            )
+            # Prefer injected planner_response for tests / future LLM assist via Planner only.
+            raw_plan_response = str(
+                event.payload.get("planner_response")
+                or event.payload.get("llm_plan_response")
+                or ""
+            )
+            if raw_plan_response:
+                plan = parse_structured_plan_response(raw_plan_response)
+                planner_mode = "llm_structured_replan"
+            else:
+                # Deterministic replan: rebuild from goal + observation-aware snippets.
+                plan = build_deterministic_plan(goal, specs)
+                planner_mode = "deterministic_replan"
+
+            if not plan.steps:
+                # Fall back: if original plan present, return it stripped of failed step when possible.
+                raw_prior = event.payload.get("plan")
+                if isinstance(raw_prior, dict):
+                    prior = ExecutionPlan.from_dict(raw_prior)
+                    failed_index = int(event.payload.get("failed_index", 0) or 0)
+                    remaining = prior.steps[failed_index + 1 :]
+                    if remaining:
+                        plan = ExecutionPlan(goal=goal, steps=remaining)
+                        planner_mode = "skip_failed_step"
+                    else:
+                        plan = prior
+                        planner_mode = "prior_plan_unchanged"
+
+            self._bus.publish(
+                PLAN_REPLAN_RESULT,
+                {
+                    "run_id": run_id,
+                    "request_id": request_id,
+                    "goal": goal,
+                    "plan": plan.to_dict(),
+                    "planner_mode": planner_mode,
+                    "observation_snippets": wm_snippets,
+                    "context_token_estimate": bundle.token_estimate,
+                    "workspace_id": workspace_id,
+                    "correlation": correlation.to_payload(),
+                },
+                source=self.name,
+            )
+            # Also emit PLAN_GENERATED for AppState / telemetry consistency.
+            self._bus.publish(
+                PLAN_GENERATED,
+                {
+                    "request_id": request_id,
+                    "goal": goal,
+                    "goal_id": "",
+                    "plan": plan.to_dict(),
+                    "planner_mode": planner_mode,
+                    "replan": True,
+                    "run_id": run_id,
+                    "correlation": correlation.to_payload(),
+                },
+                source=self.name,
+            )
+        except Exception as exc:
+            self._bus.publish(
+                PLAN_REPLAN_RESULT,
+                {
+                    "run_id": run_id,
+                    "request_id": request_id,
                     "error": str(exc),
                     "correlation": correlation.to_payload(),
                 },

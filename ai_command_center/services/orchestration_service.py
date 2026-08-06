@@ -38,6 +38,10 @@ from ai_command_center.orchestration.providers.provider_registry import (
     OrchestrationProviderRegistry,
 )
 from ai_command_center.orchestration.receipts.execution_receipt import ExecutionReceipt
+from ai_command_center.orchestration.verification.execution_truth import (
+    enrich_execution_facts,
+    validate_execution_truth,
+)
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
@@ -136,6 +140,12 @@ class OrchestrationService(BaseService):
         }
         if error:
             facts["error"] = error
+        facts = enrich_execution_facts(
+            facts=facts,
+            plan=plan if isinstance(plan, dict) else {},
+            step_outputs=step_outputs,
+            success=success,
+        )
 
         workspace_context = (
             payload.get("workspace_context")
@@ -161,9 +171,18 @@ class OrchestrationService(BaseService):
         )
         self._bus.publish(ORCHESTRATION_RECEIPT, receipt.to_dict(), source=self.name)
 
-        truth_valid = success
-        truth_detail = "execution run completed" if success else (error or "execution failed")
-        response_source = "execution" if success else "execution_rejected"
+        validation = validate_execution_truth(
+            capability=primary_capability,
+            success=success,
+            error=error,
+            response_text=response_text,
+            facts=facts,
+            receipt=receipt,
+        )
+        truth_valid = bool(validation.valid)
+        truth_detail = validation.detail
+        response_source = validation.response_source
+        response_text = validation.response_text or response_text
         self._bus.publish(
             ORCHESTRATION_TRUTH_VALIDATED,
             {

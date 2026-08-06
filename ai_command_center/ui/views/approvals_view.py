@@ -2,8 +2,8 @@
 
 Architecture contract:
 - Pure renderer. Reads AppState via apply_state(snapshot) only.
-- Uses AppState.permission_snapshot exclusively (+ optional execution risk compose).
-- Approve/Deny publish PERMISSION_CHECK_RESULT through callbacks.
+- Uses AppState.permission_snapshot + pending_tool_confirmations (ADR-009).
+- Approve/Deny publish through callbacks (permission or intention confirmation).
 """
 
 from __future__ import annotations
@@ -26,12 +26,44 @@ from ai_command_center.ui.views.approval_center import (
     PendingQueuePanel,
     RiskClassificationPanel,
 )
+from ai_command_center.ui.views.chat.decision_card import DecisionCard
 from ai_command_center.ui.views.surface_state import (
     article18_empty,
     article18_loading,
     domain_error_from_snap,
     set_surface_state,
 )
+
+
+def _compose_permission_with_confirmations(
+    snapshot: AppState,
+) -> PermissionCheckSnapshot:
+    """Prefer interactive permission pending; else surface intention confirmations."""
+    permission = snapshot.permission_snapshot
+    if permission.has_pending and permission.pending is not None:
+        return permission
+    confirmations = snapshot.pending_tool_confirmations
+    if not confirmations:
+        return permission
+    first = confirmations[0]
+    pending = PendingCheck(
+        check_id=str(first.get("confirmation_id") or ""),
+        permissions=("launch_tool",),
+        actor_type="intention",
+        actor_id=str(first.get("run_id") or ""),
+        summary=str(
+            first.get("summary")
+            or f"Approve {first.get('capability', 'capability')}"
+        ),
+    )
+    return PermissionCheckSnapshot(
+        pending=pending,
+        revision=permission.revision + 1,
+        resolved=permission.resolved,
+        total_requested=permission.total_requested + len(confirmations),
+        total_granted=permission.total_granted,
+        total_denied=permission.total_denied,
+    )
 
 
 class ApprovalsView(ctk.CTkFrame):
@@ -54,6 +86,7 @@ class ApprovalsView(ctk.CTkFrame):
         self._on_command = on_command
         self._focused_check_id = ""
         self._last_snap: AppState | None = None
+        self._decision_card: DecisionCard | None = None
         self._build()
 
     def _build(self) -> None:
@@ -104,6 +137,9 @@ class ApprovalsView(ctk.CTkFrame):
             command=self._review_next,
         )
         self._hero_action.pack(side="right", padx=(8, 0))
+
+        self._decision_host = ctk.CTkFrame(self._hero, fg_color="transparent")
+        self._decision_host.pack(fill="x", padx=T.PAD, pady=(0, 4))
 
         self._surface_state = ctk.CTkLabel(
             self._hero,
@@ -163,24 +199,26 @@ class ApprovalsView(ctk.CTkFrame):
         if not isinstance(snapshot, AppState):
             return
         self._last_snap = snapshot
-        permission = snapshot.permission_snapshot
+        permission = _compose_permission_with_confirmations(snapshot)
+        conf_n = len(snapshot.pending_tool_confirmations)
         pending_n = 1 if permission.has_pending else 0
         last = self._last_decision_label(permission)
         self._metrics.configure(
             text=(
                 f"{pending_n} pending · {permission.total_granted} granted · "
-                f"{permission.total_denied} denied · {last}"
+                f"{permission.total_denied} denied · confirmations={conf_n} · {last}"
             )
         )
         err = domain_error_from_snap(
             snapshot,
-            topic_prefixes=("permission.", "approval."),
+            topic_prefixes=("permission.", "approval.", "tool.confirmation"),
         )
         has_activity = (
             permission.has_pending
             or permission.total_granted > 0
             or permission.total_denied > 0
             or bool(permission.resolved)
+            or conf_n > 0
         )
         if err:
             set_surface_state(self._surface_state, kind="error", message=err)
@@ -205,6 +243,7 @@ class ApprovalsView(ctk.CTkFrame):
             self._hero_action.configure(state="normal")
             if not self._focused_check_id:
                 self._focused_check_id = permission.pending.check_id
+            self._mount_decision_card(permission.pending)
         else:
             self._hero_hint.configure(
                 text=(
@@ -214,6 +253,7 @@ class ApprovalsView(ctk.CTkFrame):
             )
             self._hero_action.configure(state="disabled")
             self._focused_check_id = ""
+            self._clear_decision_card()
 
         library = snapshot.execution_library
         self._queue.apply_snapshot(
@@ -224,6 +264,31 @@ class ApprovalsView(ctk.CTkFrame):
         self._risk.apply_snapshot(permission, execution_library=library)
         self._history.apply_snapshot(permission)
         self._stats.apply_snapshot(permission)
+
+    def _mount_decision_card(self, pending: PendingCheck) -> None:
+        """Wire DecisionCard for intention confirmations (ADR-021)."""
+        if pending.actor_type != "intention":
+            self._clear_decision_card()
+            return
+        if (
+            self._decision_card is not None
+            and getattr(self._decision_card, "_decision_id", "") == pending.check_id
+        ):
+            return
+        self._clear_decision_card()
+        self._decision_card = DecisionCard(
+            self._decision_host,
+            decision_id=pending.check_id,
+            summary=pending.summary or pending.check_id,
+            on_approve=lambda _did: self._decide(pending, True),
+            on_reject=lambda _did: self._decide(pending, False),
+        )
+        self._decision_card.pack(fill="x", pady=(0, 4))
+
+    def _clear_decision_card(self) -> None:
+        if self._decision_card is not None:
+            self._decision_card.destroy()
+            self._decision_card = None
 
     @staticmethod
     def _last_decision_label(permission: PermissionCheckSnapshot) -> str:
@@ -237,7 +302,7 @@ class ApprovalsView(ctk.CTkFrame):
     def _review_next(self) -> None:
         if self._last_snap is None:
             return
-        pending = self._last_snap.permission_snapshot.pending
+        pending = _compose_permission_with_confirmations(self._last_snap).pending
         if pending is None:
             return
         self._focus(pending.check_id)
