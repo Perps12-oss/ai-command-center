@@ -250,7 +250,6 @@ def test_tool_failure_triggers_replan_request() -> None:
         EXECUTION_OBSERVATION,
         EXECUTION_RUN_COMPLETE,
         PLAN_REPLAN_REQUEST,
-        TOOL_FAILED,
     )
     from ai_command_center.services.planner_service import PlannerService
 
@@ -301,6 +300,11 @@ def test_tool_failure_triggers_replan_request() -> None:
         {
             "run_id": "run-replan",
             "auto_approve": True,
+            "state_context": {
+                "workspace_id": "ws-replan",
+                "summary": "disk nearly full",
+                "entities": [{"id": "n1", "type": "resource", "label": "logs"}],
+            },
             "plan": {
                 "goal": "> echo hi",
                 "steps": [
@@ -319,5 +323,114 @@ def test_tool_failure_triggers_replan_request() -> None:
     assert observations
     assert any(not o.get("success") for o in observations)
     assert replans
+    snap = replans[0].get("wm_snapshot") or {}
+    assert snap.get("failed_step", {}).get("capability") == "shell"
+    assert snap.get("state_context", {}).get("summary") == "disk nearly full"
+    assert replans[0].get("state_context", {}).get("workspace_id") == "ws-replan"
+    assert isinstance(replans[0].get("observations"), list)
     # Planner should produce a replan result; run may complete or fail after bounded attempts.
     assert completed or True  # replan path exercised; outcome depends on deterministic plan
+
+
+def test_multi_step_fail_then_replan_continues() -> None:
+    """ADR-019 M3: multi-step plan — first step fails → replan → remaining step succeeds."""
+    from ai_command_center.core.events.topics import (
+        EXECUTION_OBSERVATION,
+        EXECUTION_RUN_COMPLETE,
+        EXECUTION_RUN_FAILED,
+        PLAN_REPLAN_REQUEST,
+        PLAN_REPLAN_RESULT,
+    )
+
+    bus = EventBus()
+    registry = ToolRegistry()
+    calls: list[str] = []
+
+    def _shell(args: object) -> ToolResult:
+        payload = dict(args) if isinstance(args, dict) else {}
+        command = str(payload.get("command") or "")
+        calls.append(command)
+        if command.startswith("fail"):
+            return ToolResult(success=False, output="", error="step boom")
+        return ToolResult(success=True, output=f"ok:{command}", error="")
+
+    registry.register_tool(ToolSpec(name="shell", description="shell", handler=_shell))
+    ToolExecutorService(bus, registry).start()
+    ExecutionOrchestratorService(bus).start()
+
+    replans: list[dict] = []
+    observations: list[dict] = []
+    completed: list[dict] = []
+    failed: list[dict] = []
+
+    def _on_replan_request(event) -> None:
+        payload = dict(event.payload)
+        replans.append(payload)
+        assert payload.get("wm_snapshot", {}).get("failed_step", {}).get("step_id") == "s1"
+        assert payload.get("state_context", {}).get("summary") == "mission critical"
+        # Explicit revised plan: skip failed step, run remaining success step.
+        bus.publish(
+            PLAN_REPLAN_RESULT,
+            {
+                "run_id": payload["run_id"],
+                "request_id": payload.get("request_id", ""),
+                "goal": payload.get("goal", ""),
+                "plan": {
+                    "goal": payload.get("goal", ""),
+                    "steps": [
+                        {
+                            "step_id": "s2",
+                            "capability": "shell",
+                            "args": {"command": "echo recovered"},
+                            "require_approval": False,
+                        }
+                    ],
+                },
+                "planner_mode": "test_skip_failed",
+                "correlation": payload.get("correlation") or {},
+            },
+            source="test_planner",
+        )
+
+    bus.subscribe(PLAN_REPLAN_REQUEST, _on_replan_request)
+    bus.subscribe(EXECUTION_OBSERVATION, lambda e: observations.append(dict(e.payload)))
+    bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
+    bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
+
+    bus.publish(
+        EXECUTION_RUN_REQUEST,
+        {
+            "run_id": "run-multi-replan",
+            "auto_approve": True,
+            "state_context": {
+                "workspace_id": "ws-multi",
+                "summary": "mission critical",
+            },
+            "plan": {
+                "goal": "recover after first failure",
+                "steps": [
+                    {
+                        "step_id": "s1",
+                        "capability": "shell",
+                        "args": {"command": "fail now"},
+                        "require_approval": False,
+                    },
+                    {
+                        "step_id": "s2",
+                        "capability": "shell",
+                        "args": {"command": "echo recovered"},
+                        "require_approval": False,
+                    },
+                ],
+            },
+        },
+        source="test",
+    )
+
+    assert replans, "expected plan.replan.request after first-step failure"
+    assert any(not o.get("success") for o in observations)
+    assert any(o.get("success") for o in observations)
+    assert completed, f"expected run complete after replan; failed={failed} calls={calls}"
+    assert not failed
+    assert "fail now" in calls
+    assert "echo recovered" in calls

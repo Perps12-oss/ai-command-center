@@ -52,6 +52,7 @@ from ai_command_center.domain.execution_observation import ExecutionObservation
 from ai_command_center.domain.intention import Intention
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
 from ai_command_center.domain.runtime_capability import CapabilityKind
+from ai_command_center.domain.state_context import StateContext
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
@@ -159,10 +160,21 @@ class ExecutionOrchestratorService(BaseService):
         if isinstance(known, (list, tuple, set)):
             known_capabilities = {str(x) for x in known}
 
+        raw_state = event.payload.get("state_context")
+        state_context = dict(raw_state) if isinstance(raw_state, dict) else {}
+        raw_receipts = event.payload.get("receipts")
+        receipts = (
+            [dict(item) for item in raw_receipts if isinstance(item, dict)]
+            if isinstance(raw_receipts, list)
+            else []
+        )
+
         self._runs[run_id] = {
             "plan": plan,
             "index": 0,
             "workspace_context": workspace_context,
+            "state_context": state_context,
+            "receipts": receipts,
             "request_id": str(event.payload.get("request_id", "")),
             "correlation": CorrelationContext.from_payload(event.payload).to_payload(),
             "auto_approve": bool(event.payload.get("auto_approve", False)),
@@ -674,6 +686,63 @@ class ExecutionOrchestratorService(BaseService):
                 policy={"stuck": True, "require_approval": True},
             )
 
+    def _resolve_run_state_context(self, run: dict[str, Any]) -> dict[str, Any]:
+        """Prefer run-carried StateContext; else synthesize a minimal WM projection."""
+        raw = run.get("state_context")
+        if isinstance(raw, dict) and (
+            raw.get("summary") or raw.get("entities") or raw.get("memories") or raw.get("goals")
+        ):
+            return dict(raw)
+        workspace_context = dict(run.get("workspace_context") or {})
+        workspace_id = str(workspace_context.get("workspace_id") or "")
+        if isinstance(raw, dict) and raw.get("workspace_id"):
+            workspace_id = str(raw.get("workspace_id") or workspace_id)
+        obs_lines: list[str] = []
+        for item in list(run.get("observations") or [])[-8:]:
+            if not isinstance(item, dict):
+                continue
+            obs_lines.append(
+                f"step={item.get('step_id')} cap={item.get('capability')} "
+                f"ok={item.get('success')} err={item.get('error', '')}"
+            )
+        summary = "; ".join(obs_lines) if obs_lines else ""
+        plan = run.get("plan")
+        goal = str(run.get("goal") or (getattr(plan, "goal", "") if plan else ""))
+        return StateContext(
+            workspace_id=workspace_id,
+            summary=summary,
+            query_text=goal,
+        ).to_dict()
+
+    def _build_wm_snapshot(self, run_id: str, error: str) -> dict[str, Any]:
+        """Structured WM / execution snapshot for plan.replan.request (ADR-019)."""
+        run = self._runs[run_id]
+        plan: ExecutionPlan = run["plan"]
+        index = int(run["index"])
+        step = plan.steps[index] if 0 <= index < len(plan.steps) else None
+        state_context = self._resolve_run_state_context(run)
+        failed_step: dict[str, Any] = {
+            "index": index,
+            "error": error,
+        }
+        if step is not None:
+            failed_step.update(
+                {
+                    "step_id": step.step_id,
+                    "capability": step.capability,
+                    "args": dict(step.args),
+                }
+            )
+        return {
+            "workspace_id": state_context.get("workspace_id", ""),
+            "state_context": state_context,
+            "observations": list(run.get("observations") or []),
+            "step_outputs": list(run.get("step_outputs") or []),
+            "plan_history": list(run.get("plan_history") or []),
+            "receipts": list(run.get("receipts") or []),
+            "failed_step": failed_step,
+        }
+
     def _request_replan(self, run_id: str, error: str) -> bool:
         """Publish explicit replan request. Returns True if replan requested."""
         run = self._runs[run_id]
@@ -683,6 +752,10 @@ class ExecutionOrchestratorService(BaseService):
         plan: ExecutionPlan = run["plan"]
         run["replan_attempts"] = attempts + 1
         run["replanning"] = True
+        wm_snapshot = self._build_wm_snapshot(run_id, error)
+        state_context = dict(wm_snapshot.get("state_context") or {})
+        # Keep run projection fresh for subsequent attempts / stuck escalate.
+        run["state_context"] = state_context
         self._bus.publish(
             PLAN_REPLAN_REQUEST,
             {
@@ -693,6 +766,11 @@ class ExecutionOrchestratorService(BaseService):
                 "failed_index": int(run["index"]),
                 "plan": plan.to_dict(),
                 "observations": list(run.get("observations") or []),
+                "step_outputs": list(run.get("step_outputs") or []),
+                "plan_history": list(run.get("plan_history") or []),
+                "receipts": list(run.get("receipts") or []),
+                "state_context": state_context,
+                "wm_snapshot": wm_snapshot,
                 "workspace_context": dict(run.get("workspace_context") or {}),
                 "correlation": dict(run.get("correlation") or {}),
                 "replan_attempt": run["replan_attempts"],
