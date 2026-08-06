@@ -1,10 +1,12 @@
 # ADR-008: Conversation Context Compaction with Visibility Metadata
 
-**Status:** Proposed  
+**Status:** Proposed — **narrowed by ADR-020**  
 **Date:** 2026-07-27  
 **Deciders:** Architecture Review (Tom)  
 **Supersedes:** —  
-**Related:** `research/patterns/PAT-003.md`, `research/decisions/RD-001.md`, `docs/architecture/CHAT_MODERNIZATION_SPEC.md`
+**Related:** `research/patterns/PAT-003.md`, `research/decisions/RD-001.md`, `docs/architecture/CHAT_MODERNIZATION_SPEC.md`, **ADR-020_MEMORY_ARCHITECTURE.md**
+
+> **Narrowing (ADR-020, 2026-08-05):** Compaction may proceed only as an **agent_visible derived view** for token-budget management. Hierarchical / LLM summaries are **not** ACC’s canonical memory. Canonical memory for planning/runtime is World Model (+ MemoryGraph for user memory SoT per ADR-015; conversation repository for user-visible transcript). Do not implement ADR-008 as a memory SoT.
 
 ---
 
@@ -14,7 +16,7 @@ Long chat sessions exceed model context windows. Dropping messages blindly loses
 
 ## Decision
 
-Implement conversation context compaction as a `ConversationService` operation driven by `context.over_budget` events. Compaction preserves the user-visible transcript while replacing older model-visible messages with a structured summary.
+Implement conversation context compaction as a `ConversationService` operation driven by `context.over_budget` events. Compaction preserves the user-visible transcript while replacing older model-visible messages with a structured summary. **Per ADR-020, the summary is a derived view — never MemoryGraph or World Model SoT.**
 
 ### Contract
 
