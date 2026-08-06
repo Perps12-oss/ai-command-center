@@ -48,7 +48,7 @@ class OpenAILLMBusTests(unittest.IsolatedAsyncioTestCase):
 
         service = OpenAIHttpService(bus)
         service._base_url = "https://api.test/v1"
-        service._api_key = "sk-test"
+        service._last_stored_api_key = "sk-test"
         service._session = MagicMock()
 
         sse_lines = [

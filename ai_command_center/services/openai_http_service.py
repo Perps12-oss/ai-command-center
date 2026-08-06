@@ -55,8 +55,8 @@ class OpenAIHttpService(BaseService):
     def __init__(self, bus) -> None:
         super().__init__(bus)
         self._base_url = _DEFAULT_BASE_URL
-        self._api_key = ""
         self._active_provider = "ollama"
+        self._last_stored_api_key = ""
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._session: aiohttp.ClientSession | None = None
@@ -125,12 +125,18 @@ class OpenAIHttpService(BaseService):
         asyncio.get_running_loop().stop()
 
     def _on_settings_snapshot(self, event: Event) -> None:
+        """Apply settings projection without keyring I/O (PERF-003).
+
+        ``resolve_openai_api_key`` hits OS keyring on cold cache (~80–140 ms) and
+        must not run on the SYNC_CRITICAL ``settings.snapshot`` path. Store the
+        opaque settings value here; resolve lazily in ``_resolved_api_key``.
+        """
         provider = str(event.payload.get("provider", "ollama")).strip() or "ollama"
         base = str(event.payload.get("openai_base_url", self._base_url)).strip()
         if base:
             base = base.rstrip("/")
         stored_key = str(event.payload.get("openai_api_key", ""))
-        # Theme/hotkey/etc. snapshots must not re-enter keyring or rewrite locals.
+        # Theme/hotkey/etc. snapshots must not rewrite locals.
         if (
             provider == self._active_provider
             and (not base or base == self._base_url)
@@ -140,12 +146,12 @@ class OpenAIHttpService(BaseService):
         self._active_provider = provider
         if base:
             self._base_url = base
-        if stored_key != getattr(self, "_last_stored_api_key", object()):
-            self._api_key = resolve_openai_api_key(stored_key)
-            self._last_stored_api_key = stored_key
-        elif not hasattr(self, "_last_stored_api_key"):
-            self._api_key = resolve_openai_api_key(stored_key)
-            self._last_stored_api_key = stored_key
+        self._last_stored_api_key = stored_key
+
+    def _resolved_api_key(self) -> str:
+        """Resolve API key off the sync bus (env → keyring cache → stored)."""
+        stored = str(getattr(self, "_last_stored_api_key", "") or "")
+        return resolve_openai_api_key(stored)
 
     def _on_cancel_request(self, event: Event) -> None:
         rid = event.payload.get("request_id")
@@ -229,7 +235,7 @@ class OpenAIHttpService(BaseService):
         while True:
             online = False
             detail = ""
-            configured = bool(self._api_key)
+            configured = bool(self._resolved_api_key())
             if not configured:
                 detail = "api key not configured"
             else:
@@ -275,8 +281,9 @@ class OpenAIHttpService(BaseService):
 
     def _auth_headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
-        if self._api_key:
-            headers["Authorization"] = f"Bearer {self._api_key}"
+        api_key = self._resolved_api_key()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         return headers
 
     async def _stream_chat_async(
@@ -297,7 +304,7 @@ class OpenAIHttpService(BaseService):
             source=self.name,
         )
 
-        if not self._api_key:
+        if not self._resolved_api_key():
             self._publish_error(
                 request_id,
                 "OpenAI API key not configured. Set it in Settings.",

@@ -4,7 +4,7 @@
 |---|---|
 | **Date** | 2026-08-04 |
 | **Authority** | Tom audit rev 2 (sequencing risk) + this remediation PR |
-| **PERF-003 status** | **Not started** in this PR |
+| **PERF-003 status** | Investigation + fix: see `PERF_003_INVESTIGATION_REPORT.md` |
 
 ## Gate
 
