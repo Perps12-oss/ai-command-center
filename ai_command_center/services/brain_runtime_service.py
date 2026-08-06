@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
+    EXECUTION_OBSERVATION,
     OBSERVATION_RECEIVED,
     RUNTIME_ACTION_COMPLETED,
     RUNTIME_ACTION_DENIED,
@@ -57,6 +58,9 @@ class BrainRuntimeService(BaseService):
                 self._bus.subscribe(RUNTIME_ACTION_REQUEST, self._on_action_request),
                 self._bus.subscribe(RUNTIME_APPROVAL_DECIDED, self._on_approval_decided),
                 self._bus.subscribe(OBSERVATION_RECEIVED, self._on_observation_received),
+                self._bus.subscribe(
+                    EXECUTION_OBSERVATION, self._on_execution_observation
+                ),
             ]
         )
         # Publish WorldModel graph state for AppState rehydration
@@ -327,6 +331,49 @@ class BrainRuntimeService(BaseService):
                 "tier": SecurityTier.READ.value,
                 "mutation": mutation.to_payload(),
                 "auto_approve": True,
+            },
+            correlation=correlation,
+        )
+
+    def _on_execution_observation(self, event: Event) -> None:
+        """ADR-019 M1: BrainRuntime owns WM apply for execution step facts."""
+        payload = dict(event.payload or {})
+        run_id = str(payload.get("run_id", "")).strip()
+        step_id = str(payload.get("step_id", "")).strip()
+        if not run_id or not step_id:
+            return
+        correlation = CorrelationContext.from_payload(payload).with_action(
+            f"exec-obs:{run_id}:{step_id}"
+        )
+        node_id = f"execution_obs:{run_id}:{step_id}"
+        node = Node(
+            id=node_id,
+            type="execution_observation",
+            attributes={
+                "run_id": run_id,
+                "step_id": step_id,
+                "step_index": int(payload.get("step_index", 0) or 0),
+                "capability": str(payload.get("capability", "")),
+                "success": bool(payload.get("success", False)),
+                "output": str(payload.get("output", ""))[:2000],
+                "error": str(payload.get("error", ""))[:1000],
+                "args": dict(payload.get("args") or {}),
+                "observed_at": str(payload.get("observed_at", "")),
+            },
+        )
+        mutation = Mutation(
+            id=f"{correlation.correlation_id}:{node_id}",
+            correlation=correlation,
+            type=MutationType.UPDATE_NODE,
+            payload={"node": node.to_payload()},
+        )
+        self._execute_action(
+            action_id=correlation.action_id or node_id,
+            payload={
+                "tier": SecurityTier.WRITE.value,
+                "mutation": mutation.to_payload(),
+                "auto_approve": True,
+                "summary": f"Record execution observation {step_id}",
             },
             correlation=correlation,
         )

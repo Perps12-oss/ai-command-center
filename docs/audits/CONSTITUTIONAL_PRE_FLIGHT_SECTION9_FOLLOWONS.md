@@ -10,12 +10,12 @@ First implementation slice of Section 9 plans:
 
 | ADR | Milestones in this PR |
 |-----|------------------------|
-| 018 | M1 intention contract + PlanStep↔Intention; M2 validation before TOOL_INVOKE + parse/validation failure topics |
-| 019 | M1 execution observation events; M2 replan topics + PlannerService handler; M3 bounded replan on fail; M4 stuck similarity utility + escalate |
-| 020 | M1 memory boundary doc |
-| 021 | M1 DecisionRecord domain (+ AppState projection of latest record) |
-| 022 | M1 AutonomyScore domain (+ optional projection) |
-| 023 | M1 degrade-mode documentation in Model Orchestration |
+| 018 | M1 intention contract + PlanStep↔Intention; M2 validation before TOOL_INVOKE + parse/validation failure topics; M4 ADR-009 confirmation alignment (`tool.confirmation_*` keyed by run_id:step_id) |
+| 019 | M1 execution observation events + BrainRuntime WM apply; M2 replan topics + PlannerService handler; M3 bounded replan on fail; M4 stuck similarity utility + escalate |
+| 020 | M1 memory boundary doc; M2 WM-first context builder (workspace snippets outrank chat history) |
+| 021 | M1 DecisionRecord domain + AppState projection; TruthBoundary live wire in OrchestrationService; DecisionCard in ApprovalsView |
+| 022 | M1 AutonomyScore domain (+ projection) |
+| 023 | M1 degrade-mode documentation; M2 distinct tier settings tests |
 
 ## Protected assets
 

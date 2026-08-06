@@ -21,6 +21,10 @@ from ai_command_center.core.events.topics import (
     WORKSPACE_CONTEXT_REQUEST,
     WORKSPACE_CONTEXT_RESULT,
 )
+from ai_command_center.core.wm_first_context import (
+    build_wm_first_context,
+    build_wm_first_snippets,
+)
 from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
 from ai_command_center.domain.state_authority import StateQuery
@@ -362,6 +366,11 @@ class PlannerService(BaseService):
 
             specs = self._fetch_capability_specs(request_id, entity_types)
 
+            # ADR-020 M2: WM / state snippets first; ContextManager is budget-only.
+            workspace_snippets = build_wm_first_snippets(
+                state_context=state_context,
+                extra=workspace_snippets,
+            )
             bundle = self._context_manager.build_context(
                 goal,
                 workspace_snippets=workspace_snippets or None,
@@ -461,6 +470,23 @@ class PlannerService(BaseService):
 
         try:
             specs = self._fetch_capability_specs(request_id, ["task", "note", "card"])
+            state_context = self._resolve_state_context(
+                goal=goal,
+                workspace_id=workspace_id,
+                payload=dict(event.payload or {}),
+            )
+            wm_snippets = build_wm_first_snippets(
+                state_context=state_context,
+                observations=observations if isinstance(observations, list) else (),
+                extra=obs_snippets,
+            )
+            bundle = build_wm_first_context(
+                self._context_manager,
+                goal,
+                state_context=state_context,
+                observations=observations if isinstance(observations, list) else (),
+                extra_snippets=obs_snippets,
+            )
             # Prefer injected planner_response for tests / future LLM assist via Planner only.
             raw_plan_response = str(
                 event.payload.get("planner_response")
@@ -497,7 +523,8 @@ class PlannerService(BaseService):
                     "goal": goal,
                     "plan": plan.to_dict(),
                     "planner_mode": planner_mode,
-                    "observation_snippets": obs_snippets,
+                    "observation_snippets": wm_snippets,
+                    "context_token_estimate": bundle.token_estimate,
                     "workspace_id": workspace_id,
                     "correlation": correlation.to_payload(),
                 },

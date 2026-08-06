@@ -34,6 +34,9 @@ from ai_command_center.core.events.topics import (
     PLAN_REPLAN_REQUEST,
     PLAN_REPLAN_RESULT,
     PLAN_REPLAN_STUCK,
+    TOOL_APPROVED,
+    TOOL_CONFIRMATION_REQUIRED,
+    TOOL_DENIED,
     TOOL_FAILED,
     TOOL_INVOKE,
     TOOL_PARSE_FAILURE,
@@ -56,6 +59,15 @@ _logger = logging.getLogger(__name__)
 _EXTERNAL_PREFIXES = ("mcp.", "external.", "mcp:")
 _LLM_CAPABILITIES = frozenset({"llm", "chat"})
 _MAX_REPLAN_ATTEMPTS = 2
+
+
+def _split_confirmation(payload: dict[str, Any]) -> tuple[str, str]:
+    confirmation_id = str(payload.get("confirmation_id") or "").strip()
+    run_id = str(payload.get("run_id") or "").strip()
+    step_id = str(payload.get("step_id") or "").strip()
+    if confirmation_id and ":" in confirmation_id and not run_id:
+        run_id, step_id = confirmation_id.split(":", 1)
+    return run_id, step_id
 
 
 def _is_external_capability(capability: str) -> bool:
@@ -108,6 +120,12 @@ class ExecutionOrchestratorService(BaseService):
         )
         self._unsubscribers.append(
             self._bus.subscribe(PLAN_REPLAN_RESULT, self._on_replan_result)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(TOOL_APPROVED, self._on_tool_approved)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(TOOL_DENIED, self._on_tool_denied)
         )
 
     def _on_unload(self) -> None:
@@ -321,6 +339,7 @@ class ExecutionOrchestratorService(BaseService):
 
         if _step_needs_approval(step, auto_approve=auto_approve):
             run["paused"] = True
+            confirmation_id = f"{run_id}:{step.step_id}"
             self._publish_decision_and_autonomy(
                 run_id=run_id,
                 step=step,
@@ -335,12 +354,56 @@ class ExecutionOrchestratorService(BaseService):
                     "step_id": step.step_id,
                     "capability": step.capability,
                     "require_approval": True,
+                    "confirmation_id": confirmation_id,
+                },
+                source=self.name,
+            )
+            # ADR-009 alignment (ADR-018 narrowed): intention confirmation, not tool_call_id
+            self._bus.publish(
+                TOOL_CONFIRMATION_REQUIRED,
+                {
+                    "confirmation_id": confirmation_id,
+                    "run_id": run_id,
+                    "step_id": step.step_id,
+                    "capability": step.capability,
+                    "args": dict(step.args),
+                    "summary": f"Approve capability {step.capability}",
+                    "kind": "intention",
                 },
                 source=self.name,
             )
             return
 
         self._dispatch_step(run_id)
+
+    def _on_tool_approved(self, event: Event) -> None:
+        """ADR-009: UI/tool.approved resumes orchestrator (maps to step approved)."""
+        run_id, step_id = _split_confirmation(event.payload)
+        if not run_id:
+            return
+        self._on_step_approved(
+            Event(
+                topic=EXECUTION_STEP_APPROVED,
+                payload={"run_id": run_id, "step_id": step_id},
+                source=event.source,
+            )
+        )
+
+    def _on_tool_denied(self, event: Event) -> None:
+        """ADR-009: denied confirmation fails the step (no LLM tool-loop SoT)."""
+        run_id, step_id = _split_confirmation(event.payload)
+        if not run_id or run_id not in self._runs:
+            return
+        run = self._runs[run_id]
+        if not run.get("paused"):
+            return
+        plan: ExecutionPlan = run["plan"]
+        index = int(run["index"])
+        if index < len(plan.steps) and step_id and plan.steps[index].step_id != step_id:
+            return
+        run["paused"] = False
+        reason = str(event.payload.get("reason") or "confirmation denied")
+        self._fail_step(run_id, reason, allow_replan=True)
 
     def _dispatch_step(self, run_id: str) -> None:
         if run_id not in self._runs:

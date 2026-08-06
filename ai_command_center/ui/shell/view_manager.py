@@ -605,7 +605,12 @@ class ViewManagerMixin:
         actor_type: str,
         actor_id: str,
     ) -> None:
-        """Publish PERMISSION_CHECK_RESULT for Approve / Deny."""
+        """Publish permission result or ADR-009 tool confirmation (run_id:step_id)."""
+        cid = str(check_id or "").strip()
+        # Intention confirmations use confirmation_id = run_id:step_id
+        if ":" in cid and actor_type == "intention":
+            self._controller.publish_tool_confirmation(cid, approved=granted)
+            return
         self._controller.publish_permission_result(
             check_id=check_id,
             granted=granted,

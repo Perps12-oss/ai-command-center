@@ -106,18 +106,19 @@ class ContextManager:
         if summary:
             sections.append((0, "conversation_summary", summary))
 
-        if working_history:
-            lines = [f"{role}: {content}" for role, content in working_history]
-            body = "\n".join(lines)
-            if body.strip():
-                sections.append((1, "conversation_history", body))
-
+        # ADR-020: World Model / workspace snippets outrank chat history.
         if workspace_snippets:
             for i, snippet in enumerate(workspace_snippets):
                 body = snippet.strip()
                 if body:
                     label = "workspace_state" if i == 0 else f"workspace_state_{i}"
-                    sections.append((1, label, body))
+                    sections.append((0, label, body))
+
+        if working_history:
+            lines = [f"{role}: {content}" for role, content in working_history]
+            body = "\n".join(lines)
+            if body.strip():
+                sections.append((2, "conversation_history", body))
 
         if graph_snippets:
             for i, snippet in enumerate(graph_snippets):

@@ -78,6 +78,9 @@ from ai_command_center.core.events.topics import (
     PLAN_GENERATED,
     DECISION_RECORD_UPDATED,
     AUTONOMY_SCORE_UPDATED,
+    TOOL_CONFIRMATION_REQUIRED,
+    TOOL_APPROVED,
+    TOOL_DENIED,
     RUNTIME_ACTION_COMPLETED,
     RUNTIME_ACTION_DENIED,
     RUNTIME_ACTION_FAILED,
@@ -316,6 +319,9 @@ APP_STATE_TOPICS: tuple[str, ...] = (
     PLAN_GENERATED,
     DECISION_RECORD_UPDATED,
     AUTONOMY_SCORE_UPDATED,
+    TOOL_CONFIRMATION_REQUIRED,
+    TOOL_APPROVED,
+    TOOL_DENIED,
     KERNEL_STATE_CHANGED,
     GOAL_SUBMITTED,
     GOAL_ACTIVATED,
@@ -694,6 +700,8 @@ class AppState:
     # ADR-021 / ADR-022 — explainability + autonomy projections
     decision_record: dict[str, object] = field(default_factory=dict)
     autonomy_score: dict[str, object] = field(default_factory=dict)
+    # ADR-009 (narrowed) — pending intention confirmations keyed by confirmation_id
+    pending_tool_confirmations: tuple[dict[str, object], ...] = ()
 
     # Blueprint Phase 1 — Operations Library & Journal
     operation_library_index: tuple[OperationSnapshot, ...] = ()
@@ -1377,7 +1385,7 @@ def _reduce_planner_last_plan(state: AppState, event: Event) -> AppState:
 
 
 def _reduce_decision_and_autonomy(state: AppState, event: Event) -> AppState:
-    """Project DecisionRecord / AutonomyScore (ADR-021 / ADR-022)."""
+    """Project DecisionRecord / AutonomyScore / pending confirmations (ADR-009/021/022)."""
     if event.topic == DECISION_RECORD_UPDATED:
         return replace(
             state,
@@ -1389,6 +1397,39 @@ def _reduce_decision_and_autonomy(state: AppState, event: Event) -> AppState:
         return replace(
             state,
             autonomy_score=dict(event.payload or {}),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic == TOOL_CONFIRMATION_REQUIRED:
+        confirmation_id = str(event.payload.get("confirmation_id") or "").strip()
+        if not confirmation_id:
+            return state
+        existing = [
+            dict(item)
+            for item in state.pending_tool_confirmations
+            if str(item.get("confirmation_id") or "") != confirmation_id
+        ]
+        existing.append(dict(event.payload or {}))
+        return replace(
+            state,
+            pending_tool_confirmations=tuple(existing),
+            last_event_topic=event.topic,
+            last_event_source=event.source,
+        )
+    if event.topic in {TOOL_APPROVED, TOOL_DENIED}:
+        confirmation_id = str(event.payload.get("confirmation_id") or "").strip()
+        run_id = str(event.payload.get("run_id") or "").strip()
+        step_id = str(event.payload.get("step_id") or "").strip()
+        if not confirmation_id and run_id and step_id:
+            confirmation_id = f"{run_id}:{step_id}"
+        remaining = tuple(
+            dict(item)
+            for item in state.pending_tool_confirmations
+            if str(item.get("confirmation_id") or "") != confirmation_id
+        )
+        return replace(
+            state,
+            pending_tool_confirmations=remaining,
             last_event_topic=event.topic,
             last_event_source=event.source,
         )

@@ -278,6 +278,11 @@ EXECUTION_OBSERVATION = "execution.observation"
 TOOL_PARSE_FAILURE = "tool.parse_failure"
 TOOL_VALIDATION_FAILURE = "tool.validation_failure"
 
+# ADR-009 confirmation (narrowed by ADR-018) — keyed by confirmation_id=run_id:step_id
+TOOL_CONFIRMATION_REQUIRED = "tool.confirmation_required"
+TOOL_APPROVED = "tool.approved"
+TOOL_DENIED = "tool.denied"
+
 # Decision Record / AutonomyScore projections (ADR-021 / ADR-022)
 DECISION_RECORD_UPDATED = "decision.record.updated"
 AUTONOMY_SCORE_UPDATED = "autonomy.score.updated"
@@ -659,6 +664,9 @@ __all__ = [
     "EXECUTION_OBSERVATION",
     "TOOL_PARSE_FAILURE",
     "TOOL_VALIDATION_FAILURE",
+    "TOOL_CONFIRMATION_REQUIRED",
+    "TOOL_APPROVED",
+    "TOOL_DENIED",
     "DECISION_RECORD_UPDATED",
     "AUTONOMY_SCORE_UPDATED",
     "GOAL_SUBMIT_REQUEST",

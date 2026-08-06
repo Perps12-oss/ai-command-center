@@ -8,6 +8,8 @@
 
 > **Narrowing (ADR-018, 2026-08-05):** ACC’s canonical tool path is **Planner intentions → Orchestrator → ToolExecutor**. The LLM must not own executable tool signatures. Any ToolConfirmationRouter implementation must gate **capability/intention** execution (align with `require_approval`, PermissionService, Brain SecurityTiers) — not assume a Goose-style model-emitted `tool_call_id` stream as the primary architecture. Denied results return to the planner/orchestrator path, not to a freeform model tool loop as SoT.
 
+> **Implementation note (Section 9, 2026-08-06):** Live path uses `tool.confirmation_required` / `tool.approved` / `tool.denied` keyed by `confirmation_id=run_id:step_id` (kind=`intention`). Orchestrator publishes confirmation alongside `execution.step.awaiting_approval`; UI ApprovalsView + DecisionCard approve/deny via UIController; AppState projects `pending_tool_confirmations`.
+
 ---
 
 ## Context
