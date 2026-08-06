@@ -434,3 +434,116 @@ def test_multi_step_fail_then_replan_continues() -> None:
     assert not failed
     assert "fail now" in calls
     assert "echo recovered" in calls
+
+
+def test_synthesized_replan_state_context_refreshes_on_retry() -> None:
+    """ADR-019: orchestrator-synthesized StateContext must refresh on replan attempt 2.
+
+    Caller-supplied projections stay frozen; self-synthesized summaries must include
+    observations recorded after the first failure (Devin review on PR #161).
+    """
+    from ai_command_center.core.events.topics import (
+        EXECUTION_OBSERVATION,
+        EXECUTION_RUN_COMPLETE,
+        EXECUTION_RUN_FAILED,
+        PLAN_REPLAN_REQUEST,
+        PLAN_REPLAN_RESULT,
+    )
+
+    bus = EventBus()
+    registry = ToolRegistry()
+    calls: list[str] = []
+
+    def _shell(args: object) -> ToolResult:
+        payload = dict(args) if isinstance(args, dict) else {}
+        command = str(payload.get("command") or "")
+        calls.append(command)
+        if command.startswith("fail"):
+            return ToolResult(success=False, output="", error=f"boom:{command}")
+        return ToolResult(success=True, output=f"ok:{command}", error="")
+
+    registry.register_tool(ToolSpec(name="shell", description="shell", handler=_shell))
+    ToolExecutorService(bus, registry).start()
+    ExecutionOrchestratorService(bus).start()
+
+    replans: list[dict] = []
+    observations: list[dict] = []
+    completed: list[dict] = []
+    failed: list[dict] = []
+
+    def _on_replan_request(event) -> None:
+        payload = dict(event.payload)
+        replans.append(payload)
+        attempt = int(payload.get("replan_attempt") or len(replans))
+        if attempt == 1:
+            # Still failing — force a second replan so synthesized summary must refresh.
+            next_command = "fail again"
+            steps = [
+                {
+                    "step_id": "s-retry",
+                    "capability": "shell",
+                    "args": {"command": next_command},
+                    "require_approval": False,
+                }
+            ]
+        else:
+            steps = [
+                {
+                    "step_id": "s-ok",
+                    "capability": "shell",
+                    "args": {"command": "echo recovered"},
+                    "require_approval": False,
+                }
+            ]
+        bus.publish(
+            PLAN_REPLAN_RESULT,
+            {
+                "run_id": payload["run_id"],
+                "request_id": payload.get("request_id", ""),
+                "goal": payload.get("goal", ""),
+                "plan": {"goal": payload.get("goal", ""), "steps": steps},
+                "planner_mode": "test_synth_refresh",
+                "correlation": payload.get("correlation") or {},
+            },
+            source="test_planner",
+        )
+
+    bus.subscribe(PLAN_REPLAN_REQUEST, _on_replan_request)
+    bus.subscribe(EXECUTION_OBSERVATION, lambda e: observations.append(dict(e.payload)))
+    bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
+    bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
+
+    bus.publish(
+        EXECUTION_RUN_REQUEST,
+        {
+            "run_id": "run-synth-refresh",
+            "auto_approve": True,
+            # Intentionally omit caller state_context so orchestrator synthesizes.
+            "plan": {
+                "goal": "refresh synthesized projection",
+                "steps": [
+                    {
+                        "step_id": "s1",
+                        "capability": "shell",
+                        "args": {"command": "fail first"},
+                        "require_approval": False,
+                    }
+                ],
+            },
+        },
+        source="test",
+    )
+
+    assert len(replans) == 2, f"expected two replan attempts; got {len(replans)} failed={failed}"
+    first_ctx = replans[0].get("state_context") or {}
+    second_ctx = replans[1].get("state_context") or {}
+    assert first_ctx.get("_orchestrator_synthesized") is True
+    assert second_ctx.get("_orchestrator_synthesized") is True
+    first_summary = str(first_ctx.get("summary") or "")
+    second_summary = str(second_ctx.get("summary") or "")
+    assert "boom:fail first" in first_summary
+    assert "boom:fail again" in second_summary
+    assert second_summary != first_summary
+    assert completed, f"expected recovery after second replan; failed={failed} calls={calls}"
+    assert not failed
+    assert "echo recovered" in calls

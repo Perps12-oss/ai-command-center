@@ -60,6 +60,9 @@ _logger = logging.getLogger(__name__)
 _EXTERNAL_PREFIXES = ("mcp.", "external.", "mcp:")
 _LLM_CAPABILITIES = frozenset({"llm", "chat"})
 _MAX_REPLAN_ATTEMPTS = 2
+# Marks orchestrator-built StateContext projections so replan attempts regenerate
+# them from the latest observations instead of freezing the first failure summary.
+_ORCHESTRATOR_SYNTHESIZED_STATE_CONTEXT = "_orchestrator_synthesized"
 
 
 def _split_confirmation(payload: dict[str, Any]) -> tuple[str, str]:
@@ -687,10 +690,22 @@ class ExecutionOrchestratorService(BaseService):
             )
 
     def _resolve_run_state_context(self, run: dict[str, Any]) -> dict[str, Any]:
-        """Prefer run-carried StateContext; else synthesize a minimal WM projection."""
+        """Prefer caller-supplied StateContext; else synthesize a fresh WM projection.
+
+        Caller-provided projections are preserved across replan attempts. Projections
+        synthesized by this orchestrator are tagged and recomputed each time so the
+        replan summary includes observations recorded since the previous attempt.
+        """
         raw = run.get("state_context")
-        if isinstance(raw, dict) and (
-            raw.get("summary") or raw.get("entities") or raw.get("memories") or raw.get("goals")
+        if (
+            isinstance(raw, dict)
+            and not raw.get(_ORCHESTRATOR_SYNTHESIZED_STATE_CONTEXT)
+            and (
+                raw.get("summary")
+                or raw.get("entities")
+                or raw.get("memories")
+                or raw.get("goals")
+            )
         ):
             return dict(raw)
         workspace_context = dict(run.get("workspace_context") or {})
@@ -708,11 +723,13 @@ class ExecutionOrchestratorService(BaseService):
         summary = "; ".join(obs_lines) if obs_lines else ""
         plan = run.get("plan")
         goal = str(run.get("goal") or (getattr(plan, "goal", "") if plan else ""))
-        return StateContext(
+        payload = StateContext(
             workspace_id=workspace_id,
             summary=summary,
             query_text=goal,
         ).to_dict()
+        payload[_ORCHESTRATOR_SYNTHESIZED_STATE_CONTEXT] = True
+        return payload
 
     def _build_wm_snapshot(self, run_id: str, error: str) -> dict[str, Any]:
         """Structured WM / execution snapshot for plan.replan.request (ADR-019)."""
