@@ -82,7 +82,8 @@ class Sidebar(ctk.CTkFrame):
         self._buttons: dict[str, ctk.CTkButton] = {}
         self._groups: dict[str, NavGroup] = {}
         self._badges: dict[str, int] = {}
-        self._active = "command_center"
+        # Empty until set_active — must not pre-set or initial highlight early-outs.
+        self._active = ""
         self._filter = ""
         self._compact = False
 
@@ -156,7 +157,7 @@ class Sidebar(ctk.CTkFrame):
             text_color=T.TEXT_MUTED,
         ).pack(anchor="w", padx=12, pady=10)
 
-        self.set_active(self._active)
+        self.set_active("command_center")
         self._refresh_fav_recent()
 
     def _on_search(self, _event=None) -> None:
@@ -191,17 +192,21 @@ class Sidebar(ctk.CTkFrame):
             self._apply_badge_labels()
 
     def _select(self, view_id: str) -> None:
-        self._active = view_id
+        # Do not assign _active before set_active — set_active owns the dirty path.
         self.set_active(view_id)
         self._prefs.record_page(view_id)
         self._refresh_fav_recent()
         self._on_navigate(view_id)
 
     def set_active(self, view_id: str) -> None:
+        """Highlight active nav item; dirty-update badge labels (PERF-004)."""
+        prev = self._active
+        if view_id == prev:
+            return
         self._active = view_id
         for group in self._groups.values():
             group.set_active(view_id)
-        self._apply_badge_labels()
+        self._apply_badge_labels(dirty_ids=(prev, view_id))
 
     def set_badge(self, view_id: str, count: int) -> None:
         """Notification badge for a nav item (0 clears)."""
@@ -209,18 +214,37 @@ class Sidebar(ctk.CTkFrame):
             self._badges.pop(view_id, None)
         else:
             self._badges[view_id] = count
-        self._apply_badge_labels()
+        self._apply_badge_labels(dirty_ids=(view_id,))
 
     def set_badges(self, badges: dict[str, int]) -> None:
+        prev_keys = set(self._badges)
         self._badges = {k: v for k, v in badges.items() if v > 0}
-        self._apply_badge_labels()
+        dirty = prev_keys | set(self._badges)
+        self._apply_badge_labels(dirty_ids=tuple(dirty) if dirty else None)
 
     def toggle_favorite(self, view_id: str) -> None:
         self._prefs.toggle_favorite(view_id)
         self._refresh_fav_recent()
+        self._apply_badge_labels(dirty_ids=(view_id,))
 
-    def _apply_badge_labels(self) -> None:
-        for view_id, btn in self._buttons.items():
+    def _apply_badge_labels(
+        self, dirty_ids: tuple[str, ...] | None = None
+    ) -> None:
+        """Update nav button texts.
+
+        PERF-004: when ``dirty_ids`` is set, only those buttons are
+        reconfigured (active mark / fav / badge). Full pass when ``None``
+        (compact toggle, search filter restore).
+        """
+        if dirty_ids is None:
+            targets = self._buttons.items()
+        else:
+            targets = (
+                (vid, self._buttons[vid])
+                for vid in dirty_ids
+                if vid in self._buttons
+            )
+        for view_id, btn in targets:
             if self._compact:
                 # Keep icon-only collapsed mode; do not restore full labels on refresh.
                 btn.configure(text="")
