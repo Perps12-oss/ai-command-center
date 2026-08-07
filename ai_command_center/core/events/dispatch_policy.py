@@ -1,15 +1,18 @@
-"""EventBus dispatch policy — topic classification for R4 async migration.
+"""EventBus dispatch policy — topic classification and policy ABC (Phase 5).
 
-This module is **policy only** in R4a: constants and enums for documentation,
-verification, and future enforcement. It does not change ``EventBus.publish()``
-semantics.
+Topic tier constants (R4a) plus ``DispatchPolicy`` / ``SyncDispatchPolicy`` for
+sync vs tiered async dispatch. Tier routing lives in
+``tiered_dispatch_policy.py``; worker pools in ``async_dispatch_queue.py``.
 
 Full design: ``docs/architecture/ASYNC_EVENTBUS_POLICY.md``
 """
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
+from typing import Any
 
 from ai_command_center.core.events import topics as T
 
@@ -133,13 +136,33 @@ def budget_exceedance_is_warning(topic: str) -> bool:
     return get_dispatch_tier(topic) is not DispatchTier.ASYNC_ELIGIBLE
 
 
+class DispatchPolicy(ABC):
+    """Strategy for invoking a single handler for an event."""
+
+    @abstractmethod
+    def dispatch(self, handler: Callable[[Any], None], event: Any) -> None:
+        """Invoke *handler* for *event* (sync or via async infrastructure)."""
+
+    def supports_async(self) -> bool:
+        return False
+
+
+class SyncDispatchPolicy(DispatchPolicy):
+    """Always invoke handlers on the current thread (backward compatible)."""
+
+    def dispatch(self, handler: Callable[[Any], None], event: Any) -> None:
+        handler(event)
+
+
 __all__ = [
     "ASYNC_ELIGIBLE_TOPICS",
     "ASYNC_ENQUEUE_BUDGET_MS",
+    "DispatchPolicy",
     "DispatchTier",
     "SYNC_CRITICAL_BUDGET_MS",
     "SYNC_CRITICAL_TOPICS",
     "SYNC_STANDARD_BUDGET_MS",
+    "SyncDispatchPolicy",
     "TOPIC_TIME_BUDGET_MS",
     "budget_exceedance_is_warning",
     "get_dispatch_tier",
