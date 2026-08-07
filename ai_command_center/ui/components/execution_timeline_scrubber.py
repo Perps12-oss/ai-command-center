@@ -99,9 +99,21 @@ class ExecutionTimelineScrubber(ctk.CTkFrame):
         self._slider.configure(from_=0, to=last, number_of_steps=last)
 
     def _safe_slider_set(self, value: float) -> None:
-        """Set slider value only when number_of_steps is safe."""
+        """Set slider value only when number_of_steps is safe.
+
+        Real CTkSlider stores an int on ``_number_of_steps``. Headless UI fakes
+        may expose a callable via ``__getattr__`` — ignore non-numeric values.
+        """
         steps = getattr(self._slider, "_number_of_steps", None)
-        if steps is not None and int(steps) < 1:
+        steps_n: int | None
+        if steps is None or callable(steps):
+            steps_n = None
+        else:
+            try:
+                steps_n = int(steps)
+            except (TypeError, ValueError):
+                steps_n = None
+        if steps_n is not None and steps_n < 1:
             self._configure_slider_range(last_index=1)
         self._slider.set(value)
 
