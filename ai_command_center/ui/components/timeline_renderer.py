@@ -92,6 +92,22 @@ class TimelineRenderer(ctk.CTkFrame):
         active_index: int = -1,
     ) -> None:
         """Render steps. Each step: {name, status, duration_ms}."""
+        fingerprint = (
+            tuple(
+                (
+                    str(step.get("event_id", "") or ""),
+                    str(step.get("name", "") or ""),
+                    str(step.get("status", "") or ""),
+                    float(step.get("duration_ms", 0) or 0.0),
+                )
+                for step in steps
+            ),
+            int(active_index),
+        )
+        if fingerprint == getattr(self, "_render_fingerprint", None):
+            return
+        self._render_fingerprint = fingerprint
+
         for child in self._scroll.winfo_children():
             child.destroy()
 
