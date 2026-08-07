@@ -86,8 +86,24 @@ class ExecutionTimelineScrubber(ctk.CTkFrame):
             button_hover_color=T.ACCENT_HOVER,
         )
         self._slider.pack(fill="x", pady=(6, 0))
-        self._slider.set(0)
+        self._safe_slider_set(0)
         self._update_controls()
+
+    def _configure_slider_range(self, *, last_index: int) -> None:
+        """Configure CTkSlider so ``set()`` cannot ZeroDivisionError.
+
+        CustomTkinter computes ``(to - from_) / number_of_steps`` inside
+        ``_round_to_step_size``. Never pass ``number_of_steps < 1``.
+        """
+        last = max(1, int(last_index))
+        self._slider.configure(from_=0, to=last, number_of_steps=last)
+
+    def _safe_slider_set(self, value: float) -> None:
+        """Set slider value only when number_of_steps is safe."""
+        steps = getattr(self._slider, "_number_of_steps", None)
+        if steps is not None and int(steps) < 1:
+            self._configure_slider_range(last_index=1)
+        self._slider.set(value)
 
     def set_timeline(
         self,
@@ -112,12 +128,12 @@ class ExecutionTimelineScrubber(ctk.CTkFrame):
         self._index = index
         if self._count <= 1:
             # Degenerate range: keep steps >= 1 so set() cannot ZeroDivisionError.
-            self._slider.configure(from_=0, to=1, number_of_steps=1)
-            self._slider.set(0)
+            self._configure_slider_range(last_index=1)
+            self._safe_slider_set(0)
         else:
             last = self._count - 1
-            self._slider.configure(from_=0, to=last, number_of_steps=last)
-            self._slider.set(self._index)
+            self._configure_slider_range(last_index=last)
+            self._safe_slider_set(self._index)
         self._refresh_label()
         self._update_controls()
 
@@ -142,7 +158,7 @@ class ExecutionTimelineScrubber(ctk.CTkFrame):
         if self._count <= 1:
             return
         self._index = max(0, min(index, self._count - 1))
-        self._slider.set(self._index)
+        self._safe_slider_set(self._index)
         self._refresh_label()
         self._on_scrub(self._index)
 

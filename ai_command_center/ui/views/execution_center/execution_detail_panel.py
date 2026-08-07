@@ -39,16 +39,39 @@ class ExecutionDetailPanel(ctk.CTkFrame):
         self._empty()
 
     def apply_snapshot(self, snap: AppState, *, selected_request_id: str = "") -> None:
-        clear_children(self._body)
         plan = snap.execution_library.active_plan
         ctx = snap.execution_context
         rid = selected_request_id or plan.request_id or ctx.request_id
+        matches_plan = bool(rid) and rid in {plan.request_id, plan.run_id}
+        matches_ctx = bool(rid) and rid == ctx.request_id
+        current = ""
+        if matches_plan and plan.current_step is not None:
+            current = plan.current_step.capability or plan.current_step.step_id
+        goal = plan.goal if matches_plan else (ctx.query if matches_ctx else "")
+        status = plan.status if matches_plan else (ctx.status if matches_ctx else "—")
+        error = plan.error if matches_plan and plan.error else "none"
+        fingerprint = (
+            str(rid or ""),
+            bool(matches_plan),
+            bool(matches_ctx),
+            str(goal or ""),
+            str(status or ""),
+            str(current or ""),
+            str(error or ""),
+            str(ctx.provider_id or "") if matches_ctx else "",
+            str(ctx.model or "") if matches_ctx else "",
+            str(ctx.status or "") if matches_ctx else "",
+            str(ctx.intent or "") if matches_ctx else "",
+        )
+        if fingerprint == getattr(self, "_snapshot_fingerprint", None):
+            return
+        self._snapshot_fingerprint = fingerprint
+
+        clear_children(self._body)
         if not rid:
             self._empty()
             return
 
-        matches_plan = rid in {plan.request_id, plan.run_id}
-        matches_ctx = rid == ctx.request_id
         if not matches_plan and not matches_ctx:
             self._row("Request ID", rid)
             self._muted(
@@ -57,13 +80,6 @@ class ExecutionDetailPanel(ctk.CTkFrame):
                 "Next: select a run that still has plan/context in AppState."
             )
             return
-
-        goal = plan.goal if matches_plan else (ctx.query if matches_ctx else "")
-        status = plan.status if matches_plan else (ctx.status if matches_ctx else "—")
-        current = ""
-        if matches_plan and plan.current_step is not None:
-            current = plan.current_step.capability or plan.current_step.step_id
-        error = plan.error if matches_plan and plan.error else "none"
 
         fg, _ = execution_state_color(status)
         self._row("Request ID", rid)
@@ -78,7 +94,7 @@ class ExecutionDetailPanel(ctk.CTkFrame):
             self._row("Intent", str(ctx.intent or "—"))
 
     def _empty(self) -> None:
-        clear_children(self._body)
+        # Caller already cleared; avoid double-destroy on Python 3.14 CTk.
         self._muted(
             "No execution selected for detail.\n"
             "Detail appears when you select a run from the list or hero action.\n"
