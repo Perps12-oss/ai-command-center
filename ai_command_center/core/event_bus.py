@@ -5,6 +5,10 @@ dispatch queue (R4b) defers ``ASYNC_ELIGIBLE`` topics to an ``event-dispatch``
 daemon thread when enabled via ``async_dispatch=True`` or env
 ``EVENTBUS_DISPATCH_QUEUE=1``.
 
+Phase 5 tiered multi-pool dispatch (R4b/R4c/R4d) is enabled via
+``tiered_dispatch=True`` or env ``EVENTBUS_TIERED_DISPATCH=1`` (see
+``tiered_dispatch_policy.py`` / ``async_dispatch_queue.py``).
+
 R4c adds per-handler ``async_queue`` adapters (``EVENTBUS_ASYNC_ADAPTERS=1``),
 bounded queue depth (``EVENTBUS_QUEUE_MAX_DEPTH``), and handler duration metrics.
 """
@@ -23,8 +27,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from ai_command_center.core.events.async_dispatch_queue import (
+    AsyncDispatchQueue,
+    PoolConfig,
+)
 from ai_command_center.core.events.dispatch_policy import (
+    DispatchPolicy,
     DispatchTier,
+    SyncDispatchPolicy,
     budget_exceedance_is_warning,
     get_dispatch_tier,
     get_time_budget_ms,
@@ -34,6 +44,11 @@ from ai_command_center.core.events.handler_dispatch import (
     HandlerRegistration,
     async_adapters_enabled_from_env,
     queue_max_depth_from_env,
+)
+from ai_command_center.core.events.tiered_dispatch_policy import (
+    DispatchPool,
+    TieredDispatchPolicy,
+    classify_dispatch_pool,
 )
 from ai_command_center.core.events.topics import (
     BUS_HANDLER_ERROR,
@@ -49,6 +64,7 @@ logger = logging.getLogger(__name__)
 
 WILDCARD_TOPIC = "*"
 DISPATCH_QUEUE_ENV = "EVENTBUS_DISPATCH_QUEUE"
+TIERED_DISPATCH_ENV = "EVENTBUS_TIERED_DISPATCH"
 
 EVENT_RELATIONSHIP_CREATED = "relationship.created"
 EVENT_RELATIONSHIP_DELETED = "relationship.deleted"
@@ -90,6 +106,11 @@ def dispatch_queue_enabled_from_env() -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def tiered_dispatch_enabled_from_env() -> bool:
+    raw = os.environ.get(TIERED_DISPATCH_ENV, "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True, slots=True)
 class Event:
     topic: str
@@ -115,7 +136,7 @@ class WildcardSubscriptionError(RuntimeError):
 
 
 class EventBus:
-    """Thread-safe event bus with optional async dispatch queue (R4b/R4c)."""
+    """Thread-safe event bus with optional async / tiered dispatch (R4b/R4c/R4d)."""
 
     def __init__(
         self,
@@ -123,14 +144,25 @@ class EventBus:
         debug_mode: bool = False,
         async_dispatch: bool | None = None,
         async_adapters: bool | None = None,
+        tiered_dispatch: bool | None = None,
         queue_max_depth: int | None = None,
+        pool_configs: tuple[PoolConfig, ...] | None = None,
+        dispatch_policy: DispatchPolicy | None = None,
     ) -> None:
         self._debug_mode = debug_mode
+        self._tiered_dispatch = (
+            tiered_dispatch
+            if tiered_dispatch is not None
+            else tiered_dispatch_enabled_from_env()
+        )
         self._async_dispatch = (
             async_dispatch
             if async_dispatch is not None
             else dispatch_queue_enabled_from_env()
         )
+        if self._tiered_dispatch:
+            # Tiered multi-pool implies async eligibility routing.
+            self._async_dispatch = True
         self._async_adapters = (
             async_adapters
             if async_adapters is not None
@@ -141,11 +173,14 @@ class EventBus:
             if queue_max_depth is not None
             else queue_max_depth_from_env()
         )
+        self._pool_configs = pool_configs
         self._lock = threading.RLock()
         self._subscribers: dict[str, list[HandlerRegistration]] = defaultdict(list)
         self._wildcard: list[HandlerRegistration] = []
         self._dispatch_queue: queue.Queue[_HandlerJob | None] | None = None
         self._dispatch_thread: threading.Thread | None = None
+        self._async_queue: AsyncDispatchQueue | None = None
+        self._policy: DispatchPolicy = dispatch_policy or SyncDispatchPolicy()
         self._shutdown = threading.Event()
         self._queue_depth = 0
         self._queue_depth_lock = threading.Lock()
@@ -161,7 +196,9 @@ class EventBus:
         self._navigate_rate_window_start = 0.0
         self._navigate_rate_count = 0
         self._navigate_rate_lock = threading.Lock()
-        if self._async_dispatch or self._async_adapters:
+        if self._tiered_dispatch:
+            self._start_tiered_dispatch()
+        elif self._async_dispatch or self._async_adapters:
             self._start_dispatch_thread()
 
     @property
@@ -173,6 +210,10 @@ class EventBus:
         return self._async_dispatch
 
     @property
+    def tiered_dispatch(self) -> bool:
+        return self._tiered_dispatch
+
+    @property
     def async_adapters(self) -> bool:
         return self._async_adapters
 
@@ -181,12 +222,20 @@ class EventBus:
         return self._queue_max_depth
 
     @property
+    def dispatch_policy(self) -> DispatchPolicy:
+        return self._policy
+
+    @property
     def dispatch_queue_depth(self) -> int:
+        if self._async_queue is not None:
+            return self._async_queue.depth
         with self._queue_depth_lock:
             return self._queue_depth
 
     @property
     def dropped_events(self) -> int:
+        if self._async_queue is not None:
+            return self._async_queue.dropped
         return self._dropped_events
 
     def get_topic_counts(self) -> dict[str, int]:
@@ -197,12 +246,17 @@ class EventBus:
     def get_handler_metrics(self) -> dict[str, float | int]:
         count = self._handler_duration_count
         avg_ms = self._handler_duration_total_ms / count if count else 0.0
-        return {
+        metrics: dict[str, float | int] = {
             "queue_depth": self.dispatch_queue_depth,
-            "dropped_events": self._dropped_events,
+            "dropped_events": self.dropped_events,
             "handler_invocations": count,
             "handler_duration_avg_ms": avg_ms,
+            "tiered_dispatch": 1 if self._tiered_dispatch else 0,
         }
+        if self._async_queue is not None:
+            for name in self._async_queue.pool_names:
+                metrics[f"pool_depth.{name}"] = self._async_queue.pool_depth(name)
+        return metrics
 
     def _assert_wildcard_allowed(self) -> None:
         if not self._debug_mode:
@@ -211,8 +265,24 @@ class EventBus:
                 "Use explicit topic subscriptions or EventBus(debug_mode=True) in diagnostics."
             )
 
+    def _start_tiered_dispatch(self) -> None:
+        if self._async_queue is not None:
+            return
+
+        def _invoke(event: Event, handler: Subscriber | None) -> None:
+            if handler is None:
+                self._invoke_handlers(event)
+            else:
+                self._invoke_single_handler(event, handler)
+
+        self._async_queue = AsyncDispatchQueue(
+            invoke=_invoke,
+            pools=self._pool_configs,
+        )
+        self._policy = TieredDispatchPolicy(self._async_queue)
+
     def _start_dispatch_thread(self) -> None:
-        if self._dispatch_thread is not None:
+        if self._dispatch_thread is not None or self._async_queue is not None:
             return
         self._dispatch_queue = queue.Queue(maxsize=self._queue_max_depth or 0)
         self._dispatch_thread = threading.Thread(
@@ -243,7 +313,11 @@ class EventBus:
                 self._dispatch_queue.task_done()
 
     def _should_enqueue_topic(self, topic: str) -> bool:
-        if not self._async_dispatch or self._shutdown.is_set():
+        if self._shutdown.is_set():
+            return False
+        if self._tiered_dispatch:
+            return classify_dispatch_pool(topic) is not DispatchPool.IMMEDIATE
+        if not self._async_dispatch:
             return False
         return get_dispatch_tier(topic) is DispatchTier.ASYNC_ELIGIBLE
 
@@ -284,6 +358,40 @@ class EventBus:
             logger.debug("Failed to publish drop metric", exc_info=True)
 
     def _enqueue(self, event: Event, handler: Subscriber | None = None) -> bool:
+        if self._tiered_dispatch and self._async_queue is not None:
+            pool = classify_dispatch_pool(event.topic)
+            if pool is DispatchPool.IMMEDIATE:
+                if handler is None:
+                    self._invoke_handlers(event)
+                else:
+                    self._invoke_single_handler(event, handler)
+                return True
+            ok = self._async_queue.enqueue(pool.value, event, handler)
+            if ok:
+                return True
+            # Backpressure: SYNC_CRITICAL never drops; run inline.
+            if get_dispatch_tier(event.topic) is DispatchTier.SYNC_CRITICAL:
+                if handler is None:
+                    self._invoke_handlers(event)
+                else:
+                    self._invoke_single_handler(event, handler)
+                return True
+            # Drop already counted on AsyncDispatchQueue; emit metric only.
+            try:
+                self.publish(
+                    EVENT_OBSERVABILITY_METRIC,
+                    {
+                        "metric_type": "eventbus.queue.dropped",
+                        "value": 1,
+                        "unit": "count",
+                        "tags": {"topic": event.topic},
+                    },
+                    source="event_bus",
+                )
+            except Exception:
+                logger.debug("Failed to publish drop metric", exc_info=True)
+            return False
+
         if self._dispatch_queue is None:
             self._start_dispatch_thread()
         assert self._dispatch_queue is not None
@@ -423,6 +531,17 @@ class EventBus:
             return
         self._invoke_handlers(event)
 
+    def dispatch_sync(self, event: Event) -> None:
+        """Always invoke handlers on the caller thread (ignores async flags)."""
+        self._invoke_handlers(event)
+
+    def dispatch_async(self, event: Event) -> None:
+        """Always enqueue when a dispatch queue is available; else sync."""
+        if self._tiered_dispatch or self._async_dispatch or self._async_adapters:
+            self._enqueue(event)
+            return
+        self._invoke_handlers(event)
+
     def _collect_registrations(self, topic: str) -> list[HandlerRegistration]:
         with self._lock:
             handlers = list(self._wildcard)
@@ -545,9 +664,12 @@ class EventBus:
                     logger.debug("Failed to publish handler duration metric", exc_info=True)
 
     def shutdown(self) -> None:
+        self._shutdown.set()
+        if self._async_queue is not None:
+            self._async_queue.shutdown(timeout=5.0)
+            self._async_queue = None
         if self._dispatch_thread is None:
             return
-        self._shutdown.set()
         assert self._dispatch_queue is not None
         try:
             self._dispatch_queue.put_nowait(None)

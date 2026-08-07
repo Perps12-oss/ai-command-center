@@ -105,3 +105,19 @@ pipeline:
   canonical:
     - "UI → CommandRouter → ContextManager → OllamaService → Response"
     - "UI → CommandRouter → ObsidianService → NoteRepository"
+
+# Phase 5 Async EventBus — pool sizes (mirrored in
+# ai_command_center.core.events.async_dispatch_queue.DEFAULT_POOL_CONFIGS).
+dispatch_policy:
+  tiered: true
+  pools:
+    tool_execution:
+      workers: 1
+      queue_size: 100
+    workflow:
+      workers: 4
+      queue_size: 50
+    model:
+      workers: 2
+      queue_size: 10
+
