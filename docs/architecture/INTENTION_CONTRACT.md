@@ -40,3 +40,12 @@ Validation runs in `ExecutionOrchestratorService` **before** `TOOL_INVOKE`.
 
 - XGrammar / GBNF / logits processors
 - LLM publishing directly to `TOOL_INVOKE`
+
+## Enforcement (ADR-018 M3)
+
+| Mechanism | Rule |
+|-----------|------|
+| Arch lint **R5** | Only `services/execution_orchestrator_service.py` may `publish(TOOL_INVOKE, …)` / `publish("tool.invoke", …)` |
+| Planner assist | LLM intention assist, if any, enters only via `PLAN_REQUEST` / `PlannerService` — never raw tool JSON to the executor |
+
+Verification: `scripts/arch_lint.py` + `tests/test_architecture_lint.py` (R5) + `tests/test_tool_invoke_authority.py`.

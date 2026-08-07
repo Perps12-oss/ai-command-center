@@ -75,6 +75,7 @@ class ToolExecutor:
             end_time=time.time(),
             outputs=(result.output,) if result.output else (),
             error=result.error,
+            facts=dict(result.facts or {}),
         )
         self._status[tool_name] = execution
         return execution

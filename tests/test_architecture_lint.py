@@ -104,6 +104,37 @@ def test_r4_allows_service_importing_intents_module() -> None:
     assert "R4" not in _rules("ai_command_center/services/chat_handler_service.py", src)
 
 
+# ── R5: exclusive TOOL_INVOKE publisher (ADR-018 M3) ─────────────────────────
+def test_r5_flags_non_orchestrator_tool_invoke_publish() -> None:
+    src = (
+        "from ai_command_center.core.events.topics import TOOL_INVOKE\n"
+        "def bad(bus):\n"
+        "    bus.publish(TOOL_INVOKE, {'tool': 'shell'})\n"
+    )
+    assert "R5" in _rules("ai_command_center/services/ollama_http_service.py", src)
+
+
+def test_r5_flags_string_literal_tool_invoke_publish() -> None:
+    src = 'def bad(bus):\n    bus.publish("tool.invoke", {"tool": "shell"})\n'
+    assert "R5" in _rules("ai_command_center/services/planner_service.py", src)
+
+
+def test_r5_allows_execution_orchestrator_tool_invoke() -> None:
+    src = (
+        "from ai_command_center.core.events.topics import TOOL_INVOKE\n"
+        "def ok(bus):\n"
+        "    bus.publish(TOOL_INVOKE, {'tool': 'shell'})\n"
+    )
+    assert "R5" not in _rules(
+        "ai_command_center/services/execution_orchestrator_service.py", src
+    )
+
+
+def test_r5_flags_ui_tool_invoke_publish() -> None:
+    src = 'def bad(bus):\n    bus.publish("tool.invoke", {})\n'
+    assert "R5" in _rules("ai_command_center/ui/views/chat_view.py", src)
+
+
 # ── repo ratchet ──────────────────────────────────────────────────────────────
 def test_no_new_architecture_violations_in_repo() -> None:
     baseline_path = _ROOT / "tests" / "arch_lint_baseline.json"

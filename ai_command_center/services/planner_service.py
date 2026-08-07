@@ -475,9 +475,21 @@ class PlannerService(BaseService):
                 workspace_id=workspace_id,
                 payload=dict(event.payload or {}),
             )
+            raw_receipts = event.payload.get("receipts")
+            if not isinstance(raw_receipts, list):
+                snap = event.payload.get("wm_snapshot")
+                raw_receipts = (
+                    snap.get("receipts") if isinstance(snap, dict) else None
+                )
+            receipts = (
+                [item for item in raw_receipts if isinstance(item, dict)]
+                if isinstance(raw_receipts, list)
+                else []
+            )
             wm_snippets = build_wm_first_snippets(
                 state_context=state_context,
                 observations=observations if isinstance(observations, list) else (),
+                receipts=receipts,
                 extra=obs_snippets,
             )
             bundle = build_wm_first_context(
@@ -485,6 +497,7 @@ class PlannerService(BaseService):
                 goal,
                 state_context=state_context,
                 observations=observations if isinstance(observations, list) else (),
+                receipts=receipts,
                 extra_snippets=obs_snippets,
             )
             # Prefer injected planner_response for tests / future LLM assist via Planner only.

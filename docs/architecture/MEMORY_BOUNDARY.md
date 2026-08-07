@@ -22,4 +22,13 @@
 
 ## Replan context (ADR-019)
 
-`plan.replan.request` carries `observations` (`execution.observation` facts). Summaries of chat are not a substitute for those structured observations.
+`plan.replan.request` carries a structured **WM snapshot** plus execution facts:
+
+| Field | Meaning |
+|-------|---------|
+| `observations` | `execution.observation` facts from the run |
+| `state_context` | World Model projection (`StateContext`) when available |
+| `wm_snapshot` | Bundled projection: state_context, observations, step_outputs, plan_history, receipts, failed_step |
+| `step_outputs` / `plan` / `failed_index` | Orchestrator run facts for PlannerService |
+
+Chat summaries are **not** a substitute for those structured observations / WM fields.

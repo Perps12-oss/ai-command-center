@@ -26,6 +26,7 @@ def run_launch_application(args: dict[str, Any]) -> ToolResult:
         success=result.success,
         output=result.response_text or "",
         error=result.error,
+        facts=dict(result.facts or {}),
     )
 
 
@@ -40,6 +41,7 @@ def run_system_time_query(args: dict[str, Any]) -> ToolResult:
         success=result.success,
         output=result.response_text or "",
         error=result.error,
+        facts=dict(result.facts or {}),
     )
 
 
@@ -54,6 +56,7 @@ def run_calendar_query(args: dict[str, Any]) -> ToolResult:
         success=result.success,
         output=result.response_text or "",
         error=result.error,
+        facts=dict(result.facts or {}),
     )
 
 
@@ -68,4 +71,5 @@ def run_calendar_event_create(args: dict[str, Any]) -> ToolResult:
         success=result.success,
         output=result.response_text or "",
         error=result.error,
+        facts=dict(result.facts or {}),
     )

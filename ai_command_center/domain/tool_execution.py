@@ -16,3 +16,4 @@ class ToolExecution:
     inputs: tuple[tuple[str, Any], ...] = field(default_factory=tuple)
     outputs: tuple[Any, ...] = field(default_factory=tuple)
     error: str | None = None
+    facts: dict[str, Any] = field(default_factory=dict)
