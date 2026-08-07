@@ -69,6 +69,16 @@ class TruthValidationPanel(ctk.CTkFrame):
         state = truth_state_for_entry(entry)
         detail = str(getattr(entry, "truth_detail", "") or "") if entry is not None else ""
         source = str(getattr(entry, "response_source", "") or "") if entry is not None else ""
+        fingerprint = (
+            str(selected_request_id or ""),
+            state,
+            detail,
+            source,
+            str(getattr(entry, "request_id", "") or "") if entry is not None else "",
+        )
+        if fingerprint == getattr(self, "_snapshot_fingerprint", None):
+            return
+        self._snapshot_fingerprint = fingerprint
 
         clear_children(self._body)
         if not state:
@@ -88,7 +98,8 @@ class TruthValidationPanel(ctk.CTkFrame):
         strip.pack(fill="x", padx=8, pady=(8, 4))
 
     def _show_empty(self) -> None:
-        clear_children(self._body)
+        if self._body.winfo_children():
+            clear_children(self._body)
         self._badge.configure(text="—", text_color=T.TEXT_MUTED)
         self.configure(border_color=T.EXECUTION_BLUE)
         ctk.CTkLabel(

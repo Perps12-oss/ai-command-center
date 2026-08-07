@@ -64,28 +64,43 @@ class ReceiptViewerPanel(ctk.CTkFrame):
         entry = resolve_orchestration_entry(
             snap.orchestration_run, selected_request_id=selected_request_id
         )
-        clear_children(self._body)
-        if entry is None or not getattr(entry, "receipt_id", ""):
-            self._show_empty()
-            return
-
-        facts = getattr(entry, "execution_facts", ()) or ()
+        facts = getattr(entry, "execution_facts", ()) or () if entry is not None else ()
         if isinstance(facts, dict):
             fact_pairs = tuple(facts.items())
         else:
             fact_pairs = tuple(facts)
+        receipt_id = str(getattr(entry, "receipt_id", "") or "") if entry is not None else ""
+        fingerprint = (
+            str(selected_request_id or ""),
+            receipt_id,
+            str(getattr(entry, "response_source", "") or "") if entry is not None else "",
+            bool(getattr(entry, "execution_success", False)) if entry is not None else False,
+            str(getattr(entry, "execution_error", "") or "") if entry is not None else "",
+            fact_pairs[:6],
+        )
+        if fingerprint == getattr(self, "_snapshot_fingerprint", None):
+            return
+        self._snapshot_fingerprint = fingerprint
+
+        clear_children(self._body)
+        if entry is None or not receipt_id:
+            self._show_empty()
+            return
+
         summary = ", ".join(f"{k}={v}" for k, v in fact_pairs[:6]) if fact_pairs else "—"
         outcome = "success" if getattr(entry, "execution_success", False) else "failed"
         if getattr(entry, "execution_error", None):
             outcome = f"{outcome} ({entry.execution_error})"
 
-        self._row("Receipt ID", str(entry.receipt_id))
+        self._row("Receipt ID", receipt_id)
         self._row("Response Source", str(getattr(entry, "response_source", "") or "—"))
         self._row("Execution Outcome", outcome)
         self._row("Evidence Summary", summary)
 
     def _show_empty(self) -> None:
-        clear_children(self._body)
+        # apply_snapshot already cleared; init path starts empty.
+        if self._body.winfo_children():
+            clear_children(self._body)
         ctk.CTkLabel(
             self._body,
             text=(

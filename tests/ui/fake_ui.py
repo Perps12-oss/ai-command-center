@@ -11,7 +11,12 @@ import types
 from collections.abc import Callable
 
 
-def _make_widget_class(name: str, button: bool = False, textbox: bool = False):
+def _make_widget_class(
+    name: str,
+    button: bool = False,
+    textbox: bool = False,
+    slider: bool = False,
+):
     """Return a fake CustomTkinter widget class."""
 
     class FakeWidget:
@@ -136,6 +141,37 @@ def _make_widget_class(name: str, button: bool = False, textbox: bool = False):
 
         return FakeTextbox
 
+    if slider:
+        class FakeSlider(FakeWidget):
+            """Minimal CTkSlider stand-in with real ``_number_of_steps`` storage."""
+
+            def __init__(self, master=None, **kwargs) -> None:
+                super().__init__(master, **kwargs)
+                self._number_of_steps = kwargs.get("number_of_steps", 1)
+                self._from_ = kwargs.get("from_", 0)
+                self._to = kwargs.get("to", 1)
+                self._value = self._from_
+
+            def configure(self, **kwargs) -> None:
+                super().configure(**kwargs)
+                if "number_of_steps" in kwargs:
+                    self._number_of_steps = kwargs["number_of_steps"]
+                if "from_" in kwargs:
+                    self._from_ = kwargs["from_"]
+                if "to" in kwargs:
+                    self._to = kwargs["to"]
+
+            def set(self, value) -> None:
+                steps = self._number_of_steps
+                if steps is not None and int(steps) < 1:
+                    raise ZeroDivisionError("float division by zero")
+                self._value = value
+
+            def get(self):
+                return self._value
+
+        return FakeSlider
+
     return FakeWidget
 
 
@@ -155,7 +191,7 @@ def _build_fake_customtkinter() -> types.ModuleType:
     mod.CTkOptionMenu = _make_widget_class("CTkOptionMenu")
     mod.CTkSwitch = _make_widget_class("CTkSwitch")
     mod.CTkProgressBar = _make_widget_class("CTkProgressBar")
-    mod.CTkSlider = _make_widget_class("CTkSlider")
+    mod.CTkSlider = _make_widget_class("CTkSlider", slider=True)
     mod.CTkTabview = _make_widget_class("CTkTabview")
     mod.CTkComboBox = _make_widget_class("CTkComboBox")
     mod.CTkCheckBox = _make_widget_class("CTkCheckBox")
