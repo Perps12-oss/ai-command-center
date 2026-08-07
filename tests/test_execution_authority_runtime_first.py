@@ -107,6 +107,17 @@ def _wire_runtime(bus: EventBus) -> dict:
                     if str(args.get("application")) == "calculator"
                     else f"unsupported application: {args.get('application')}"
                 ),
+                facts=(
+                    {
+                        "application": str(args.get("application") or ""),
+                        "launched": True,
+                    }
+                    if str(args.get("application")) == "calculator"
+                    else {
+                        "application": str(args.get("application") or ""),
+                        "launched": False,
+                    }
+                ),
             ),
         )
     )

@@ -242,7 +242,12 @@ class ExecutionOrchestratorService(BaseService):
                 str(event.payload.get("error") or event.payload.get("message") or "tool failed"),
             )
             return
-        self._complete_step(run_id, output=str(event.payload.get("output", "")))
+        facts = event.payload.get("facts")
+        self._complete_step(
+            run_id,
+            output=str(event.payload.get("output", "")),
+            facts=dict(facts) if isinstance(facts, dict) else None,
+        )
 
     def _on_tool_failed(self, event: Event) -> None:
         run_id = str(event.payload.get("run_id", "")).strip()
@@ -796,7 +801,13 @@ class ExecutionOrchestratorService(BaseService):
         )
         return True
 
-    def _complete_step(self, run_id: str, *, output: str = "") -> None:
+    def _complete_step(
+        self,
+        run_id: str,
+        *,
+        output: str = "",
+        facts: dict[str, Any] | None = None,
+    ) -> None:
         if run_id not in self._runs:
             return
         run = self._runs[run_id]
@@ -805,14 +816,15 @@ class ExecutionOrchestratorService(BaseService):
         step = plan.steps[index]
         self._publish_observation(run_id, success=True, output=output)
         outputs = list(run.get("step_outputs") or [])
-        outputs.append(
-            {
-                "step_id": step.step_id,
-                "capability": step.capability,
-                "output": output,
-                "success": True,
-            }
-        )
+        step_record: dict[str, Any] = {
+            "step_id": step.step_id,
+            "capability": step.capability,
+            "output": output,
+            "success": True,
+        }
+        if facts:
+            step_record["facts"] = dict(facts)
+        outputs.append(step_record)
         run["step_outputs"] = outputs
         self._bus.publish(
             EXECUTION_STEP_COMPLETED,
@@ -859,6 +871,12 @@ class ExecutionOrchestratorService(BaseService):
             source=self.name,
         )
         if allow_replan and self._request_replan(run_id, error):
+            # EventBus is sync: if PlannerService handled the replan, replanning is cleared.
+            # If still set, no handler answered — fail the run instead of hanging.
+            current = self._runs.get(run_id)
+            if current is not None and current.get("replanning"):
+                current["replanning"] = False
+                self._fail_run(run_id, error)
             return
         self._fail_run(run_id, error)
 

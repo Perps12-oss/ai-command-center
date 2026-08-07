@@ -80,7 +80,12 @@ def start_runtime_stack(
             query="",
             args={str(k): str(v) for k, v in args.items()},
         )
-        return ToolResult(success=result.success, output=result.response_text or "", error=result.error)
+        return ToolResult(
+            success=result.success,
+            output=result.response_text or "",
+            error=result.error,
+            facts=dict(result.facts or {}),
+        )
 
     def _time(args: dict) -> ToolResult:
         result = facts.execute(
@@ -92,7 +97,12 @@ def start_runtime_stack(
             query="",
             args={str(k): str(v) for k, v in args.items()},
         )
-        return ToolResult(success=result.success, output=result.response_text or "", error=result.error)
+        return ToolResult(
+            success=result.success,
+            output=result.response_text or "",
+            error=result.error,
+            facts=dict(result.facts or {}),
+        )
 
     def _cal_query(args: dict) -> ToolResult:
         result = calendar.execute(
@@ -104,7 +114,12 @@ def start_runtime_stack(
             query="",
             args={str(k): str(v) for k, v in args.items()},
         )
-        return ToolResult(success=result.success, output=result.response_text or "", error=result.error)
+        return ToolResult(
+            success=result.success,
+            output=result.response_text or "",
+            error=result.error,
+            facts=dict(result.facts or {}),
+        )
 
     def _cal_create(args: dict) -> ToolResult:
         result = calendar.execute(
@@ -116,7 +131,12 @@ def start_runtime_stack(
             query="",
             args={str(k): str(v) for k, v in args.items()},
         )
-        return ToolResult(success=result.success, output=result.response_text or "", error=result.error)
+        return ToolResult(
+            success=result.success,
+            output=result.response_text or "",
+            error=result.error,
+            facts=dict(result.facts or {}),
+        )
 
     registry.register_tool(ToolSpec(name="launch_application", description="", handler=_launch))
     registry.register_tool(ToolSpec(name="system_time_query", description="", handler=_time))
