@@ -68,7 +68,7 @@ Statuses below are from **repository code on `origin/main`**, not from legacy pl
 |----------|---------------|------|
 | Remaining Implementation Plan (2026-07-12) | STALE | [`../archive/REMAINING_IMPLEMENTATION_PLAN_2026-07-12_STALE.md`](../archive/REMAINING_IMPLEMENTATION_PLAN_2026-07-12_STALE.md) |
 
-**No Phase 5–10 plan was archived as COMPLETE** — code verification found zero COMPLETE_ON_MAIN plans.
+**No Phase 6–10 plan was archived as COMPLETE** — Phase 5 closes with the Async EventBus train once on `main`.
 
 ---
 
@@ -86,7 +86,7 @@ Do not treat frontend Phase 11 completeness as cross-platform Phase 11 completen
 ## Phase Dependencies (informational)
 
 ```
-Phase 5 ──► later phases (Async EventBus — **approval-gated**)
+Phase 5 ──► later phases (Async EventBus — **COMPLETE** pending main merge)
 Phase 6 ──► external capability aggregation
 Phase 8 ──► Operator Kernel (**RETIRED from live — ADR-006**)
 Phase 9 ──► Goals (**ADR-012 A**) + Multi-Agent (**ADR-013 research-only**)

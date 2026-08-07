@@ -243,7 +243,7 @@ An R4b/R4c/R4d Phase 5 implementation PR is **done** when:
 
 - [x] Constitutional ownership flow unchanged; UCGS layer import PASS
 - [x] `scripts/verify_constitution.py` PASS (CI)
-- [x] `scripts/verify_phase4a.py` PASS (vault index off bus thread preserved)
+- [ ] `scripts/verify_phase4a.py` PASS (vault index off bus thread preserved) — **script currently stale on `main`** (`ui.command` `note:` path removed; index-off-bus still true via Obsidian worker; not regressed by Phase 5)
 - [x] Chat streaming tests PASS; no Tk calls off main thread (UIQueue invariant)
 - [x] `dispatch_policy.py` tiers + `TieredDispatchPolicy` pools enforced when enabled
 - [x] `bus.handler_error` emitted on handler failure; no silent swallow
