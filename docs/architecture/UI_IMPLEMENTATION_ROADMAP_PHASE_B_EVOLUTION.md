@@ -1,12 +1,16 @@
 ﻿# Phase B UI Implementation Roadmap — Evolution Plan (Canon-corrected)
 
-**Status:** ACTIVE implementation roadmap (Devin UI)  
+**Status:** COMPLETE on `origin/main` (living historical roadmap — do not re-open E00–E13)  
+**Tip verified:** `origin/main` @ `16f549e` (2026-08-07)  
 **Baseline:** `origin/main` only  
 **Handover:** [`docs/agents/DEVIN_UI_HANDOVER.md`](../agents/DEVIN_UI_HANDOVER.md)  
 **Audit gate:** [`docs/agents/CURSOR_AUDIT_GATE.md`](../agents/CURSOR_AUDIT_GATE.md)  
-**Authority:** ADR-006 (ExecutionAuthority canonical); [`REPOSITORY_TRUTH_CANON.md`](../audits/REPOSITORY_TRUTH_CANON.md)
+**Package audit:** [`TOM_AUDIT_PHASE_B_UI_PACKAGE_E00_E13.md`](../audits/TOM_AUDIT_PHASE_B_UI_PACKAGE_E00_E13.md)  
+**Conditions cleared:** [`TOM_AUDIT_PHASE_B_CONDITIONS_CLEARED.md`](../audits/TOM_AUDIT_PHASE_B_CONDITIONS_CLEARED.md) (#105)  
+**Authority:** ADR-006 (ExecutionAuthority canonical); [`REPOSITORY_TRUTH_CANON.md`](../audits/REPOSITORY_TRUTH_CANON.md)  
+**Hygiene disposition:** [`REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md`](../audits/REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md)
 
-This is the reconciled **evolution** version of the Phase B UI roadmap (not a rewrite plan). Foundation, workspaces, and inspector/palette primitives already exist on `main`. Remaining work is **incremental evolution**.
+This is the reconciled **evolution** version of the Phase B UI roadmap (not a rewrite plan). **E00–E13 shipped on `main`** via PRs #87–#103; Stage 1 Tom CONDITIONS cleared via #105. Sections below retain the original plan text as historical SoT; §4 is the tip-truth ship matrix.
 
 > **Do not branch from `phase-11a-command-center`.** That branch is superseded. Inventory SoT is `origin/main`.
 
@@ -37,10 +41,11 @@ This is the reconciled **evolution** version of the Phase B UI roadmap (not a re
 
 ### Foundation already on `origin/main`
 
-- `InspectorHost`, `BaseInspector`, typed inspectors (`message`, `artifact`, `provider`, `decision`, `execution`, `payload`, `workflow_node`), `InspectorDock`
-- `CommandPalette`, `TopBar`, `Sidebar`, `ViewManager`
-- `UIController` / `WorkspaceOsUIController`, `state_applier`, `app_state`, `topics.py`
+- `InspectorHost`, `BaseInspector`, typed inspectors including Phase B kinds (`message`, `artifact`, `provider`, `decision`, `goal`, `task`, `memory`, `agent`, `note`, `world_node`, `execution_event`, `evidence`, `operation`), `InspectorDock`
+- `OSPalette` + `palette_provider` registry (E03), `GlobalContextBar` (E02), `TopBar`, grouped `Sidebar`/`NavGroup` (E04), `ViewManager`
+- `UIController` / `WorkspaceOsUIController`, `state_applier`, `app_state`, `topics.py` (UI_* families)
 - `ui/views/surface_state.py` (Article 18 empty/loading/error surfaces)
+- Phase B workspaces registered: `brain`, `evidence`, `operations`, `graph_workspace`, `insights`, plus hardened Memory/Goal/Agent/World shells
 
 ### Existence matrix
 
@@ -87,26 +92,32 @@ The shell files (`*_view.py`) are **orchestrators** that compose packages of pan
 
 ---
 
-## 4. Remaining Phase B gaps (evolution)
+## 4. Phase B ship matrix (tip truth @ `16f549e`)
 
-| # | Gap | Why it remains |
-|---|-----|----------------|
-| 1 | **Global Context Bar** | No shell-wide context widget below `TopBar`. |
-| 2 | **OS Palette provider system** | `CommandPalette` is static; no provider registry, context sections, or dynamic scoping. |
-| 3 | **Navigation Shell grouping** | `Sidebar` is a flat list; needs collapsible groups (Ops / Monitor / Library / Settings). |
-| 4 | **Memory Workspace hardening** | `MemoryView` is a simple list; missing search, detail pane, injection indicator, inspector. |
-| 5 | **Brain Inspector workspace** | No dedicated `BrainView` for kernel state, goals, observations, actions, plan. |
-| 6 | **Goal Workspace hardening** | `GoalView` + `goal_dashboard` package exist; missing inspector wiring, `UI_GOAL_*` topics, cross-panel selection, success-criteria/task detail integration. |
-| 7 | **Agent Operations Center hardening** | `AgentsView` + `agent_monitor` package exist; missing inspector wiring, `UI_AGENT_*` topics, cross-panel selection, run timeline scrubber. |
-| 8 | **Execution Center hardening** | `ExecutionsView` + `execution_center` package exist; missing inspector wiring, `UI_EXECUTION_*` topics, mission-control layout. |
-| 9 | **World Model Explorer hardening** | `WorldExplorerView` + `world_model` package exist; missing inspector docking (`SelectionInspectorPanel` → `InspectorHost`), palette commands, `UI_WORLD_*` topics. |
-| 10 | **Evidence Workspace** | No `EvidenceView`; can reuse `execution_center.ReceiptViewerPanel` and `TruthValidationPanel` plus a claim list. |
-| 11 | **Mission Control Operations** | No `OperationsView` for live `Planner → Router → Executor → Verifier → Receipt` pipeline with `ExecutionTimelineDock`. |
-| 12 | **Relationship Graph Workspace** | No full-graph workspace; build a new shell that reuses `KnowledgeGraphPanel` and `SelectionInspectorPanel` on `BaseGraphCanvas`. |
-| 13 | **Insights Placeholder** | No `insights` view, state, or sidebar entry. |
-| 14 | **Extended inspector kinds** | `InspectorHost` only registers `message`, `artifact`, `provider`, `decision`. Missing `goal`, `task`, `memory`, `agent`, `note`, `world_node`, `execution_event`. |
-| 15 | **UI-level EventBus topics** | Missing `UI_CONTEXT_*`, `UI_MEMORY_*`, `UI_GOAL_*`, `UI_AGENT_*`, `UI_EXECUTION_*`, `UI_WORLD_*`, `UI_EVIDENCE_*`, `UI_OPERATION_*`, `UI_GRAPH_*`, `UI_INSIGHTS_*`. |
-| 16 | **Composite state projections** | No `global_context`, `evidence_state`, `operations_state`, `graph_state`, or `insights_state` projections. |
+> Historical “remaining gaps” list below is **closed**. Do not reopen E00–E13 as greenfield. Future UI work is post-Phase-B product evolution under new ADRs / plans.
+
+| # | Capability | Tip status | Evidence |
+|---|------------|------------|----------|
+| 1 | **Global Context Bar** | ✅ SHIPPED (+ Stage 1 active goal) | `global_context_bar.py`, `global_context_state.py`, #92 + #105 |
+| 2 | **OS Palette provider system** | ✅ SHIPPED | `OSPalette`, `palette_provider.py`, #93 |
+| 3 | **Navigation Shell grouping** | ✅ SHIPPED | `sidebar.py` `NAV_GROUPS` / `NavGroup`, #94 |
+| 4 | **Memory Workspace hardening** | ✅ SHIPPED | `memory_view.py` search/detail/injection, #95 |
+| 5 | **Brain Inspector workspace** | ✅ SHIPPED | `brain_view.py` + `ui/components/brain/`, #96 |
+| 6 | **Goal Workspace hardening** | ✅ SHIPPED (+ Stage 1 `task` kind) | `goal_view.py` / `goal_dashboard/`, #97 + #105 |
+| 7 | **Agent Operations Center hardening** | ✅ SHIPPED | `agents_view.py` / `agent_monitor/`, #99 |
+| 8 | **Execution Center hardening** | ✅ SHIPPED | `executions_view.py` / `execution_center/`, Mission Control UX follow-ons |
+| 9 | **World Model Explorer hardening** | ✅ SHIPPED | `world_explorer_view.py` + `InspectorDock`, #98 |
+| 10 | **Evidence Workspace** | ✅ SHIPPED | `evidence_view.py`, #100 |
+| 11 | **Mission Control Operations** | ✅ SHIPPED | `operations_view.py`, #101 |
+| 12 | **Relationship Graph Workspace** | ✅ SHIPPED | `graph_workspace_view.py`, #102 |
+| 13 | **Insights Placeholder** | ✅ SHIPPED (intentional stub) | `insights_view.py` + `insights_state`, #103 |
+| 14 | **Extended inspector kinds** | ✅ SHIPPED | `InspectorHost` registers goal/task/memory/agent/note/world_node/execution_event/evidence/operation |
+| 15 | **UI-level EventBus topics** | ✅ SHIPPED | `topics.py` UI_CONTEXT/MEMORY/GOAL/AGENT/WORLD/EVIDENCE/OPERATION/GRAPH/INSIGHTS (+ BRAIN, execution scrub) |
+| 16 | **Composite state projections** | ✅ PARTIAL-by-design | `global_context` + `insights_state` present; evidence/ops reuse orchestration snapshots (Tom-allowed) |
+
+**Program status:** COMPLIANT / COMPLETE on `main` after #105 (`TOM_AUDIT_PHASE_B_CONDITIONS_CLEARED.md`).
+
+**Non-blocking residual debt (not open Phase B slices):** leftover `home_view.py` widget helpers; legacy mutable `WorldModelState` on Relationship/Dependency views; Insights still placeholder-only by plan.
 
 ---
 
@@ -161,7 +172,9 @@ The shell files (`*_view.py`) are **orchestrators** that compose packages of pan
 
 ---
 
-## 6. Updated PR breakdown
+## 6. Updated PR breakdown (historical plan — all slices MERGED)
+
+> **Ship note (2026-08-07):** E00–E13 landed as GitHub PRs **#87–#103**; Stage 1 CONDITIONS as **#105**. The dependency graph and per-PR file lists below are retained as the approved plan record. Do not treat unchecked acceptance bullets as open work.
 
 ### Dependency graph
 
@@ -542,12 +555,12 @@ Before any implementation:
 
 ## 10. Summary
 
-`origin/main` already contains the Phase 11 workspace shells and panel packages (`goal_dashboard`, `agent_monitor`, `execution_center`, `world_model`) and the shared primitives (`BaseGraphCanvas`, `TimelineRenderer`, `ExecutionTimelineDock`, `InspectorHost`). Phase B is therefore an **evolution**, not a rewrite:
+`origin/main` contains the Phase 11 workspace shells and panel packages **and** the Phase B evolution surfaces (E00–E13). Tip verification @ `16f549e`:
 
-1. Align on `origin/main` and close stale `phase-11a-command-center` assumptions.
-2. Extend the universal inspector and reconcile `SelectionInspectorPanel` by composition.
-3. Add the Global Context Bar and OS Palette.
-4. Reorganize navigation.
-5. Harden each Workspace OS view incrementally (Memory, Brain, Goal, Agent, Execution, World, Evidence, Operations, Graph, Insights).
+1. Canon baseline is `origin/main`; `phase-11a-command-center` remains non-SoT (deleted remotely).
+2. Universal inspector kinds + `SelectionInspectorPanel` composition into `InspectorDock` are on main.
+3. Global Context Bar (with active goal) and OS Palette providers are on main.
+4. Navigation is grouped; Memory/Brain/Goal/Agent/World/Evidence/Operations/Graph/Insights workspaces are registered.
+5. Program COMPLETE / COMPLIANT after Stage 1 (#105). Remaining items are non-blocking debt or new-scoped product work — not reopenable Phase B gaps.
 
-This reduces risk, reuses the existing UI Constitution and `StateApplierMixin` patterns, and avoids duplicate implementation.
+Agents must plan from §4 tip-truth matrix + Tom CONDITIONS-cleared audit, not from the historical “remaining gaps” wording that previously lived in this file.
