@@ -6,7 +6,7 @@ import logging
 import subprocess
 import threading
 import uuid
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 from uuid import UUID
 
 from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
@@ -325,20 +325,23 @@ class ToolExecutorService(BaseService):
 
         if execution.status == "failed":
             error = execution.error or "tool failed"
+            failed_payload: dict[str, Any] = {
+                "contract_version": TOOL_CONTRACT_VERSION,
+                "invoke_id": invoke_id,
+                "tool": tool_name,
+                "message": error,
+                "run_id": run_id,
+                "step_id": step_id,
+                "success": False,
+                "error": error,
+                "workspace_context": workspace_context,
+                **({"agent_id": agent_id} if agent_id else {}),
+            }
+            if execution.facts:
+                failed_payload["facts"] = dict(execution.facts)
             self._bus.publish(
                 TOOL_FAILED,
-                {
-                    "contract_version": TOOL_CONTRACT_VERSION,
-                    "invoke_id": invoke_id,
-                    "tool": tool_name,
-                    "message": error,
-                    "run_id": run_id,
-                    "step_id": step_id,
-                    "success": False,
-                    "error": error,
-                    "workspace_context": workspace_context,
-                    **({"agent_id": agent_id} if agent_id else {}),
-                },
+                failed_payload,
                 source=self.name,
             )
             self._record_tool_timeline(
@@ -351,20 +354,23 @@ class ToolExecutorService(BaseService):
             return
 
         output = execution.outputs[0] if execution.outputs else ""
+        result_payload: dict[str, Any] = {
+            "contract_version": TOOL_CONTRACT_VERSION,
+            "invoke_id": invoke_id,
+            "tool": tool_name,
+            "success": True,
+            "output": output,
+            "error": execution.error,
+            "run_id": run_id,
+            "step_id": step_id,
+            "workspace_context": workspace_context,
+            **({"agent_id": agent_id} if agent_id else {}),
+        }
+        if execution.facts:
+            result_payload["facts"] = dict(execution.facts)
         self._bus.publish(
             TOOL_RESULT,
-            {
-                "contract_version": TOOL_CONTRACT_VERSION,
-                "invoke_id": invoke_id,
-                "tool": tool_name,
-                "success": True,
-                "output": output,
-                "error": execution.error,
-                "run_id": run_id,
-                "step_id": step_id,
-                "workspace_context": workspace_context,
-                **({"agent_id": agent_id} if agent_id else {}),
-            },
+            result_payload,
             source=self.name,
         )
         self._record_tool_timeline(

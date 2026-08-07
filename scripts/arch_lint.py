@@ -3,7 +3,8 @@
 
 Risk area #2 - Concurrency & state violations.
 
-Enforces four rules from ``AGENTS.md`` / ``PROJECT_CONSTITUTION_V4.md``:
+Enforces five rules from ``AGENTS.md`` / ``PROJECT_CONSTITUTION_V4.md``
+and ADR-018:
 
 R1  No file under ``ui/`` may import from ``services/`` or ``backend/``.
 R2  Service classes (``*Service``) may only be *instantiated* inside the
@@ -14,6 +15,8 @@ R4  No file under ``services/`` may import a peer service module except
     infra modules (``base``, ``states``) or entries in
     ``_SERVICE_PEER_IMPORT_ALLOWLIST`` (Workspace OS wiring uses composition
     roots ``service_factory.py`` / ``workspace_os_service.py`` instead).
+R5  Only ``ExecutionOrchestratorService`` may publish ``tool.invoke``
+    (ADR-018 M3 — refuse LLM / peer → TOOL_INVOKE bypass).
 
 The linter is importable (``analyze_source`` / ``scan_tree``) so it can be unit
 tested against synthetic fixtures, and runnable as a CLI / pre-commit hook.
@@ -68,6 +71,15 @@ _APPSTATE_INSTANCE_NAMES = {"app_state", "appstate"}
 # Classes that end in "Service" but are not concrete services to instantiate-guard.
 _SERVICE_NAME_IGNORE = {"BaseService"}
 
+# ADR-018 M3: exclusive TOOL_INVOKE publisher (relative to package root).
+_TOOL_INVOKE_PUBLISHER_ALLOWLIST = frozenset(
+    {
+        "services/execution_orchestrator_service.py",
+    }
+)
+_TOOL_INVOKE_TOPIC = "tool.invoke"
+_TOOL_INVOKE_SYMBOL = "TOOL_INVOKE"
+
 
 @dataclass(frozen=True)
 class Violation:
@@ -112,6 +124,7 @@ class _Analyzer(ast.NodeVisitor):
             "core/state/app_state.py"
         )
         pkg_rel = rel_path.split(f"{PACKAGE}/", 1)[-1]
+        self._pkg_rel = pkg_rel
         self._is_composition_root = pkg_rel in _COMPOSITION_ROOTS
 
     # R1 - UI must not import service/backend layers.
@@ -150,6 +163,7 @@ class _Analyzer(ast.NodeVisitor):
         self.generic_visit(node)
 
     # R2 - service classes may only be instantiated in services/ or a root.
+    # R5 - only ExecutionOrchestrator may publish tool.invoke (ADR-018 M3).
     def visit_Call(self, node: ast.Call) -> None:
         if not (self._in_services or self._is_composition_root):
             name = _callee_name(node.func)
@@ -167,6 +181,20 @@ class _Analyzer(ast.NodeVisitor):
                         message=(
                             f"service class {name!r} instantiated outside services/ "
                             "or composition root"
+                        ),
+                    )
+                )
+        if _callee_name(node.func) == "publish" and _call_publishes_tool_invoke(node):
+            if self._pkg_rel not in _TOOL_INVOKE_PUBLISHER_ALLOWLIST:
+                self.violations.append(
+                    Violation(
+                        rule="R5",
+                        file=self.rel_path,
+                        line=node.lineno,
+                        message=(
+                            "publishes tool.invoke / TOOL_INVOKE; only "
+                            "ExecutionOrchestratorService may publish TOOL_INVOKE "
+                            "(ADR-018 M3 — route LLM assist via PLAN_REQUEST / PlannerService)"
                         ),
                     )
                 )
@@ -230,6 +258,25 @@ def _callee_name(func: ast.expr) -> str | None:
     if isinstance(func, ast.Attribute):
         return func.attr
     return None
+
+
+def _is_tool_invoke_topic(node: ast.expr) -> bool:
+    """True if AST node names the tool.invoke topic (constant or TOOL_INVOKE)."""
+    if isinstance(node, ast.Name) and node.id == _TOOL_INVOKE_SYMBOL:
+        return True
+    if isinstance(node, ast.Constant) and node.value == _TOOL_INVOKE_TOPIC:
+        return True
+    return False
+
+
+def _call_publishes_tool_invoke(node: ast.Call) -> bool:
+    """Detect ``*.publish(TOOL_INVOKE, ...)`` / ``publish("tool.invoke", ...)``."""
+    if node.args and _is_tool_invoke_topic(node.args[0]):
+        return True
+    for kw in node.keywords:
+        if kw.arg in {"topic", "event_type"} and _is_tool_invoke_topic(kw.value):
+            return True
+    return False
 
 
 def analyze_source(rel_path: str, source: str) -> list[Violation]:

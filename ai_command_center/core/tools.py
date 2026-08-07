@@ -23,11 +23,15 @@ class ToolResult:
     success: bool
     output: str
     error: str | None = None
+    facts: dict[str, Any] | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "contract_version": TOOL_CONTRACT_VERSION,
             "success": self.success,
             "output": self.output,
             "error": self.error,
         }
+        if self.facts:
+            payload["facts"] = dict(self.facts)
+        return payload

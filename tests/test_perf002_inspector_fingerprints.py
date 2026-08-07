@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-import customtkinter as ctk
+import pytest
+
+try:
+    import customtkinter as ctk
+    _root = ctk.CTk()
+    _root.destroy()
+except Exception as exc:  # noqa: BLE001 — display / tk init probe
+    pytest.skip(f"tkinter display unavailable: {exc}", allow_module_level=True)
 
 from ai_command_center.core.app_state import (
     AppState,

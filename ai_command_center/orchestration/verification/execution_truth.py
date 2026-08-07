@@ -35,7 +35,7 @@ def enrich_execution_facts(
     step_outputs: list[Any],
     success: bool,
 ) -> dict[str, Any]:
-    """Add TruthBoundary-required keys (e.g. shell command) from plan/outputs."""
+    """Add TruthBoundary-required keys from plan args and provider step facts."""
     out = dict(facts)
     out["success"] = success
     steps = list(plan.get("steps") or [])
@@ -51,6 +51,16 @@ def enrich_execution_facts(
             out["output"] = first_out.get("output")
         if first_out.get("success") is True:
             out["success"] = True
+        # Provider facts (time/launched/events/…) travel on step_outputs when tools
+        # return ToolResult.facts — required for TruthBoundary after ADR-021 wire.
+        raw_facts = first_out.get("facts")
+        if isinstance(raw_facts, dict):
+            for key, value in raw_facts.items():
+                out.setdefault(key, value)
+    capability = str(first_step.get("capability") or out.get("capability") or "").strip().lower()
+    if capability == "launch_application" and out.get("success") is True:
+        if "application" in out and out.get("launched") is None:
+            out["launched"] = True
     return out
 
 

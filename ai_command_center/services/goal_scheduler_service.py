@@ -365,6 +365,10 @@ class SingleGoalScheduler(BaseService):
         self._bus.publish(PLAN_REQUEST, payload, source=self.name)
 
     def _on_plan_generated(self, event: Event) -> None:
+        # ADR-019 replan publishes plan.replan.result for the live run; a parallel
+        # PLAN_GENERATED(replan=True) must not spawn a second EXECUTION_RUN_REQUEST.
+        if bool(event.payload.get("replan")):
+            return
         if self._active_goal is None:
             return
         if str(event.payload.get("request_id", "")) != self._active_goal.correlation.correlation_id:
@@ -475,14 +479,16 @@ class SingleGoalScheduler(BaseService):
     def _event_matches_active_goal(self, event: Event) -> bool:
         if self._active_goal is None:
             return False
-        run_id = str(event.payload.get("run_id") or "")
-        if run_id and self._active_task_id and run_id != self._active_task_id:
-            return False
         correlation = CorrelationContext.from_payload(event.payload)
-        if correlation.goal_id:
-            return correlation.goal_id == self._active_goal.id
+        if correlation.goal_id and correlation.goal_id == self._active_goal.id:
+            return True
         request_id = str(event.payload.get("request_id") or "")
-        return bool(request_id and request_id == self._active_goal.correlation.correlation_id)
+        if request_id and request_id == self._active_goal.correlation.correlation_id:
+            return True
+        run_id = str(event.payload.get("run_id") or "")
+        if run_id and self._active_task_id and run_id == self._active_task_id:
+            return True
+        return False
 
 
 def _parse_priority(value: object) -> Priority:
