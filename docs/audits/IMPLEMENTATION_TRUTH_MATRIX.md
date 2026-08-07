@@ -30,7 +30,7 @@
 | Brain / Evidence / Operations / Graph / Insights views | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Phase B E06–E13 on main; Insights placeholder by plan |
 | Cross-platform hotkey (macOS) | ✅ Impl packages + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **PARTIAL** | `get_hotkey_provider()` placeholder; Impl under `platform/macos|linux/` unwired — **Phase 11 backlog**, not R1 blocker |
 | Platform tray / notifications | ⚠️ stubs + working TrayController | ❌ platform_service | ❌ | ⚠️ partial | **PARTIAL** | `NotImplementedError` in `platform_service.py`; `ui/tray` pystray path exists — Phase 11 |
-| Phase 5 Async EventBus (tiered + async queue) | ⚠️ policy only | ❌ | ⚠️ | ❌ | **PARTIAL** | `dispatch_policy.py` only; `tiered_dispatch_policy.py` / `async_dispatch_queue.py` **not** implemented — gated by Performance Investigation Report + human approval |
+| Phase 5 Async EventBus (tiered + async queue) | ✅ | ✅ | ✅ | ✅ | **COMPLETE** (pending main merge of this PR) | `tiered_dispatch_policy.py` + `async_dispatch_queue.py`; pools in UCGS profile; R4a p95 gate; see `PERF_PHASE5_ASYNC_EVENTBUS_INVESTIGATION.md` |
 
 Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
 

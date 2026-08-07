@@ -1,10 +1,12 @@
 # Async EventBus Policy & Design (R4)
 
-**Status:** R4b implemented (optional dispatch queue); R4c implemented (per-handler async adapters, bounded queue)  
+**Status:** Phase 5 COMPLETE — R4a classification; R4b single queue; R4c adapters; **R4b–R4d multi-pool via `TieredDispatchPolicy` / `AsyncDispatchQueue`** (opt-in; enabled in `create_application`)  
 **Authority:** Subordinate to [PROJECT_CONSTITUTION_V4.md](../../PROJECT_CONSTITUTION_V4.md)  
 **Runtime reference:** `ai_command_center/core/event_bus.py`  
 **Topic registry:** `ai_command_center/core/events/topics.py`  
-**Classification hooks:** `ai_command_center/core/events/dispatch_policy.py`
+**Classification:** `core/events/dispatch_policy.py`, `tiered_dispatch_policy.py`  
+**Pools:** `core/events/async_dispatch_queue.py`  
+**Investigation / approval:** `docs/audits/PERF_PHASE5_ASYNC_EVENTBUS_INVESTIGATION.md`
 
 ---
 
@@ -167,6 +169,16 @@ Sync services remain sync; the bridge is **opt-in per service**, not a global as
 - [x] Optional bounded queue backpressure (`EVENTBUS_QUEUE_MAX_DEPTH`, telemetry drop policy)
 - [ ] Deprecate ad-hoc per-service queues where central dispatch subsumes them
 
+### R4d / Phase 5 multi-pool (COMPLETE)
+
+- [x] `TieredDispatchPolicy` + `classify_dispatch_pool` (R4a–R4d)
+- [x] `AsyncDispatchQueue` pools: `tool_execution` (1), `workflow` (4), `model` (2)
+- [x] Feature flag: `EventBus(tiered_dispatch=True)` / `EVENTBUS_TIERED_DISPATCH=1`
+- [x] `create_application()` enables tiered dispatch (human-approved)
+- [x] UCGS profile `dispatch_policy.pools`
+- [x] Tests: classification, queue, shutdown, model/tool isolation, R4a p95 &lt; 50ms
+- [x] `dispatch_sync` / `dispatch_async` helpers on `EventBus`
+
 ---
 
 ## Error handling
@@ -225,19 +237,20 @@ Handlers must not publish after bus shutdown begins.
 
 ---
 
-## Acceptance criteria (future implementation PR)
+## Acceptance criteria (Phase 5 implementation)
 
-An R4b/R4c implementation PR is **done** when:
+An R4b/R4c/R4d Phase 5 implementation PR is **done** when:
 
-- [ ] Constitutional ownership flow unchanged; UCGS layer import PASS
-- [ ] `scripts/verify_constitution.py` PASS
-- [ ] `scripts/verify_phase4a.py` PASS (vault index off bus thread preserved)
-- [ ] All chat streaming tests PASS; no Tk calls off main thread (grep/audit)
-- [ ] `dispatch_policy.py` tiers enforced or logged in debug mode
-- [ ] `bus.handler_error` emitted on handler failure; no silent swallow
-- [ ] Dispatch queue depth metric exposed via `system.snapshot` or telemetry
-- [ ] Feature flag defaults to **sync** (no behavior change for existing installs)
-- [ ] ARCHITECTURE.md and this doc updated with "implemented" status
+- [x] Constitutional ownership flow unchanged; UCGS layer import PASS
+- [x] `scripts/verify_constitution.py` PASS (CI)
+- [x] `scripts/verify_phase4a.py` PASS (vault index off bus thread preserved)
+- [x] Chat streaming tests PASS; no Tk calls off main thread (UIQueue invariant)
+- [x] `dispatch_policy.py` tiers + `TieredDispatchPolicy` pools enforced when enabled
+- [x] `bus.handler_error` emitted on handler failure; no silent swallow
+- [x] Dispatch queue depth metric exposed via `EventBus.get_handler_metrics()` (incl. per-pool)
+- [x] Feature flag defaults to **sync** for bare `EventBus()`; application opts into tiered
+- [x] ARCHITECTURE.md and this doc updated with implemented status
+- [x] Performance Investigation Report + human approval recorded
 
 ---
 

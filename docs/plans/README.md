@@ -21,7 +21,7 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 **Ungated Stage 2 / R1 disposition work is closed.** See [`docs/audits/R1_UNGATED_STOP_LINE.md`](../audits/R1_UNGATED_STOP_LINE.md).
 
-**SA.mutate track CLOSED** (ADR-015/016/017). Parallel other tracks: Async EventBus (perf approval); Goose = Stage 3.
+**SA.mutate track CLOSED** (ADR-015/016/017). Parallel other tracks: Async EventBus = Phase 5 **COMPLETE** (this train); Goose = Stage 3.
 
 Goal: keep `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).
 
@@ -53,7 +53,7 @@ Statuses below are from **repository code on `origin/main`**, not from legacy pl
 
 | Phase | Document | Code status | Archive? |
 |-------|----------|-------------|----------|
-| 5 | `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | **PARTIAL** | No — keep active |
+| 5 | `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | **COMPLETE** (merge this train → COMPLETE_ON_MAIN; then archive) | Yes — after merge |
 | 6 | `PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | **PARTIAL** | No — keep active |
 | 7 | ~~`PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md`~~ | NOT_COMPLETE / abandoned layout | **Archived SUPERSEDED** → [`../archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md`](../archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md) |
 | 8 | `PHASE_8_OPERATOR_KERNEL_PLAN.md` | **PARTIAL** (not live intake) | No — keep active |

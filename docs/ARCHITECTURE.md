@@ -168,7 +168,7 @@ flowchart TB
 | Chat | `services/chat_handler_service.py`, `ui/views/chat_view.py` | [CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md) |
 | UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [UI_REFURBISHMENT_BACKLOG.md](architecture/UI_REFURBISHMENT_BACKLOG.md) |
 | Platform | `platform/`, `utils/hotkey.py` | [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md), [PACKAGING_MSI_DESIGN.md](architecture/PACKAGING_MSI_DESIGN.md) |
-| EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — sync today; async dispatch design complete |
+| EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py`, `tiered_dispatch_policy.py`, `async_dispatch_queue.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — Phase 5 tiered multi-pool (opt-in; on in `create_application`) |
 | Tools | `tools/`, `services/tool_executor_service.py` | Phase 4B flow below |
 | Settings | `repositories/settings_repository.py`, `services/settings_service.py` | Settings section below |
 | Plugins | `services/plugin_registry_service.py` | Plugin registry below |

@@ -11,7 +11,7 @@
 
 | Plan | Code verdict | Archive as COMPLETE? | Archive other class? |
 |------|--------------|----------------------|----------------------|
-| `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | PARTIAL | **NO** | Keep active |
+| `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | COMPLETE | **YES** (after this PR merges) | Archive after merge to `main` |
 | `PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | PARTIAL | **NO** | Keep active |
 | `PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md` | NOT_COMPLETE (GATED / abandoned layout) | **NO** | **YES → SUPERSEDED** |
 | `PHASE_8_OPERATOR_KERNEL_PLAN.md` | PARTIAL (library + tests; not live intake) | **NO** | Keep active |
@@ -29,12 +29,15 @@
 
 ## Evidence (blocking gaps)
 
-### Phase 5 — Async EventBus — PARTIAL
+### Phase 5 — Async EventBus — COMPLETE (code on this train)
 
-| Present | Missing / incomplete vs plan |
-|---------|------------------------------|
-| `core/events/dispatch_policy.py`, `handler_dispatch.py`, async path in `core/event_bus.py` | `tiered_dispatch_policy.py`, `async_dispatch_queue.py` as specified |
-| Tests: `tests/test_eventbus_*.py`, `tests/test_dispatch_policy_budgets.py` | R4c multi-pool / R4d model-queue isolation; formal &lt;50ms gate evidence |
+| Present | Notes |
+|---------|-------|
+| `dispatch_policy.py` (ABC + Sync), `tiered_dispatch_policy.py`, `async_dispatch_queue.py` | Multi-pool R4b/R4c/R4d |
+| `event_bus.py` tiered path; `create_application()` enables `tiered_dispatch=True` | Bare `EventBus()` remains sync |
+| Tests: `test_tiered_dispatch_policy.py`, `test_async_dispatch_queue.py` (+ existing R4b/R4c) | Isolation + R4a p95 &lt; 50ms |
+| UCGS profile `dispatch_policy.pools` | Matches DEFAULT_POOL_CONFIGS |
+| Investigation + approval | `PERF_PHASE5_ASYNC_EVENTBUS_INVESTIGATION.md` |
 
 ### Phase 6 — External Capability Bridge — PARTIAL
 

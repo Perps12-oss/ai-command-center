@@ -32,7 +32,7 @@ are **not** required to close this stop line.
 
 | Work | Gate |
 |------|------|
-| Phase 5 Async EventBus | Performance Investigation Report + human approval |
+| Phase 5 Async EventBus | ✅ implemented — approval + investigation in `PERF_PHASE5_ASYNC_EVENTBUS_INVESTIGATION.md` |
 | Goose / external patterns | Stage 3 + Integration Proposal + ADR |
 | Live-wire Predictive/Undo | ADR superseding ADR-014 |
 | OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator re-wire | ADR superseding 006 / 012 / 013 |
