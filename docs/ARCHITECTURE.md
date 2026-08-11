@@ -1,19 +1,19 @@
 # AI Command Center — Architecture
 
-See [ARCHITECTURE_ENFORCEMENT.md](ARCHITECTURE_ENFORCEMENT.md) for the implementation directives that coding agents must follow when modifying this repository.
+See [`docs/ARCHITECTURE_ENFORCEMENT.md`](ARCHITECTURE_ENFORCEMENT.md) for the implementation directives that coding agents must follow when modifying this repository. (Article II names this Level-2 authority by basename; the living file path is under `docs/`.)
 
 ## Authority hierarchy
 
 ```text
 PROJECT_CONSTITUTION_V4.md
-  → AGENTS.md / ARCHITECTURE_ENFORCEMENT.md
+  → AGENTS.md / docs/ARCHITECTURE_ENFORCEMENT.md
     → ARCHITECTURE.md (this document)
       → core/contracts.py, core/events/topics.py
         → Phase gate history (below)
           → Implementation
 ```
 
-This document **expands** runtime architecture; it does not supersede the Constitution.
+This document **expands** runtime architecture; it does not supersede the Constitution. Accepted ADRs bind implementers under V4 but are not Article II Level 2.
 
 ---
 

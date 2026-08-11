@@ -55,8 +55,8 @@ Research may recommend. Research cannot decide.
 
 ## Quickstart
 
-1. Pick a repository from `backlog/repositories.md`.
-2. Create `repositories/{expedition-id}-{repo-name}/`.
+1. Pick a repository from `backlog/repositories.md` (IDs are already reserved in `repositories/index.md` as `exp-NNN`).
+2. Create `repositories/{exp-NNN}-{repo-name}/` using the reserved ID (do not invent a parallel ID scheme).
 3. Copy `templates/repository/repository_template.md` into the folder as `report.md`.
 4. Extract pattern candidates and validate them.
 5. Promote validated patterns to `patterns/index.md`.
@@ -65,8 +65,8 @@ Research may recommend. Research cannot decide.
 
 ## Relation to governance
 
-- `research/` = descriptive intelligence
-- `docs/architecture/adr/` = approved architecture decisions
-- `governance/` = constitutional authority
+- `research/` = descriptive intelligence (not architecture authority)
+- `docs/architecture/adr/` = Accepted ADRs bind under V4; Proposed are non-binding
+- `governance/` = constitutional **recordkeeping** (ledger, templates, AER forms) — **not** the supreme constitution (`PROJECT_CONSTITUTION_V4.md` is)
 
-A pattern may only influence implementation after it has an Integration Proposal, passes Architecture Review, and is recorded as an ADR.
+A pattern may only influence implementation after it has an Integration Proposal, passes Architecture Review, and is recorded as an **Accepted** ADR.

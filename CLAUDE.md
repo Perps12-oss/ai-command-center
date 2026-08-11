@@ -11,19 +11,20 @@
 
 ## Authority
 
-Read in this order before changing architecture-sensitive code:
+Read in this order before changing architecture-sensitive code (Article II + subordinate bindings):
 
-1. `PROJECT_CONSTITUTION_V4.md` (+ peers `PERFORMANCE_CONSTITUTION.md`, `docs/UI_CONSTITUTION.md`)
-2. Accepted ADRs under `docs/architecture/adr/` (see index; **Proposed ≠ binding**)
-3. Architecture contracts (`docs/ARCHITECTURE.md`, `docs/architecture/*`, `contracts.py`, `topics.py`)
-4. Repository truth on `origin/main` (code + audits)
-5. Approved plans / roadmap
-6. Research (evidence only)
-7. External repos (reference only)
+1. `PROJECT_CONSTITUTION_V4.md` (supreme)
+2. `AGENTS.md`, `docs/ARCHITECTURE_ENFORCEMENT.md` (Art II Level 2)
+3. `docs/ARCHITECTURE.md`, contracts, topics (Art II Level 3)
+4. **Accepted** ADRs under `docs/architecture/adr/` — binding under V4, **not** Art II Level 2; **Proposed ≠ binding**
+5. Peer domain docs (`PERFORMANCE_CONSTITUTION.md`, `docs/UI_CONSTITUTION.md`) under V4 (V4 wins on conflict)
+6. Repository truth on `origin/main` (code + audits)
+7. Approved plans / roadmap (roadmap domain only)
+8. Research (evidence only) / external repos (reference only)
 
 Operational restatement: `docs/governance/IMPLEMENTATION_GUIDE.md`. If anything here conflicts with a higher authority, the higher authority wins and this file is corrected.
 
-Do **not** treat this file, `.claude/`, or any tool-specific folder as Level-1/2 authority.
+Do **not** treat this file, `.claude/`, Cursor, Devin, or any LLM as Level-1/2 authority.
 
 ---
 

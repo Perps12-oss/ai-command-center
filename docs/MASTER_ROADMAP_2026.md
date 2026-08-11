@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This document is the **single source of truth** for the AI Command Center development roadmap. It consolidates all prior program work into four coherent phases, identifies remaining deliverables, and provides clear exit criteria for each phase.
+This document is the **authoritative roadmap** for AI Command Center **development sequencing** (phases, remaining deliverables, exit criteria). It is **not** the repository’s general source of truth — that remains `PROJECT_CONSTITUTION_V4.md` and domain SoTs under Article V / Invariant 11.
 
 ```text
 Current State (2026-07-11)
