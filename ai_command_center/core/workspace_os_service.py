@@ -28,8 +28,6 @@ from ai_command_center.core.entity.entity_bus_handlers import RESOURCE_VALUE_KEY
 
 from ai_command_center.core.events.topics import (
 
-    ACTION_INVOKE_REQUEST,
-
     ACTION_INVOKE_RESULT,
 
     ENTITY_CREATE_REQUEST,
@@ -59,6 +57,8 @@ from ai_command_center.core.events.topics import (
     UI_LAUNCH_RESOURCE,
 
     UI_SEARCH_WORKSPACE_OS,
+
+    WORKFLOW_EXECUTION_REQUEST,
 
     WORKSPACE_ADD_ENTITY_REQUEST,
 
@@ -580,7 +580,17 @@ class WorkspaceOsService(BaseService):
 
     def _on_launch_resource(self, event: Any) -> None:
 
-        """Handle UI_LAUNCH_RESOURCE via action.invoke.request + timeline.record.request."""
+        """Handle UI_LAUNCH_RESOURCE through the canonical execution boundary (G2).
+
+        Launches previously went straight to ActionRegistry, producing real OS side
+        effects with no ExecutionAuthority decision, no ExecutionReceipt and no
+        TruthBoundary validation. They now enter ExecutionAuthority as an explicit
+        tool step, so the sole TOOL_INVOKE publisher dispatches them and the run is
+        receipted or fails closed.
+
+        ActionRegistry keeps no execution authority; the frozen launch handlers are
+        reused below the boundary via ``orchestration/workspace_launch_tools.py``.
+        """
 
         from ai_command_center.core.entity.entity import (
 
@@ -602,43 +612,71 @@ class WorkspaceOsService(BaseService):
 
 
 
-        action_name = {
+        tool_name, arg_key, action_name = {
 
-            RESOURCE_TYPE_FOLDER: "Open Folder",
+            RESOURCE_TYPE_FOLDER: (
 
-            RESOURCE_TYPE_COMMAND: "Execute Command",
+                "workspace_open_folder",
 
-        }.get(resource_type, "Launch URL")
+                "path",
+
+                "Open Folder",
+
+            ),
+
+            RESOURCE_TYPE_COMMAND: (
+
+                "workspace_execute_command",
+
+                "command",
+
+                "Execute Command",
+
+            ),
+
+        }.get(resource_type, ("workspace_open_url", "url", "Launch URL"))
 
 
 
-        invoke_request_id = uuid.uuid4().hex
+        run_id = uuid.uuid4().hex
 
-        self._pending[invoke_request_id] = {}
+        self._bus.publish(
 
-        self._publish_request(
-
-            ACTION_INVOKE_REQUEST,
-
-            invoke_request_id,
+            WORKFLOW_EXECUTION_REQUEST,
 
             {
 
-                "action_type": "launch",
+                "run_id": run_id,
 
-                "action_name": action_name,
+                "request_id": run_id,
 
-                "parameters": {"url": value, "path": value, "command": value},
+                "workflow_id": f"workspace_os.launch.{resource_type}",
+
+                "workspace_id": payload.get("workspace_id", ""),
+
+                "entity_id": resource_id,
+
+                "steps": [
+
+                    {
+
+                        "id": "launch-1",
+
+                        "type": "tool",
+
+                        "tool": tool_name,
+
+                        "args": {arg_key: value},
+
+                    }
+
+                ],
 
             },
 
+            source=self.name,
+
         )
-
-        invoke_result = self._await_result(invoke_request_id)
-
-        if invoke_result.get("error"):
-
-            raise ValueError(str(invoke_result["error"]))
 
 
 

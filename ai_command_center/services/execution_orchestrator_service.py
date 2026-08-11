@@ -31,6 +31,7 @@ from ai_command_center.core.events.topics import (
     EXECUTION_STEP_FAILED,
     EXECUTION_STEP_STARTED,
     LLM_STEP_REQUEST,
+    ORCHESTRATION_RECEIPT,
     PLAN_REPLAN_REQUEST,
     PLAN_REPLAN_RESULT,
     PLAN_REPLAN_STUCK,
@@ -102,6 +103,11 @@ class ExecutionOrchestratorService(BaseService):
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
         self._runs: dict[str, dict[str, Any]] = {}
+        # G1 receipt boundary: correlation ids seen on ORCHESTRATION_RECEIPT.
+        # EXECUTION_RUN_COMPLETE is SYNC_STANDARD (dispatch_policy.py), so it is
+        # dispatched inline — any receipt for a run has been recorded here by the
+        # time publish() returns. See _complete_run.
+        self._receipted_ids: set[str] = set()
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
@@ -131,12 +137,22 @@ class ExecutionOrchestratorService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(TOOL_DENIED, self._on_tool_denied)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(ORCHESTRATION_RECEIPT, self._on_orchestration_receipt)
+        )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
         self._runs.clear()
+        self._receipted_ids.clear()
+
+    def _on_orchestration_receipt(self, event: Event) -> None:
+        """Record receipt evidence so _complete_run can verify the G1 boundary."""
+        request_id = str(event.payload.get("request_id") or "").strip()
+        if request_id:
+            self._receipted_ids.add(request_id)
 
     def _on_run_request(self, event: Event) -> None:
         run_id = str(event.payload.get("run_id") or uuid.uuid4().hex)
@@ -885,21 +901,74 @@ class ExecutionOrchestratorService(BaseService):
         request_id = str(run.get("request_id", "")) if run else ""
         correlation = dict(run.get("correlation") or {}) if run else {}
         plan = run.get("plan") if run else None
+        step_outputs = list(run.get("step_outputs") or []) if run else []
+        observations = list(run.get("observations") or []) if run else []
+        plan_dict = plan.to_dict() if isinstance(plan, ExecutionPlan) else {}
+        workspace_context = dict(run.get("workspace_context") or {}) if run else {}
+        goal = (
+            getattr(plan, "goal", "")
+            if plan
+            else str(run.get("goal", "") if run else "")
+        )
+
+        # Correlation ids a receipt for this run may legitimately carry.
+        # OrchestrationService keys receipts on request_id, falling back to run_id.
+        correlating_ids = {i for i in (request_id, run_id) if i}
+        self._receipted_ids -= correlating_ids
+
         self._bus.publish(
             EXECUTION_RUN_COMPLETE,
             {
                 "run_id": run_id,
                 "request_id": request_id,
                 "correlation": correlation,
-                "goal": getattr(plan, "goal", "") if plan else str(run.get("goal", "") if run else ""),
+                "goal": goal,
                 "success": True,
-                "step_outputs": list(run.get("step_outputs") or []) if run else [],
-                "observations": list(run.get("observations") or []) if run else [],
-                "plan": plan.to_dict() if isinstance(plan, ExecutionPlan) else {},
-                "workspace_context": dict(run.get("workspace_context") or {}) if run else {},
+                "step_outputs": step_outputs,
+                "observations": observations,
+                "plan": plan_dict,
+                "workspace_context": workspace_context,
             },
             source=self.name,
         )
+
+        # G1 receipt boundary — fail closed.
+        # EXECUTION_RUN_COMPLETE dispatches inline, so a conforming receipt observer
+        # has already run. If no ExecutionReceipt was produced for this run, the
+        # side effect happened but is unverified: report failure, never success.
+        # Read once, then clear unconditionally: ids are caller-supplied and may be
+        # reused across runs, so a leftover entry must never satisfy a later guard.
+        receipted = bool(self._receipted_ids & correlating_ids)
+        self._receipted_ids -= correlating_ids
+        if not receipted:
+            _logger.error(
+                "execution.receipt_boundary_violation run_id=%s request_id=%s — "
+                "run completed without an ExecutionReceipt; failing closed",
+                run_id,
+                request_id,
+            )
+            self._bus.publish(
+                EXECUTION_RUN_FAILED,
+                {
+                    "run_id": run_id,
+                    "request_id": request_id,
+                    "error": (
+                        "receipt boundary violation: execution completed without an "
+                        "ExecutionReceipt or TruthBoundary validation"
+                    ),
+                    "receipt_boundary_violation": True,
+                    "correlation": correlation,
+                    "goal": goal,
+                    "success": False,
+                    "step_outputs": step_outputs,
+                    "observations": observations,
+                    "plan": plan_dict,
+                    "workspace_context": workspace_context,
+                },
+                source=self.name,
+            )
+            self._receipted_ids -= correlating_ids
+            return
 
     def _fail_run(self, run_id: str, error: str) -> None:
         run = self._runs.pop(run_id, None)
@@ -922,3 +991,6 @@ class ExecutionOrchestratorService(BaseService):
             },
             source=self.name,
         )
+        # Clear after publishing: the failure itself is receipted, and that entry
+        # must not accumulate or satisfy a later run reusing the same ids.
+        self._receipted_ids -= {i for i in (request_id, run_id) if i}

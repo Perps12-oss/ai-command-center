@@ -17,12 +17,25 @@ from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.services.execution_orchestrator_service import (
     ExecutionOrchestratorService,
 )
+from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
 
 
 def _noop_tool(_args: object) -> ToolResult:
     return ToolResult(success=True, output="done")
+
+
+def _wire_receipt_boundary(bus: EventBus) -> OrchestrationService:
+    """Compose the real receipt / truth observer.
+
+    ExecutionOrchestratorService fails closed (G1) when a run completes without an
+    ExecutionReceipt, so any test that drives a run to completion must compose the
+    receipt boundary — omitting it is itself the bypass the guard exists to catch.
+    """
+    service = OrchestrationService(bus)
+    service.start()
+    return service
 
 
 def _wire_tool_stack(bus: EventBus) -> ToolRegistry:
@@ -357,6 +370,7 @@ def test_multi_step_fail_then_replan_continues() -> None:
     registry.register_tool(ToolSpec(name="shell", description="shell", handler=_shell))
     ToolExecutorService(bus, registry).start()
     ExecutionOrchestratorService(bus).start()
+    _wire_receipt_boundary(bus)
 
     replans: list[dict] = []
     observations: list[dict] = []
@@ -465,6 +479,7 @@ def test_synthesized_replan_state_context_refreshes_on_retry() -> None:
     registry.register_tool(ToolSpec(name="shell", description="shell", handler=_shell))
     ToolExecutorService(bus, registry).start()
     ExecutionOrchestratorService(bus).start()
+    _wire_receipt_boundary(bus)
 
     replans: list[dict] = []
     observations: list[dict] = []

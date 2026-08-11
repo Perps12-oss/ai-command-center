@@ -116,7 +116,15 @@ class OrchestrationService(BaseService):
         payload = dict(event.payload)
         request_id = str(payload.get("request_id") or payload.get("run_id") or "").strip()
         if not request_id:
-            return
+            # G1: a run without a correlating id must still produce receipt + truth.
+            # Returning here previously let a real side effect complete with no
+            # ExecutionReceipt and no TruthBoundary validation.
+            request_id = uuid.uuid4().hex
+            _logger.warning(
+                "orchestration.completion missing request_id/run_id — "
+                "synthesized request_id=%s to preserve receipt boundary",
+                request_id,
+            )
 
         run_id = str(payload.get("run_id", "")).strip()
         goal = str(payload.get("goal") or "")
