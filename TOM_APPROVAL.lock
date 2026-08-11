@@ -2,6 +2,9 @@
   "tom_audit_v2": true,
   "verdict": "COMPLIANT",
   "repo_commit": "a73af7934cab4ee54fc902831cc76aacfdec7313",
+  "ci_enforced": false,
+  "status": "stale_informational",
+  "note": "Optional local ledger only — NOT a CI gate and NOT equivalent to an independent Tom auditor pass. Do not treat as merge authority. Tip may be far behind origin/main.",
   "files_checked": [
     "ai_command_center/operator/",
     "ai_command_center/orchestration/goals/",

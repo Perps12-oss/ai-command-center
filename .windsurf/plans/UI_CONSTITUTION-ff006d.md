@@ -1,8 +1,16 @@
+<!--
+Status: SUPERSEDED
+Archive-class: STALE (IDE plan copy — not the living UI authority)
+Superseded-by: docs/UI_CONSTITUTION.md
+Do-not-plan-from: true
+Note: Preserved as historical evidence from Phase 11 planning. Sole living UI constitution is docs/UI_CONSTITUTION.md.
+-->
+
 # AI Command Center (ACC) UI Constitution
 
 Version: 1.0
-Status: Authoritative UI Governance Document
-Scope: All ACC UI, UX, Visualization, Layout, Interaction, Themes, Navigation, and Operator Experience
+Status: SUPERSEDED — historical Windsurf IDE plan copy (not authoritative)
+Scope: Historical duplicate only. Living authority: `docs/UI_CONSTITUTION.md`.
 
 ---
 

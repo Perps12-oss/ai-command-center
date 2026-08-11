@@ -1,6 +1,7 @@
 # Architecture Decision Records (ADR) Index
 
-**Authority:** ADRs are Level 2 under `PROJECT_CONSTITUTION_V4.md`.  
+**Authority:** ADRs are **subordinate** to `PROJECT_CONSTITUTION_V4.md`. They do **not** occupy Article II Level 2 (that slot is `AGENTS.md` and `docs/ARCHITECTURE_ENFORCEMENT.md`).  
+**Binding rule:** **Accepted** ADRs are binding architectural decisions under V4 — implementers must follow them. **Proposed** ADRs are **non-binding**. Neither status amends V4 unless Article XIV is followed.  
 **Process:** Major architecture decisions use [`ARCHITECTURE_DECISION_FRAMEWORK.md`](../../governance/ARCHITECTURE_DECISION_FRAMEWORK.md) (multi-council review).  
 **Location:** This directory. Naming: `ADR-NNN_UPPER_SNAKE_CASE.md`.
 
@@ -10,8 +11,8 @@
 
 | Status | Meaning |
 |--------|---------|
-| Proposed | Binding intent undecided or not yet Accepted |
-| Accepted | Binding; implementers must follow |
+| Proposed | **Non-binding** — binding intent undecided or not yet Accepted |
+| Accepted | **Binding** under V4; implementers must follow (not a constitutional Level 2 identity) |
 | Accepted — disposition | Accepted with retire / research-only / remain-outside outcome |
 | Narrowed by | Later Accepted ADR constrains scope without full supersession |
 
@@ -53,9 +54,9 @@
 - Degrade modes: [`docs/architecture/MODEL_ORCHESTRATION.md`](../MODEL_ORCHESTRATION.md)
 - Pre-flight: [`docs/audits/CONSTITUTIONAL_PRE_FLIGHT_SECTION9_FOLLOWONS.md`](../../audits/CONSTITUTIONAL_PRE_FLIGHT_SECTION9_FOLLOWONS.md)
 
-### Number collision
+### Number collision (permanent labels)
 
-**ADR-007** was assigned twice historically (`APPSTATE_NOTIFICATION_STORMS` and `PROVIDER_REGISTRY`). Do not reuse numbers. Prefer explicit filenames; treat 007a/007b as index labels only.
+**ADR-007** was assigned twice historically (`APPSTATE_NOTIFICATION_STORMS` = **007a**, `PROVIDER_REGISTRY` = **007b**). **Do not renumber.** Keep **007a** / **007b** permanently. Prefer explicit filenames; treat 007a/007b as stable index labels only.
 
 ### Next free number
 

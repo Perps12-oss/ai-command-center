@@ -1,6 +1,6 @@
 # ACC Governance Audit
 
-**Status:** ACTIVE — documentation of governance / verification / tool-parity reality  
+**Status:** ACTIVE — historical findings inventory (A–F); **living-document alignment executed** per owner decision register on `cursor/governance-alignment-323d` (Guide/adr README hierarchy wording, UI windsurf SUPERSEDED, research ID/provenance labels, tool-neutral adapters). This file’s narrative may still describe pre-alignment wording for evidence; prefer current living docs for operative rules.  
 **Audit date:** 2026-08-11  
 **Audit baseline:** `origin/main` @ `16f549e` (2026-08-07) — canon read via `git show origin/main:<path>`; no checkout of foreign branches, no fetch required for the audit pass  
 **Documentation tip:** landed on `origin/main` lineage at/after `417b8e9` (see Related)  

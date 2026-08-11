@@ -73,23 +73,29 @@ Those arrive as **inputs** from their owning authorities. The implementation age
 
 ---
 
-## Authority order (restated, not created)
+## Authority order (restated from Article II — not created)
 
-The order below **restates** the precedence already established by `PROJECT_CONSTITUTION_V4.md` and the ADRs so implementers have it in one place. It creates no new hierarchy. This guide derives its authority from, and never supersedes, levels 1–5.
+Article II of `PROJECT_CONSTITUTION_V4.md` is the constitutional hierarchy. This guide **does not** amend Article II and **must not** invent alternate Level labels.
 
-| # | Source | Examples |
-|---|--------|----------|
-| 1 | **`PROJECT_CONSTITUTION_V4.md`** — supreme authority | plus peer constitutions `PERFORMANCE_CONSTITUTION.md`, `docs/UI_CONSTITUTION.md` |
-| 2 | **ADRs** | `docs/architecture/adr/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`, etc. |
-| 3 | **Architecture contracts** | e.g. `docs/architecture/STATE_AUTHORITY_CONTRACT.md`, `docs/ARCHITECTURE.md` |
-| 4 | **Repository truth** — current implementation + verified audits on `origin/main` | `IMPLEMENTATION_TRUTH_MATRIX.md`, Tom audits, code on `main` |
-| 5 | **Canonical roadmap / approved implementation plans** | `docs/MASTER_ROADMAP_2026.md`, `docs/plans/PHASE_*.md` (active, code-verified) |
-| 6 | **Research (Engineering Intelligence)** | expedition / pattern reports |
-| 7 | **External repositories** | Goose, OpenHands, CrewAI, etc. |
+| Art II level | Source |
+|--------------|--------|
+| 1 | `PROJECT_CONSTITUTION_V4.md` |
+| 2 | `AGENTS.md`, `docs/ARCHITECTURE_ENFORCEMENT.md` |
+| 3 | `docs/ARCHITECTURE.md`, `ai_command_center/core/contracts.py`, `ai_command_center/core/events/topics.py` |
+| 4 | Phase documents (gate history in `docs/ARCHITECTURE.md`) |
+| 5 | Verification framework |
+| 6 | Implementation |
 
-> **Applying the existing rule:** consistent with the Constitution and `PHASE_COMPLETION_RULE.md`, lower-precedence sources may *inform* higher-precedence ones but may not *override* them. **Information may flow upward as evidence, but authority never flows downward.** Research (6) may motivate a roadmap change (5) only via an accepted ADR (2) / owner decision; an external repo (7) may never silently change ACC's direction. This is a restatement of existing governance, not a new rule.
+### Binding subordinate decisions (not Art II Level 2)
+
+- **Accepted ADRs** are **binding subordinate architectural decisions under V4**. Implementers must follow them. They are **not** Article II Level 2 and do **not** amend V4 unless Art XIV is followed.
+- **Proposed ADRs** are **non-binding** (intent undecided). Do not implement from them as if Accepted.
+- **Peer domain constitutions** (`PERFORMANCE_CONSTITUTION.md`, `docs/UI_CONSTITUTION.md`) govern their domains under V4; on conflict, **V4 wins**. They are not listed in Article II and are not elevated by this guide.
+- **Roadmap / plans / repository truth / research / external repos** inform work in that operational order; none override V4 or Accepted ADRs. Research remains descriptive.
+
+> **Applying the existing rule:** lower sources may *inform* higher ones but may not *override* them. **Information may flow upward as evidence; authority never flows downward.** An external repo may never silently change ACC's direction.
 >
-> Note: `PHASE_COMPLETION_RULE.md` ("main is the only truth") governs *when a phase may be called complete*; for that judgement, audited code on `origin/main` is authoritative. It does not subordinate the Constitution or ADRs, which remain supreme for *decisions*.
+> `PHASE_COMPLETION_RULE.md` ("main is the only truth") governs *when a phase may be called complete*; audited code on `origin/main` is authoritative for that judgement. It does not subordinate the Constitution.
 >
 > **When authoritative sources conflict, implementation must stop until the conflict is resolved; the implementation agent must never resolve authority conflicts by assumption.**
 
@@ -104,7 +110,7 @@ Does repository truth / an approved plan already require this?
    └─ YES → Implement.
    └─ NO ↓
 
-Does the Constitution, an ADR, or an architecture contract approve it?
+Does the Constitution, an **Accepted** ADR, or an architecture contract approve it?
    └─ YES → Implement.
    └─ NO ↓
 
@@ -115,7 +121,7 @@ autonomy, model coupling, dual authority, or “more like a generic AI agent”)
             Accept / Hybrid and Section 9 plan exist.
    └─ NO ↓
 
-Does research (6) recommend it?
+Does research recommend it?
    └─ YES → Create an Integration Proposal (for ADR / owner review). Do NOT implement.
    └─ NO ↓
 
