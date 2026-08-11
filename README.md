@@ -123,7 +123,7 @@ gh repo create ai-command-center --private --source=. --remote=origin --push
 
 ## UCGS v5 governance
 
-Architecture governance kit (warn mode by default).
+Architecture governance kit (`ucgs.config.yaml` sets `enforcement_mode: block`; CI sets `UCGS_ENFORCEMENT=block`).
 
 ```powershell
 python tools/ucgs_runner.py

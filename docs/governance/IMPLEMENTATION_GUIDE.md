@@ -15,6 +15,8 @@ This guide applies to any implementation agent (human or AI) working on ACC. The
 
 The identity of the implementation agent is not architecturally significant. Compliance with repository governance is. The repository—not any particular tool—is the long-term source of authority. The active implementation agent may be Devin, Cursor, Claude Code, Gemini CLI, or any other approved implementation tool; switching tools must not require governance changes.
 
+Non-Cursor implementation agents: see root [`CLAUDE.md`](../../CLAUDE.md) for tool-parity procedures (babysit-PR intent, verification order, markdown-only rules). Governance inventory: [`docs/audits/ACC_GOVERNANCE_AUDIT.md`](../audits/ACC_GOVERNANCE_AUDIT.md).
+
 ---
 
 ## Purpose
