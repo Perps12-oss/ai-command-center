@@ -91,8 +91,13 @@ rules:
       - "ai_command_center/core/contracts.py"
       - "ai_command_center/core/context_manager.py"
     required_fields:
+      # COMMAND_ROUTED_VERSION was retired in 8002c72 (#80, 2026-07-20, State
+      # Authority migration), which removed it from contracts.py,
+      # verify_contracts.py, command_router_service.py and context_manager.py.
+      # This profile was not updated then, so the requirement outlived the
+      # contract and blocked every subsequent change to contracts.py.
+      # See docs/audits/UCGS_PROFILE_CORRECTION_COMMAND_ROUTED.md
       - "CONTEXT_BUNDLE_VERSION"
-      - "COMMAND_ROUTED_VERSION"
       - "OLLAMA_SERVICE_API_VERSION"
       - "SUPPORTED_VERSIONS"
 
