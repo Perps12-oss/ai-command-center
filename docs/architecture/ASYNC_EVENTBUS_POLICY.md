@@ -228,13 +228,14 @@ Callers that must not lose work should inspect `event.delivery` after publish. S
 
 Order (align with `ApplicationCore` teardown):
 
-1. Stop accepting new publishes (or drain flag)
-2. Signal service workers (`ObsidianService._index_stop`, Ollama loop stop)
-3. Join dispatch thread with timeout (R4b+)
+1. Stop accepting new async publishes (`_shutdown` → enqueue disabled)
+2. **Drain** the dispatch queue (process remaining jobs; bounded timeout)
+3. Signal sentinel and join dispatch thread (R4b+)
 4. Unsubscribe all / clear handlers
 5. Join remaining daemon threads
 
-Handlers must not publish after bus shutdown begins.
+Handlers must not publish after bus shutdown begins. Queued work that arrived
+before shutdown must not be abandoned when the flag is set.
 
 ---
 

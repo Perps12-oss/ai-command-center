@@ -1,14 +1,14 @@
-"""Notes repository wrapper for the new architecture package."""
+"""Compatibility spelling for AGENTS.md ``notes_repository`` name.
+
+Authoritative implementation: ``note_repository.NoteRepository`` (index + vault).
+This module re-exports that type — it is not a second persistence authority.
+"""
 
 from __future__ import annotations
 
-import sqlite3
+from ai_command_center.repositories.note_repository import NoteHit, NoteRepository
 
-from ai_command_center.db.note_repository import NoteRepository as DbNoteRepository
+# Historical class name used in AGENTS.md deliverable list.
+NotesRepository = NoteRepository
 
-
-class NotesRepository(DbNoteRepository):
-    """Compatibility wrapper that exposes the repository contract via the new package."""
-
-    def __init__(self, conn: sqlite3.Connection) -> None:
-        super().__init__(conn)
+__all__ = ["NoteHit", "NoteRepository", "NotesRepository"]

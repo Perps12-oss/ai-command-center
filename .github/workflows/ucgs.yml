@@ -88,13 +88,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-test.txt
 
+      - name: Permanent UCGS negative-proof gate
+        # Critical property: bad PR diff → UCGS FAIL → block → cannot merge.
+        # Must remain even when the current PR itself is clean.
+        run: >
+          python -m pytest tests/test_ucgs_diff_semantics.py -q --no-cov
+          -k "ci_range_mode_not_empty or block_enforcement or range_mode_without_base"
+
       - name: Ruff check
         run: python -m ruff check ai_command_center
 
       - name: Ruff F821 (undefined names)
         run: python -m ruff check ai_command_center --select F821
 
-      - name: Pytest (incl. UCGS negative/positive semantics)
+      - name: Pytest (incl. full UCGS semantics suite)
         run: python -m pytest tests -q
 
       - name: Upload UCGS report
