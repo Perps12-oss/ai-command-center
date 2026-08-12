@@ -20,7 +20,7 @@ import traceback
 import uuid
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ai_command_center.core.events.dispatch_policy import (
@@ -97,6 +97,10 @@ class Event:
     event_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     timestamp: float = field(default_factory=time.time)
     source: str = "system"
+    # Delivery outcome for async enqueue (explicit contract — not silent).
+    # delivered=sync handlers ran; queued=accepted by dispatch queue;
+    # dropped=rejected by backpressure; reentrant_dropped=ui.navigate guard.
+    delivery: str = "delivered"
 
 
 @dataclass(frozen=True, slots=True)
@@ -310,8 +314,21 @@ class EventBus:
         try:
             self._dispatch_queue.put_nowait(job)
         except queue.Full:
-            self._record_drop(event.topic)
-            return False
+            # Policy: only telemetry may be dropped under backpressure.
+            # Other topics block briefly; if still full, record drop + False.
+            if event.topic == TELEMETRY_EVENT:
+                self._record_drop(event.topic)
+                return False
+            try:
+                self._dispatch_queue.put(job, timeout=1.0)
+            except queue.Full:
+                logger.error(
+                    "EventBus queue full after wait; dropping non-telemetry "
+                    "topic=%s (caller must check Event.delivery)",
+                    event.topic,
+                )
+                self._record_drop(event.topic)
+                return False
 
         with self._queue_depth_lock:
             self._queue_depth += 1
@@ -373,7 +390,7 @@ class EventBus:
                 str(event.payload.get("view", "")),
                 self._navigate_dropped_reentrant,
             )
-            return event
+            return replace(event, delivery="reentrant_dropped")
         with self._topic_counts_lock:
             self._topic_publish_counts[topic] += 1
         if topic == UI_NAVIGATE:
@@ -386,10 +403,10 @@ class EventBus:
                     get_dispatch_tier(topic).value,
                     get_time_budget_ms(topic),
                 )
-            self._enqueue(event)
-            return event
+            accepted = self._enqueue(event)
+            return replace(event, delivery="queued" if accepted else "dropped")
         self._invoke_handlers(event)
-        return event
+        return replace(event, delivery="delivered")
 
     def _note_navigate_publish_rate(self, source: str, payload: dict[str, Any]) -> None:
         now = time.monotonic()

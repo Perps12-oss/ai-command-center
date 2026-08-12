@@ -56,12 +56,24 @@ def test_bounded_queue_drops_telemetry_when_enabled(monkeypatch) -> None:
         release.wait(timeout=2.0)
 
     bus.subscribe(TELEMETRY_EVENT, block)
-    bus.publish(TELEMETRY_EVENT, {"name": "first"}, source="test")
+    first = bus.publish(TELEMETRY_EVENT, {"name": "first"}, source="test")
+    assert first.delivery == "queued"
     assert started.wait(timeout=2.0)
-    bus.publish(TELEMETRY_EVENT, {"name": "overflow"}, source="test")
+    overflow = bus.publish(TELEMETRY_EVENT, {"name": "overflow"}, source="test")
     time.sleep(0.05)
     assert bus.dropped_events >= 1
+    assert overflow.delivery == "dropped"
     release.set()
+    bus.shutdown()
+
+
+def test_publish_delivery_field_observable_on_sync_path() -> None:
+    bus = EventBus()
+    seen: list[str] = []
+    bus.subscribe(CHAT_CHUNK, lambda e: seen.append(e.topic))
+    event = bus.publish(CHAT_CHUNK, {"seq": 1}, source="test")
+    assert event.delivery == "delivered"
+    assert seen == [CHAT_CHUNK]
     bus.shutdown()
 
 

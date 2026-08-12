@@ -82,7 +82,7 @@ Cheapest-first order (from `AGENTS.md` Cloud / common commands, reordered):
 1. `scripts/verify_constitution.py` — authority file existence + AST  
 2. `scripts/arch_lint.py --baseline` — AST boundary rules (one package)  
 3. `ruff`  
-4. `tools/ucgs_runner.py` / `tools/ucgs_ci_gate.py` (staged diff)  
+4. `tools/ucgs_runner.py` / `tools/ucgs_ci_gate.py` — **CI uses range diff** (`UCGS_DIFF_MODE=range`, `UCGS_DIFF_BASE...HEAD`); local pre-commit uses staged (`git diff --cached`)
 5. `pytest` (~2 min)
 
 | Script | Checks |
