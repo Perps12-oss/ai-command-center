@@ -14,6 +14,10 @@ from collections.abc import Callable
 from typing import Any
 
 from ai_command_center.core.command_classify import classify_command
+from ai_command_center.core.control_plane import (
+    intake_run_fields,
+    plan_step_require_approval_for_capability,
+)
 from ai_command_center.core.contracts import (
     COMMAND_DEFERRED_VERSION,
     INTAKE_AGENT,
@@ -255,6 +259,7 @@ class ExecutionAuthorityService(BaseService):
                 scope=scope,
                 state_context=state_context,
                 skip_planner=False,
+                intake=INTAKE_UI_COMMAND,
                 extra_payload=extra or None,
             )
             return
@@ -282,6 +287,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=INTAKE_UI_COMMAND,
         )
 
     def _publish_decision(
@@ -408,6 +414,7 @@ class ExecutionAuthorityService(BaseService):
             scope=scope,
             state_context=state_context,
             workspace_context_override=workspace_context,
+            intake=INTAKE_WORKFLOW,
             extra_payload={"workflow_run_id": run_id, "workflow_id": workflow_id},
         )
 
@@ -457,6 +464,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=INTAKE_AGENT,
         )
 
     def _dispatch_agent(
@@ -505,6 +513,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=INTAKE_AGENT,
         )
 
     def _submit_plan(
@@ -519,6 +528,7 @@ class ExecutionAuthorityService(BaseService):
         skip_planner: bool | None = None,
         workspace_context_override: dict[str, Any] | None = None,
         extra_payload: dict[str, Any] | None = None,
+        intake: str = INTAKE_UI_COMMAND,
     ) -> None:
         use_synthetic = decision.skip_planner if skip_planner is None else skip_planner
         correlation = CorrelationContext.new(goal_id=request_id).to_payload()
@@ -541,11 +551,11 @@ class ExecutionAuthorityService(BaseService):
             "description": decision.reason or decision.kind.value,
             "request_id": request_id,
             "correlation": correlation,
-            "auto_approve": True,
             "workspace_context": workspace_context,
             "workspace_id": scope.get("workspace_id", ""),
             "authority_decision": decision.to_payload(),
             "state_context": state_context.to_dict(),
+            **intake_run_fields(intake=intake),
         }
         if plan is not None and use_synthetic:
             payload["plan"] = plan.to_dict()
@@ -770,7 +780,9 @@ class ExecutionAuthorityService(BaseService):
                     step_id="step-1",
                     capability=decision.capability,
                     args=dict(decision.args),
-                    require_approval=False,
+                    require_approval=plan_step_require_approval_for_capability(
+                        decision.capability
+                    ),
                 ),
             ),
         )

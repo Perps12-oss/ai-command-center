@@ -28,11 +28,13 @@ from ai_command_center.services.execution_orchestrator_service import (
 from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
+from tests.support.shell_confirmation import wire_auto_confirm_shell
 
 
 class Phase5ShellToolScopeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.bus = EventBus()
+        wire_auto_confirm_shell(self.bus)
         self.invokes: list[dict] = []
         self.bus.subscribe(TOOL_INVOKE, lambda e: self.invokes.append(dict(e.payload)))
         self.goals: list[dict] = []
