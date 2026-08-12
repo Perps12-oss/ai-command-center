@@ -320,14 +320,16 @@ class ToolExecutorService(BaseService):
         agent_id = payload.get("agent_id")
         workspace_context = self._workspace_context(payload)
 
-        if tool_name == "shell" and not self._shell_allowed(payload):
+        # Shell-equivalent tools share the LAUNCH_TOOL permission boundary.
+        _COMMAND_TOOLS = frozenset({"shell", "workspace_execute_command"})
+        if tool_name in _COMMAND_TOOLS and not self._shell_allowed(payload):
             self._bus.publish(
                 TOOL_FAILED,
                 {
                     "contract_version": TOOL_CONTRACT_VERSION,
                     "invoke_id": invoke_id,
                     "tool": tool_name,
-                    "message": "shell tool requires launch_tool permission",
+                    "message": f"{tool_name} requires launch_tool permission",
                     "run_id": run_id,
                     "step_id": step_id,
                     "success": False,

@@ -17,6 +17,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # Need full history so base...HEAD three-dot diffs resolve.
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -26,6 +29,30 @@ jobs:
       - name: Install dependencies
         run: pip install pyyaml gitpython
 
+      - name: Resolve UCGS CI diff range
+        id: ucgs_range
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "UCGS_DIFF_MODE=range" >> "$GITHUB_ENV"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            # push to main — compare previous tip to this SHA
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            if [ -z "$BASE" ] || [[ "$BASE" =~ ^0+$ ]]; then
+              BASE="$(git rev-parse HEAD~1)"
+            fi
+          fi
+          echo "UCGS_DIFF_BASE=$BASE" >> "$GITHUB_ENV"
+          echo "UCGS_DIFF_HEAD=$HEAD" >> "$GITHUB_ENV"
+          echo "Resolved UCGS range: $BASE...$HEAD"
+          git rev-parse --verify "$BASE"
+          git rev-parse --verify "$HEAD"
+          git diff --name-only "${BASE}...${HEAD}" | head -50 || true
+
       - name: Run Constitution Gate
         run: python scripts/verify_constitution.py
 
@@ -34,6 +61,27 @@ jobs:
 
       - name: Evaluate Verdict
         run: python tools/ucgs_ci_gate.py ucgs_report.yaml
+
+      - name: Prove UCGS range mode is not staged-empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os, yaml
+          from pathlib import Path
+          report = yaml.safe_load(Path("ucgs_report.yaml").read_text())
+          ctx = report.get("context") or {}
+          assert ctx.get("diff_mode") == "range", ctx
+          assert os.environ.get("UCGS_DIFF_BASE"), "UCGS_DIFF_BASE unset"
+          # Staged must be empty in CI; range mode must still have run.
+          import subprocess
+          staged = subprocess.check_output(
+              ["git", "diff", "--cached", "--name-only"], text=True
+          ).strip()
+          assert staged == "", f"unexpected staged files in CI: {staged!r}"
+          print("UCGS CI range-mode proof OK:", ctx.get("diff_base"), "...", ctx.get("diff_head"))
+          print("changed_files count:", len(ctx.get("changed_files") or []))
+          PY
 
       - name: Install test dependencies
         run: |
@@ -46,7 +94,7 @@ jobs:
       - name: Ruff F821 (undefined names)
         run: python -m ruff check ai_command_center --select F821
 
-      - name: Pytest
+      - name: Pytest (incl. UCGS negative/positive semantics)
         run: python -m pytest tests -q
 
       - name: Upload UCGS report

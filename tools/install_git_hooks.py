@@ -12,6 +12,7 @@ from pathlib import Path
 HOOK_BODY = """#!/usr/bin/env python3
 \"\"\"UCGS v5 pre-commit hook (auto-generated).\"\"\"
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -19,11 +20,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PYTHON = sys.executable
 
-def run(cmd):
-    return subprocess.run(cmd, cwd=ROOT, check=False)
-
 def main():
     print("Running UCGS pre-commit check...")
+    env = os.environ.copy()
+    env.setdefault("UCGS_DIFF_MODE", "staged")
+    def run(cmd):
+        return subprocess.run(cmd, cwd=ROOT, check=False, env=env)
     run([PYTHON, "tools/ucgs_runner.py"])
     gate = run([PYTHON, "tools/ucgs_ci_gate.py", ".ucgs_last.yaml"])
     if gate.returncode != 0:

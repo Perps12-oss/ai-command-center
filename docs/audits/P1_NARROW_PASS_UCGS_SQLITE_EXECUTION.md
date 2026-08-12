@@ -1,9 +1,9 @@
 # P1 Narrow Pass — UCGS CI Gate, Shared SQLite Transactions, Execution Boundary
 
-**Status:** ACTIVE — read-only verification of three P1 surfaces from Independent Verification Audit  
+**Status:** SUPERSEDED for remediation tracking — fixes landed on `cursor/p1-remediation-ucgs-efe6`; see `docs/audits/P1_REMEDIATION_LEDGER.md`  
 **Date:** 2026-08-12  
-**Baseline:** `origin/main` @ `ec34287`  
-**Scope:** Narrow pass only. Not a repo-wide re-audit. No product code changed.  
+**Baseline:** `origin/main` @ `ec34287` (verification); remediation follows on later tip  
+**Scope:** Narrow pass only. Not a repo-wide re-audit. No product code changed **in the verification PR**.  
 **Method:** Static proof + local reproduction (`write_local=False` for UCGS; throwaway DB under `/tmp` for SQLite). Test suite and `tools/ucgs_runner.py` default write path not used against the working tree.
 
 **Verdict:** All three P1 surfaces **CONFIRMED**. UCGS CI architecture gate is inert. Shared-connection transaction ownership is broken for unlocked writers. The falsified `alias→TOOL_INVOKE` narrative must be dropped; the adjacent real problem is a live unreceipted ActionRegistry execution path (plus a related permission hole on `workspace_execute_command`).

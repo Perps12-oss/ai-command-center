@@ -203,11 +203,24 @@ Current behavior (preserve):
 
 When dispatch queue depth exceeds threshold (R4c):
 
-1. **Drop policy (telemetry only)** — `telemetry.event` may drop oldest with counter metric
+1. **Drop policy (telemetry only)** — `telemetry.event` may drop with counter metric when `EVENTBUS_QUEUE_DROP_TELEMETRY=1`
 2. **Block policy (never for UI ingress)** — `ui.command`, `settings.set_request` must not block publisher
 3. **Coalesce policy (streaming)** — `chat.chunk` / `llm.chunk`: keep latest N per session in queue
 
 Default: unbounded queue in R4b prototype; bounded queue required before production enablement.
+
+### Caller observability (enforced)
+
+`EventBus.publish()` still returns `Event` (callers unchanged) but sets `Event.delivery`:
+
+| Value | Meaning |
+|-------|---------|
+| `delivered` | Sync handlers invoked inline |
+| `queued` | Accepted onto the dispatch queue |
+| `dropped` | Rejected by backpressure (check `dropped_events` / logs) |
+| `reentrant_dropped` | `ui.navigate` re-entrancy guard |
+
+Callers that must not lose work should inspect `event.delivery` after publish. Silent success after a drop is not the contract.
 
 ---
 
