@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from ai_command_center.core.entity.entity import (
     ENTITY_TYPE_CARD,
@@ -35,6 +35,7 @@ from ai_command_center.core.events.topics import (
     SERVICE_READY,
     UI_SELECT_ENTITY,
     UI_SELECT_WORKSPACE,
+    WORKFLOW_EXECUTION_REQUEST,
     WORKSPACE_ADD_ENTITY_REQUEST,
     WORKSPACE_ADD_ENTITY_RESULT,
     WORKSPACE_CONTEXT_REQUEST,
@@ -130,10 +131,11 @@ def register_entity_bus_handlers(
     relationship_service: Any,
     workspace_service: Any,
     timeline_service: Any,
-    action_registry: Any,
+    action_registry: Any,  # call-site compat; ActionRegistry.invoke path closed (P1-C)
     source: str = "entity_bus_handlers",
 ) -> list[Callable[[], None]]:
     """Wire synchronous entity/workspace bus handlers. Returns unsubscribe callbacks."""
+    _ = action_registry  # no longer invoked — launches go through WORKFLOW_EXECUTION_REQUEST
 
     def on_entity_create_request(event: Event) -> None:
         rid = _request_id(event)
@@ -550,40 +552,89 @@ def register_entity_bus_handlers(
             )
 
     def on_action_invoke_request(event: Event) -> None:
+        """Compatibility shim: never invoke ActionRegistry for OS side effects.
+
+        Launch actions are delegated to ``WORKFLOW_EXECUTION_REQUEST`` so
+        ExecutionAuthority → TOOL_INVOKE → receipt remains the only path that
+        can cause OS side effects. Direct ``ActionRegistry.invoke`` is a P1
+        bypass and is closed here.
+        """
         rid = _request_id(event)
         payload = event.payload
-        action_type = str(payload.get("action_type", "launch"))
-        action_name = str(payload.get("action_name", ""))
+        action_name = str(payload.get("action_name", "")).strip()
         parameters = dict(payload.get("parameters") or {})
-        actions = [
-            a for a in action_registry.get_by_type(action_type) if a.name == action_name
-        ]
-        if not actions:
+
+        # Map frozen workspace launch action names → receipted tool steps.
+        launch_map = {
+            "Launch URL": ("workspace_open_url", "url", RESOURCE_TYPE_URL),
+            "Open Folder": ("workspace_open_folder", "path", RESOURCE_TYPE_FOLDER),
+            "Execute Command": (
+                "workspace_execute_command",
+                "command",
+                RESOURCE_TYPE_COMMAND,
+            ),
+        }
+        mapped = launch_map.get(action_name)
+        if mapped is None:
             _publish_result(
                 bus,
                 ACTION_INVOKE_RESULT,
                 rid,
-                {"error": f"Launch action not found: {action_name}"},
+                {
+                    "error": (
+                        "ACTION_INVOKE_REQUEST is closed for direct execution; "
+                        "use WORKFLOW_EXECUTION_REQUEST / UI_LAUNCH_RESOURCE"
+                    ),
+                    "action_name": action_name,
+                },
                 source=source,
             )
             return
-        try:
-            action_registry.invoke(actions[0].id, parameters=parameters)
+
+        tool_name, arg_key, resource_type = mapped
+        value = parameters.get(arg_key) or parameters.get("value") or ""
+        if not str(value).strip():
             _publish_result(
                 bus,
                 ACTION_INVOKE_RESULT,
                 rid,
-                {"action_id": str(actions[0].id), "action_name": action_name},
+                {"error": f"missing {arg_key} for {action_name}"},
                 source=source,
             )
-        except Exception as exc:  # noqa: BLE001
-            _publish_result(
-                bus,
-                ACTION_INVOKE_RESULT,
-                rid,
-                {"error": str(exc)},
-                source=source,
-            )
+            return
+
+        run_id = uuid4().hex
+        bus.publish(
+            WORKFLOW_EXECUTION_REQUEST,
+            {
+                "run_id": run_id,
+                "request_id": run_id,
+                "workflow_id": f"workspace_os.launch.{resource_type}",
+                "workspace_id": str(payload.get("workspace_id", "") or ""),
+                "entity_id": str(payload.get("entity_id", "") or payload.get("resource_id", "") or ""),
+                "steps": [
+                    {
+                        "id": "launch-1",
+                        "type": "tool",
+                        "tool": tool_name,
+                        "args": {arg_key: value},
+                    }
+                ],
+            },
+            source=source,
+        )
+        _publish_result(
+            bus,
+            ACTION_INVOKE_RESULT,
+            rid,
+            {
+                "delegated": True,
+                "run_id": run_id,
+                "action_name": action_name,
+                "tool": tool_name,
+            },
+            source=source,
+        )
 
     subs = [
         bus.subscribe(ENTITY_CREATE_REQUEST, on_entity_create_request),
