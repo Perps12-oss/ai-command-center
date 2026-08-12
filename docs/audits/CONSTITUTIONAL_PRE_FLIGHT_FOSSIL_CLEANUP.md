@@ -53,3 +53,17 @@ Implementation of product code must not begin before this pre-flight. This task 
 ## Decision
 
 Proceed with documentation-only cleanup.
+
+---
+
+## Second pass (deep-dive)
+
+After the first commit, a fresh search still found living documents that a competent LLM could treat as Queue 1. Closed in the follow-up commit (docs only):
+
+- `DOC_HYGIENE.md` no longer tells implementers to plan from `docs/plans/`
+- Phase B UI specs E05–E13 no longer say “pending merge”
+- `PROVIDER_PLATFORM.md`, `UI_REFURBISHMENT_BACKLOG.md`, `PLACEHOLDER_AUDIT.md`, research backlog/registry bannered as not product Queue 1
+- Truth matrix StateAuthority row no longer **PARTIAL** (WEA remain-outside is ADR-017, not a ticket)
+- `ASYNC_EVENTBUS_POLICY.md` problem statement marked historical (pre-R4b)
+
+Queue 1 remains **EMPTY**. No runtime edits.
