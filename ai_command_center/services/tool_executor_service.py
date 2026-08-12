@@ -199,7 +199,9 @@ class ToolExecutorService(BaseService):
         self._unsubscribers.clear()
 
     def _shell_allowed(self, payload: dict) -> bool:
-        actor_type = str(payload.get("actor_type", "user")).strip() or "user"
+        actor_type = str(payload.get("actor_type", "agent")).strip() or "agent"
+        if actor_type == "user" and not bool(payload.get("interactive_user")):
+            actor_type = "agent"
         if actor_type == "user":
             return True
         if self._permission is None:
@@ -290,7 +292,9 @@ class ToolExecutorService(BaseService):
                 source=self.name,
             )
             return
-        actor_type = str(payload.get("actor_type", "user")).strip() or "user"
+        actor_type = str(payload.get("actor_type", "agent")).strip() or "agent"
+        if actor_type == "user" and not bool(payload.get("interactive_user")):
+            actor_type = "agent"
         if actor_type != "user" and not is_valid_workspace_context(
             payload.get("workspace_context")
         ):

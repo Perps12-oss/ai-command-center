@@ -74,6 +74,10 @@ class CommandSandbox:
             raise SecurityError(
                 f"command {program!r} is not in the sandbox allowlist {sorted(self._allowlist)}"
             )
+        if program == "python" and ("-c" in argv or "--command" in argv):
+            raise SecurityError(
+                "python inline execution (-c/--command) is not permitted by the sandbox"
+            )
         return argv
 
     def is_safe(self, command: str) -> bool:

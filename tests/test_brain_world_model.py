@@ -338,6 +338,8 @@ def test_single_goal_scheduler_runs_goal_to_completion() -> None:
                 "capability": "goal",
                 "reason": "test",
             },
+            "interactive_user": True,
+            "actor_provenance": "ui",
         },
         source="test",
     )

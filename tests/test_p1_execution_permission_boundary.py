@@ -178,6 +178,7 @@ def test_workspace_execute_command_allowed_for_user_actor() -> None:
             "tool": "workspace_execute_command",
             "args": {"command": "echo hi"},
             "actor_type": "user",
+            "interactive_user": True,
         },
         source="test",
     )

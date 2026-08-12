@@ -13,6 +13,11 @@ from collections.abc import Callable
 from typing import Any
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
+from ai_command_center.core.control_plane import (
+    resolve_run_context,
+    resolve_tool_invoke_actor,
+    step_requires_human_approval,
+)
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     AUTONOMY_SCORE_UPDATED,
@@ -86,12 +91,6 @@ def _is_llm_capability(capability: str) -> bool:
 
 def _is_agent_capability(capability: str) -> bool:
     return capability.strip().lower().startswith("agent.")
-
-
-def _step_needs_approval(step: PlanStep, *, auto_approve: bool) -> bool:
-    if auto_approve:
-        return False
-    return bool(step.require_approval)
 
 
 class ExecutionOrchestratorService(BaseService):
@@ -194,7 +193,7 @@ class ExecutionOrchestratorService(BaseService):
             "receipts": receipts,
             "request_id": str(event.payload.get("request_id", "")),
             "correlation": CorrelationContext.from_payload(event.payload).to_payload(),
-            "auto_approve": bool(event.payload.get("auto_approve", False)),
+            **resolve_run_context(event.payload if isinstance(event.payload, dict) else {}),
             "paused": False,
             "replanning": False,
             "replan_attempts": 0,
@@ -359,7 +358,6 @@ class ExecutionOrchestratorService(BaseService):
             return
 
         step = plan.steps[index]
-        auto_approve = bool(run.get("auto_approve", False))
         self._bus.publish(
             EXECUTION_STEP_STARTED,
             {
@@ -371,7 +369,7 @@ class ExecutionOrchestratorService(BaseService):
             source=self.name,
         )
 
-        if _step_needs_approval(step, auto_approve=auto_approve):
+        if step_requires_human_approval(step, run=run):
             run["paused"] = True
             confirmation_id = f"{run_id}:{step.step_id}"
             self._publish_decision_and_autonomy(
@@ -532,7 +530,7 @@ class ExecutionOrchestratorService(BaseService):
             )
             return
 
-        actor_type = str(step.args.get("actor_type") or "user")
+        actor_type, interactive_user = resolve_tool_invoke_actor(run=run)
         tool_args = {
             k: v
             for k, v in dict(step.args).items()
@@ -552,6 +550,7 @@ class ExecutionOrchestratorService(BaseService):
                 "run_id": run_id,
                 "step_id": step.step_id,
                 "actor_type": actor_type,
+                "interactive_user": interactive_user,
                 "workspace_context": workspace_context,
                 "intention": intention.to_dict(),
                 **(
