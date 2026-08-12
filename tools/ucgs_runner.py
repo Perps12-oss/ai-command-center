@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +14,7 @@ import yaml
 TOOLS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS_DIR))
 
-from ucgs_checks import CheckResult, run_all_checks, severity_rank
+from ucgs_checks import CheckResult, Violation, run_all_checks, severity_rank
 from ucgs_checks.contract_drift import check_contract_drift
 from ucgs_checks.forbidden_patterns import check_forbidden_patterns
 from ucgs_checks.large_commit import check_large_commit
@@ -27,38 +28,92 @@ CHECKS = {
     "contract_drift": check_contract_drift,
 }
 
+# Diff modes:
+#   staged — local pre-commit (git diff --cached)
+#   range  — CI PR/push (git diff <base>...HEAD); requires UCGS_DIFF_BASE
+DIFF_MODE_STAGED = "staged"
+DIFF_MODE_RANGE = "range"
+
 
 def _git_available(project_root: Path) -> bool:
     return (project_root / ".git").exists()
 
 
-def _collect_git_diff(project_root: Path) -> tuple[list[str], str, bool]:
-    if not _git_available(project_root):
-        return [], "", False
+def resolve_diff_mode() -> str:
+    """Return ``staged`` or ``range``.
 
-    try:
-        staged = subprocess.run(
-            ["git", "diff", "--cached", "--name-only"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        )
-        diff = subprocess.run(
-            ["git", "diff", "--cached"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        )
-        if staged.returncode != 0 or diff.returncode != 0:
-            return [], "", False
-        files = [line.strip() for line in staged.stdout.splitlines() if line.strip()]
-        return files, diff.stdout, True
-    except OSError:
+    Local pre-commit defaults to staged. CI must set ``UCGS_DIFF_MODE=range``
+    (and ``UCGS_DIFF_BASE``) so a clean checkout is not audited as an empty
+    staged index.
+    """
+    raw = os.getenv("UCGS_DIFF_MODE", DIFF_MODE_STAGED).strip().lower()
+    if raw in {"ci", "pr", "range"}:
+        return DIFF_MODE_RANGE
+    if raw in {"", "staged", "cached", "local"}:
+        return DIFF_MODE_STAGED
+    return DIFF_MODE_STAGED
+
+
+def _run_git(project_root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+
+
+def _collect_staged_diff(project_root: Path) -> tuple[list[str], str, bool]:
+    staged = _run_git(project_root, "diff", "--cached", "--name-only")
+    diff = _run_git(project_root, "diff", "--cached")
+    if staged.returncode != 0 or diff.returncode != 0:
         return [], "", False
+    files = [line.strip() for line in staged.stdout.splitlines() if line.strip()]
+    return files, diff.stdout, True
+
+
+def _collect_range_diff(
+    project_root: Path,
+    *,
+    base: str,
+    head: str,
+) -> tuple[list[str], str, bool]:
+    """Three-dot diff ``base...head`` — commits reachable from head not from base."""
+    if not base.strip():
+        return [], "", False
+    head_ref = head.strip() or "HEAD"
+    # Ensure base is resolvable (shallow clones must fetch with adequate depth).
+    resolve = _run_git(project_root, "rev-parse", "--verify", base)
+    if resolve.returncode != 0:
+        return [], "", False
+    names = _run_git(project_root, "diff", "--name-only", f"{base}...{head_ref}")
+    patch = _run_git(project_root, "diff", f"{base}...{head_ref}")
+    if names.returncode != 0 or patch.returncode != 0:
+        return [], "", False
+    files = [line.strip() for line in names.stdout.splitlines() if line.strip()]
+    return files, patch.stdout, True
+
+
+def _collect_git_diff(project_root: Path) -> tuple[list[str], str, bool, str]:
+    """Return ``(changed_files, diff_text, git_ok, diff_mode)``."""
+    if not _git_available(project_root):
+        return [], "", False, resolve_diff_mode()
+
+    mode = resolve_diff_mode()
+    try:
+        if mode == DIFF_MODE_RANGE:
+            base = os.getenv("UCGS_DIFF_BASE", "").strip()
+            head = os.getenv("UCGS_DIFF_HEAD", "HEAD").strip() or "HEAD"
+            files, diff_text, ok = _collect_range_diff(
+                project_root, base=base, head=head
+            )
+            return files, diff_text, ok, mode
+        files, diff_text, ok = _collect_staged_diff(project_root)
+        return files, diff_text, ok, mode
+    except OSError:
+        return [], "", False, mode
 
 
 def _read_phase_tag(config: dict[str, Any], project_root: Path) -> str:
@@ -107,6 +162,9 @@ def _build_report(
     report_complete: bool,
     git_ok: bool,
     changed_files: list[str],
+    diff_mode: str = DIFF_MODE_STAGED,
+    diff_base: str = "",
+    diff_head: str = "",
 ) -> dict[str, Any]:
     verdict, risk_level = _compute_verdict(result)
     cd_meta = result.metadata.get("contract_drift", False)
@@ -181,6 +239,9 @@ def _build_report(
             "changed_files": changed_files,
             "checks_run": list(CHECKS.keys()),
             "enforcement_mode": config.get("enforcement_mode", "warn"),
+            "diff_mode": diff_mode,
+            "diff_base": diff_base,
+            "diff_head": diff_head,
         },
     }
 
@@ -189,6 +250,9 @@ def run_ucgs(project_root: Path | None = None, write_local: bool = True) -> dict
     root = project_root or find_project_root()
     config_path = root / "ucgs.config.yaml"
     report_complete = config_path.exists()
+    diff_mode = resolve_diff_mode()
+    diff_base = os.getenv("UCGS_DIFF_BASE", "").strip()
+    diff_head = os.getenv("UCGS_DIFF_HEAD", "HEAD").strip() or "HEAD"
 
     if not report_complete:
         config: dict[str, Any] = {
@@ -203,6 +267,9 @@ def run_ucgs(project_root: Path | None = None, write_local: bool = True) -> dict
             report_complete=False,
             git_ok=False,
             changed_files=[],
+            diff_mode=diff_mode,
+            diff_base=diff_base,
+            diff_head=diff_head,
         )
         report["ucgs_summary"]["recommended_action"] = "run_llm_fallback"
         if write_local:
@@ -212,9 +279,42 @@ def run_ucgs(project_root: Path | None = None, write_local: bool = True) -> dict
         return report
 
     config = load_config(root)
-    changed_files, diff_text, git_ok = _collect_git_diff(root)
+    changed_files, diff_text, git_ok, diff_mode = _collect_git_diff(root)
     if not git_ok:
         report_complete = False
+        # Range mode without a resolvable base must not silently PASS as empty.
+        if diff_mode == DIFF_MODE_RANGE:
+            report = _build_report(
+                config,
+                CheckResult(
+                    violations=[
+                        Violation(
+                            rule_id="ucgs_diff_range_unresolved",
+                            severity="S4",
+                            message=(
+                                "UCGS_DIFF_MODE=range but base/head diff could not be "
+                                "resolved (set UCGS_DIFF_BASE to the PR/push merge-base)."
+                            ),
+                            classification="CRITICAL",
+                            remediation=(
+                                "Checkout with fetch-depth: 0 and export UCGS_DIFF_BASE / "
+                                "UCGS_DIFF_HEAD from the CI event."
+                            ),
+                        )
+                    ]
+                ),
+                report_complete=False,
+                git_ok=False,
+                changed_files=[],
+                diff_mode=diff_mode,
+                diff_base=diff_base,
+                diff_head=diff_head,
+            )
+            if write_local:
+                (root / ".ucgs_last.yaml").write_text(
+                    yaml.dump(report, sort_keys=False), encoding="utf-8"
+                )
+            return report
 
     result = run_all_checks(config, changed_files, diff_text, CHECKS)
     report = _build_report(
@@ -223,6 +323,9 @@ def run_ucgs(project_root: Path | None = None, write_local: bool = True) -> dict
         report_complete=report_complete and git_ok,
         git_ok=git_ok,
         changed_files=changed_files,
+        diff_mode=diff_mode,
+        diff_base=diff_base if diff_mode == DIFF_MODE_RANGE else "",
+        diff_head=diff_head if diff_mode == DIFF_MODE_RANGE else "",
     )
 
     if not report["ucgs_summary"]["report_complete"]:
