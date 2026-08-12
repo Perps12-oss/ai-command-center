@@ -1,7 +1,13 @@
 # Runtime Authority Map
 
-**Milestone:** PHASE R1 — Runtime Reconciliation  
-**Baseline:** `origin/main` @ `426c6b7`  
+**STATUS:** LIVE verification artifact (intake = ExecutionAuthority). Not an implementation queue.
+
+OperatorKernel path is **PAPER / RETIRED**. Do not restore it.
+
+Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Milestone:** PHASE R1 — Runtime Reconciliation (**COMPLETE**)  
+**Baseline:** `origin/main` @ `426c6b7` (map date); live path re-verified 2026-08-12 @ `b949f3e`  
 **Method:** Source + `service_factory.py` wiring only (not plan claims)
 
 ---

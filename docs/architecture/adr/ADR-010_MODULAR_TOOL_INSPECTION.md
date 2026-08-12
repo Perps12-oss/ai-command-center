@@ -1,6 +1,7 @@
 # ADR-010: Modular Tool Inspection and Permission Pipeline
 
 **Status:** Proposed  
+**Disposition:** PARKED / NOT REQUIRED — **NOT IMPLEMENTATION WORK.** Do not implement a Goose-style inspection pipeline from this ADR. Live permission/HITL path is ADR-004/009 in-effect plus ADR-018.  
 **Date:** 2026-07-27  
 **Deciders:** Architecture Review (Tom)  
 **Supersedes:** —  

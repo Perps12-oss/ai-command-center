@@ -8,11 +8,13 @@
 
 ## Rule
 
-**`docs/plans/` holds only active or incomplete work.**  
-**Completed or superseded plans move to `docs/archive/`.**  
-**Code on `origin/main` is the only proof a plan may be archived as COMPLETE.**
+**`docs/plans/` may hold historical, parked, or complete-but-unarchived plans** if they are **bannered**.  
+**Completed or superseded plans may move to `docs/archive/`.**  
+**Code on `origin/main` is the only proof a plan may be archived as COMPLETE.**  
+**Agents may implement only from the canonical Queue 1** in [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md).
 
 Never archive a plan as COMPLETE because a status table, agent report, or stale branch says so.
+Never treat a PARTIAL plan as Queue 1.
 
 ---
 
@@ -20,11 +22,16 @@ Never archive a plan as COMPLETE because a status table, agent report, or stale 
 
 | Status | Location | Meaning |
 |--------|----------|---------|
-| `ACTIVE` | `docs/plans/` | Open work; agents may plan from it |
-| `PARTIAL` | `docs/plans/` | Some deliverables on `main`; exit criteria unmet — **keep active** |
-| `COMPLETE` | `docs/archive/*_COMPLETE.md` | Exit criteria verified against `origin/main` code + tests |
-| `SUPERSEDED` | `docs/archive/*_SUPERSEDED.md` | Replaced by another design; do not implement |
-| `STALE` | `docs/archive/*_STALE.md` | Untrustworthy claims; do not plan from |
+| `ACTIVE` | `docs/plans/` | Open work; agents may plan from it **only if** the Implementation Guide Queue 1 lists it |
+| `PARTIAL` | `docs/plans/` | Some deliverables on `main`; exit criteria unmet — **keep as evidence**; not automatically Queue 1 |
+| `PARKED` | `docs/plans/` or audits | Idea survived disposition; **NOT IMPLEMENTATION WORK** until owner + named gate |
+| `COMPLETE` | `docs/archive/*_COMPLETE.md` or bannered in place | Exit criteria verified against `origin/main` code + tests |
+| `SUPERSEDED` | `docs/archive/*_SUPERSEDED.md` or bannered | Replaced by another design; do not implement |
+| `STALE` / `HISTORICAL` | archive or bannered in place | Untrustworthy or provenance-only; do not plan from |
+| `RETIRED` / `ABANDONED` | bannered in place | Do not restore / do not recover as a program |
+
+Canonical planned-work queue: [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md).  
+Fossil index: [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md).
 
 ---
 

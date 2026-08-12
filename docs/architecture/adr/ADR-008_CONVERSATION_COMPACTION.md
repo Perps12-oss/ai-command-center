@@ -1,6 +1,7 @@
 # ADR-008: Conversation Context Compaction with Visibility Metadata
 
 **Status:** Proposed — **narrowed by ADR-020**  
+**Disposition:** UNDECIDED PRODUCT IDEA / PARKED — **NOT IMPLEMENTATION WORK.** Compaction may only be an agent-visible derived view (ADR-020). Do not implement as memory SoT. Do not treat this file as Queue 1.  
 **Date:** 2026-07-27  
 **Deciders:** Architecture Review (Tom)  
 **Supersedes:** —  

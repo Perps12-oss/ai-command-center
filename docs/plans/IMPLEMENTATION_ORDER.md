@@ -1,12 +1,17 @@
 # Implementation Order Recommendation
 
-**Status:** RECOMMENDATION — **HISTORICAL / STALE relative to ADR-006**  
-**Authority:** `MASTER_ROADMAP_2026.md` (planning-era); live authority = ADR-006 + R1  
-**Purpose:** Optimal phase implementation order based on dependencies  
-**Banner (2026-08-04):** Do **not** treat this document as a completion record or as
-current composition truth. OperatorKernel is **not** the live intake (ADR-006 →
-ExecutionAuthority). Prefer `IMPLEMENTATION_GUIDE.md`, `SHADOW_SOT_INVENTORY.md`,
-and `IMPLEMENTATION_TRUTH_MATRIX.md`.
+**STATUS:** HISTORICAL / STALE relative to ADR-006
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records previous investigation/work. It is **not** the current implementation plan.  
+**Do not implement from this document.** Do not restore OperatorKernel because this order lists Phase 8 next.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Authority:** historical `MASTER_ROADMAP_2026.md`; live authority = ADR-006 + R1 (complete)  
+**Purpose:** Optimal phase implementation order based on dependencies (planning-era)  
+**Banner (2026-08-04 / 2026-08-12):** OperatorKernel is **not** the live intake (ADR-006 → ExecutionAuthority).
 
 ---
 

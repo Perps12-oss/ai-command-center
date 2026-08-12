@@ -1,8 +1,16 @@
 # Handover — Phase A + Phase B → Cursor
 
-**Branch:** `feat/receipt-boundary-phase-a`
-**Base:** `origin/main` @ `59262fe` (post-PR #165)
-**Commits:** `3709325` (Phase A) · `8a4a7a0` (governance correction) · `0e56b37` (Phase B)
+**STATUS:** HISTORICAL — Phases A/B landed on `main`; this handover is **not Queue 1**
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records previous investigation/work. It is **not** the current implementation plan.  
+**Do not implement from this document.** “Phase C NOT STARTED” is **not** a current implementation ticket. Canonical Queue 1 is **EMPTY**.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Branch:** `feat/receipt-boundary-phase-a` (historical)  
+**Base:** `origin/main` @ `59262fe` (post-PR #165)  
 **Implementation role:** Claude Code (never an authority — `CLAUDE.md`)
 
 ---

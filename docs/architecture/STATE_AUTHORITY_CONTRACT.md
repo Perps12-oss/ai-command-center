@@ -1,7 +1,8 @@
 # State Authority Contract
 
 **Status:** ACTIVE (soft-shadow closed; WM + Memory ADR-015 + Goals ADR-016 mutate live; workflows/executions/agents **remain outside** per ADR-017)  
-**Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-005_WORLD_MODEL_AUTHORITY.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`, `ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md`, `ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md`, `ADR-017_SA_MUTATE_WORKFLOWS_EXECUTIONS_AGENTS_DISPOSITION.md`  
+**Authority:** `PROJECT_CONSTITUTION_V4.md`, `ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`, `ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md`, `ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md`, `ADR-017_SA_MUTATE_WORKFLOWS_EXECUTIONS_AGENTS_DISPOSITION.md`  
+**Note:** `ADR-005_WORLD_MODEL_AUTHORITY.md` original wording is **SUPERSEDED** by ADR-015–017. Do not implement from ADR-005.  
 **Verified:** ADR-017 acceptance tip (2026-08-04)  
 **Implementation today:** `ai_command_center/services/state_authority_service.py`  
 **Domain types:** `ai_command_center/domain/state_authority.py` (`StateQuery`, `StateProjection`, `StateDelta`, `MutationReceipt`, `ProjectionScope`)  

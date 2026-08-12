@@ -3,9 +3,11 @@
 **Status:** ACTIVE — subordinate operational guide (living document)
 **Authority:** **Derives its authority entirely from `PROJECT_CONSTITUTION_V4.md` and the accepted ADRs** (e.g. `docs/architecture/adr/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md`). This guide is **not** an independent authority.
 **Scope:** Operationalizes *how* implementation is carried out. It **introduces no new governing rules**; it only restates and applies rules already established by the Constitution, the ADRs, architecture contracts, and existing governance (`docs/governance/PHASE_COMPLETION_RULE.md`).
-**Related:** `docs/plans/README.md`, `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md`, `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md`
+**Related:** `docs/plans/README.md`, `docs/governance/HISTORICAL_AND_RETIRED_WORK.md`, `docs/audits/FOSSIL_DISPOSITION_AUDIT.md`, `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md`
 
-> **Precedence of this document:** If anything here ever conflicts with `PROJECT_CONSTITUTION_V4.md`, an approved ADR, an architecture contract, a canonical roadmap / approved implementation plan, or `PHASE_COMPLETION_RULE.md`, the higher-authority document always prevails and this guide is corrected. Changes to the underlying governance are made in those documents, not here.
+> **Canonical planned-work document:** This file is the **only** canonical active planning authority (Queue 1). Historical roadmaps, phase plans, and inventories are evidence, not implementation queues.
+>
+> **Precedence of this document:** If anything here ever conflicts with `PROJECT_CONSTITUTION_V4.md`, an **Accepted** ADR, an architecture contract, or `PHASE_COMPLETION_RULE.md`, the higher-authority document always prevails and this guide is corrected. Changes to the underlying governance are made in those documents, not here. Historical roadmaps do not outrank this queue.
 
 ---
 
@@ -101,6 +103,61 @@ Article II of `PROJECT_CONSTITUTION_V4.md` is the constitutional hierarchy. This
 
 ---
 
+## How to Read This Repository (document authority)
+
+This section does **not** amend Article II. It tells a fresh engineer or LLM which documents win when they **conflict about what to implement next**.
+
+Constitutional hierarchy (Article II) always wins. Accepted ADRs are binding subordinate decisions under V4; they are **not** Art II Level 2.
+
+**DOCUMENT AUTHORITY (planned work / fossils)**
+
+1. **Live code on `origin/main`** — Exists ≠ Wired ≠ Authoritative; the **live path** wins.
+2. **`PROJECT_CONSTITUTION_V4.md`** — supreme (Art II Level 1).
+3. **Accepted ADRs** — binding under V4. **Proposed ADRs are not implementation authority.**
+4. **This Implementation Guide** — the **only** canonical planned-work queue (Queue 1 below).
+5. **Current disposition / fossil index** — [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md) and [`FOSSIL_DISPOSITION_AUDIT.md`](../audits/FOSSIL_DISPOSITION_AUDIT.md).
+6. **Historical / research documents** — audits, old plans, retired packages, Proposed ADRs, `MASTER_ROADMAP_2026.md`, `PLANNED_WORK_INVENTORY.md`. Provenance only.
+
+Historical plans, retired packages, Proposed ADRs, research branches, and old inventories are **not** implementation authority.
+
+```text
+                    CURRENT MAIN
+                         │
+                         ▼
+                CURRENT ARCHITECTURE
+                         │
+                         ▼
+                ACCEPTED DECISIONS
+                         │
+                         ▼
+              THIS CANONICAL PLAN
+                         │
+                         ▼
+                ACTIVE QUEUE 1
+                         │
+                         ▼
+              IMPLEMENTATION WORK
+```
+
+---
+
+## Current State (what is already on `main`)
+
+Do not describe these as future work:
+
+- **EventBus:** `async_dispatch=True` **single** `event-dispatch` queue (R4b). Not multi-pool.
+- **Intake:** ExecutionAuthority (ADR-006). OperatorKernel is **not** live.
+- **Receipts / TruthBoundary / HITL confirmation:** live.
+- **Scheduler:** `SingleGoalScheduler`. GoalEngine is **not** live.
+- **World Model + SA mutate:** ADR-015/016 live; workflows/executions/agents **remain outside** (ADR-017).
+- **Chat:** AppState / `chat.*` path.
+- **Provider catalog:** `AppState.provider_registry` snapshot.
+- **Phase B, PHASE R1, SA.mutate track:** COMPLETE.
+
+Retired packages (OperatorKernel, GoalEngine, PlanningEngine, AgentCoordinator, PredictiveEngine, UndoReplay) may still exist on disk. They are **RETIRED / NON-CANONICAL**. See [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md).
+
+---
+
 ## Decision process (before touching any code)
 
 An operational checklist for applying the authority order above:
@@ -138,9 +195,9 @@ This prevents **research creep** and **external-project creep**.
 
 Incoming information is triaged into three classes:
 
-- **Class A — Repository Truth (Authoritative):** comes from the repo; the implementation agent trusts it. (e.g. Phase B CONDITIONS cleared on `main` (#105); Stage 2 soft-shadow + R1 P1–P4 + ADR-014–017 on `main`; SA.mutate track **CLOSED**; Phase 5 Async EventBus incomplete and **approval-gated**; OperatorKernel / Predictive / Undo **retired from live**.)
+- **Class A — Repository Truth (Authoritative):** comes from the repo; the implementation agent trusts it. (e.g. Phase B CONDITIONS cleared on `main` (#105); Stage 2 soft-shadow + R1 P1–P4 + ADR-014–017 on `main`; SA.mutate track **CLOSED**; R4b single-queue EventBus **live**; Phase 5 **tiered pools PARKED** (not Queue 1); OperatorKernel / Predictive / Undo **retired from live**.)
 - **Class B — Engineering Intelligence (Reference):** e.g. Goose provider abstraction / extension system / runtime / desktop architecture. Reference material, **not** implementation instructions.
-- **Class C — Future Opportunities (Backlog):** e.g. potential provider registry, plugin registry, runtime improvements. Backlog, **not** current work.
+- **Class C — Future Opportunities (Backlog):** parked ideas and owner-gated tracks. **Not** current Queue 1. See [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md).
 
 ---
 
@@ -148,15 +205,23 @@ Incoming information is triaged into three classes:
 
 ### Queue 1 — Must Do (blocks progress; from repository truth + approved plans)
 
-Source: EPOCH A audit + `PHASE_R1_RUNTIME_RECONCILIATION.md`. Ordered:
+**Queue 1: EMPTY** — no approved implementation work currently outstanding.
 
-1. **Phase B remediation (close program conditions):** ✅ **on `main`** via [#105](https://github.com/Perps12-oss/ai-command-center/pull/105) (`f03a4fa`, 2026-07-29). Phase B UI program CONDITIONS cleared.
-2. **PHASE R1 — Runtime Reconciliation** — P1–P4 **passed**; P5 Predictive/Undo **disposition closed (ADR-014 research-only)**. Composition retire rows: ADR-006/012/013/014. Soft-shadow Stage 2 **closed**.
-3. **State Authority Contract** — soft-shadow complete; live mutate = WM + Memory + Goals; workflows/executions/agents **remain outside (ADR-017)** — R1 SA.mutate track **CLOSED**.
-4. **Phase 5 — Async EventBus** — implement `tiered_dispatch_policy.py` + `async_dispatch_queue.py` (currently only policy-only `dispatch_policy.py` exists); meet exit 5.4. *Gated by PERFORMANCE_CONSTITUTION Art. VII/XII — Performance Investigation Report + human approval before implementation.*
-5. **Verification** — gates green on `main` per `PHASE_COMPLETION_RULE.md`.
+That is intentional. Do **not** invent replacement tickets from historical inventories.
 
-> Ungated Stage 2 / R1 P1–P5 disposition work is on `main`. See `docs/audits/R1_UNGATED_STOP_LINE.md`. Do not start Phase 5 Async EventBus without Performance Investigation Report + human approval. No Goose until Stage 3.
+Completed (do not re-open):
+
+1. **Phase B remediation** — ✅ **COMPLETE** on `main` ([#105](https://github.com/Perps12-oss/ai-command-center/pull/105)).
+2. **PHASE R1 — Runtime Reconciliation** — ✅ **COMPLETE**. P1–P4 passed; P5 Predictive/Undo disposition closed (ADR-014 research-only).
+3. **State Authority / SA.mutate** — ✅ **COMPLETE**. Live mutate = WM + Memory + Goals; workflows/executions/agents remain outside (ADR-017).
+
+Removed from Queue 1 (not “next”):
+
+4. **Phase 5 — tiered EventBus pools** — **STATUS: PARKED — NOT IMPLEMENTATION WORK.** Historical branch `cursor/phase5-async-eventbus-744e` is **ABANDONED** (not a merge candidate). Current main is R4b **single-queue** `async_dispatch=True`. Do not implement `tiered_dispatch_policy.py` / `async_dispatch_queue.py` without owner approval and a Performance Investigation Report based on **measured** single-queue contention (Art. VII/XII). See [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md).
+
+Standing process (not a fossil ticket): verification gates on `main` per `PHASE_COMPLETION_RULE.md` whenever implementation work exists.
+
+> Historical inventory (superseded as a queue): [`PLANNED_WORK_INVENTORY.md`](../audits/PLANNED_WORK_INVENTORY.md). Do not implement from it.
 
 ### Queue 2 — Evaluate (no implementation yet; Class B)
 
@@ -170,9 +235,9 @@ Pattern registry, plugin marketplace, advanced runtime, new UI ideas, performanc
 
 ## Immediate roadmap
 
-1. **Stage 1 — Stabilization:** Phase B rem + truth matrix **done on `main` (#105)**. R1 P2 wire-or-retire **closed** (ADR-006/012/013/014). EventBus only after approval. **No Goose integration.**
-2. **Stage 2 — State Authority / R1 closeout:** **soft-shadow closed**; **P4/P5 closed**; **ADR-015/016 mutate live**; **ADR-017 WEA disposition** — **SA.mutate track CLOSED** (`R1_UNGATED_STOP_LINE.md`). Parallel other tracks: Goose = Stage 3; Async EventBus = Phase 5 + approval; live-wire Predictive/Undo only with ADR superseding 014.
-3. **Stage 3 — Goose Review:** only after the canonical roadmap reaches a stable checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"*
+1. **Stage 1 — Stabilization:** ✅ **COMPLETE** on `main` (#105). R1 P2 wire-or-retire **closed** (ADR-006/012/013/014). **No Goose integration.**
+2. **Stage 2 — State Authority / R1 closeout:** ✅ **COMPLETE**. SA.mutate track CLOSED (`R1_UNGATED_STOP_LINE.md`). Parallel tracks are **PARKED / GATED**, not Queue 1: Goose = Stage 3; EventBus pool isolation = parked; live-wire Predictive/Undo only with ADR superseding 014.
+3. **Stage 3 — Goose Review:** GATED. Only after owner checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"* Do not implement Goose extras from research notes.
 
 ---
 

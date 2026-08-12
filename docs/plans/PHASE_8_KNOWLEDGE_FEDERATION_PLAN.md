@@ -1,9 +1,17 @@
 # Phase 8: Knowledge Federation
 
-**Status:** NOT_COMPLETE (code-verified 2026-07-20)  
-**Priority:** MEDIUM  
-**Estimated Effort:** 6-8 weeks  
-**Dependencies:** Phase 6 (External Bridge); Phase 7 multi-agent plan SUPERSEDED  
+**STATUS:** ABANDONED AS A PROGRAM (unified SoT / vectors)
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records a federation program. Unified knowledge federation / vectors-as-SoT is **abandoned as a program**.  
+Read-only `FederationService` (if present) is **PARKED** and **not** in the composition root.  
+**Do not implement from this document.** Vector DB remains constitutionally gated.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)  
+Index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
+
+**Priority:** historical  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`  
 **Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`
 

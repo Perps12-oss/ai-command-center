@@ -24,6 +24,10 @@ Implementation may not begin before pre-flight completion.
 
 See `docs/governance/PHASE_COMPLETION_RULE.md` and `.cursor/rules/phase-complete-on-main.mdc`.
 
+**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) (Queue 1).  
+**Fossil / retired index:** [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md).  
+Historical roadmaps, Proposed ADRs, and old inventories are **not** implementation authority.
+
 ---
 
 ## Default PR workflow — babysit (tool-neutral intent)

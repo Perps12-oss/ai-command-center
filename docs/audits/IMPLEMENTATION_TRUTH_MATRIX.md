@@ -1,10 +1,14 @@
 # Implementation Truth Matrix
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
-**Baseline:** `origin/main` @ `426c6b7` (R1 ungated docs closeout — 2026-08-04)  
+**Baseline:** `origin/main` @ `b949f3e` (fossil disposition 2026-08-12; prior matrix baseline `426c6b7`)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
-**Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` · Phase B roadmap  
+**Canonical plan:** `docs/governance/IMPLEMENTATION_GUIDE.md` (Queue 1 **EMPTY**)  
+**Fossil index:** `docs/governance/HISTORICAL_AND_RETIRED_WORK.md`  
+**Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` (**COMPLETE**) · Phase B (**COMPLETE**)  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
+
+This matrix is a **verification artifact**, not an implementation queue. RETIRED rows are not “PARTIAL tickets.”
 
 ---
 
@@ -12,8 +16,8 @@
 
 | Capability | Exists | Wired (composition root) | Tested | Live path? | Status | Evidence |
 |------------|:------:|:------------------------:|:------:|:----------:|--------|----------|
-| OperatorKernel | ✅ | ❌ | ⚠️ unit/golden only | ❌ bypassed | **PARTIAL** | `operator/kernel.py`; **not** in `service_factory.py` / `application.py`; ADR-006 → research only |
-| GoalEngine | ✅ tree | ❌ | ✅ unit | ❌ | **RETIRED** | ADR-012 Accepted Option A; not in factory; live = `GoalRepository` + scheduler; cleanup optional |
+| OperatorKernel | ✅ | ❌ | ⚠️ unit/golden only | ❌ bypassed | **RETIRED / NON-CANONICAL** | `operator/kernel.py`; **not** in `service_factory.py` / `application.py`; ADR-006. Do not restore. |
+| GoalEngine | ✅ tree | ❌ | ✅ unit | ❌ | **RETIRED / NON-CANONICAL** | ADR-012 Accepted Option A; not in factory; live = `GoalRepository` + scheduler. Do not restore. |
 | AgentCoordinator | ✅ | ❌ | ⚠️ orchestration tests | ❌ | **RETIRED** | ADR-013 Accepted; research/tests only; live = `AgentRuntimeService` |
 | PlanningEngine | ✅ | ❌ | ⚠️ tests | ❌ | **RETIRED** | ADR-013 Accepted; research/tests only; live = `PlannerService` |
 | ExternalCapabilityBridge | ✅ | ✅ | ✅ | ✅ | **WIRED** | `ExternalCapabilityBridgeService(bus)` in factory |
@@ -28,9 +32,10 @@
 | GlobalContextBar | ✅ | ✅ (UI shell) | ✅ | ✅ UI | **WIRED** (UI) | `global_context_bar.py` + `GlobalContextSnapshot` incl. active goal |
 | OSPalette + provider registry | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | `palette_provider.py`; Ctrl+K |
 | Brain / Evidence / Operations / Graph / Insights views | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Phase B E06–E13 on main; Insights placeholder by plan |
-| Cross-platform hotkey (macOS) | ✅ Impl packages + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **PARTIAL** | `get_hotkey_provider()` placeholder; Impl under `platform/macos|linux/` unwired — **Phase 11 backlog**, not R1 blocker |
-| Platform tray / notifications | ⚠️ stubs + working TrayController | ❌ platform_service | ❌ | ⚠️ partial | **PARTIAL** | `NotImplementedError` in `platform_service.py`; `ui/tray` pystray path exists — Phase 11 |
-| Phase 5 Async EventBus (tiered + async queue) | ⚠️ policy only | ❌ | ⚠️ | ❌ | **PARTIAL** | `dispatch_policy.py` only; `tiered_dispatch_policy.py` / `async_dispatch_queue.py` **not** implemented — gated by Performance Investigation Report + human approval |
+| Cross-platform hotkey (macOS) | ✅ Impl packages + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **GATED / NOT CURRENT WORK** | `get_hotkey_provider()` placeholder; Impl under `platform/macos|linux/` unwired — **not Queue 1**. `_start_tap()` is a log stub. |
+| Platform tray / notifications | ⚠️ stubs + working TrayController | ❌ platform_service | ❌ | ⚠️ partial | **GATED / NOT CURRENT WORK** | `NotImplementedError` in `platform_service.py`; `ui/tray` pystray path exists — not Queue 1 |
+| Phase 5 Async EventBus (R4b single queue) | ✅ | ✅ `async_dispatch=True` | ✅ | ✅ single queue | **LIVE** | `application.py` `EventBus(..., async_dispatch=True)`; tests `test_eventbus_async_adapters.py`, `test_eventbus_dispatch_queue.py` |
+| Phase 5 tiered pools (`tiered_dispatch_policy` / `async_dispatch_queue`) | ❌ not on main | ❌ | ❌ | ❌ | **PARKED / BRANCH ABANDONED** | Not Queue 1. Branch `cursor/phase5-async-eventbus-744e` is **not a merge candidate**. Gate: measured contention + Art. VII/XII + owner. |
 
 Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
 

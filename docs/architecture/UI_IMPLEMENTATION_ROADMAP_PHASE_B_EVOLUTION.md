@@ -1,14 +1,21 @@
 ﻿# Phase B UI Implementation Roadmap — Evolution Plan (Canon-corrected)
 
-**Status:** ACTIVE implementation roadmap (Devin UI)  
+**STATUS:** COMPLETE on `main` (#105) — **not Queue 1**
+
+**HISTORICAL / NON-AUTHORITATIVE as an open roadmap**
+
+Phase B UI program CONDITIONS are cleared. Do **not** treat remaining “incremental evolution” language as current implementation work.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+
 **Baseline:** `origin/main` only  
 **Handover:** [`docs/agents/DEVIN_UI_HANDOVER.md`](../agents/DEVIN_UI_HANDOVER.md)  
 **Audit gate:** [`docs/agents/CURSOR_AUDIT_GATE.md`](../agents/CURSOR_AUDIT_GATE.md)  
-**Authority:** ADR-006 (ExecutionAuthority canonical); [`REPOSITORY_TRUTH_CANON.md`](../audits/REPOSITORY_TRUTH_CANON.md)
+**Authority:** ADR-006 (ExecutionAuthority canonical)
 
-This is the reconciled **evolution** version of the Phase B UI roadmap (not a rewrite plan). Foundation, workspaces, and inspector/palette primitives already exist on `main`. Remaining work is **incremental evolution**.
+This is the reconciled **evolution** version of the Phase B UI roadmap (historical). Foundation, workspaces, and inspector/palette primitives exist on `main`.
 
-> **Do not branch from `phase-11a-command-center`.** That branch is superseded. Inventory SoT is `origin/main`.
+> **Do not branch from `phase-11a-command-center`.** That branch is superseded.
 
 ---
 

@@ -1,9 +1,14 @@
 # Phase 6: External Capability Bridge
 
-**Status:** PARTIAL (code-verified 2026-07-20 — bridge exists; MCP scan exit incomplete)  
-**Priority:** HIGH  
-**Estimated Effort:** 2-3 weeks  
-**Dependencies:** Phase 4 Phase E scaffold ✅  
+**STATUS:** LIVE-IN-EFFECT (bridge wired); remaining MCP extras **not Queue 1**
+
+**HISTORICAL / NON-AUTHORITATIVE as an open implementation plan**
+
+`ExternalCapabilityBridgeService` is **wired** in the composition root. Remaining checklist items (MCP scan extras, etc.) are **not** canonical Queue 1.  
+Do not treat this file as “implement next.”
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
 **Authority:** `AGENT_RUNTIME_INTERFACE.md`, `PROJECT_CONSTITUTION_V4.md`  
 **Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`
 

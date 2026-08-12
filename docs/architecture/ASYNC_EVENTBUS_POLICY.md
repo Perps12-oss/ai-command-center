@@ -1,6 +1,11 @@
 # Async EventBus Policy & Design (R4)
 
-**Status:** R4b implemented (optional dispatch queue); R4c implemented (per-handler async adapters, bounded queue)  
+**STATUS:** R4b/R4c **LIVE on main** (`async_dispatch=True` single queue). Multi-pool / R4d isolation = **PARKED**.
+
+This is a **design** document. Unchecked “future implementation PR” checklists below are **fossils**.  
+Do **not** implement `tiered_dispatch_policy.py` / `async_dispatch_queue.py` from this file.  
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+
 **Authority:** Subordinate to [PROJECT_CONSTITUTION_V4.md](../../PROJECT_CONSTITUTION_V4.md)  
 **Runtime reference:** `ai_command_center/core/event_bus.py`  
 **Topic registry:** `ai_command_center/core/events/topics.py`  
@@ -238,7 +243,10 @@ Handlers must not publish after bus shutdown begins.
 
 ---
 
-## Acceptance criteria (future implementation PR)
+## Acceptance criteria (historical — R4b/R4c already on `main`)
+
+**STATUS: COMPLETE / LIVE** for R4b single-queue + R4c adapters.  
+The unchecked boxes below are **historical**. They are not Queue 1. Feature flag on `create_application()` is `async_dispatch=True` (not “defaults to sync”).
 
 An R4b/R4c implementation PR is **done** when:
 

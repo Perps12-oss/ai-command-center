@@ -1,6 +1,7 @@
 # ADR-002: Scheduler Model
 
 **Status:** Proposed  
+**Disposition:** LIVE-IN-EFFECT — `SingleGoalScheduler` is factory-wired on `origin/main`. Formal Status remains **Proposed** (not silently Accepted). This is not a future-work ticket.  
 **Date:** 2026-07-09
 
 ## Context
