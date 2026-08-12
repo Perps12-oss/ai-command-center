@@ -7,6 +7,7 @@ import sqlite3
 import time
 import uuid
 
+from ai_command_center.db.conn_sync import connection_lock
 from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.execution_run import ExecutionRun
 
@@ -20,21 +21,22 @@ class ExecutionRunRepository:
 
     def _migrate(self) -> None:
         """Additive migration: add correlation_id column if absent."""
-        cols = {
-            row[1]
-            for row in self._conn.execute(
-                "PRAGMA table_info(execution_runs)"
-            ).fetchall()
-        }
-        if "correlation_id" not in cols:
-            self._conn.execute(
-                "ALTER TABLE execution_runs ADD COLUMN correlation_id TEXT NOT NULL DEFAULT ''"
-            )
-            self._conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_execution_runs_correlation"
-                " ON execution_runs(correlation_id)"
-            )
-            self._conn.commit()
+        with connection_lock(self._conn):
+            cols = {
+                row[1]
+                for row in self._conn.execute(
+                    "PRAGMA table_info(execution_runs)"
+                ).fetchall()
+            }
+            if "correlation_id" not in cols:
+                self._conn.execute(
+                    "ALTER TABLE execution_runs ADD COLUMN correlation_id TEXT NOT NULL DEFAULT ''"
+                )
+                self._conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_execution_runs_correlation"
+                    " ON execution_runs(correlation_id)"
+                )
+                self._conn.commit()
 
     def append(
         self,
@@ -47,20 +49,21 @@ class ExecutionRunRepository:
         run_id = uuid.uuid4().hex
         created_at = time.time()
         resolved_correlation = correlation or CorrelationContext.new()
-        self._conn.execute(
-            "INSERT INTO execution_runs"
-            " (run_id, request_id, source, snapshot, created_at, correlation_id)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (
-                run_id,
-                request_id,
-                source,
-                json.dumps(snapshot),
-                created_at,
-                resolved_correlation.correlation_id,
-            ),
-        )
-        self._conn.commit()
+        with connection_lock(self._conn):
+            self._conn.execute(
+                "INSERT INTO execution_runs"
+                " (run_id, request_id, source, snapshot, created_at, correlation_id)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    request_id,
+                    source,
+                    json.dumps(snapshot),
+                    created_at,
+                    resolved_correlation.correlation_id,
+                ),
+            )
+            self._conn.commit()
         return ExecutionRun(
             run_id=run_id,
             request_id=request_id,
@@ -71,31 +74,34 @@ class ExecutionRunRepository:
         )
 
     def list_by_request(self, request_id: str, *, limit: int = 50) -> list[ExecutionRun]:
-        rows = self._conn.execute(
-            "SELECT run_id, request_id, source, snapshot, created_at "
-            "FROM execution_runs WHERE request_id = ? "
-            "ORDER BY created_at ASC LIMIT ?",
-            (request_id, limit),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                "SELECT run_id, request_id, source, snapshot, created_at "
+                "FROM execution_runs WHERE request_id = ? "
+                "ORDER BY created_at ASC LIMIT ?",
+                (request_id, limit),
+            ).fetchall()
         return [self._row_to_run(row) for row in rows]
 
     def get_by_correlation(
         self, correlation_id: str, *, limit: int = 50
     ) -> list[ExecutionRun]:
-        rows = self._conn.execute(
-            "SELECT run_id, request_id, source, snapshot, created_at, correlation_id"
-            " FROM execution_runs WHERE correlation_id = ?"
-            " ORDER BY created_at ASC LIMIT ?",
-            (correlation_id, limit),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                "SELECT run_id, request_id, source, snapshot, created_at, correlation_id"
+                " FROM execution_runs WHERE correlation_id = ?"
+                " ORDER BY created_at ASC LIMIT ?",
+                (correlation_id, limit),
+            ).fetchall()
         return [self._row_to_run(row) for row in rows]
 
     def list_recent(self, *, limit: int = 20) -> list[ExecutionRun]:
-        rows = self._conn.execute(
-            "SELECT run_id, request_id, source, snapshot, created_at "
-            "FROM execution_runs ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                "SELECT run_id, request_id, source, snapshot, created_at "
+                "FROM execution_runs ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
         return [self._row_to_run(row) for row in reversed(rows)]
 
     @staticmethod

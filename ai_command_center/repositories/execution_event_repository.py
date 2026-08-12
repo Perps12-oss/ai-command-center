@@ -7,6 +7,7 @@ import sqlite3
 import time
 import uuid
 
+from ai_command_center.db.conn_sync import connection_lock
 from ai_command_center.domain.execution_event import ExecutionEvent, _dict_to_pairs
 
 
@@ -18,28 +19,29 @@ class ExecutionEventRepository:
         self._ensure_table()
 
     def _ensure_table(self) -> None:
-        self._conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS execution_events (
-                event_id TEXT PRIMARY KEY,
-                trace_id TEXT NOT NULL DEFAULT '',
-                parent_event_id TEXT,
-                timestamp REAL NOT NULL,
-                event_type TEXT NOT NULL,
-                actor TEXT NOT NULL DEFAULT '',
-                scope TEXT NOT NULL DEFAULT '',
-                request_id TEXT NOT NULL DEFAULT '',
-                payload TEXT NOT NULL DEFAULT '{}',
-                state_diff TEXT
-            );
-            CREATE INDEX IF NOT EXISTS idx_execution_events_request
-                ON execution_events(request_id);
-            CREATE INDEX IF NOT EXISTS idx_execution_events_trace
-                ON execution_events(trace_id);
-            CREATE INDEX IF NOT EXISTS idx_execution_events_timestamp
-                ON execution_events(timestamp);
-            """
-        )
+        with connection_lock(self._conn):
+            self._conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS execution_events (
+                    event_id TEXT PRIMARY KEY,
+                    trace_id TEXT NOT NULL DEFAULT '',
+                    parent_event_id TEXT,
+                    timestamp REAL NOT NULL,
+                    event_type TEXT NOT NULL,
+                    actor TEXT NOT NULL DEFAULT '',
+                    scope TEXT NOT NULL DEFAULT '',
+                    request_id TEXT NOT NULL DEFAULT '',
+                    payload TEXT NOT NULL DEFAULT '{}',
+                    state_diff TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_execution_events_request
+                    ON execution_events(request_id);
+                CREATE INDEX IF NOT EXISTS idx_execution_events_trace
+                    ON execution_events(trace_id);
+                CREATE INDEX IF NOT EXISTS idx_execution_events_timestamp
+                    ON execution_events(timestamp);
+                """
+            )
 
     def append(self, event: ExecutionEvent) -> ExecutionEvent:
         event_id = event.event_id or uuid.uuid4().hex
@@ -56,68 +58,72 @@ class ExecutionEventRepository:
             payload=event.payload,
             state_diff=event.state_diff,
         )
-        self._conn.execute(
-            """
-            INSERT INTO execution_events (
-                event_id, trace_id, parent_event_id, timestamp, event_type,
-                actor, scope, request_id, payload, state_diff
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                stored.event_id,
-                stored.trace_id,
-                stored.parent_event_id,
-                stored.timestamp,
-                stored.event_type,
-                stored.actor,
-                stored.scope,
-                stored.request_id,
-                json.dumps(dict(stored.payload)),
-                json.dumps(dict(stored.state_diff)) if stored.state_diff is not None else None,
-            ),
-        )
-        self._conn.commit()
+        with connection_lock(self._conn):
+            self._conn.execute(
+                """
+                INSERT INTO execution_events (
+                    event_id, trace_id, parent_event_id, timestamp, event_type,
+                    actor, scope, request_id, payload, state_diff
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    stored.event_id,
+                    stored.trace_id,
+                    stored.parent_event_id,
+                    stored.timestamp,
+                    stored.event_type,
+                    stored.actor,
+                    stored.scope,
+                    stored.request_id,
+                    json.dumps(dict(stored.payload)),
+                    json.dumps(dict(stored.state_diff)) if stored.state_diff is not None else None,
+                ),
+            )
+            self._conn.commit()
         return stored
 
     def list_by_request(self, request_id: str, *, limit: int = 200) -> list[ExecutionEvent]:
-        rows = self._conn.execute(
-            """
-            SELECT event_id, trace_id, parent_event_id, timestamp, event_type,
-                   actor, scope, request_id, payload, state_diff
-            FROM execution_events
-            WHERE request_id = ?
-            ORDER BY timestamp ASC, event_id ASC
-            LIMIT ?
-            """,
-            (request_id, limit),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                """
+                SELECT event_id, trace_id, parent_event_id, timestamp, event_type,
+                       actor, scope, request_id, payload, state_diff
+                FROM execution_events
+                WHERE request_id = ?
+                ORDER BY timestamp ASC, event_id ASC
+                LIMIT ?
+                """,
+                (request_id, limit),
+            ).fetchall()
         return [self._row_to_event(row) for row in rows]
 
     def list_by_trace(self, trace_id: str, *, limit: int = 200) -> list[ExecutionEvent]:
-        rows = self._conn.execute(
-            """
-            SELECT event_id, trace_id, parent_event_id, timestamp, event_type,
-                   actor, scope, request_id, payload, state_diff
-            FROM execution_events
-            WHERE trace_id = ?
-            ORDER BY timestamp ASC, event_id ASC
-            LIMIT ?
-            """,
-            (trace_id, limit),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                """
+                SELECT event_id, trace_id, parent_event_id, timestamp, event_type,
+                       actor, scope, request_id, payload, state_diff
+                FROM execution_events
+                WHERE trace_id = ?
+                ORDER BY timestamp ASC, event_id ASC
+                LIMIT ?
+                """,
+                (trace_id, limit),
+            ).fetchall()
         return [self._row_to_event(row) for row in rows]
 
     def list_recent(self, *, limit: int = 50) -> list[ExecutionEvent]:
-        rows = self._conn.execute(
-            """
-            SELECT event_id, trace_id, parent_event_id, timestamp, event_type,
-                   actor, scope, request_id, payload, state_diff
-            FROM execution_events
-            ORDER BY timestamp DESC, event_id DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
+        with connection_lock(self._conn):
+            rows = self._conn.execute(
+                """
+                SELECT event_id, trace_id, parent_event_id, timestamp, event_type,
+                       actor, scope, request_id, payload, state_diff
+                FROM execution_events
+                ORDER BY timestamp DESC, event_id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
         return [self._row_to_event(row) for row in reversed(rows)]
 
     @staticmethod

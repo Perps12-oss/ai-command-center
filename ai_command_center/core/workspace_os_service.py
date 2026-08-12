@@ -638,6 +638,35 @@ class WorkspaceOsService(BaseService):
 
 
 
+        # Record timeline *before* WORKFLOW_EXECUTION_REQUEST. Application EventBus
+        # uses async_dispatch=True, so TOOL_INVOKE runs on a worker thread and can
+        # race timeline SQLite writes if we record after enqueueing the run.
+        timeline_request_id = uuid.uuid4().hex
+
+        self._pending[timeline_request_id] = {}
+
+        self._publish_request(
+
+            TIMELINE_RECORD_REQUEST,
+
+            timeline_request_id,
+
+            {
+
+                "event_type": action_name,
+
+                "entity_id": resource_id,
+
+                "entity_type": "resource",
+
+            },
+
+        )
+
+        self._await_result(timeline_request_id)
+
+
+
         run_id = uuid.uuid4().hex
 
         self._bus.publish(
@@ -677,32 +706,6 @@ class WorkspaceOsService(BaseService):
             source=self.name,
 
         )
-
-
-
-        timeline_request_id = uuid.uuid4().hex
-
-        self._pending[timeline_request_id] = {}
-
-        self._publish_request(
-
-            TIMELINE_RECORD_REQUEST,
-
-            timeline_request_id,
-
-            {
-
-                "event_type": action_name,
-
-                "entity_id": resource_id,
-
-                "entity_type": "resource",
-
-            },
-
-        )
-
-        self._await_result(timeline_request_id)
 
 
 

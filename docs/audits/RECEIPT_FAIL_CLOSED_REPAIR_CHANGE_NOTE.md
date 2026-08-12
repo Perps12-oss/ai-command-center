@@ -33,9 +33,17 @@ pre-emitted receipt it performs fanout only (no duplicate receipt).
 
 ## CI
 
-`TimelineRepository` now uses `connection_lock` so Phase-A async `TOOL_INVOKE`
+`TimelineRepository` uses `connection_lock` so Phase-A async `TOOL_INVOKE`
 cannot race timeline writes on the shared SQLite connection (ubuntu py3.11 failure).
 
+Follow-up babysit harden (same failure mode after tip `58757f6`):
+
+- `WorkspaceOsService._on_launch_resource` records the launch timeline event
+  **before** publishing `WORKFLOW_EXECUTION_REQUEST` (app `EventBus` uses
+  `async_dispatch=True`, so `TOOL_INVOKE` is worker-threaded).
+- `ExecutionRunRepository` / `ExecutionEventRepository` also take
+  `connection_lock` — they are the concurrent writers on the async path that
+  previously bypassed the timeline lock.
 ## Out of scope
 
-N-1, N-3, F-1–F-4, Phase C, B5. N-2 left as follow-up (optimistic launch timeline).
+N-1, N-3, F-1–F-4, Phase C, B5. N-2 (outcome-gated launch timeline) still deferred.
