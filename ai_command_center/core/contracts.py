@@ -54,6 +54,15 @@ TOOL_CONTRACT_VERSION = "1.0"
 # operation.load_request / operation.loaded envelope (Blueprint Phase 0)
 OPERATION_CONTRACT_VERSION = "1.0"
 
+# execution.authority.decision `intake` provenance (Phase B).
+#   Producer: ExecutionAuthorityService (sole publisher)
+#   Consumer: chat_state reducer — only INTAKE_UI_COMMAND may mutate chat state
+# A decision without an `intake` key predates this contract and is treated as
+# INTAKE_UI_COMMAND, preserving established behaviour.
+INTAKE_UI_COMMAND = "ui_command"
+INTAKE_WORKFLOW = "workflow"
+INTAKE_AGENT = "agent"
+
 # TOOL_INVOKE without workspace_context — documented opt-out paths (Program 3 exit):
 #   1. actor_type "user" with empty workspace_context (no active workspace at invoke time)
 #   2. Non-production tests and verification scripts
@@ -91,6 +100,24 @@ def build_workspace_context(
     if etype:
         ctx["entity_type"] = etype
     return ctx
+
+
+def is_executable_workflow_step(step: object) -> bool:
+    """Whether a workflow step manifest entry becomes an ExecutionPlan step.
+
+    Single owner of this rule (Inv 11): WorkflowEngineService uses it to reject a
+    workflow that would produce no work, and ExecutionAuthority uses it to build
+    plan steps. Two independent copies could drift and silently reintroduce the
+    stuck-run defect this predicate exists to prevent.
+
+    A step with no explicit ``type`` is treated as a tool step, matching the
+    established intake behaviour.
+    """
+    if not isinstance(step, dict):
+        return False
+    if str(step.get("type") or "tool") != "tool":
+        return False
+    return bool(str(step.get("tool") or "").strip())
 
 
 def is_valid_workspace_context(value: object) -> bool:

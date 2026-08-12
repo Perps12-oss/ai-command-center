@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from ai_command_center.core.contracts import INTAKE_UI_COMMAND
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     CHAT_CANCELLED,
@@ -64,6 +65,15 @@ def _is_pending_chat_user_text(text: str) -> bool:
 
 def _reduce_authority_decision(state: Any, event: Event) -> Any:
     if event.topic != EXECUTION_AUTHORITY_DECISION:
+        return state
+    # B3 (Inv 4): authority decisions are operational state. Only a decision that
+    # represents an actual user chat command may mutate user-facing chat state.
+    # Programmatic intakes (workflow, agent) carry goal text like "workflow:demo",
+    # which would otherwise surface as a pending user chat bubble.
+    # A decision with no intake stamp predates this contract and is treated as a
+    # user command, preserving established behaviour.
+    intake = str(event.payload.get("intake") or INTAKE_UI_COMMAND)
+    if intake != INTAKE_UI_COMMAND:
         return state
     text = str(event.payload.get("text", ""))
     pending = text if _is_pending_chat_user_text(text) else ""

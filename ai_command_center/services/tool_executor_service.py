@@ -128,6 +128,11 @@ class ToolExecutorService(BaseService):
             run_launch_application,
             run_system_time_query,
         )
+        from ai_command_center.orchestration.workspace_launch_tools import (
+            run_workspace_execute_command,
+            run_workspace_open_folder,
+            run_workspace_open_url,
+        )
 
         builtins = (
             ToolSpec(
@@ -154,6 +159,23 @@ class ToolExecutorService(BaseService):
                 name="calendar_event_create",
                 description="Create a calendar event",
                 handler=run_calendar_event_create,
+            ),
+            # G2: Workspace OS launches dispatched via TOOL_INVOKE so they are
+            # receipted like any other capability. See workspace_launch_tools.
+            ToolSpec(
+                name="workspace_open_url",
+                description="Open a workspace URL resource in the default browser",
+                handler=run_workspace_open_url,
+            ),
+            ToolSpec(
+                name="workspace_open_folder",
+                description="Open a workspace folder resource in the file manager",
+                handler=run_workspace_open_folder,
+            ),
+            ToolSpec(
+                name="workspace_execute_command",
+                description="Run a sandbox-validated workspace command resource",
+                handler=run_workspace_execute_command,
             ),
         )
         for spec in builtins:

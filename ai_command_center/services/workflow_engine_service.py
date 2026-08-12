@@ -11,7 +11,10 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from ai_command_center.core.contracts import build_workspace_context
+from ai_command_center.core.contracts import (
+    build_workspace_context,
+    is_executable_workflow_step,
+)
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     EXECUTION_RUN_COMPLETE,
@@ -92,6 +95,15 @@ class WorkflowEngineService(BaseService):
             self._bus.publish(
                 WORKFLOW_FAILED,
                 {"run_id": run_id, "error": "max workflow steps exceeded"},
+                source=self.name,
+            )
+            return
+        if not any(is_executable_workflow_step(step) for step in steps):
+            # ExecutionAuthority would drop every step and return silently, leaving
+            # this run registered with no terminal event. Fail before registering.
+            self._bus.publish(
+                WORKFLOW_FAILED,
+                {"run_id": run_id, "error": "workflow has no executable tool steps"},
                 source=self.name,
             )
             return
