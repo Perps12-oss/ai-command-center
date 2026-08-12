@@ -14,6 +14,7 @@ from typing import Any
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
 from ai_command_center.core.control_plane import (
+    DEFAULT_AUTOMATION_ACTOR,
     resolve_run_context,
     resolve_tool_invoke_actor,
     step_requires_human_approval,
@@ -584,6 +585,10 @@ class ExecutionOrchestratorService(BaseService):
                 "text": task,
                 "agent_id": args.get("agent_id"),
                 "request_id": request_id,
+                # Re-entering intake must not launder agent origin into
+                # interactive-user trust. ExecutionAuthority only ever
+                # de-escalates on this field, never escalates.
+                "actor_provenance": DEFAULT_AUTOMATION_ACTOR,
             }
             if workspace_context.get("workspace_id"):
                 payload["workspace_id"] = workspace_context["workspace_id"]

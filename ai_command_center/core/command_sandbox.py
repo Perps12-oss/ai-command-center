@@ -30,6 +30,23 @@ _DEFAULT_ALLOWLIST = frozenset(
     {"echo", "cat", "type", "ls", "dir", "whoami", "hostname", "python", "git"}
 )
 
+# Arguments that make an allowlisted program execute caller-supplied code.
+# ``git -c`` sets arbitrary config (core.fsmonitor, alias.x=!cmd) and
+# ``--upload-pack``/``--receive-pack``/``--exec`` name a program to run.
+_ARG_DENYLIST: dict[str, frozenset[str]] = {
+    "python": frozenset({"-c", "--command", "-m"}),
+    "git": frozenset(
+        {
+            "-c",
+            "--config-env",
+            "--exec",
+            "--exec-path",
+            "--receive-pack",
+            "--upload-pack",
+        }
+    ),
+}
+
 
 class CommandSandbox:
     """Validates command strings before execution with ``shell=False``."""
@@ -74,11 +91,29 @@ class CommandSandbox:
             raise SecurityError(
                 f"command {program!r} is not in the sandbox allowlist {sorted(self._allowlist)}"
             )
-        if program == "python" and ("-c" in argv or "--command" in argv):
-            raise SecurityError(
-                "python inline execution (-c/--command) is not permitted by the sandbox"
-            )
+        self._reject_code_bearing_arguments(program, argv)
         return argv
+
+    @staticmethod
+    def _reject_code_bearing_arguments(program: str, argv: list[str]) -> None:
+        """Reject arguments that turn an allowlisted program into an interpreter.
+
+        Allowlisting ``argv[0]`` is not sufficient: ``python`` and ``git`` both
+        accept code or program paths as *arguments*, so ``shell=False`` provides
+        no protection. Values may be attached with ``=``
+        (``--upload-pack=calc``) or supplied as the next token (``-c cfg=val``),
+        so compare on the flag portion only.
+        """
+        denied = _ARG_DENYLIST.get(program)
+        if not denied:
+            return
+        for token in argv[1:]:
+            flag = token.split("=", 1)[0].strip().strip("\"'").lower()
+            if flag in denied:
+                raise SecurityError(
+                    f"{program} inline execution via {flag!r} is not permitted "
+                    f"by the sandbox: {' '.join(argv)!r}"
+                )
 
     def is_safe(self, command: str) -> bool:
         try:

@@ -19,21 +19,45 @@ def capability_requires_human_approval(capability: str) -> bool:
     return capability.strip().lower() in COMMAND_TOOL_CAPABILITIES
 
 
+def effective_tool_for_step(step: PlanStep) -> str:
+    """Return the tool a step will actually dispatch, not its capability label.
+
+    ``agent.*`` capabilities are dispatched by
+    ``ExecutionOrchestratorService._dispatch_agent_step``, which reads the tool
+    from ``step.args["tool"]`` and **defaults to shell**. The capability label is
+    planner-authored, so it must never be the thing the approval gate keys on.
+    ``agent.task`` is the one agent capability that dispatches no tool (it
+    re-enters intake instead) and therefore resolves to no tool here.
+    """
+    cap = step.capability.strip().lower()
+    if not cap.startswith("agent."):
+        return cap
+    if cap == "agent.task":
+        return ""
+    args = step.args if isinstance(step.args, dict) else {}
+    return str(args.get("tool") or "shell").strip().lower() or "shell"
+
+
 def step_requires_human_approval(step: PlanStep, *, run: dict[str, Any]) -> bool:
-    """Return True when orchestrator must pause for tool.confirmation_required."""
+    """Return True when orchestrator must pause for tool.confirmation_required.
+
+    Fails **closed**: any command-tool step requires approval unless its origin
+    is explicitly exempt. Previously only ``ui`` provenance gated, so agent,
+    llm, and unknown/empty origins all fell through to False, leaving the
+    default ``LAUNCH_TOOL`` grant as the sole control.
+    """
     if bool(step.require_approval):
         return True
-    cap = step.capability.strip().lower()
-    if cap.startswith("agent."):
-        return False
-    if not capability_requires_human_approval(cap):
+    if not (
+        capability_requires_human_approval(step.capability)
+        or capability_requires_human_approval(effective_tool_for_step(step))
+    ):
         return False
     provenance = str(run.get("actor_provenance") or "").lower()
+    # Workflow runs are approved once at definition time, not per step.
     if provenance == WORKFLOW_PROVENANCE:
         return False
-    if provenance in UI_PROVENANCES or bool(run.get("interactive_user")):
-        return True
-    return False
+    return True
 
 
 def intake_run_fields(*, intake: str) -> dict[str, Any]:
