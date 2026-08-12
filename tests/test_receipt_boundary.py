@@ -1,11 +1,8 @@
-"""G1 receipt boundary — execution may not report success without an ExecutionReceipt.
+"""G1 receipt boundary — COMPLETE cannot precede ExecutionReceipt evidence.
 
-Each test here fails at baseline 59262fe:
-  * ``test_run_without_receipt_observer_fails_closed`` — the orchestrator used to
-    publish EXECUTION_RUN_COMPLETE(success=True) with no receipt and no failure.
-  * ``test_completion_without_correlation_id_still_receipts`` — OrchestrationService
-    used to ``return`` early when request_id/run_id were absent, emitting neither
-    receipt nor TruthBoundary validation.
+Invariant:
+  NO RECEIPT → NO EXECUTION_RUN_COMPLETE → NO GoalStatus.COMPLETE
+             → terminal EXECUTION_RUN_FAILED only
 """
 
 from __future__ import annotations
@@ -13,6 +10,7 @@ from __future__ import annotations
 import threading
 import webbrowser
 from pathlib import Path
+from unittest.mock import patch
 
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
@@ -24,9 +22,15 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.core.events.topics import UI_LAUNCH_RESOURCE
 from ai_command_center.core.tools import ToolResult, ToolSpec
+from ai_command_center.db.connection import connect, init_database
+from ai_command_center.domain.correlation import CorrelationContext
+from ai_command_center.domain.goal import Goal, GoalStatus, Priority
+from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
+from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.execution_orchestrator_service import (
     ExecutionOrchestratorService,
 )
+from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
@@ -44,12 +48,12 @@ def _wire_tools(bus: EventBus) -> None:
     ToolExecutorService(bus, registry).start()
 
 
-def _run_plan(bus: EventBus) -> None:
+def _run_plan(bus: EventBus, *, run_id: str = "run-g1", request_id: str = "req-g1") -> None:
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
-            "run_id": "run-g1",
-            "request_id": "req-g1",
+            "run_id": run_id,
+            "request_id": request_id,
             "auto_approve": True,
             "plan": {
                 "goal": "do the thing",
@@ -67,26 +71,8 @@ def _run_plan(bus: EventBus) -> None:
     )
 
 
-def test_run_without_receipt_observer_fails_closed() -> None:
-    """No receipt observer composed → the run must NOT stand as a success."""
-    bus = EventBus()
-    _wire_tools(bus)
-    ExecutionOrchestratorService(bus).start()
-    # Deliberately no OrchestrationService — this is the G1 bypass.
-
-    failed: list[dict] = []
-    bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
-
-    _run_plan(bus)
-
-    assert failed, "run completed with no receipt but never failed closed"
-    assert failed[0].get("receipt_boundary_violation") is True
-    assert failed[0].get("success") is False
-    assert "receipt boundary violation" in str(failed[0].get("error", ""))
-
-
 def test_run_with_receipt_observer_succeeds_and_is_receipted() -> None:
-    """Canonical composition → receipt + truth validation, and no violation."""
+    """T1/T4/T6: canonical path → COMPLETE, receipt, truth; no boundary FAILED."""
     bus = EventBus()
     _wire_tools(bus)
     ExecutionOrchestratorService(bus).start()
@@ -112,10 +98,104 @@ def test_run_with_receipt_observer_succeeds_and_is_receipted() -> None:
         "receipted run must not be flagged as a boundary violation"
     )
     assert receipts[0]["request_id"] == "req-g1"
+    # Success receipt is emitted once (EOS gate); COMPLETE fanout must not duplicate.
+    assert len([r for r in receipts if r.get("success") is True]) == 1
+
+
+def test_no_complete_when_receipt_emit_returns_none() -> None:
+    """T2: if receipt emit fails → FAILED only; never COMPLETE."""
+    bus = EventBus()
+    _wire_tools(bus)
+    orch = ExecutionOrchestratorService(bus)
+    orch.start()
+
+    completed: list[dict] = []
+    failed: list[dict] = []
+    bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
+    bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
+
+    plan = ExecutionPlan(
+        goal="probe",
+        steps=(PlanStep(step_id="s1", capability="shell", args={"command": "echo"}),),
+    )
+    orch._runs["run-x"] = {
+        "request_id": "req-x",
+        "correlation": {},
+        "plan": plan,
+        "step_outputs": [{"capability": "shell", "success": True}],
+        "observations": [],
+        "workspace_context": {},
+        "index": 1,
+    }
+
+    with patch(
+        "ai_command_center.orchestration.receipts.boundary_emit.emit_execution_receipt",
+        return_value=None,
+    ):
+        orch._complete_run("run-x")
+
+    assert completed == []
+    assert failed and failed[0].get("receipt_boundary_violation") is True
+
+
+def test_goal_never_completes_without_receipt() -> None:
+    """T3/T5: GoalStatus never COMPLETE; active goal not success-cleared."""
+    db = init_database(connect(Path(":memory:")))
+    bus = EventBus()
+    repo = GoalRepository(db)
+    sched = SingleGoalScheduler(bus, repo)
+    sched.start()
+    orch = ExecutionOrchestratorService(bus)
+    orch.start()
+
+    corr = CorrelationContext(correlation_id="corr-g", goal_id="goal-g")
+    goal = Goal(
+        id="goal-g",
+        title="probe",
+        status=GoalStatus.ACTIVE,
+        priority=Priority.NORMAL,
+        correlation=corr,
+    )
+    repo.save_goal(goal)
+    sched._active_goal = goal
+    sched._active_task_id = "run-g"
+
+    completed: list[dict] = []
+    failed: list[dict] = []
+    bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
+    bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
+
+    plan = ExecutionPlan(
+        goal="probe",
+        steps=(PlanStep(step_id="s1", capability="navigate", args={"view": "home"}),),
+    )
+    orch._runs["run-g"] = {
+        "request_id": "corr-g",
+        "correlation": corr.to_payload(),
+        "plan": plan,
+        "step_outputs": [{"capability": "navigate", "success": True}],
+        "observations": [],
+        "workspace_context": {},
+        "index": 1,
+    }
+
+    with patch(
+        "ai_command_center.orchestration.receipts.boundary_emit.emit_execution_receipt",
+        return_value=None,
+    ):
+        orch._complete_run("run-g")
+
+    assert completed == []
+    assert failed and failed[0].get("receipt_boundary_violation") is True
+    stored = repo.get_goal("goal-g")
+    assert stored is not None
+    assert stored.status != GoalStatus.COMPLETE
+    # Active goal may be cleared via the failure path — never via success COMPLETE.
+    assert stored.status == GoalStatus.FAILED or sched._active_goal is not None
 
 
 def test_completion_without_correlation_id_still_receipts() -> None:
-    """A completion carrying no request_id/run_id must still produce receipt + truth."""
+    """Direct COMPLETE (legacy publishers) still synthesizes receipt via observer."""
     bus = EventBus()
     OrchestrationService(bus).start()
 
@@ -129,7 +209,6 @@ def test_completion_without_correlation_id_still_receipts() -> None:
     bus.publish(
         EXECUTION_RUN_COMPLETE,
         {
-            # no request_id, no run_id — the baseline early-return hole
             "goal": "untracked side effect",
             "success": True,
             "step_outputs": [{"step_id": "s1", "capability": "shell", "success": True}],
@@ -142,50 +221,66 @@ def test_completion_without_correlation_id_still_receipts() -> None:
     assert receipts[0]["request_id"], "synthesized receipt must carry a request_id"
 
 
-def test_reused_request_id_does_not_inherit_a_stale_receipt() -> None:
-    """A receipt from an earlier run must not satisfy a later run's guard.
-
-    Workflow intake propagates a caller-supplied run_id as request_id, so ids can
-    repeat. If the guard's ledger were not cleared per run, the second (unreceipted)
-    run would pass on the first run's evidence.
-    """
+def test_stale_receipt_cannot_satisfy_current_run() -> None:
+    """T5: cleared stale ledger + failed emit → boundary FAILED."""
     bus = EventBus()
-    registry = ToolRegistry()
-    outcome = {"ok": False}
+    orch = ExecutionOrchestratorService(bus)
+    orch.start()
 
-    def _toggling_tool(_args: object) -> ToolResult:
-        if outcome["ok"]:
-            return ToolResult(success=True, output="done")
-        return ToolResult(success=False, output="", error="boom")
-
-    registry.register_tool(
-        ToolSpec(name="shell", description="shell", handler=_toggling_tool)
+    orch._receipted_ids.add("req-stale")
+    plan = ExecutionPlan(
+        goal="probe",
+        steps=(PlanStep(step_id="s1", capability="shell", args={"command": "echo"}),),
     )
-    ToolExecutorService(bus, registry).start()
-    ExecutionOrchestratorService(bus).start()
-    observer = OrchestrationService(bus)
-    observer.start()
+    orch._runs["run-stale"] = {
+        "request_id": "req-stale",
+        "correlation": {},
+        "plan": plan,
+        "step_outputs": [{"capability": "shell", "success": True}],
+        "observations": [],
+        "workspace_context": {},
+        "index": 1,
+    }
 
-    # Run 1 fails. The failure is receipted, seeding the guard's ledger with these ids.
-    _run_plan(bus)
-
-    # Drop the receipt observer, then succeed with the same ids.
-    observer.stop()
-    outcome["ok"] = True
-
+    completed: list[dict] = []
     failed: list[dict] = []
+    bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
     bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
 
+    with patch(
+        "ai_command_center.orchestration.receipts.boundary_emit.emit_execution_receipt",
+        return_value=None,
+    ):
+        orch._complete_run("run-stale")
+
+    assert completed == []
+    assert failed and failed[0].get("receipt_boundary_violation") is True
+    assert "req-stale" not in orch._receipted_ids
+
+
+def test_eos_emits_receipt_before_complete_without_orchestration_service() -> None:
+    """Receipt is structural in EOS (shared emit), not an optional observer."""
+    bus = EventBus()
+    _wire_tools(bus)
+    ExecutionOrchestratorService(bus).start()
+    # No OrchestrationService — fanout absent, but receipt+COMPLETE must still work.
+
+    completed: list[dict] = []
+    failed: list[dict] = []
+    receipts: list[dict] = []
+    bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
+    bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
+    bus.subscribe(ORCHESTRATION_RECEIPT, lambda e: receipts.append(dict(e.payload)))
+
     _run_plan(bus)
 
-    assert [f for f in failed if f.get("receipt_boundary_violation")], (
-        "second run reused request_id and passed the guard on run 1's stale receipt"
-    )
+    assert receipts, "EOS must emit receipt before COMPLETE"
+    assert completed, "receipted run must publish COMPLETE"
+    assert not [f for f in failed if f.get("receipt_boundary_violation")]
+    assert completed[0].get("receipt_already_emitted") is True
 
 
 class _NoOpBrowser:
-    """Suppress real browser launches while still reporting success."""
-
     def __init__(self) -> None:
         self.last_url: str | None = None
 
@@ -195,13 +290,8 @@ class _NoOpBrowser:
 
 
 def test_workspace_os_launch_is_receipted() -> None:
-    """G2: UI_LAUNCH_RESOURCE must run inside the boundary and produce a receipt.
-
-    At baseline this launch reached ActionRegistry directly: real side effect,
-    no ExecutionAuthority decision, no ExecutionReceipt, no TruthBoundary.
-    """
+    """G2: UI_LAUNCH_RESOURCE must run inside the boundary and produce a receipt."""
     from ai_command_center.application import create_application
-    from ai_command_center.db.connection import connect, init_database
 
     webbrowser.register("noop-receipt", None, _NoOpBrowser())
     webbrowser.get("noop-receipt")
@@ -230,7 +320,6 @@ def test_workspace_os_launch_is_receipted() -> None:
             source="test",
         )
 
-        # TOOL_INVOKE is ASYNC_ELIGIBLE, so the run completes on the dispatch worker.
         assert got_receipt.wait(timeout=10), (
             "workspace OS launch produced no ExecutionReceipt — G2 bypass still open"
         )

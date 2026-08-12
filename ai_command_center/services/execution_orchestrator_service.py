@@ -104,9 +104,7 @@ class ExecutionOrchestratorService(BaseService):
         self._unsubscribers: list[Callable[[], None]] = []
         self._runs: dict[str, dict[str, Any]] = {}
         # G1 receipt boundary: correlation ids seen on ORCHESTRATION_RECEIPT.
-        # EXECUTION_RUN_COMPLETE is SYNC_STANDARD (dispatch_policy.py), so it is
-        # dispatched inline — any receipt for a run has been recorded here by the
-        # time publish() returns. See _complete_run.
+        # Success path emits receipt *before* EXECUTION_RUN_COMPLETE (fail-closed).
         self._receipted_ids: set[str] = set()
 
     def _on_load(self) -> None:
@@ -897,6 +895,10 @@ class ExecutionOrchestratorService(BaseService):
         self._fail_run(run_id, error)
 
     def _complete_run(self, run_id: str) -> None:
+        from ai_command_center.orchestration.receipts.boundary_emit import (
+            emit_execution_receipt,
+        )
+
         run = self._runs.pop(run_id, None)
         request_id = str(run.get("request_id", "")) if run else ""
         correlation = dict(run.get("correlation") or {}) if run else {}
@@ -912,38 +914,44 @@ class ExecutionOrchestratorService(BaseService):
         )
 
         # Correlation ids a receipt for this run may legitimately carry.
-        # OrchestrationService keys receipts on request_id, falling back to run_id.
         correlating_ids = {i for i in (request_id, run_id) if i}
+        # Drop stale ledger entries before emitting fresh evidence for this run.
         self._receipted_ids -= correlating_ids
 
-        self._bus.publish(
-            EXECUTION_RUN_COMPLETE,
-            {
-                "run_id": run_id,
-                "request_id": request_id,
-                "correlation": correlation,
-                "goal": goal,
-                "success": True,
-                "step_outputs": step_outputs,
-                "observations": observations,
-                "plan": plan_dict,
-                "workspace_context": workspace_context,
-            },
-            source=self.name,
+        completion_payload = {
+            "run_id": run_id,
+            "request_id": request_id,
+            "correlation": correlation,
+            "goal": goal,
+            "success": True,
+            "step_outputs": step_outputs,
+            "observations": observations,
+            "plan": plan_dict,
+            "workspace_context": workspace_context,
+        }
+
+        # G1 fail-closed: establish receipt evidence *before* any public success.
+        # Uses existing ORCHESTRATION_RECEIPT (SYNC_STANDARD) — no new bus topic.
+        evidence = emit_execution_receipt(
+            self._bus,
+            payload=completion_payload,
+            success=True,
+            error="",
         )
+        receipted = bool(evidence) and bool(self._receipted_ids & correlating_ids)
+        if not receipted and evidence:
+            # Emit published a receipt whose request_id may have been synthesized.
+            rid = str(evidence.get("request_id") or "").strip()
+            receipted = bool(rid) and rid in self._receipted_ids
+            if receipted and not request_id:
+                request_id = rid
+                completion_payload["request_id"] = rid
+                correlating_ids.add(rid)
 
-        # G1 receipt boundary — fail closed.
-        # EXECUTION_RUN_COMPLETE dispatches inline, so a conforming receipt observer
-        # has already run. If no ExecutionReceipt was produced for this run, the
-        # side effect happened but is unverified: report failure, never success.
-        # Read once, then clear unconditionally: ids are caller-supplied and may be
-        # reused across runs, so a leftover entry must never satisfy a later guard.
-        receipted = bool(self._receipted_ids & correlating_ids)
-        self._receipted_ids -= correlating_ids
         if not receipted:
             _logger.error(
                 "execution.receipt_boundary_violation run_id=%s request_id=%s — "
-                "run completed without an ExecutionReceipt; failing closed",
+                "no ExecutionReceipt before COMPLETE; failing closed",
                 run_id,
                 request_id,
             )
@@ -969,6 +977,19 @@ class ExecutionOrchestratorService(BaseService):
             )
             self._receipted_ids -= correlating_ids
             return
+
+        # Public success only after receipt evidence exists.
+        if evidence:
+            completion_payload["receipt_id"] = evidence.get("receipt_id")
+            completion_payload["receipt_already_emitted"] = True
+            completion_payload["truth_valid"] = evidence.get("truth_valid")
+            completion_payload["truth_detail"] = evidence.get("truth_detail")
+            completion_payload["response_source"] = evidence.get("response_source")
+            completion_payload["response_text"] = evidence.get("response_text")
+            completion_payload["primary_capability"] = evidence.get("primary_capability")
+            completion_payload["execution_facts"] = evidence.get("facts")
+        self._bus.publish(EXECUTION_RUN_COMPLETE, completion_payload, source=self.name)
+        self._receipted_ids -= correlating_ids
 
     def _fail_run(self, run_id: str, error: str) -> None:
         run = self._runs.pop(run_id, None)
