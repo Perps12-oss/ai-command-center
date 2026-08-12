@@ -147,7 +147,7 @@ Do not describe these as future work:
 
 - **EventBus:** `async_dispatch=True` **single** `event-dispatch` queue (R4b). Not multi-pool.
 - **Intake:** ExecutionAuthority (ADR-006). OperatorKernel is **not** live.
-- **Receipts / TruthBoundary / HITL confirmation:** live.
+- **Receipts / TruthBoundary / HITL confirmation:** live (control-plane path repaired #175; closeout `docs/audits/RUNTIME_INTEGRITY_CLOSEOUT.md`).
 - **Scheduler:** `SingleGoalScheduler`. GoalEngine is **not** live.
 - **World Model + SA mutate:** ADR-015/016 live; workflows/executions/agents **remain outside** (ADR-017).
 - **Chat:** AppState / `chat.*` path.

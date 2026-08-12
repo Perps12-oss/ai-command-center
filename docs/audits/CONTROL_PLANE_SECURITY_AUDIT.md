@@ -1,9 +1,12 @@
 # Control-Plane Security Audit (Focused)
 
 **Date:** 2026-08-12  
-**Baseline:** `origin/main` @ `1ee05ba`  
-**Status:** REMEDIATED — see `cursor/control-plane-security-remediation-4b28`  
+**Baseline:** `origin/main` @ `1ee05ba` (pre-remediation narrative below)  
+**Status:** **REMEDIATED** — PR #175 + closeout ledger `RUNTIME_INTEGRITY_CLOSEOUT.md`  
 **Scope:** Approval authority, actor identity, shell/tool authority only — not a repo-wide fossil pass.
+
+> **Historical sections below** document the pre-#175 defect state for audit provenance.  
+> For current disposition and proof, see `docs/audits/RUNTIME_INTEGRITY_CLOSEOUT.md`.
 
 ---
 
@@ -113,7 +116,7 @@ Shrinking the allowlist helps but does not replace **approval authority** and **
 ## Acceptance tests (before fix)
 
 See `tests/test_control_plane_security_acceptance.py` — marked `control_plane_acceptance`.  
-**Expected on `main` (2026-08-12):** **8 xfailed, 11 passed** — xfailed tests encode live defects (`strict=True`; remove xfail in remediation PR).
+**Expected after remediation (#175):** **19 passed** (`tests/test_control_plane_security_acceptance.py`)
 
 ### Adversarial audit question (post-fix)
 
@@ -127,10 +130,7 @@ APPDATA=/tmp/aicc_appdata python3 -m pytest tests/test_control_plane_security_ac
 
 ---
 
-## Remediation direction (not implemented here)
+## Remediation (landed #175)
 
-1. Remove unconditional `auto_approve: True` from EA; derive from `SecurityTier` / `require_approval` / capability risk.
-2. Stamp `actor_type` (and `actor_id`) at orchestrator from run provenance — **reject** payload escalation.
-3. Treat `user` as interactive-only (UI session), never from plan args or `TOOL_INVOKE` payload.
-4. High-risk tools (`shell`, `workspace_execute_command`, `python`, `git`) require orchestrator HITL **and** permission check for non-interactive actors.
-5. Narrow sandbox: remove `python`/`git` from default allowlist or require structured subcommands.
+Implemented in PR #175 (`core/control_plane.py`, EA/orchestrator/tool-executor/sandbox changes).  
+Closeout disposition and proof: `docs/audits/RUNTIME_INTEGRITY_CLOSEOUT.md`.
