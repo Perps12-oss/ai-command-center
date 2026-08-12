@@ -26,6 +26,7 @@ from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.intents import (
     INTENT_AGENT,
     INTENT_CHAT,
+    INTENT_GOAL,
     INTENT_SHELL,
 )
 from ai_command_center.core.events.topics import (
@@ -235,14 +236,26 @@ class ExecutionAuthorityService(BaseService):
 
         if decision.capability == "goal":
             # Free-text goals go through planner with World Model context.
+            # Prefer decision.text (prefix stripped) over raw UI_COMMAND text.
+            goal_title = str(decision.text or text).strip() or text
+            extra: dict[str, Any] = {}
+            if "priority" in event.payload:
+                try:
+                    extra["priority"] = int(event.payload.get("priority") or 0)
+                except (TypeError, ValueError):
+                    extra["priority"] = 0
+            description = str(event.payload.get("description") or "").strip()
+            if description:
+                extra["description"] = description
             self._submit_plan(
                 request_id=request_id,
-                text=text,
+                text=goal_title,
                 decision=decision,
                 plan=None,
                 scope=scope,
                 state_context=state_context,
                 skip_planner=False,
+                extra_payload=extra or None,
             )
             return
 
@@ -602,6 +615,17 @@ class ExecutionAuthorityService(BaseService):
                 args=dict(prefix_args),
                 reason="agent_capability",
                 skip_planner=True,
+            )
+
+        if prefix_intent == INTENT_GOAL:
+            goal_body = str(prefix_args.get("goal") or "").strip() or stripped
+            return ExecutionDecision(
+                kind=DecisionKind.ACTIONABLE,
+                text=goal_body,
+                capability="goal",
+                args={"goal": goal_body},
+                reason="goal_prefix",
+                skip_planner=False,
             )
 
         # Former legacy prefixes → first-class capabilities.

@@ -15,6 +15,7 @@ INTENT_NAVIGATE = "navigate"
 INTENT_MEMORY_REMEMBER = "memory_remember"
 INTENT_MEMORY_SELECT = "memory_select"
 INTENT_AGENT = "agent"
+INTENT_GOAL = "goal"
 INTENT_UNKNOWN = "unknown"
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "INTENT_MEMORY_REMEMBER",
     "INTENT_MEMORY_SELECT",
     "INTENT_AGENT",
+    "INTENT_GOAL",
     "INTENT_UNKNOWN",
 ]

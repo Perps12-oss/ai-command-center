@@ -3,7 +3,7 @@
 Architecture contract:
 - Pure renderer. Reads AppState via apply_state(snapshot) only.
 - Uses AppState.brain_state (+ optional planner_last_plan compose).
-- New Goal publishes GOAL_SUBMIT_REQUEST only (never lifecycle facts).
+- New Goal publishes EA intake (UI_COMMAND goal: …) only (never GOAL_SUBMIT_REQUEST / lifecycle facts).
 - Selection intents flow through callbacks → UI_GOAL_* / inspect (shell).
 """
 
@@ -238,7 +238,7 @@ class GoalView(ctk.CTkFrame):
                 kind="empty",
                 message=article18_empty(
                     why="No goals or plans are present in the brain_state projection.",
-                    creates="Goals appear when New Goal publishes GOAL_SUBMIT_REQUEST.",
+                    creates="Goals appear when EA admits a New Goal into the scheduler.",
                     next_action="Click New Goal to submit the first goal.",
                 ),
             )

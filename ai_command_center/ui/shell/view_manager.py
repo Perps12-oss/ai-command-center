@@ -613,7 +613,7 @@ class ViewManagerMixin:
         self._on_goal_select(gid)
 
     def _on_goal_new(self, title: str, priority: int = 0) -> None:
-        """Publish GOAL_SUBMIT_REQUEST for Hero New Goal (never lifecycle facts)."""
+        """Hero New Goal → EA intake (UI_COMMAND); never GOAL_SUBMIT_REQUEST."""
         self._controller.publish_goal_submit_request(title, priority=priority)
 
     def _on_approval_decide(

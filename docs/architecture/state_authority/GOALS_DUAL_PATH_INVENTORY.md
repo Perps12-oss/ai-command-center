@@ -24,8 +24,9 @@ into intake without a new ADR that supersedes ADR-012.** **Do not** let SA write
 ## Path A — Live (authoritative for UI / intake)
 
 ```text
-UI / ExecutionAuthority
-      → GOAL_SUBMIT_REQUEST
+UI → UI_COMMAND (Hero: goal: <title>) → ExecutionAuthority
+      → EXECUTION_AUTHORITY_DECISION + admit
+      → GOAL_SUBMIT_REQUEST (authority_decision stamped)
       → SingleGoalScheduler
       → GoalRepository (table: goals)
       → GOAL_SUBMITTED / lifecycle topics
@@ -37,8 +38,8 @@ Evidence:
 | Probe | Location |
 |-------|----------|
 | Intake emit | `execution_authority_service.py` publishes `GOAL_SUBMIT_REQUEST` |
-| UI emit | `ui/controller.py`, Hero New Goal → same topic |
-| Consumer | `goal_scheduler_service.py` subscribes `GOAL_SUBMIT_REQUEST` |
+| UI emit | `ui/controller.py` Hero New Goal → `UI_COMMAND` only (B5 fork 1; no direct scheduler topic) |
+| Consumer | `goal_scheduler_service.py` subscribes `GOAL_SUBMIT_REQUEST` (refuses without `authority_decision`) |
 | Persistence | `repositories/goal_repository.py` → `goals` |
 | SA aggregation | `service_factory._goal_lookup` → `goal_repo.list_goals()` only |
 | Registered | `goal_scheduler` in `services.register(...)` loop |

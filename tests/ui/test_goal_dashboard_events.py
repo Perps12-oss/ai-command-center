@@ -1,4 +1,4 @@
-"""Goal Dashboard EventBus publication path tests (GOAL_SUBMIT_REQUEST only)."""
+"""Goal Dashboard EventBus publication path — Hero via EA intake (B5)."""
 
 from __future__ import annotations
 
@@ -9,20 +9,23 @@ from ai_command_center.core.events.topics import (
     GOAL_CANCELLED,
     GOAL_PAUSED,
     GOAL_SUBMIT_REQUEST,
+    UI_COMMAND,
 )
 from ai_command_center.domain.brain_state_snapshot import BrainStateSnapshot, GoalSnapshot
 from ai_command_center.ui.controller import UIController
 from tests.ui.fake_ui import GoalView
 
 
-def test_view_manager_style_new_goal_path_publishes_submit_only() -> None:
-    """Mirrors ViewManager._on_goal_new → UIController.publish_goal_submit_request."""
+def test_view_manager_style_new_goal_path_publishes_ea_intake_only() -> None:
+    """Mirrors ViewManager._on_goal_new → UIController → UI_COMMAND (not scheduler)."""
     bus = EventBus()
     store = AppStateStore(bus)
     ctrl = UIController(bus, store, on_state=lambda: None)
-    submitted: list[dict] = []
+    commands: list[dict] = []
+    submits: list[dict] = []
     lifecycle: list[str] = []
-    bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: submitted.append(dict(e.payload)))
+    bus.subscribe(UI_COMMAND, lambda e: commands.append(dict(e.payload)))
+    bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: submits.append(dict(e.payload)))
     for topic in (GOAL_ACTIVATED, GOAL_PAUSED, GOAL_CANCELLED):
         bus.subscribe(topic, lambda e, t=topic: lifecycle.append(t))
 
@@ -41,25 +44,25 @@ def test_view_manager_style_new_goal_path_publishes_submit_only() -> None:
     )
     view._hero_action.invoke()
 
-    assert len(submitted) == 1
-    assert submitted[0]["title"] == "New Goal"
-    assert submitted[0]["priority"] == 0
+    assert len(commands) == 1
+    assert commands[0]["text"] == "goal: New Goal"
+    assert commands[0]["priority"] == 0
+    assert submits == []
     assert lifecycle == []
 
 
-def test_controller_payload_includes_goal_aliases() -> None:
+def test_controller_goal_payload_uses_goal_prefix() -> None:
     bus = EventBus()
     ctrl = UIController(bus, AppStateStore(bus), on_state=lambda: None)
     seen: list[dict] = []
-    bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: seen.append(dict(e.payload)))
+    bus.subscribe(UI_COMMAND, lambda e: seen.append(dict(e.payload)))
     ctrl.publish_goal_submit_request(
         "Investigate outage",
         priority=2,
         description="sev-1",
         goal_id="g-42",
     )
-    assert seen[0]["title"] == "Investigate outage"
-    assert seen[0]["goal"] == "Investigate outage"
+    assert seen[0]["text"] == "goal: Investigate outage"
     assert seen[0]["priority"] == 2
     assert seen[0]["description"] == "sev-1"
     assert seen[0]["goal_id"] == "g-42"

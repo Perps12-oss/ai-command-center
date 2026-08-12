@@ -5,6 +5,7 @@ from __future__ import annotations
 from ai_command_center.core.events.intents import (
     INTENT_AGENT,
     INTENT_CHAT,
+    INTENT_GOAL,
     INTENT_MEMORY_REMEMBER,
     INTENT_MEMORY_SELECT,
     INTENT_NAVIGATE,
@@ -72,6 +73,8 @@ def classify_command(text: str) -> tuple[str, dict[str, str]]:
         return INTENT_MEMORY_REMEMBER, {"body": text[9:].strip()}
     if lower.startswith("memory:"):
         return INTENT_MEMORY_SELECT, {"query": text[7:].strip()}
+    if lower.startswith("goal:"):
+        return INTENT_GOAL, {"goal": text[5:].strip() or "New Goal"}
     if lower.startswith("agent: spawn "):
         role = stripped[13:].strip()
         return INTENT_AGENT, {
