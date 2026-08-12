@@ -113,7 +113,7 @@ Shrinking the allowlist helps but does not replace **approval authority** and **
 ## Acceptance tests (before fix)
 
 See `tests/test_control_plane_security_acceptance.py` — marked `control_plane_acceptance`.  
-**Expected on `main` (2026-08-12):** **8 xfailed, 11 passed** — xfailed tests encode live defects (`strict=True`; remove xfail in remediation PR).
+**Expected after remediation:** **19 passed** (`tests/test_control_plane_security_acceptance.py`)
 
 ### Adversarial audit question (post-fix)
 
