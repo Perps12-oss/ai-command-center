@@ -1,9 +1,12 @@
 # Control-Plane Security Audit (Focused)
 
 **Date:** 2026-08-12  
-**Baseline:** `origin/main` @ `1ee05ba`  
-**Status:** REMEDIATED — see `cursor/control-plane-security-remediation-4b28`  
+**Baseline:** `origin/main` @ `1ee05ba` (pre-remediation narrative below)  
+**Status:** **REMEDIATED** — PR #175 + closeout ledger `RUNTIME_INTEGRITY_CLOSEOUT.md`  
 **Scope:** Approval authority, actor identity, shell/tool authority only — not a repo-wide fossil pass.
+
+> **Historical sections below** document the pre-#175 defect state for audit provenance.  
+> For current disposition and proof, see `docs/audits/RUNTIME_INTEGRITY_CLOSEOUT.md`.
 
 ---
 

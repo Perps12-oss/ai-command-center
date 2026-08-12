@@ -28,7 +28,7 @@ Abandoning historical fossils does **not** regress current `main`. The live arch
 | R4b async EventBus | `create_application()` → `EventBus(..., async_dispatch=True)` — **single** `event-dispatch` queue |
 | ExecutionAuthority intake | ADR-006; factory-wired |
 | Receipts + TruthBoundary | Orchestration verification path |
-| HITL confirmation | `tool.confirmation_*` + ApprovalsView (ADR-009 live-in-effect) |
+| HITL confirmation | `tool.confirmation_*` + ApprovalsView (ADR-009 live-in-effect; control-plane path repaired #175) |
 | SingleGoalScheduler | Factory-wired; `Goal.depends_on` |
 | World Model + SA mutate | ADR-015 memory, ADR-016 goals; ADR-017 WEA remain outside |
 | Chat AppState path | `chat.*` reducers / StateApplier |

@@ -228,7 +228,7 @@ class EventBus:
 
     def _dispatch_worker(self) -> None:
         assert self._dispatch_queue is not None
-        while not self._shutdown.is_set():
+        while True:
             try:
                 job = self._dispatch_queue.get(timeout=0.1)
             except queue.Empty:
@@ -395,6 +395,8 @@ class EventBus:
             self._topic_publish_counts[topic] += 1
         if topic == UI_NAVIGATE:
             self._note_navigate_publish_rate(source, event.payload)
+        if self._shutdown.is_set() and get_dispatch_tier(topic) is DispatchTier.ASYNC_ELIGIBLE:
+            return replace(event, delivery="dropped")
         if self._should_enqueue_topic(topic):
             if self._debug_mode:
                 logger.debug(
@@ -434,6 +436,11 @@ class EventBus:
                 "EventBus dropped reentrant ui.navigate (dispatch) source=%s",
                 event.source,
             )
+            return
+        if (
+            self._shutdown.is_set()
+            and get_dispatch_tier(event.topic) is DispatchTier.ASYNC_ELIGIBLE
+        ):
             return
         if self._should_enqueue_topic(event.topic):
             self._enqueue(event)
@@ -561,7 +568,7 @@ class EventBus:
                 except Exception:
                     logger.debug("Failed to publish handler duration metric", exc_info=True)
 
-    def shutdown(self) -> None:
+    def shutdown(self, *, timeout: float = 5.0) -> None:
         if self._dispatch_thread is None:
             return
         self._shutdown.set()
@@ -569,7 +576,7 @@ class EventBus:
         try:
             self._dispatch_queue.put_nowait(None)
         except queue.Full:
-            self._dispatch_queue.put(None)
-        self._dispatch_thread.join(timeout=5.0)
+            self._dispatch_queue.put(None, timeout=1.0)
+        self._dispatch_thread.join(timeout=timeout)
         self._dispatch_thread = None
         self._dispatch_queue = None
