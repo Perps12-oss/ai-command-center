@@ -1,13 +1,18 @@
 # Phase 9: Goals, Planning & Multi-Agent Coordination
 
-**Status:** PARTIAL — **research / plan archive** (not live composition truth)  
-**Live truth (2026-08-04):** GoalEngine **RETIRED from live (ADR-012 A)**;
-PlanningEngine + AgentCoordinator **RETIRED from live (ADR-013)**; live goals =
-`GoalRepository` + `SingleGoalScheduler`; live agents = `AgentRuntimeService`;
-live planning = `PlannerService`.  
-**Priority:** HIGH (historical plan priority)  
-**Estimated Effort:** 8-10 weeks (plan-era estimate; ignore for agent scheduling)  
-**Dependencies:** Phase 8 Operator Kernel (PARTIAL / research-only per ADR-006)  
+**STATUS:** RETIRED / NON-CANONICAL (GoalEngine, PlanningEngine, AgentCoordinator)
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+These packages are historical research and are **not** part of the live architecture.  
+**Do not restore or wire them into the current runtime without a superseding ADR.**
+
+Live: `GoalRepository` + `SingleGoalScheduler`; `PlannerService`; `AgentRuntimeService`.  
+ADRs: 012, 013.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Priority:** historical  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `AGENTS.md`  
 **Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`, ADR-012, ADR-013
 

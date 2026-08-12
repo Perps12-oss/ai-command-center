@@ -1,7 +1,7 @@
 # E09 — Agent Operations Center
 
 **Slice:** PR-UI-E09  
-**Status:** Implemented on feature branch (pending merge)
+**Status:** COMPLETE on `main` (#105) — **not Queue 1**. Historical spec; not pending merge.
 
 ## Purpose
 

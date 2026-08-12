@@ -1,25 +1,44 @@
 # Phase 5: Async EventBus Policy Implementation
 
-**Status:** PARTIAL (code-verified 2026-07-20 — not COMPLETE)  
-**Priority:** HIGH  
-**Estimated Effort:** 2-3 weeks  
-**Dependencies:** Phase 1-4 complete ✅  
+**STATUS:** PARKED (concept) / ABANDONED (historical implementation & branch)
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records previous investigation/work. It is **not** the current implementation plan.  
+**Do not implement from this document.**
+
+- Historical implementation / branch `cursor/phase5-async-eventbus-744e`: **ABANDONED — not a merge candidate**
+- Concept (multi-pool / `tiered_dispatch_policy.py` / `async_dispatch_queue.py`): **PARKED — NOT IMPLEMENTATION WORK**
+- Current `main`: `EventBus(..., async_dispatch=True)` **single** `event-dispatch` queue (R4b)
+- Future trigger: measured single-queue contention
+- Gate: PERFORMANCE_CONSTITUTION Art. VII/XII + owner approval
+
+Do **not** describe this as incomplete, nearly complete, ready, next, pending, or awaiting merge.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).  
+Index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
+
+**Priority:** historical  
 **Authority:** `ASYNC_EVENTBUS_POLICY.md`, `PROJECT_CONSTITUTION_V4.md`  
-**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — keep in `docs/plans/` until exit criteria met on `main`
+**Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — 2026-07-20 snapshot; superseded by fossil disposition 2026-08-12
 
 ---
 
 ## Executive Summary
 
-Implement non-blocking dispatch for heavy EventBus handlers while maintaining backward compatibility with synchronous handlers. The goal is to reduce UI latency and improve throughput for workflow/orchestration operations.
+**Historical design (do not implement from this section).** R4b single-queue async dispatch is already live. The multi-pool design below is **PARKED**.
+
+Historical intent: non-blocking dispatch for heavy EventBus handlers while maintaining backward compatibility with synchronous handlers, to reduce UI latency and improve throughput for workflow/orchestration operations.
 
 ---
 
 ## Current State
 
-**Design:** Complete in `ASYNC_EVENTBUS_POLICY.md`
+**STATUS: PARKED / ABANDONED as implementation.** Ignore the checklists below as Queue 1.
 
-**Implementation:** Sync dispatch active; async components stubbed
+**On `origin/main` (2026-08-12):** `create_application()` constructs `EventBus(..., async_dispatch=True)` — R4b **single** dispatch queue. `tiered_dispatch_policy.py` / `async_dispatch_queue.py` are **not** on main and **must not** be implemented from this plan.
+
+**Design (historical):** `ASYNC_EVENTBUS_POLICY.md`
 
 ---
 

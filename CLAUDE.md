@@ -134,15 +134,21 @@ Also:
 
 ## Current program
 
-**Active:** Section 9 of ADR-018–023; performance track under `PERFORMANCE_CONSTITUTION.md`.
+**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: EMPTY**.
 
-**Hard stops** (`docs/audits/R1_UNGATED_STOP_LINE.md`) — do not implement without the named gate:
+**Active implementation work:** none approved. Do not invent tickets from historical plans.
 
-- Phase 5 Async EventBus → Performance Investigation Report + human approval  
-- Goose / external patterns → Stage 3 + Integration Proposal + ADR  
-- Live Predictive/Undo → ADR superseding 014  
-- Re-wire OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator → ADR superseding 006/012/013  
-- Platform hotkey/tray → Phase 11 backlog  
+Section 9 of ADR-018–023 is **Accepted architecture already on `main`**. Remaining optional envelopes (ADR-021/022 extras) are **PARKED**, not Queue 1. Performance track under `PERFORMANCE_CONSTITUTION.md` does **not** authorize Phase 5 tiered pools.
+
+**Hard stops** (`docs/audits/R1_UNGATED_STOP_LINE.md`) — do not implement without the named gate; these are **not** a backlog:
+
+- Phase 5 EventBus **pool isolation** → PARKED (R4b single-queue already live; branch abandoned)
+- Goose / external patterns → Stage 3 + Integration Proposal + ADR
+- Live Predictive/Undo → ADR superseding 014 (**RETIRED** until then)
+- Re-wire OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator → ADR superseding 006/012/013 (**RETIRED**; do not restore)
+- Platform hotkey/tray → owner SKU decision (**GATED**)
+
+Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md).
 
 One implementation role consumes evidence from many sources; do not spawn overlapping implementation agents that rewrite the same surfaces.
 

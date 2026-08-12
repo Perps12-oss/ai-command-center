@@ -1,8 +1,15 @@
 # Phase 7-10: Key Questions & Answers
 
-**Status:** ACTIVE  
+**STATUS:** HISTORICAL / NON-AUTHORITATIVE
+
+This document records previous investigation. It is **not** the current implementation plan.  
+**Do not implement from this document.** OperatorKernel is **RETIRED** (ADR-006). GoalEngine / PlanningEngine / AgentCoordinator are **RETIRED**. Predictive/Undo are **RETIRED** (ADR-014).
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)  
+Index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
+
 **Authority:** `PROJECT_CONSTITUTION_V4.md`  
-**Purpose:** Document critical questions and answers for Phases 7-10 implementation
+**Purpose:** Historical Q&A for Phases 7-10 (planning-era)
 
 ---
 

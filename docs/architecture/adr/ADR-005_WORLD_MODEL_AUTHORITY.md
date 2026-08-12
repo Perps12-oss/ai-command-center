@@ -1,6 +1,7 @@
 # ADR-005: World Model Authority
 
 **Status:** Proposed  
+**Disposition:** SUPERSEDED / REWRITE REQUIRED — later Accepted **ADR-015–017** refined World Model vs State Authority vs scheduler authority. Do **not** Accept this ADR’s original “sole source of truth for workspace reality / no component may maintain authoritative state outside the World Model” wording. Do not implement from this file.  
 **Date:** 2026-07-09
 
 ## Context

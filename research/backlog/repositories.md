@@ -1,6 +1,11 @@
 # Repository Backlog
 
-Candidate repositories for the ACC Engineering Intelligence Program.
+**STATUS:** RESEARCH / CLASS B — **not product Queue 1**
+
+Candidate repositories for the ACC Engineering Intelligence Program. Research is **descriptive, never prescriptive** (`research/CONSTITUTION.md`).  
+Goose / external patterns are **Stage 3 GATED** (Integration Proposal + ADR). Do **not** implement product work from this table.
+
+Canonical product queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../docs/governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
 
 | Priority | Repository | Language | Subsystems of Interest | Assigned Expedition ID | Notes |
 |----------|------------|----------|------------------------|------------------------|-------|

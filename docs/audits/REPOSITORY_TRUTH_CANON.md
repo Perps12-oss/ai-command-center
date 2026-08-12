@@ -1,9 +1,14 @@
 # Repository Truth Canon — Phase 11 UI Assets
 
-**Status:** Binding verification artifact (Repository Guardian / Tom)  
+**STATUS:** HISTORICAL verification artifact (baseline `e128a72`, 2026-07-20)
+
+**HISTORICAL / NON-AUTHORITATIVE as a planned-work queue.** The rule “`origin/main` tip is the only code SoT” remains valid. This inventory is **not** current Queue 1.
+
+Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
 **Date:** 2026-07-20  
 **Authority:** `PROJECT_CONSTITUTION_V4.md` · `docs/governance/PHASE_COMPLETION_RULE.md`  
-**Baseline (Source of Truth):** `origin/main` @ `e128a72`
+**Baseline (Source of Truth at audit time):** `origin/main` @ `e128a72`
 
 ---
 

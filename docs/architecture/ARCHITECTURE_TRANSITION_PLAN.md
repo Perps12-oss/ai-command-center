@@ -1,10 +1,17 @@
 # Architecture Transition Plan
 
-**Status:** **Single source of truth** — all backlog, audit, enforcement stages, stabilization history, and program execution live here only.  
-**Authority:** Derived from code audit, supplemental dependency/EventBus/Workspace OS analysis, and `PROJECT_CONSTITUTION_V4.md`  
-**Scope:** Four programs — no feature sprawl until gravity shifts
+**STATUS:** HISTORICAL / SUPERSEDED — **NOT CANONICAL PLANNING AUTHORITY**
 
-> **Do not create parallel backlogs.** Architecture specs (`WORKSPACE_VISION.md`, `MODEL_ORCHESTRATION.md`, etc.) describe *what* to build; this document describes *when* and *in what order*.
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records previous investigation/work (Programs 1–4 era). It is **not** the current implementation plan.  
+**Do not implement from this document.** Its “single source of truth / do not create parallel backlogs” claim is **revoked**.
+
+Canonical planned-work queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).  
+Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
+
+**Authority:** `PROJECT_CONSTITUTION_V4.md`  
+**Scope:** Historical four-program sequencing
 
 ---
 

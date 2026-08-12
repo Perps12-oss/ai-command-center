@@ -1,12 +1,17 @@
 # Phase 10: Workspace OS Intelligence & World Model Expansion
 
-**Status:** PARTIAL — **research / plan archive** (not live composition truth)  
-**Live truth (2026-08-04):** World Model + SA mutate/query live; PredictiveEngine /
-UndoReplay **RETIRED from live (ADR-014)** — research/unit-test tree only; live
-timeline undo / snapshots = TimelineService / SnapshotService / WM recover.  
-**Priority:** MEDIUM (historical)  
-**Estimated Effort:** 10-12 weeks (plan-era estimate; ignore for agent scheduling)  
-**Dependencies:** Phase 9 Goals (PARTIAL / ADR-012 A)  
+**STATUS:** WM core LIVE; PredictiveEngine / UndoReplay RETIRED / NON-CANONICAL
+
+**HISTORICAL / NON-AUTHORITATIVE as an open plan**
+
+World Model + SA mutate/query are **live**. PredictiveEngine / UndoReplay are **RETIRED from live (ADR-014)** — research/unit-test tree only.  
+**Do not restore or wire PredictiveEngine or UndoReplay without a superseding ADR.**
+
+Live timeline/snapshots = TimelineService / SnapshotService / WM recover.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Priority:** historical  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `VNEXT_STATE_DRIVEN_BLUEPRINT.md`  
 **Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md`, ADR-014
 
