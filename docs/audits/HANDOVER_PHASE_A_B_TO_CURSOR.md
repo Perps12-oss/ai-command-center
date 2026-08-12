@@ -114,14 +114,16 @@ question, and a possible Inv-1 shortcut. Open question, deliberately not assumed
 
 ### Phase C
 
+**HISTORICAL — not Queue 1.** “Still outstanding” below is a 2026-08 handover snapshot. Canonical Queue 1 is **EMPTY**. Phase 5 async waiver is **PARKED**. ADR-007/009 are **LIVE-IN-EFFECT**; ADR-011 is **PARKED**. G5 DecisionRecord-on-success is **PARKED** (ADR-021 extra). Do not implement from this list.
+
 - `docs/audits/PHASE_C_BACKLOG_GOVERNANCE_FOSSILS.md` — F-1 stale `pipeline.canonical`,
-  F-2 misleading `eventbus_bypass.remediation`. **Systematic pass, not opportunistic fixes.**
-- Original Phase C scope still outstanding: Phase 7 roadmap honesty (C1), Phase 5 async
+  F-2 misleading `eventbus_bypass.remediation`. Governance-config honesty, not product Queue 1.
+- Original Phase C scope (historical): Phase 7 roadmap honesty (C1), Phase 5 async
   waiver (C2), Phase 8/10 hygiene (C3), ADR-007/009/011 (C4).
-- **G5/B2 confirmed still open:** `_publish_decision_and_autonomy` has only 2 call sites
+- **G5/B2 (PARKED):** `_publish_decision_and_autonomy` has only 2 call sites
   (`:379` awaiting-approval, `:705` replan-stuck) — no DecisionRecord/AutonomyScore on normal
-  success or ordinary failure.
-- **G6:** only **7** test files reference `create_application` (audit claimed ~15).
+  success or ordinary failure. That is **not** a Queue 1 ticket.
+- **G6:** only **7** test files reference `create_application` (audit claimed ~15). Observation only.
 
 ---
 

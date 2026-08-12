@@ -68,7 +68,11 @@ These files still exist. They are **not** implementation queues:
 
 - `docs/MASTER_ROADMAP_2026.md`
 - `docs/architecture/ARCHITECTURE_TRANSITION_PLAN.md`
+- `docs/architecture/PROVIDER_PLATFORM.md`
+- `docs/architecture/UI_REFURBISHMENT_BACKLOG.md`
+- `docs/architecture/UI_COMPONENT_SPECS/` (E05–E13 landed on `main`; Insights placeholder is intentional)
 - `docs/audits/PLANNED_WORK_INVENTORY.md`
+- `docs/PLACEHOLDER_AUDIT.md`
 - `docs/plans/*` phase plans (bannered in place)
 
 Canonical queue: [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) only.

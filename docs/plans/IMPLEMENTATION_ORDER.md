@@ -354,6 +354,8 @@ Phase 5 → Phase 8 → Phase 9 → Phase 10
 
 ## Recommended Starting Point
 
+**HISTORICAL BODY — ignore IMMEDIATE / NEXT.** Phase 5 tiered pools are **PARKED**. OperatorKernel is **RETIRED**. Canonical Queue 1 is **EMPTY**.
+
 ```
 IMMEDIATE: Complete Phase 5 (Async EventBus)
    └── Required for all subsequent work

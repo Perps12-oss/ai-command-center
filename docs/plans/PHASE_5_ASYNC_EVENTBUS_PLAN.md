@@ -26,7 +26,9 @@ Index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORIC
 
 ## Executive Summary
 
-Implement non-blocking dispatch for heavy EventBus handlers while maintaining backward compatibility with synchronous handlers. The goal is to reduce UI latency and improve throughput for workflow/orchestration operations.
+**Historical design (do not implement from this section).** R4b single-queue async dispatch is already live. The multi-pool design below is **PARKED**.
+
+Historical intent: non-blocking dispatch for heavy EventBus handlers while maintaining backward compatibility with synchronous handlers, to reduce UI latency and improve throughput for workflow/orchestration operations.
 
 ---
 

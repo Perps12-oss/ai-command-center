@@ -43,7 +43,7 @@ Implementation of product code must not begin before this pre-flight. This task 
 |-----------|--------|
 | Current main contradicts fossil disposition on **runtime authority** | **No.** Live intake = ExecutionAuthority; EventBus = `async_dispatch=True` single queue; WM + SA mutate per 015/016; WEA out per 017. |
 | Cleanup requires production code | **No** for the planned edits. UCGS profile still contains CommandRouter pipeline strings — reported, not silently “fixed” in yaml (see remaining ambiguities). |
-| Two documents both claim canonical planning authority | **Yes, today** (`IMPLEMENTATION_GUIDE.md` Queue 1 vs `MASTER_ROADMAP_2026.md` “authoritative roadmap” vs `PLANNED_WORK_INVENTORY.md` UNGATED list). Cleanup resolves this: one canonical plan = Implementation Guide. |
+| Two documents both claim canonical planning authority | **Resolved by this cleanup.** One canonical plan = [`IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md). `MASTER_ROADMAP_2026.md` and `PLANNED_WORK_INVENTORY.md` are bannered HISTORICAL / NON-AUTHORITATIVE. |
 | Accepted ADR conflicts with live architecture | **No conflict found** that this docs pass would paper over. ADR-005 Proposed original wording is **not** Accepted. |
 | Supposedly complete feature is unwired | R4b async single queue **is** wired (`application.py` `EventBus(..., async_dispatch=True)`). Tiered pools are **not** on main and will **not** be marked complete. |
 | Genuinely active implementation work misclassified as abandoned | Queue 1 items 1–3 are complete on main. Phase 5 implement instruction is a fossil. Remaining inventory UNGATED rows are **not** promoted to Queue 1 (owner instruction: do not invent replacement work). |

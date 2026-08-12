@@ -29,10 +29,10 @@ Current State (2026-07-11)
 ✓ Program 3: Workspace Adoption                 — COMPLETE
 ✓ Program 4 Slices 1-3: Platform Improvements  — COMPLETE
 ✓ Program 5 Phases A-D: Reasoning Layer MVP    — COMPLETE
-⏳ Program 4 Slice 4: Phase 6 Async EventBus    — PARTIAL
-⏳ Program 5 Phase E: External Integrations     — IN PROGRESS
-⬜ Program 6: Multi-Agent Runtime               — GATED
-⬜ Program 7: Knowledge Federation              — FUTURE
+⏳ Program 4 Slice 4: Phase 6 Async EventBus    — PARTIAL (historical 2026-07; R4b single-queue now LIVE; tiered pools PARKED)
+⏳ Program 5 Phase E: External Integrations     — IN PROGRESS (historical 2026-07 snapshot)
+⬜ Program 6: Multi-Agent Runtime               — GATED (historical label)
+⬜ Program 7: Knowledge Federation              — FUTURE (historical label; program **ABANDONED** as unified SoT)
 ```
 
 ---

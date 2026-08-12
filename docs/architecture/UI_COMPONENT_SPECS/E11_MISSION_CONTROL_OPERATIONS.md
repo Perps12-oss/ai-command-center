@@ -1,7 +1,7 @@
 # E11 — Mission Control Operations
 
 **Slice:** PR-UI-E11  
-**Status:** Implemented on feature branch (pending merge)
+**Status:** COMPLETE on `main` (#105) — **not Queue 1**. Historical spec; not pending merge.
 
 ## Purpose
 

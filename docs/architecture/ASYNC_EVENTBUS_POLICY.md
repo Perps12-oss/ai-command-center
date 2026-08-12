@@ -15,7 +15,9 @@ Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLE
 
 ## Problem statement
 
-Today `EventBus.publish()` runs every subscriber **synchronously on the caller's thread**:
+**Historical (pre-R4b).** Current `main` uses `EventBus(..., async_dispatch=True)` — a **single** `event-dispatch` queue. The synchronous-on-caller-thread behaviour below is the **problem that R4b addressed**, not current live dispatch. Multi-pool / R4d isolation remains **PARKED**.
+
+Historically `EventBus.publish()` ran every subscriber **synchronously on the caller's thread**:
 
 ```155:186:ai_command_center/core/event_bus.py
     def publish(self, topic: str, payload: dict[str, Any] | None = None, *, source: str = "system") -> Event:

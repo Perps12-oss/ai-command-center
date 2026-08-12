@@ -27,7 +27,9 @@ Current `ucgs.profiles/ai-command-center.yaml` forbids vectors without a constit
 
 ## Executive Summary
 
-Implement cross-source knowledge federation enabling unified search across entities, notes, memory, and external sources (Obsidian vault, external APIs). This transforms the workspace from a collection of isolated data stores into a unified knowledge graph.
+**Historical program (do not implement).** Unified knowledge federation / vectors-as-SoT is **ABANDONED**. Read-only `FederationService` is **PARKED** (not in the composition root).
+
+Historical intent: cross-source knowledge federation enabling unified search across entities, notes, memory, and external sources (Obsidian vault, external APIs).
 
 ---
 

@@ -25,7 +25,7 @@ This matrix is a **verification artifact**, not an implementation queue. RETIRED
 | Predictive engine | ✅ | ❌ | ⚠️ package tests | ❌ | **RETIRED** | ADR-014 Accepted; research only; live blockers = Brain heuristics / SA-WM |
 | Undo / replay | ✅ | ❌ | ⚠️ package tests | ❌ | **RETIRED** | ADR-014 Accepted; research only; live = TimelineService / SnapshotService / WM recover |
 | ExecutionAuthority | ✅ | ✅ | ✅ | ✅ | **WIRED** | factory — canonical intake (ADR-006) |
-| StateAuthority | ✅ | ✅ | ✅ | ⚠️ query+project+planner+WM node/edge mutate; goals SoT = scheduler | **PARTIAL** | Stage 2 soft-shadow closed (3a–6b + agents); WM mutate only; see `SHADOW_SOT_INVENTORY.md` |
+| StateAuthority | ✅ | ✅ | ✅ | ✅ in-scope mutate live | **LIVE (ADR-015/016)** | WM + Memory + Goals mutate live. Workflows/executions/agents **remain outside** (ADR-017) — that is Accepted disposition, **not** an incomplete Queue 1 ticket. See `SHADOW_SOT_INVENTORY.md`. |
 | BaseGraphCanvas | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | used by GraphCanvas, World Explorer, Graph Workspace |
 | TimelineRenderer + ExecutionTimelineDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Ops / Agent Ops reuse |
 | InspectorHost + InspectorDock | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | universal kinds incl. `task` (not `plan_step`) |
@@ -48,7 +48,7 @@ Registered = constructed in factory and started with other services.
 | Component | Exists | Registered | Live EventBus role | R1 disposition |
 |-----------|:------:|:----------:|--------------------|----------------|
 | ExecutionAuthorityService | ✅ | ✅ | **Intake** — `UI_COMMAND` | **keep** (ADR-006) |
-| StateAuthorityService | ✅ | ✅ | State projection before plan | **keep** — deepen per contract (P3) |
+| StateAuthorityService | ✅ | ✅ | State projection before plan | **keep** — P3 SA.mutate **CLOSED**; WEA remain outside (ADR-017), not Queue 1 |
 | SingleGoalScheduler | ✅ | ✅ | Goal queue → `EXECUTION_RUN_REQUEST` | **keep** |
 | PlannerService | ✅ | ✅ | `PLAN_REQUEST` when not synthetic | **keep** |
 | ExecutionOrchestratorService | ✅ | ✅ | Step execution | **keep** |

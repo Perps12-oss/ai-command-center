@@ -1,11 +1,14 @@
 # UI Refurbishment — Follow-on Backlog
 
-**Status:** Active  
+**STATUS:** HISTORICAL / NON-AUTHORITATIVE as an implementation queue — **not Queue 1**
+
+The 15-PR UI Refurbishment program (PRs #49–#65) is **merged**. Checked items below are **COMPLETE**.  
+The remaining unchecked “library palette drop-to-canvas” row is leftover UI debt, **not** canonical Queue 1. Do not treat this file as active planned work.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+
 **Supersedes:** PR sequence in [archive/ACC_UI_REFURBISHMENT.md](archive/ACC_UI_REFURBISHMENT.md) (complete)  
 **History:** [UI_REFURBISHMENT_AUDIT_STATUS.md](UI_REFURBISHMENT_AUDIT_STATUS.md)
-
-The 15-PR UI Refurbishment program (PRs #49–#65) is merged. This backlog tracks
-remaining debt and Slice 1b / hardening work only.
 
 ---
 
