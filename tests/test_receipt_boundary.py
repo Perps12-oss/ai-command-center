@@ -315,7 +315,9 @@ def test_workspace_os_launch_is_receipted() -> None:
             {
                 "resource_type": "url",
                 "value": "https://example.com/receipted-launch",
-                "resource_id": "resource-1",
+                # Real entity ids are UUIDs; non-UUID values fail timeline parse
+                # but must not block the G2 execution/receipt path.
+                "resource_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             },
             source="test",
         )

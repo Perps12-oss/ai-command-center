@@ -41,9 +41,13 @@ Follow-up babysit harden (same failure mode after tip `58757f6`):
 - `WorkspaceOsService._on_launch_resource` records the launch timeline event
   **before** publishing `WORKFLOW_EXECUTION_REQUEST` (app `EventBus` uses
   `async_dispatch=True`, so `TOOL_INVOKE` is worker-threaded).
-- `ExecutionRunRepository` / `ExecutionEventRepository` also take
-  `connection_lock` — they are the concurrent writers on the async path that
-  previously bypassed the timeline lock.
+- `ExecutionRunRepository` / `ExecutionEventRepository` / `ArtifactRepository`
+  also take `connection_lock` — concurrent writers on the async TOOL_INVOKE
+  path that previously bypassed the timeline lock.
+
+No test weakening. No new EventBus topic.
+
 ## Out of scope
 
 N-1, N-3, F-1–F-4, Phase C, B5. N-2 (outcome-gated launch timeline) still deferred.
+
