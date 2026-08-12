@@ -21,6 +21,8 @@ Completed / superseded / stale plans live in `docs/archive/`.
 
 **Ungated Stage 2 / R1 disposition work is closed.** See [`docs/audits/R1_UNGATED_STOP_LINE.md`](../audits/R1_UNGATED_STOP_LINE.md).
 
+**Unimplemented / lost-work inventory (2026-08-12):** [`docs/audits/PLANNED_WORK_INVENTORY.md`](../audits/PLANNED_WORK_INVENTORY.md) — planned work not on `main`, backlogs, gated tracks, and items displaced by later programs. Not a completion record.
+
 **SA.mutate track CLOSED** (ADR-015/016/017). Parallel other tracks: Async EventBus (perf approval); Goose = Stage 3.
 
 Goal: keep `origin/main` truthful (docs ↔ UI inventory ↔ runtime composition).

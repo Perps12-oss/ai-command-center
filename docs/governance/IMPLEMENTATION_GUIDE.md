@@ -157,6 +157,8 @@ Source: EPOCH A audit + `PHASE_R1_RUNTIME_RECONCILIATION.md`. Ordered:
 5. **Verification** — gates green on `main` per `PHASE_COMPLETION_RULE.md`.
 
 > Ungated Stage 2 / R1 P1–P5 disposition work is on `main`. See `docs/audits/R1_UNGATED_STOP_LINE.md`. Do not start Phase 5 Async EventBus without Performance Investigation Report + human approval. No Goose until Stage 3.
+>
+> Full inventory of unimplemented plans, backlogs, and work lost to later programs: `docs/audits/PLANNED_WORK_INVENTORY.md`.
 
 ### Queue 2 — Evaluate (no implementation yet; Class B)
 
