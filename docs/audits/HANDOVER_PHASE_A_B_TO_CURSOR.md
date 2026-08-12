@@ -14,7 +14,7 @@
 | **A** — receipt boundary (G1/G2/G3) | **COMPLETE**, gate green |
 | **Governance correction** — stale UCGS contract lock | **COMPLETE** |
 | **B** — intake authority convergence (B1–B4) | **COMPLETE** |
-| **B5** — direct `GOAL_SUBMIT_REQUEST` intake | **RECORDED ONLY** — needs owner decision |
+| **B5** — direct `GOAL_SUBMIT_REQUEST` intake | **CLOSED (fork 1)** — see `B5_HERO_EA_INTAKE_CHANGE_NOTE.md` |
 | **C** — docs↔code reconciliation | **NOT STARTED** — backlog seeded |
 
 **Not on `main` yet.** `PHASE_COMPLETION_RULE.md`: a phase is complete only on `main`.

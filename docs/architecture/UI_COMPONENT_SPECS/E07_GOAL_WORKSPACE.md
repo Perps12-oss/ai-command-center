@@ -11,7 +11,7 @@ Evolve `GoalView` into a Goal Workspace with tree, tasks, success criteria, and 
 
 ```
 GoalView
-├── Hero (metrics, New Goal → GOAL_SUBMIT_REQUEST)
+├── Hero (metrics, New Goal → UI_COMMAND / EA intake)
 ├── Workspace row
 │   ├── GoalTree
 │   ├── Tasks (TaskRow list from plan steps)

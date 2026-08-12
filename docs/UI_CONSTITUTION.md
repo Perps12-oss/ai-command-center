@@ -627,7 +627,11 @@ Goals must remain visible across the application.
 
 Accent token: `GOAL_AMBER` (defined in `theme_v2.py`). Goal Dashboard shell and all Article 16 panels must use `GOAL_AMBER` — never hardcoded amber hex values.
 
-Hero Immediate Action **New Goal** publishes `GOAL_SUBMIT_REQUEST` only. Lifecycle facts (`GOAL_ACTIVATED`, `GOAL_PAUSED`, `GOAL_CANCELLED`) are service-owned and must not be published by UI.
+Hero Immediate Action **New Goal** publishes EA intake intent (`UI_COMMAND` with a
+`goal:` prefix) only — never `GOAL_SUBMIT_REQUEST`. Lifecycle facts
+(`GOAL_ACTIVATED`, `GOAL_PAUSED`, `GOAL_CANCELLED`) are service-owned and must not
+be published by UI. `GOAL_SUBMIT_REQUEST` is internal post-authority (ADR-006);
+ExecutionAuthority alone emits it after decision and admission.
 
 ---
 
