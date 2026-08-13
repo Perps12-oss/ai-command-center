@@ -221,6 +221,9 @@ def test_llm_payload_actor_type_user_is_not_trusted() -> None:
     _wire_orchestrator_stack(bus, permission=_DenyAllPermission())
     invokes = _collect(bus, TOOL_INVOKE)
 
+    confirmations = _collect(bus, TOOL_CONFIRMATION_REQUIRED)
+    failed = _collect(bus, TOOL_FAILED)
+
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
@@ -249,11 +252,15 @@ def test_llm_payload_actor_type_user_is_not_trusted() -> None:
         source="llm_planner",
     )
 
-    assert invokes, "orchestrator should attempt dispatch for this scenario"
-    actor = str(invokes[0].get("actor_type", ""))
-    assert actor != "user", (
-        "payload actor_type=user must be rejected/overridden for non-interactive runs"
-    )
+    if invokes:
+        actor = str(invokes[0].get("actor_type", ""))
+        assert actor != "user", (
+            "payload actor_type=user must be rejected/overridden for non-interactive runs"
+        )
+    else:
+        assert confirmations or failed, (
+            "WRITE_DESTROY must block spoofed user escalation before dispatch"
+        )
 
 
 def test_missing_actor_type_does_not_default_to_trusted_user() -> None:
@@ -262,6 +269,7 @@ def test_missing_actor_type_does_not_default_to_trusted_user() -> None:
     _wire_orchestrator_stack(bus, permission=_DenyAllPermission())
     invokes = _collect(bus, TOOL_INVOKE)
     failed = _collect(bus, TOOL_FAILED)
+    confirmations = _collect(bus, TOOL_CONFIRMATION_REQUIRED)
 
     bus.publish(
         EXECUTION_RUN_REQUEST,
@@ -291,7 +299,9 @@ def test_missing_actor_type_does_not_default_to_trusted_user() -> None:
     if invokes:
         assert str(invokes[0].get("actor_type", "")) != "user"
     else:
-        assert failed, "missing actor must fail closed (deny), not silently run as user"
+        assert failed or confirmations, (
+            "missing actor must fail closed (deny or HITL), not silently run as user"
+        )
 
 
 def test_serialized_plan_actor_escalation_rejected() -> None:
@@ -299,6 +309,7 @@ def test_serialized_plan_actor_escalation_rejected() -> None:
     bus = EventBus()
     _wire_orchestrator_stack(bus, permission=_DenyAllPermission())
     invokes = _collect(bus, TOOL_INVOKE)
+    confirmations = _collect(bus, TOOL_CONFIRMATION_REQUIRED)
 
     serialized_plan = {
         "goal": "escalation",
@@ -323,8 +334,10 @@ def test_serialized_plan_actor_escalation_rejected() -> None:
         source="goal_store",
     )
 
-    assert invokes
-    assert str(invokes[0].get("actor_type", "")) != "user"
+    if invokes:
+        assert str(invokes[0].get("actor_type", "")) != "user"
+    else:
+        assert confirmations, "serialized escalation must be blocked by WRITE_DESTROY HITL"
 
 
 # ---------------------------------------------------------------------------
@@ -504,6 +517,7 @@ def test_unknown_actor_denies_shell_invoke() -> None:
             "tool": "workspace_execute_command",
             "args": {"command": "echo hi"},
             "actor_type": "llm",
+            "human_approved": True,
             "workspace_context": {
                 "workspace_id": str(uuid4()),
                 "entity_id": str(uuid4()),

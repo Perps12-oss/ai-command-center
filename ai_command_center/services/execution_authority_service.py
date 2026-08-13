@@ -201,6 +201,21 @@ class ExecutionAuthorityService(BaseService):
             return StateContext.empty(workspace_id=workspace_id, query_text=text)
         return self._state_authority.project(text=text, workspace_id=workspace_id)
 
+    @staticmethod
+    def _ui_command_intake(event: Event) -> str:
+        """Resolve intake for UI_COMMAND, de-escalating only.
+
+        ``UI_COMMAND`` is re-published by the orchestrator for ``agent.task``
+        steps. A payload may lower its own trust (``actor_provenance=agent``)
+        but must never raise it to interactive user.
+        """
+        declared = str(event.payload.get("actor_provenance") or "").strip().lower()
+        if declared.startswith("agent"):
+            return INTAKE_AGENT
+        if declared == "workflow":
+            return INTAKE_WORKFLOW
+        return INTAKE_UI_COMMAND
+
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
@@ -211,10 +226,11 @@ class ExecutionAuthorityService(BaseService):
         clipboard = event.payload.get("clipboard")
         state_context = self._project_state(text, scope.get("workspace_id", ""))
         decision = self.analyze(text, clipboard=clipboard, state_context=state_context)
+        intake = self._ui_command_intake(event)
 
         self._publish_decision(
             request_id=request_id,
-            intake=INTAKE_UI_COMMAND,
+            intake=intake,
             decision=decision,
             scope=scope,
             state_context=state_context,
@@ -259,7 +275,7 @@ class ExecutionAuthorityService(BaseService):
                 scope=scope,
                 state_context=state_context,
                 skip_planner=False,
-                intake=INTAKE_UI_COMMAND,
+                intake=intake,
                 extra_payload=extra or None,
             )
             return
@@ -287,7 +303,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
-            intake=INTAKE_UI_COMMAND,
+            intake=intake,
         )
 
     def _publish_decision(

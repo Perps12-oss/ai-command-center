@@ -36,6 +36,7 @@ from ai_command_center.services.orchestration_service import OrchestrationServic
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.workflow_engine_service import WorkflowEngineService
 from ai_command_center.tools.tool_registry import ToolRegistry
+from tests.support.shell_confirmation import wire_auto_confirm_shell
 
 _PKG = Path(__file__).resolve().parents[1] / "ai_command_center"
 _ALLOWED_TOOL_INVOKE_FILES = {
@@ -109,6 +110,7 @@ def _wire_authority_stack(bus: EventBus) -> AgentRuntimeService:
 
     permission = PermissionService(bus)
     permission.wire_bus_handlers()
+    wire_auto_confirm_shell(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(

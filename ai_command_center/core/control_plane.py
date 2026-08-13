@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from ai_command_center.core.security_policy import (
+    normalize_tool_name,
+    resolve_tool_tier,
+    tier_requires_hitl,
+)
 from ai_command_center.domain.planner_plan import PlanStep
 
 COMMAND_TOOL_CAPABILITIES = frozenset({"shell", "workspace_execute_command"})
@@ -16,24 +21,43 @@ WORKFLOW_PROVENANCE = "workflow"
 
 
 def capability_requires_human_approval(capability: str) -> bool:
-    return capability.strip().lower() in COMMAND_TOOL_CAPABILITIES
+    """Legacy helper — prefer ``step_requires_human_approval`` + SecurityTier."""
+    tool = normalize_tool_name(capability)
+    tier = resolve_tool_tier(tool)
+    return tier is not None and tier_requires_hitl(tier)
+
+
+def effective_tool_for_step(step: PlanStep) -> str:
+    """Return the concrete tool a step will dispatch, not its capability label.
+
+    ``agent.*`` capabilities read ``step.args["tool"]`` (default ``shell``).
+    ``agent.task`` re-enters intake and dispatches no tool.
+    """
+    cap = step.capability.strip().lower()
+    if not cap.startswith("agent."):
+        return normalize_tool_name(cap)
+    if cap == "agent.task":
+        return ""
+    args = step.args if isinstance(step.args, dict) else {}
+    return normalize_tool_name(str(args.get("tool") or "shell").strip() or "shell")
 
 
 def step_requires_human_approval(step: PlanStep, *, run: dict[str, Any]) -> bool:
-    """Return True when orchestrator must pause for tool.confirmation_required."""
+    """Return True when orchestrator must pause for tool.confirmation_required.
+
+    SecurityTier (ADR-004) drives HITL: ``WRITE_DESTROY`` always requires
+    explicit human approval regardless of actor provenance. ``auto_approve`` on
+    the run cannot suppress this gate.
+    """
     if bool(step.require_approval):
         return True
-    cap = step.capability.strip().lower()
-    if cap.startswith("agent."):
+    tool = effective_tool_for_step(step)
+    if not tool:
         return False
-    if not capability_requires_human_approval(cap):
+    tier = resolve_tool_tier(tool)
+    if tier is None:
         return False
-    provenance = str(run.get("actor_provenance") or "").lower()
-    if provenance == WORKFLOW_PROVENANCE:
-        return False
-    if provenance in UI_PROVENANCES or bool(run.get("interactive_user")):
-        return True
-    return False
+    return tier_requires_hitl(tier)
 
 
 def intake_run_fields(*, intake: str) -> dict[str, Any]:

@@ -124,6 +124,7 @@ def test_workspace_execute_command_denied_for_agent_without_permission() -> None
             "args": {"command": "echo hi"},
             "actor_type": "agent",
             "actor_id": str(uuid4()),
+            "human_approved": True,
             "workspace_context": {
                 "workspace_id": str(uuid4()),
                 "entity_id": str(uuid4()),
@@ -148,6 +149,7 @@ def test_shell_and_workspace_execute_command_share_permission_gate() -> None:
                 "tool": tool,
                 "args": {"command": "echo hi"},
                 "actor_type": "agent",
+                "human_approved": True,
                 "workspace_context": {
                     "workspace_id": str(uuid4()),
                     "entity_id": str(uuid4()),

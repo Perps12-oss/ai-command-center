@@ -23,6 +23,7 @@ from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
 from ai_command_center.services.workflow_engine_service import WorkflowEngineService
 from ai_command_center.tools.tool_registry import ToolRegistry
+from tests.support.shell_confirmation import wire_auto_confirm_shell
 
 
 def _echo_tool(args: dict) -> ToolResult:
@@ -32,6 +33,7 @@ def _echo_tool(args: dict) -> ToolResult:
 def _wire_workflow_stack(bus: EventBus) -> None:
     permission = PermissionService(bus)
     permission.wire_bus_handlers()
+    wire_auto_confirm_shell(bus)
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(name="shell", description="test shell", handler=_echo_tool)

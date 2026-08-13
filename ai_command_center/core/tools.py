@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
+from ai_command_center.domain.runtime_safety import SecurityTier
 
 ToolHandler = Callable[[dict[str, Any]], "ToolResult"]
 
@@ -16,6 +17,7 @@ class ToolSpec:
     name: str
     description: str
     handler: ToolHandler
+    tier: SecurityTier | None = None
 
 
 @dataclass(frozen=True, slots=True)
