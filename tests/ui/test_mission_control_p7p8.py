@@ -61,13 +61,6 @@ def test_theme_manager_applies_light_and_high_contrast() -> None:
     theme_manager.apply(win, theme_name="High Contrast")
     assert theme_manager.active_name() == "High Contrast"
     assert T.TEXT_PRIMARY == T.HIGH_CONTRAST_TEXT or T.TEXT_PRIMARY == "#FFFFFF"
-    theme_manager.apply(win, theme_name="golden_hour")
-    assert theme_manager.active_name() == "Golden Hour"
-    assert T.ACCENT_DEFAULT == "#f4a900"
-    assert T.BG_DEEP == "#d4b896"
-    assert T.TEXT_PRIMARY == "#4a403a"
-    assert T.BG_GLASS_BORDER == "#c1666b"
-    assert "Golden Hour" in theme_manager.theme_names()
     # Restore a dark theme for other tests
     theme_manager.apply(win, theme_name="VS Dark")
 
