@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ai_command_center.core.security_policy import READONLY_SHELL_TOOL
+
 import ast
 import sqlite3
 from pathlib import Path
@@ -112,7 +114,7 @@ def _wire_authority_stack(bus: EventBus) -> AgentRuntimeService:
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(
-            name="shell",
+            name=READONLY_SHELL_TOOL,
             description="shell",
             handler=lambda args: ToolResult(success=True, output=str(args.get("command", "ok"))),
         )
@@ -188,8 +190,8 @@ def test_workflow_path_uses_plan_orchestrator_only() -> None:
             "workflow_id": "demo",
             "workspace_context": {"workspace_id": "ws-wf"},
             "steps": [
-                {"id": "a", "type": "tool", "tool": "shell", "args": {"command": "echo 1"}},
-                {"id": "b", "type": "tool", "tool": "shell", "args": {"command": "echo 2"}},
+                {"id": "a", "type": "tool", "tool": READONLY_SHELL_TOOL, "args": {"command": "echo 1"}},
+                {"id": "b", "type": "tool", "tool": READONLY_SHELL_TOOL, "args": {"command": "echo 2"}},
             ],
         },
         source="ui",

@@ -370,6 +370,11 @@ class ExecutionOrchestratorService(BaseService):
             source=self.name,
         )
 
+        # ADR-004 classification is enforced at the TOOL_INVOKE boundary in
+        # ToolExecutorService, where the tool name is concrete. Plan capability
+        # names are aliased (e.g. "create_note" -> "notes.create"), so rejecting
+        # on the capability label here would deny legitimate work while adding
+        # no security: nothing executes without passing the executor's gate.
         if step_requires_human_approval(step, run=run):
             run["paused"] = True
             confirmation_id = f"{run_id}:{step.step_id}"

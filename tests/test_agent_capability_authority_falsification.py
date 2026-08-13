@@ -40,6 +40,12 @@ from uuid import uuid4
 import pytest
 
 from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
+from ai_command_center.core.security_policy import (
+    READONLY_SHELL_ALLOWLIST,
+    READONLY_SHELL_TOOL,
+    SecurityTier,
+    resolve_tool_tier,
+)
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     AGENT_EXECUTION_REQUEST,
@@ -82,6 +88,13 @@ class _ProductionDefaultPermission:
         return permission == Permission.LAUNCH_TOOL.value
 
 
+class _DenyAllPermission:
+    """Actor authorized for nothing — proves permission is independent of tier."""
+
+    def check(self, permission: str, context: PermissionContext) -> bool:
+        return False
+
+
 def _conn() -> sqlite3.Connection:
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
@@ -103,7 +116,7 @@ def _wire_orchestrator_stack(
             sink.append(command)
         return ToolResult(success=True, output=command or "ok")
 
-    for name in ("shell", "workspace_execute_command"):
+    for name in ("shell", "workspace_execute_command", READONLY_SHELL_TOOL):
         registry.register_tool(
             ToolSpec(name=name, description=name, handler=_handler)
         )
@@ -336,32 +349,115 @@ def test_c1_agent_task_does_not_launder_agent_provenance_into_user_trust() -> No
     )
 
 
-def test_d1_workflow_provenance_still_dispatches_with_nonuser_actor() -> None:
-    """Positive control: the exempt path must still reach dispatch.
+def test_d1_authorized_agent_executes_bounded_read_without_hitl() -> None:
+    """PROOF 1 (safe read): agent -> bounded READ -> authorized -> no HITL -> executes.
 
-    After the approval boundary was made fail-closed, several actor-identity
-    assertions in test_control_plane_security_acceptance.py are satisfied by the
-    step being *blocked*. This test keeps the identity path positively covered:
-    ``workflow`` provenance is exempt from per-step HITL by design (closeout §4,
-    "Workflow shell — workflow actor, LAUNCH_TOOL, no per-step HITL"), so it must
-    still dispatch — and must still not dispatch as an interactive user.
+    Re-authored for the tier model. The prior version asserted that ``workflow``
+    provenance was exempt from HITL — a provenance-based rule ADR-004 does not
+    grant. Under ADR-004 the exemption belongs to the *tier*, so the positive
+    control is now a genuinely READ-classified capability.
     """
     bus = EventBus()
-    _wire_orchestrator_stack(bus, permission=_ProductionDefaultPermission())
+    ran: list[str] = _executed()
+    _wire_orchestrator_stack(bus, permission=_ProductionDefaultPermission(), sink=ran)
+    confirmations = _collect(bus, TOOL_CONFIRMATION_REQUIRED)
+    completed = _collect(bus, TOOL_COMPLETED)
+
+    run = _agent_run("echo agent-ok")
+    run["plan"]["steps"][0]["args"]["tool"] = READONLY_SHELL_TOOL
+    bus.publish(EXECUTION_RUN_REQUEST, run, source="llm_planner")
+
+    assert not confirmations, "a READ-classified action must not demand approval"
+    assert completed, "authorized agent READ action must execute"
+    assert ran == ["echo agent-ok"], f"expected the bounded command to run, got {ran!r}"
+
+
+def test_d2_bounded_read_tool_cannot_reach_an_interpreter() -> None:
+    """The READ classification is only defensible if the tool stays bounded."""
+    sandbox = CommandSandbox(allowlist=READONLY_SHELL_ALLOWLIST)
+    assert sandbox.validate_command("echo hi")[0].lower().startswith("echo")
+    for command in ("python -m http.server", "git status", 'python -c "x"'):
+        with pytest.raises(SecurityError):
+            sandbox.validate_command(command)
+
+
+def test_e1_unauthorized_actor_denied_even_for_read() -> None:
+    """PROOF 3: PermissionService denial blocks execution independently of tier."""
+    bus = EventBus()
+    ran: list[str] = _executed()
+    _wire_orchestrator_stack(bus, permission=_DenyAllPermission(), sink=ran)
+    failed = _collect(bus, TOOL_FAILED)
+    completed = _collect(bus, TOOL_COMPLETED)
+
+    run = _agent_run("echo denied")
+    run["plan"]["steps"][0]["args"]["tool"] = READONLY_SHELL_TOOL
+    bus.publish(EXECUTION_RUN_REQUEST, run, source="llm_planner")
+
+    assert not completed and not ran, "denied actor must not execute even a READ action"
+    assert failed and failed[0].get("error") == "permission denied"
+
+
+def test_e2_untiered_action_is_rejected() -> None:
+    """PROOF 4: authorized actor + unclassified capability -> DENY, no execution."""
+    bus = EventBus()
+    ran: list[str] = _executed()
+    _wire_orchestrator_stack(bus, permission=_ProductionDefaultPermission(), sink=ran)
+    confirmations = _collect(bus, TOOL_CONFIRMATION_REQUIRED)
+    completed = _collect(bus, TOOL_COMPLETED)
     invokes = _collect(bus, TOOL_INVOKE)
 
-    run = _agent_run("echo workflow", capability="shell")
-    run["actor_provenance"] = "workflow"
-    run["actor_type"] = "workflow"
-    bus.publish(EXECUTION_RUN_REQUEST, run, source="workflow_engine")
+    failed = _collect(bus, TOOL_FAILED)
 
-    assert invokes, (
-        "workflow provenance is documented as exempt from per-step approval; "
-        "gating it would break the documented design"
+    run = _agent_run("echo untiered")
+    run["plan"]["steps"][0]["args"]["tool"] = "totally_unregistered_tool"
+    bus.publish(EXECUTION_RUN_REQUEST, run, source="llm_planner")
+
+    assert not completed and not ran, "unclassified action must not execute"
+    assert not confirmations, "unclassified action must be rejected, not gated"
+    # Classification is enforced at the TOOL_INVOKE boundary, where the tool
+    # name is concrete; the invoke may be published but must never execute.
+    assert failed, "unclassified action must produce an explicit denial"
+    assert failed[0].get("error") == "unclassified action rejected", failed[0]
+    assert len(invokes) <= 1, "rejection must be terminal, not retried"
+
+
+@pytest.mark.parametrize(
+    "forged_tier",
+    [None, "", "read", "READ", "unknown", "not_a_tier", "write_destroy"],
+)
+def test_e3_forged_tier_in_plan_args_is_ignored(forged_tier: object) -> None:
+    """PROOF 5: an LLM cannot declare its own SecurityTier for a dangerous tool.
+
+    Generic ``shell`` is WRITE_DESTROY in the authoritative registry. No value a
+    planner supplies — including a valid-looking "read" — may lower that.
+    """
+    bus = EventBus()
+    ran: list[str] = _executed()
+    _wire_orchestrator_stack(bus, permission=_ProductionDefaultPermission(), sink=ran)
+    confirmations = _collect(bus, TOOL_CONFIRMATION_REQUIRED)
+    completed = _collect(bus, TOOL_COMPLETED)
+
+    run = _agent_run("echo forged")
+    step_args = run["plan"]["steps"][0]["args"]
+    step_args["tool"] = "shell"
+    step_args["tier"] = forged_tier
+    step_args["security_tier"] = forged_tier
+    run["plan"]["steps"][0]["security_tier"] = forged_tier
+    bus.publish(EXECUTION_RUN_REQUEST, run, source="llm_planner")
+
+    assert confirmations, (
+        f"forged tier {forged_tier!r} suppressed approval for generic shell"
     )
-    assert str(invokes[0].get("actor_type", "")) != "user", (
-        "workflow run dispatched with interactive-user identity"
-    )
+    assert not completed and not ran, "generic shell executed without approval"
+
+
+def test_e4_registry_is_the_only_tier_source() -> None:
+    """Unit-level: tier resolution never consults caller-supplied data."""
+    assert resolve_tool_tier("shell") is SecurityTier.WRITE_DESTROY
+    assert resolve_tool_tier("workspace_execute_command") is SecurityTier.WRITE_DESTROY
+    assert resolve_tool_tier(READONLY_SHELL_TOOL) is SecurityTier.READ
+    for unknown in ("", "   ", "nope", "SHELL_", None):
+        assert resolve_tool_tier(unknown) is None, unknown  # type: ignore[arg-type]
 
 
 def test_d2_interactive_user_path_still_gates_and_can_be_approved() -> None:

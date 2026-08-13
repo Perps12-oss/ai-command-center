@@ -19,6 +19,7 @@ from ai_command_center.core.events.topics import (
     UI_COMMAND,
 )
 from ai_command_center.core.permission.permission_service import PermissionService
+from ai_command_center.core.security_policy import READONLY_SHELL_TOOL
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.agent_runtime_service import AgentRuntimeService
@@ -106,7 +107,7 @@ def test_supervised_demo_spawn_requires_permission_and_runs_tool() -> None:
     assert permission_checks[0].get("interactive") is True
     assert {"use_ai", "launch_tool"}.issubset(set(permission_checks[0].get("permissions", [])))
     assert tool_invokes
-    assert tool_invokes[0]["tool"] == "shell"
+    assert tool_invokes[0]["tool"] == READONLY_SHELL_TOOL
     assert all(inv["_source"] == "execution_orchestrator" for inv in tool_invokes)
     assert terminated
     assert not terminated[0].get("error")

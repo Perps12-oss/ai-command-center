@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from ai_command_center.core.security_policy import (
+    is_classified,
+    tool_requires_human_approval,
+)
 from ai_command_center.domain.planner_plan import PlanStep
 
 COMMAND_TOOL_CAPABILITIES = frozenset({"shell", "workspace_execute_command"})
@@ -38,26 +42,33 @@ def effective_tool_for_step(step: PlanStep) -> str:
     return str(args.get("tool") or "shell").strip().lower() or "shell"
 
 
+def step_is_classified(step: PlanStep) -> bool:
+    """Return True when the step's dispatched tool has an authoritative tier.
+
+    Steps that dispatch no tool (orchestration-only capabilities such as
+    ``llm``, ``goal``, ``workflow``, ``agent.task``) are not tool actions and
+    are outside ADR-004's classification requirement.
+    """
+    tool = effective_tool_for_step(step)
+    if not tool:
+        return True
+    return is_classified(tool)
+
+
 def step_requires_human_approval(step: PlanStep, *, run: dict[str, Any]) -> bool:
     """Return True when orchestrator must pause for tool.confirmation_required.
 
-    Fails **closed**: any command-tool step requires approval unless its origin
-    is explicitly exempt. Previously only ``ui`` provenance gated, so agent,
-    llm, and unknown/empty origins all fell through to False, leaving the
-    default ``LAUNCH_TOOL`` grant as the sole control.
+    ADR-004/ADR-022: approval is a property of the action's SecurityTier, not of
+    the actor. ``run`` is accepted for interface stability and deliberately not
+    consulted — provenance identifies the actor for PermissionService and grants
+    no approval authority.
+
+    Unclassified tools are rejected upstream by :func:`step_is_classified`, so
+    they never reach an approval decision.
     """
     if bool(step.require_approval):
         return True
-    if not (
-        capability_requires_human_approval(step.capability)
-        or capability_requires_human_approval(effective_tool_for_step(step))
-    ):
-        return False
-    provenance = str(run.get("actor_provenance") or "").lower()
-    # Workflow runs are approved once at definition time, not per step.
-    if provenance == WORKFLOW_PROVENANCE:
-        return False
-    return True
+    return tool_requires_human_approval(effective_tool_for_step(step))
 
 
 def intake_run_fields(*, intake: str) -> dict[str, Any]:
