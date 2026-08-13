@@ -86,9 +86,11 @@ Same standard as `tom-auditor`: the `Current Repository` section is evidence-dri
 
 ## Output location and numbering
 
-Existing ADRs occupy `ADR-001` through `ADR-013` in `docs/architecture/adr/`, in a `Status / Date / Deciders / Supersedes / Related` header style followed by `Context / Decision / Rationale`. **Note a pre-existing numbering collision unrelated to this framework:** two files both claim `ADR-007` (`ADR-007_PROVIDER_REGISTRY.md` and `ADR-007_APPSTATE_NOTIFICATION_STORMS.md`) — flag this for cleanup separately; don't let it block new numbering.
+Existing ADRs occupy `ADR-001` through `ADR-023` in `docs/architecture/adr/`, in a `Status / Date / Deciders / Supersedes / Related` header style followed by `Context / Decision / Rationale`. **Note a pre-existing numbering collision unrelated to this framework:** two files both claim `ADR-007` (`ADR-007_PROVIDER_REGISTRY.md` and `ADR-007_APPSTATE_NOTIFICATION_STORMS.md`) — disclosed in `adr/README.md`; flag for cleanup separately, don't let it block new numbering.
 
-New Architecture Decision Reviews continue the sequence starting at **ADR-014**, using the same header block as existing ADRs, with the 9-section adversarial body appended below `Rationale`. Six ADRs are pre-seeded in the config (`docs/agents/adr-review-config.json`) as ADR-014 through ADR-019 — confirm no other in-flight work has already claimed those numbers before writing the file (a separate track referenced "ADR-015/016/017" informally earlier in this project's history for an unrelated state-authority decision; verify those aren't real files elsewhere before reusing the numbers).
+New Architecture Decision Reviews continue the sequence starting at **ADR-024**, using the same header block as existing ADRs, with the 9-section adversarial body appended below `Rationale`. `CLAUDE.md` is the authority on the next free number — re-read it rather than trusting this line, and confirm the file does not already exist before writing it.
+
+**ADR-014 through ADR-023 are claimed. Do not write to them.** The six reviews this framework originally pre-seeded as ADR-014..ADR-019 were realized as **ADR-018–023** (Tool Invocation, Planning, Memory, Explainability, Confidence & Autonomy, Model Strategy), which are Accepted architecture already on `main`. ADR-014–017 are separate disposition and state-authority decisions. Roadmap text numbering those six "ADR-001 … ADR-006" refers to ADR-018–023, not files 001–006.
 
 ## Pre-publish self-check
 
