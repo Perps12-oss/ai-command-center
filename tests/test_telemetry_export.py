@@ -15,8 +15,8 @@ from ai_command_center.repositories.database_bootstrap_repository import (
     DatabaseBootstrapRepository,
 )
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
-from ai_command_center.services import telemetry_export
-from ai_command_center.services.telemetry_export import (
+from ai_command_center.telemetry import session_export as telemetry_export
+from ai_command_center.telemetry.session_export import (
     STATS_CACHE_FILENAME,
     export_session,
     resolve_export_dir,

@@ -4,7 +4,7 @@
 **Baseline:** `origin/main` @ `2f6c88b`  
 **Branch:** `cursor/strategic-runtime-program-4cf5`  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`; Accepted ADRs; `docs/governance/IMPLEMENTATION_GUIDE.md`; `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md`  
-**Task class:** Governance / planned-work / architecture-program documentation. **No runtime product code in this change.**
+**Task class:** Governance / planned-work documentation, plus a scoped R4 repair of telemetry export placement (no new product behavior).
 
 ---
 
@@ -18,6 +18,8 @@
 - Gate 1 Integration Proposal drafts for streams A–F (no implementation).
 - Drop macOS Hotkey as a standalone strategic item.
 - Name Cross-OS support as the **only remaining strategic gate**.
+
+**Follow-up (CI babysit):** `main` commit `14782b3` introduced R4 service→service imports (`telemetry_export` ↔ `telemetry_summary` / `TelemetryService`). Relocate export helpers to `ai_command_center/telemetry/session_export.py`. Do **not** expand `_SERVICE_PEER_IMPORT_ALLOWLIST`. Behavior of session JSON export is unchanged.
 
 **Out of scope (this change)**
 

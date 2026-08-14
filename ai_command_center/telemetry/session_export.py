@@ -1,5 +1,9 @@
 """Session telemetry export — end-of-session snapshot written to disk.
 
+Lives under ``telemetry/`` (not ``services/``) so TelemetryService can call it
+without an R4 service→service import. Summary math stays in
+``services.telemetry_summary`` (pure functions; no service instance calls).
+
 Telemetry itself stays passive: the bus → SQLite path is unchanged. This module
 only *reads* what was already persisted and materializes it as JSON so the data
 is inspectable without opening the database.
