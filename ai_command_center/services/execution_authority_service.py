@@ -201,11 +201,29 @@ class ExecutionAuthorityService(BaseService):
             return StateContext.empty(workspace_id=workspace_id, query_text=text)
         return self._state_authority.project(text=text, workspace_id=workspace_id)
 
+    @staticmethod
+    def _ui_command_intake(event: Event) -> str:
+        """Resolve intake for UI_COMMAND, de-escalating only.
+
+        ``UI_COMMAND`` is re-published by the orchestrator for ``agent.task``
+        steps, so an unconditional INTAKE_UI_COMMAND stamp would grant an
+        agent-authored step interactive-user identity. A payload may therefore
+        *lower* its own trust but never raise it: anything that does not
+        explicitly declare automation origin keeps the default UI intake.
+        """
+        declared = str(event.payload.get("actor_provenance") or "").strip().lower()
+        if declared.startswith("agent"):
+            return INTAKE_AGENT
+        if declared == "workflow":
+            return INTAKE_WORKFLOW
+        return INTAKE_UI_COMMAND
+
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
             return
 
+        intake = self._ui_command_intake(event)
         request_id = uuid.uuid4().hex
         scope = self._workspace_scope(event)
         clipboard = event.payload.get("clipboard")
@@ -214,7 +232,7 @@ class ExecutionAuthorityService(BaseService):
 
         self._publish_decision(
             request_id=request_id,
-            intake=INTAKE_UI_COMMAND,
+            intake=intake,
             decision=decision,
             scope=scope,
             state_context=state_context,
@@ -259,7 +277,7 @@ class ExecutionAuthorityService(BaseService):
                 scope=scope,
                 state_context=state_context,
                 skip_planner=False,
-                intake=INTAKE_UI_COMMAND,
+                intake=intake,
                 extra_payload=extra or None,
             )
             return
@@ -287,7 +305,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
-            intake=INTAKE_UI_COMMAND,
+            intake=intake,
         )
 
     def _publish_decision(

@@ -14,6 +14,7 @@ from typing import Any
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
 from ai_command_center.core.control_plane import (
+    DEFAULT_AUTOMATION_ACTOR,
     resolve_run_context,
     resolve_tool_invoke_actor,
     step_requires_human_approval,
@@ -369,6 +370,11 @@ class ExecutionOrchestratorService(BaseService):
             source=self.name,
         )
 
+        # ADR-004 classification is enforced at the TOOL_INVOKE boundary in
+        # ToolExecutorService, where the tool name is concrete. Plan capability
+        # names are aliased (e.g. "create_note" -> "notes.create"), so rejecting
+        # on the capability label here would deny legitimate work while adding
+        # no security: nothing executes without passing the executor's gate.
         if step_requires_human_approval(step, run=run):
             run["paused"] = True
             confirmation_id = f"{run_id}:{step.step_id}"
@@ -584,6 +590,10 @@ class ExecutionOrchestratorService(BaseService):
                 "text": task,
                 "agent_id": args.get("agent_id"),
                 "request_id": request_id,
+                # Re-entering intake must not launder agent origin into
+                # interactive-user trust. ExecutionAuthority only ever
+                # de-escalates on this field, never escalates.
+                "actor_provenance": DEFAULT_AUTOMATION_ACTOR,
             }
             if workspace_context.get("workspace_id"):
                 payload["workspace_id"] = workspace_context["workspace_id"]

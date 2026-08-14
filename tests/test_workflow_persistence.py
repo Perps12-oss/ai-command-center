@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ai_command_center.core.security_policy import READONLY_SHELL_TOOL
+
 import sqlite3
 
 from ai_command_center.core.app_state import AppStateStore
@@ -58,7 +60,7 @@ def test_workflow_persistence_replays_into_app_state() -> None:
             "run_id": "run-persist",
             "workflow_id": "sync",
             "total_steps": 1,
-            "steps": [{"id": "a", "type": "tool", "tool": "shell"}],
+            "steps": [{"id": "a", "type": "tool", "tool": READONLY_SHELL_TOOL}],
         },
         source="test",
     )
@@ -120,8 +122,8 @@ def test_engine_and_persistence_vertical_slice() -> None:
     registry = ToolRegistry()
     registry.register_tool(
         ToolSpec(
-            name="shell",
-            description="shell",
+            name=READONLY_SHELL_TOOL,
+            description="bounded shell",
             handler=lambda args: ToolResult(success=True, output="ok"),
         )
     )
@@ -146,7 +148,7 @@ def test_engine_and_persistence_vertical_slice() -> None:
             "run_id": "run-engine",
             "workflow_id": "demo",
             "workspace_context": {"workspace_id": "ws-engine"},
-            "steps": [{"id": "a", "type": "tool", "tool": "shell", "args": {"command": "echo"}}],
+            "steps": [{"id": "a", "type": "tool", "tool": READONLY_SHELL_TOOL, "args": {"command": "echo"}}],
         },
         source="test",
     )
