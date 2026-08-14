@@ -14,11 +14,23 @@ from collections.abc import Callable
 from typing import Any
 
 from ai_command_center.core.command_classify import classify_command
-from ai_command_center.core.contracts import COMMAND_DEFERRED_VERSION, build_workspace_context
+from ai_command_center.core.control_plane import (
+    intake_run_fields,
+    plan_step_require_approval_for_capability,
+)
+from ai_command_center.core.contracts import (
+    COMMAND_DEFERRED_VERSION,
+    INTAKE_AGENT,
+    INTAKE_UI_COMMAND,
+    INTAKE_WORKFLOW,
+    build_workspace_context,
+    is_executable_workflow_step,
+)
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.intents import (
     INTENT_AGENT,
     INTENT_CHAT,
+    INTENT_GOAL,
     INTENT_SHELL,
 )
 from ai_command_center.core.events.topics import (
@@ -66,7 +78,22 @@ _FIND_NOTE_RE = re.compile(
 )
 
 # Capabilities that may proceed without an active workspace.
-_WORKSPACE_OPTIONAL_CAPABILITIES: frozenset[str] = frozenset({"navigate"})
+#
+# Phase B (B-D1a option A) added "workflow" and the agent.* family. This
+# SUPERSEDES the previous gate, which deferred UI agent commands when no
+# workspace was active — see
+# docs/audits/GATE_SUPERSESSION_WORKSPACE_REQUIRED_AGENT.md (Art. VI record).
+# The exemption is keyed on capability so every intake admits alike.
+_WORKSPACE_OPTIONAL_CAPABILITIES: frozenset[str] = frozenset({"navigate", "workflow"})
+_WORKSPACE_OPTIONAL_PREFIXES: tuple[str, ...] = ("agent.",)
+
+
+def _workspace_optional(capability: str) -> bool:
+    """Single definition of the workspace exemption rule (Inv 11)."""
+    cap = (capability or "").strip()
+    if cap in _WORKSPACE_OPTIONAL_CAPABILITIES:
+        return True
+    return cap.startswith(_WORKSPACE_OPTIONAL_PREFIXES)
 
 _ORCH_CAPABILITY: dict[OrchestrationIntent, str] = {
     OrchestrationIntent.LAUNCH_APPLICATION: "launch_application",
@@ -174,42 +201,49 @@ class ExecutionAuthorityService(BaseService):
             return StateContext.empty(workspace_id=workspace_id, query_text=text)
         return self._state_authority.project(text=text, workspace_id=workspace_id)
 
+    @staticmethod
+    def _ui_command_intake(event: Event) -> str:
+        """Resolve intake for UI_COMMAND, de-escalating only.
+
+        ``UI_COMMAND`` is re-published by the orchestrator for ``agent.task``
+        steps, so an unconditional INTAKE_UI_COMMAND stamp would grant an
+        agent-authored step interactive-user identity. A payload may therefore
+        *lower* its own trust but never raise it: anything that does not
+        explicitly declare automation origin keeps the default UI intake.
+        """
+        declared = str(event.payload.get("actor_provenance") or "").strip().lower()
+        if declared.startswith("agent"):
+            return INTAKE_AGENT
+        if declared == "workflow":
+            return INTAKE_WORKFLOW
+        return INTAKE_UI_COMMAND
+
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
             return
 
+        intake = self._ui_command_intake(event)
         request_id = uuid.uuid4().hex
         scope = self._workspace_scope(event)
         clipboard = event.payload.get("clipboard")
         state_context = self._project_state(text, scope.get("workspace_id", ""))
         decision = self.analyze(text, clipboard=clipboard, state_context=state_context)
 
-        self._bus.publish(
-            EXECUTION_AUTHORITY_DECISION,
-            {
-                "request_id": request_id,
-                **decision.to_payload(),
-                **scope,
-                "state_context": state_context.to_dict(),
-            },
-            source=self.name,
+        self._publish_decision(
+            request_id=request_id,
+            intake=intake,
+            decision=decision,
+            scope=scope,
+            state_context=state_context,
         )
 
-        active_workspace_id = self._resolve_active_workspace_id(event)
-        if (
-            not active_workspace_id
-            and decision.capability not in _WORKSPACE_OPTIONAL_CAPABILITIES
+        if not self._admit(
+            request_id=request_id,
+            text=text,
+            decision=decision,
+            active_workspace_id=self._resolve_active_workspace_id(event),
         ):
-            if decision.capability == "shell":
-                deferred_intent = INTENT_SHELL
-            elif decision.capability == "llm":
-                deferred_intent = INTENT_CHAT
-            elif (decision.capability or "").startswith("agent"):
-                deferred_intent = INTENT_AGENT
-            else:
-                deferred_intent = decision.capability or INTENT_CHAT
-            self._defer_no_workspace(request_id, text, deferred_intent)
             return
 
         if (decision.capability or "").startswith("agent"):
@@ -224,14 +258,27 @@ class ExecutionAuthorityService(BaseService):
 
         if decision.capability == "goal":
             # Free-text goals go through planner with World Model context.
+            # Prefer decision.text (prefix stripped) over raw UI_COMMAND text.
+            goal_title = str(decision.text or text).strip() or text
+            extra: dict[str, Any] = {}
+            if "priority" in event.payload:
+                try:
+                    extra["priority"] = int(event.payload.get("priority") or 0)
+                except (TypeError, ValueError):
+                    extra["priority"] = 0
+            description = str(event.payload.get("description") or "").strip()
+            if description:
+                extra["description"] = description
             self._submit_plan(
                 request_id=request_id,
-                text=text,
+                text=goal_title,
                 decision=decision,
                 plan=None,
                 scope=scope,
                 state_context=state_context,
                 skip_planner=False,
+                intake=intake,
+                extra_payload=extra or None,
             )
             return
 
@@ -258,7 +305,58 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=intake,
         )
+
+    def _publish_decision(
+        self,
+        *,
+        request_id: str,
+        intake: str,
+        decision: ExecutionDecision,
+        scope: dict[str, str],
+        state_context: StateContext,
+    ) -> None:
+        """Publish the authority decision. One definition for every intake (Inv 11).
+
+        ``intake`` records provenance so consumers can tell an actual user chat
+        command from a programmatic run (see contracts.INTAKE_*).
+        """
+        self._bus.publish(
+            EXECUTION_AUTHORITY_DECISION,
+            {
+                "request_id": request_id,
+                "intake": intake,
+                **decision.to_payload(),
+                **scope,
+                "state_context": state_context.to_dict(),
+            },
+            source=self.name,
+        )
+
+    def _admit(
+        self,
+        *,
+        request_id: str,
+        text: str,
+        decision: ExecutionDecision,
+        active_workspace_id: str,
+    ) -> bool:
+        """Workspace-required admission gate. Returns False when deferred.
+
+        Keyed on capability, not on intake: the same capability is admitted
+        identically whichever door it arrives through (Phase B / O-4).
+        """
+        if active_workspace_id or _workspace_optional(decision.capability):
+            return True
+        if decision.capability == "shell":
+            deferred_intent = INTENT_SHELL
+        elif decision.capability == "llm":
+            deferred_intent = INTENT_CHAT
+        else:
+            deferred_intent = decision.capability or INTENT_CHAT
+        self._defer_no_workspace(request_id, text, deferred_intent)
+        return False
 
     def _on_workflow_execution_request(self, event: Event) -> None:
         run_id = str(event.payload.get("run_id") or uuid.uuid4().hex)
@@ -278,14 +376,11 @@ class ExecutionAuthorityService(BaseService):
 
         plan_steps: list[PlanStep] = []
         for index, step in enumerate(raw_steps):
-            if not isinstance(step, dict):
-                continue
-            step_type = str(step.get("type") or "tool")
-            if step_type != "tool":
+            # Shared predicate with WorkflowEngineService (Inv 11) — the engine
+            # rejects manifests where this matches nothing, so the two must agree.
+            if not is_executable_workflow_step(step):
                 continue
             tool_name = str(step.get("tool") or "").strip()
-            if not tool_name:
-                continue
             step_id = str(step.get("id") or f"step-{index}")
             plan_steps.append(
                 PlanStep(
@@ -314,14 +409,30 @@ class ExecutionAuthorityService(BaseService):
             reason="workflow_start",
             skip_planner=True,
         )
+        scope = {"workspace_id": ws} if ws else {}
+        self._publish_decision(
+            request_id=run_id,
+            intake=INTAKE_WORKFLOW,
+            decision=decision,
+            scope=scope,
+            state_context=state_context,
+        )
+        if not self._admit(
+            request_id=run_id,
+            text=plan.goal,
+            decision=decision,
+            active_workspace_id=ws or self._active_workspace_id,
+        ):
+            return
         self._submit_plan(
             request_id=run_id,
             text=plan.goal,
             decision=decision,
             plan=plan,
-            scope={"workspace_id": ws} if ws else {},
+            scope=scope,
             state_context=state_context,
             workspace_context_override=workspace_context,
+            intake=INTAKE_WORKFLOW,
             extra_payload={"workflow_run_id": run_id, "workflow_id": workflow_id},
         )
 
@@ -349,13 +460,29 @@ class ExecutionAuthorityService(BaseService):
             reason="agent_execution_request",
             skip_planner=True,
         )
+        scope = {"workspace_id": ws} if ws else {}
+        self._publish_decision(
+            request_id=request_id,
+            intake=INTAKE_AGENT,
+            decision=decision,
+            scope=scope,
+            state_context=state_context,
+        )
+        if not self._admit(
+            request_id=request_id,
+            text=plan.goal,
+            decision=decision,
+            active_workspace_id=ws or self._active_workspace_id,
+        ):
+            return
         self._submit_plan(
             request_id=request_id,
             text=plan.goal,
             decision=decision,
             plan=plan,
-            scope={"workspace_id": ws} if ws else {},
+            scope=scope,
             state_context=state_context,
+            intake=INTAKE_AGENT,
         )
 
     def _dispatch_agent(
@@ -404,6 +531,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=INTAKE_AGENT,
         )
 
     def _submit_plan(
@@ -418,6 +546,7 @@ class ExecutionAuthorityService(BaseService):
         skip_planner: bool | None = None,
         workspace_context_override: dict[str, Any] | None = None,
         extra_payload: dict[str, Any] | None = None,
+        intake: str = INTAKE_UI_COMMAND,
     ) -> None:
         use_synthetic = decision.skip_planner if skip_planner is None else skip_planner
         correlation = CorrelationContext.new(goal_id=request_id).to_payload()
@@ -440,11 +569,11 @@ class ExecutionAuthorityService(BaseService):
             "description": decision.reason or decision.kind.value,
             "request_id": request_id,
             "correlation": correlation,
-            "auto_approve": True,
             "workspace_context": workspace_context,
             "workspace_id": scope.get("workspace_id", ""),
             "authority_decision": decision.to_payload(),
             "state_context": state_context.to_dict(),
+            **intake_run_fields(intake=intake),
         }
         if plan is not None and use_synthetic:
             payload["plan"] = plan.to_dict()
@@ -514,6 +643,17 @@ class ExecutionAuthorityService(BaseService):
                 args=dict(prefix_args),
                 reason="agent_capability",
                 skip_planner=True,
+            )
+
+        if prefix_intent == INTENT_GOAL:
+            goal_body = str(prefix_args.get("goal") or "").strip() or stripped
+            return ExecutionDecision(
+                kind=DecisionKind.ACTIONABLE,
+                text=goal_body,
+                capability="goal",
+                args={"goal": goal_body},
+                reason="goal_prefix",
+                skip_planner=False,
             )
 
         # Former legacy prefixes → first-class capabilities.
@@ -658,7 +798,9 @@ class ExecutionAuthorityService(BaseService):
                     step_id="step-1",
                     capability=decision.capability,
                     args=dict(decision.args),
-                    require_approval=False,
+                    require_approval=plan_step_require_approval_for_capability(
+                        decision.capability
+                    ),
                 ),
             ),
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import replace
@@ -33,6 +34,8 @@ from ai_command_center.domain.correlation import CorrelationContext
 from ai_command_center.domain.goal import Goal, GoalStatus, Priority, Task, TaskStatus
 from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.base import BaseService
+
+_logger = logging.getLogger(__name__)
 
 _PRIORITY_ORDER = {
     Priority.CRITICAL: 0,
@@ -260,6 +263,16 @@ class SingleGoalScheduler(BaseService):
 
     def _on_submit_request(self, event: Event) -> None:
         payload = event.payload
+        # B5 fail-closed: GOAL_SUBMIT_REQUEST is post-authority only.
+        # Direct UI (or any non-EA) publish without authority_decision is refused.
+        authority = payload.get("authority_decision")
+        if not isinstance(authority, dict) or not authority:
+            _logger.warning(
+                "goal.submit.request refused: missing authority_decision "
+                "(source=%s) — EA admission required",
+                getattr(event, "source", ""),
+            )
+            return
         correlation = CorrelationContext.from_payload(payload)
         goal_id = str(payload.get("goal_id") or uuid.uuid4().hex)
         title = str(payload.get("title") or payload.get("goal") or "").strip()
@@ -288,6 +301,9 @@ class SingleGoalScheduler(BaseService):
             self._prebuilt_plans[goal_id] = dict(raw_plan)
         options: dict = {
             "auto_approve": bool(payload.get("auto_approve", False)),
+            "actor_provenance": str(payload.get("actor_provenance") or ""),
+            "interactive_user": bool(payload.get("interactive_user")),
+            "actor_type": str(payload.get("actor_type") or ""),
         }
         workspace_context = payload.get("workspace_context")
         if isinstance(workspace_context, dict):
@@ -384,7 +400,12 @@ class SingleGoalScheduler(BaseService):
             "plan": dict(event.payload.get("plan") or {}),
             "auto_approve": bool(options.get("auto_approve", False)),
             "correlation": self._active_goal.correlation.to_payload(),
+            "actor_provenance": str(options.get("actor_provenance") or ""),
+            "interactive_user": bool(options.get("interactive_user")),
         }
+        actor_type = str(options.get("actor_type") or "").strip()
+        if actor_type:
+            run_payload["actor_type"] = actor_type
         workspace_context = options.get("workspace_context")
         if isinstance(workspace_context, dict):
             run_payload["workspace_context"] = workspace_context

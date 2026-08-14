@@ -1,11 +1,17 @@
 # Phase 8: Operator Kernel & Model Independence
 
-**Status:** PARTIAL — **research / plan archive** (not live intake)  
-**Live truth (2026-08-04):** OperatorKernel **RETIRED from live (ADR-006)**;
-canonical intake = ExecutionAuthority.  
-**Priority:** HIGH (historical)  
-**Estimated Effort:** 6-8 weeks (plan-era estimate; ignore for agent scheduling)  
-**Dependencies:** Phase 5 (Async — approval-gated); Phase 7 multi-agent plan SUPERSEDED  
+**STATUS:** RETIRED / NON-CANONICAL (live path)
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This package is historical research and is **not** part of the live architecture.  
+**Do not restore or wire OperatorKernel into the current runtime without a superseding ADR.**
+
+Live intake = **ExecutionAuthority** (ADR-006).  
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Live truth:** OperatorKernel **RETIRED from live (ADR-006)**  
+**Priority:** historical  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`, `AGENTS.md`  
 **Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — `OperatorKernel` not in `service_factory`; ADR-006
 

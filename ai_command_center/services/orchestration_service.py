@@ -20,9 +20,7 @@ from ai_command_center.core.events.topics import (
     EXECUTION_RUN_COMPLETE,
     EXECUTION_RUN_FAILED,
     ORCHESTRATION_PROVIDER_HEALTH,
-    ORCHESTRATION_RECEIPT,
     ORCHESTRATION_RUN_SNAPSHOT,
-    ORCHESTRATION_TRUTH_VALIDATED,
     RUNTIME_ACTION_REQUEST,
     SESSION_UPDATE_REQUEST,
     TELEMETRY_EVENT,
@@ -37,10 +35,9 @@ from ai_command_center.domain.world_model import MutationType
 from ai_command_center.orchestration.providers.provider_registry import (
     OrchestrationProviderRegistry,
 )
-from ai_command_center.orchestration.receipts.execution_receipt import ExecutionReceipt
-from ai_command_center.orchestration.verification.execution_truth import (
-    enrich_execution_facts,
-    validate_execution_truth,
+from ai_command_center.orchestration.receipts.boundary_emit import (
+    RECEIPT_BUS_SOURCE,
+    emit_execution_receipt,
 )
 from ai_command_center.services.base import BaseService
 
@@ -114,87 +111,70 @@ class OrchestrationService(BaseService):
         error: str,
     ) -> None:
         payload = dict(event.payload)
-        request_id = str(payload.get("request_id") or payload.get("run_id") or "").strip()
-        if not request_id:
-            return
+        pre_emitted = bool(payload.get("receipt_already_emitted"))
+        evidence: dict | None = None
+        if pre_emitted and success:
+            # EOS already published receipt+truth before COMPLETE (B-1 gate).
+            evidence = {
+                "request_id": str(payload.get("request_id") or payload.get("run_id") or ""),
+                "receipt_id": str(payload.get("receipt_id") or ""),
+                "run_id": str(payload.get("run_id") or ""),
+                "goal": str(payload.get("goal") or ""),
+                "primary_capability": str(payload.get("primary_capability") or ""),
+                "facts": payload.get("execution_facts")
+                if isinstance(payload.get("execution_facts"), dict)
+                else {},
+                "truth_valid": bool(payload.get("truth_valid")),
+                "truth_detail": str(payload.get("truth_detail") or ""),
+                "response_source": str(payload.get("response_source") or "orchestration"),
+                "response_text": str(payload.get("response_text") or ""),
+                "scope_fields": {},
+            }
+            workspace_context = (
+                payload.get("workspace_context")
+                if isinstance(payload.get("workspace_context"), dict)
+                else {}
+            )
+            workspace_id = str(
+                workspace_context.get("workspace_id") or payload.get("workspace_id") or ""
+            ).strip()
+            entity_id = str(workspace_context.get("entity_id") or "").strip()
+            if workspace_id:
+                evidence["scope_fields"]["workspace_id"] = workspace_id
+            if entity_id:
+                evidence["scope_fields"]["entity_id"] = entity_id
+        else:
+            evidence = emit_execution_receipt(
+                self._bus,
+                payload=payload,
+                success=success,
+                error=error,
+                source=RECEIPT_BUS_SOURCE,
+            )
+            if evidence is None:
+                _logger.error(
+                    "orchestration.completion_receipt_failed success=%s",
+                    success,
+                )
+                return
 
-        run_id = str(payload.get("run_id", "")).strip()
-        goal = str(payload.get("goal") or "")
-        step_outputs = list(payload.get("step_outputs") or [])
-        plan = payload.get("plan") if isinstance(payload.get("plan"), dict) else {}
-        steps = list(plan.get("steps") or [])
-        primary_capability = ""
-        if steps and isinstance(steps[0], dict):
-            primary_capability = str(steps[0].get("capability") or "")
-        elif step_outputs and isinstance(step_outputs[0], dict):
-            primary_capability = str(step_outputs[0].get("capability") or "")
-
-        response_text = _compose_response_text(step_outputs, success=success, error=error)
-        facts: dict[str, object] = {
-            "run_id": run_id,
-            "goal": goal,
-            "capability": primary_capability,
-            "step_count": len(step_outputs) or len(steps),
-            "step_outputs": step_outputs,
-            "success": success,
-        }
-        if error:
-            facts["error"] = error
-        facts = enrich_execution_facts(
-            facts=facts,
-            plan=plan if isinstance(plan, dict) else {},
-            step_outputs=step_outputs,
-            success=success,
-        )
-
-        workspace_context = (
-            payload.get("workspace_context")
-            if isinstance(payload.get("workspace_context"), dict)
+        request_id = str(evidence["request_id"])
+        run_id = str(evidence.get("run_id") or "")
+        goal = str(evidence.get("goal") or "")
+        primary_capability = str(evidence.get("primary_capability") or "")
+        facts = evidence.get("facts") if isinstance(evidence.get("facts"), dict) else {}
+        truth_valid = bool(evidence.get("truth_valid"))
+        truth_detail = str(evidence.get("truth_detail") or "")
+        response_source = str(evidence.get("response_source") or "orchestration")
+        response_text = str(evidence.get("response_text") or "")
+        receipt_id = str(evidence.get("receipt_id") or "")
+        scope_fields = (
+            dict(evidence["scope_fields"])
+            if isinstance(evidence.get("scope_fields"), dict)
             else {}
         )
-        workspace_id = str(workspace_context.get("workspace_id") or payload.get("workspace_id") or "").strip()
-        entity_id = str(workspace_context.get("entity_id") or "").strip()
-        scope_fields: dict[str, str] = {}
-        if workspace_id:
-            scope_fields["workspace_id"] = workspace_id
-        if entity_id:
-            scope_fields["entity_id"] = entity_id
-
-        receipt = ExecutionReceipt(
-            receipt_id=uuid.uuid4().hex,
-            request_id=request_id,
-            intent=primary_capability or "execution_run",
-            provider_id="execution_orchestrator",
-            success=success,
-            facts=tuple(sorted(facts.items(), key=lambda item: item[0])),
-            error=error or None,
-        )
-        self._bus.publish(ORCHESTRATION_RECEIPT, receipt.to_dict(), source=self.name)
-
-        validation = validate_execution_truth(
-            capability=primary_capability,
-            success=success,
-            error=error,
-            response_text=response_text,
-            facts=facts,
-            receipt=receipt,
-        )
-        truth_valid = bool(validation.valid)
-        truth_detail = validation.detail
-        response_source = validation.response_source
-        response_text = validation.response_text or response_text
-        self._bus.publish(
-            ORCHESTRATION_TRUTH_VALIDATED,
-            {
-                "request_id": request_id,
-                "valid": truth_valid,
-                "detail": truth_detail,
-                "response_source": response_source,
-                "run_id": run_id,
-                **scope_fields,
-            },
-            source=self.name,
-        )
+        plan = payload.get("plan") if isinstance(payload.get("plan"), dict) else {}
+        step_outputs = list(payload.get("step_outputs") or [])
 
         snapshot = OrchestrationRunSnapshot(
             request_id=request_id,
@@ -208,7 +188,7 @@ class OrchestrationService(BaseService):
             truth_detail=truth_detail,
             response_source=response_source,
             response_text=response_text,
-            receipt_id=receipt.receipt_id,
+            receipt_id=receipt_id,
             trace_id=uuid.uuid4().hex,
             span_id=uuid.uuid4().hex[:16],
         )
@@ -225,7 +205,7 @@ class OrchestrationService(BaseService):
             goal=goal,
             primary_capability=primary_capability,
             success=success,
-            receipt_id=receipt.receipt_id,
+            receipt_id=receipt_id,
             plan=plan if isinstance(plan, dict) else {},
             step_outputs=step_outputs,
         ):
@@ -247,7 +227,7 @@ class OrchestrationService(BaseService):
                     "output": {
                         "request_id": request_id,
                         "run_id": run_id,
-                        "receipt_id": receipt.receipt_id,
+                        "receipt_id": receipt_id,
                         "node_id": node["id"],
                         "node_type": node["type"],
                     },
@@ -287,7 +267,7 @@ class OrchestrationService(BaseService):
                 "orchestration": {
                     "intent": primary_capability or "execution_run",
                     "provider_id": "execution_orchestrator",
-                    "receipt_id": receipt.receipt_id,
+                    "receipt_id": receipt_id,
                     "truth_detail": truth_detail,
                     "run_id": run_id,
                 },
@@ -324,30 +304,6 @@ class OrchestrationService(BaseService):
             run_id,
             success,
         )
-
-
-def _compose_response_text(
-    step_outputs: list[object],
-    *,
-    success: bool,
-    error: str,
-) -> str:
-    texts: list[str] = []
-    for item in step_outputs:
-        if not isinstance(item, dict):
-            continue
-        output = str(item.get("output") or "").strip()
-        if output:
-            texts.append(output)
-        elif not item.get("success", True):
-            step_error = str(item.get("error") or "").strip()
-            if step_error:
-                texts.append(step_error)
-    if texts:
-        return "\n".join(texts)
-    if success:
-        return "Done."
-    return f"I could not complete that action: {error or 'execution failed'}"
 
 
 def _world_model_nodes_for_run(

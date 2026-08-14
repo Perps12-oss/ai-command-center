@@ -1,6 +1,14 @@
 # PHASE R1 — Runtime Reconciliation
 
-**Status:** ACTIVE — **blocks** Phase B UI expansion and Phase 8–10 feature completion  
+**STATUS:** COMPLETE on `origin/main` (P1–P4 passed; P5 Predictive/Undo closed via ADR-014)
+
+**HISTORICAL / NON-AUTHORITATIVE as an open plan**
+
+This document records the R1 program. It is **not** current Queue 1.  
+Do not re-open R1 as implementation work. Do not restore OperatorKernel from the “paper path” section.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Strategic Runtime Program).
+
 **Supersedes:** `PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md` (same intent, strict priority order)  
 **Baseline:** `origin/main`  
 **Authority:** Constitution · `DOC_HYGIENE.md` · `REPOSITORY_TRUTH_CANON.md` · `RUNTIME_AUTHORITY_MAP.md`
@@ -186,7 +194,7 @@ Runtime authority is settled (P1–P4); feature wire of retired research package
 | **UI** | Inspector, Timeline, Graph unified | ✅ P4 |
 | **Documentation** | Every active plan reflects runtime reality | ✅ this closeout + stop line |
 
-See `docs/audits/R1_UNGATED_STOP_LINE.md` for the next hard gate.
+See `docs/audits/R1_UNGATED_STOP_LINE.md` — the R1 stop line is **CLOSED**. Parallel tracks are parked/gated, not Queue 1.
 
 ---
 

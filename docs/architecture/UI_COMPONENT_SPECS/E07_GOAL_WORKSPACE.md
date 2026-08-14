@@ -1,7 +1,7 @@
 # E07 — Goal Workspace
 
 **Slice:** PR-UI-E07  
-**Status:** Implemented on feature branch (pending merge)
+**Status:** COMPLETE on `main` (#105) — **not Queue 1**. Historical spec; not pending merge.
 
 ## Purpose
 
@@ -11,7 +11,7 @@ Evolve `GoalView` into a Goal Workspace with tree, tasks, success criteria, and 
 
 ```
 GoalView
-├── Hero (metrics, New Goal → GOAL_SUBMIT_REQUEST)
+├── Hero (metrics, New Goal → UI_COMMAND / EA intake)
 ├── Workspace row
 │   ├── GoalTree
 │   ├── Tasks (TaskRow list from plan steps)

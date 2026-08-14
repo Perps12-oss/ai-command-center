@@ -1,6 +1,16 @@
 # Provider Capability Platform
 
-Four-week delivery cycle for ACC provider SDK, observability, diagnostics, and certification.
+**STATUS:** HISTORICAL / NON-AUTHORITATIVE as a delivery cycle — **not Queue 1**
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records a four-week provider-platform cycle. It is **not** the current implementation plan.  
+Live substitute on `main` is `AppState.provider_registry` (snapshot). Goose extras / `provider_sdk` live-wire are **ABANDONED as current work**. Remaining CP2 “immediate slice” language is **not** Queue 1.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).  
+Index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
+
+Four-week delivery cycle (historical) for ACC provider SDK, observability, diagnostics, and certification.
 
 ## Architecture
 
@@ -31,7 +41,7 @@ CP1 covers Weeks 1–4 of the original platform cycle (SDK, tracing, inspector, 
 
 ## Checkpoint: CP2 — ControlPlaneReady
 
-**Status:** Immediate implementation slice — lifecycle contracts, manager, settings→tracing, CI lifecycle tests.
+**Status:** HISTORICAL checkpoint language — **not** an immediate implementation slice / not Queue 1. Lifecycle contracts that already exist on `main` are live; remaining “still future” rows are parked extras.
 
 | Area | In place (CP2) | Still future |
 |------|----------------|--------------|

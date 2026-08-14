@@ -49,7 +49,10 @@ def test_confirmation_required_and_approve_resumes(tmp_path=None) -> None:
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            "interactive_user": True,
+            "actor_provenance": "ui",
             "run_id": "run-c1",
+            "request_id": "req-c1",
             "plan": {
                 "goal": "note",
                 "steps": [

@@ -78,6 +78,8 @@ Architecture: `Services → Events → AppState → UI`.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for repository policy, state ownership, and EventBus rules.
 
+**Planning:** the only canonical planned-work queue is [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) (Queue 1 is **EMPTY**). Historical roadmaps are not implementation authority — see [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md).
+
 
 | Module | Role |
 |--------|------|
@@ -123,7 +125,7 @@ gh repo create ai-command-center --private --source=. --remote=origin --push
 
 ## UCGS v5 governance
 
-Architecture governance kit (warn mode by default).
+Architecture governance kit (`ucgs.config.yaml` sets `enforcement_mode: block`; CI sets `UCGS_ENFORCEMENT=block`).
 
 ```powershell
 python tools/ucgs_runner.py

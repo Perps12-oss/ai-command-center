@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ai_command_center.core.app_state import AppState, AppStateStore
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.topics import GOAL_SUBMIT_REQUEST
+from ai_command_center.core.events.topics import UI_COMMAND
 from ai_command_center.domain.brain_state_snapshot import (
     BrainStateSnapshot,
     GoalSnapshot,
@@ -110,13 +110,14 @@ def test_empty_states() -> None:
     assert "No Data" not in surface
 
 
-def test_new_goal_publishes_goal_submit_request() -> None:
+def test_new_goal_publishes_ea_intake() -> None:
     bus = EventBus()
     ctrl = UIController(bus, AppStateStore(bus), on_state=lambda: None)
     seen: list[dict] = []
-    bus.subscribe(GOAL_SUBMIT_REQUEST, lambda e: seen.append(dict(e.payload)))
+    bus.subscribe(UI_COMMAND, lambda e: seen.append(dict(e.payload)))
     ctrl.publish_goal_submit_request("New Goal", priority=1)
-    assert seen and seen[0]["title"] == "New Goal"
+    assert seen and seen[0]["text"] == "goal: New Goal"
+    assert seen[0]["priority"] == 1
 
     submitted: list[tuple[str, int]] = []
     view = GoalView(None, on_new_goal=lambda t, p: submitted.append((t, p)))

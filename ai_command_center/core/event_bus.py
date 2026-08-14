@@ -20,7 +20,7 @@ import traceback
 import uuid
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ai_command_center.core.events.dispatch_policy import (
@@ -97,6 +97,10 @@ class Event:
     event_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     timestamp: float = field(default_factory=time.time)
     source: str = "system"
+    # Delivery outcome for async enqueue (explicit contract — not silent).
+    # delivered=sync handlers ran; queued=accepted by dispatch queue;
+    # dropped=rejected by backpressure; reentrant_dropped=ui.navigate guard.
+    delivery: str = "delivered"
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,10 +228,14 @@ class EventBus:
 
     def _dispatch_worker(self) -> None:
         assert self._dispatch_queue is not None
-        while not self._shutdown.is_set():
+        # Drain-friendly loop: after shutdown is signalled, keep processing
+        # until the queue is empty (then exit). Do not abandon queued work.
+        while True:
             try:
                 job = self._dispatch_queue.get(timeout=0.1)
             except queue.Empty:
+                if self._shutdown.is_set():
+                    break
                 continue
             if job is None:
                 self._dispatch_queue.task_done()
@@ -310,8 +318,21 @@ class EventBus:
         try:
             self._dispatch_queue.put_nowait(job)
         except queue.Full:
-            self._record_drop(event.topic)
-            return False
+            # Policy: only telemetry may be dropped under backpressure.
+            # Other topics block briefly; if still full, record drop + False.
+            if event.topic == TELEMETRY_EVENT:
+                self._record_drop(event.topic)
+                return False
+            try:
+                self._dispatch_queue.put(job, timeout=1.0)
+            except queue.Full:
+                logger.error(
+                    "EventBus queue full after wait; dropping non-telemetry "
+                    "topic=%s (caller must check Event.delivery)",
+                    event.topic,
+                )
+                self._record_drop(event.topic)
+                return False
 
         with self._queue_depth_lock:
             self._queue_depth += 1
@@ -373,11 +394,13 @@ class EventBus:
                 str(event.payload.get("view", "")),
                 self._navigate_dropped_reentrant,
             )
-            return event
+            return replace(event, delivery="reentrant_dropped")
         with self._topic_counts_lock:
             self._topic_publish_counts[topic] += 1
         if topic == UI_NAVIGATE:
             self._note_navigate_publish_rate(source, event.payload)
+        if self._shutdown.is_set() and get_dispatch_tier(topic) is DispatchTier.ASYNC_ELIGIBLE:
+            return replace(event, delivery="dropped")
         if self._should_enqueue_topic(topic):
             if self._debug_mode:
                 logger.debug(
@@ -386,10 +409,10 @@ class EventBus:
                     get_dispatch_tier(topic).value,
                     get_time_budget_ms(topic),
                 )
-            self._enqueue(event)
-            return event
+            accepted = self._enqueue(event)
+            return replace(event, delivery="queued" if accepted else "dropped")
         self._invoke_handlers(event)
-        return event
+        return replace(event, delivery="delivered")
 
     def _note_navigate_publish_rate(self, source: str, payload: dict[str, Any]) -> None:
         now = time.monotonic()
@@ -417,6 +440,11 @@ class EventBus:
                 "EventBus dropped reentrant ui.navigate (dispatch) source=%s",
                 event.source,
             )
+            return
+        if (
+            self._shutdown.is_set()
+            and get_dispatch_tier(event.topic) is DispatchTier.ASYNC_ELIGIBLE
+        ):
             return
         if self._should_enqueue_topic(event.topic):
             self._enqueue(event)
@@ -544,15 +572,39 @@ class EventBus:
                 except Exception:
                     logger.debug("Failed to publish handler duration metric", exc_info=True)
 
-    def shutdown(self) -> None:
+    def shutdown(self, *, timeout: float = 5.0) -> None:
+        """Stop accepting new async work, drain the dispatch queue, then join.
+
+        Order (ASYNC_EVENTBUS_POLICY Shutdown):
+        1. Set shutdown flag (``_should_enqueue_topic`` returns False).
+        2. Wait for queued jobs to finish (bounded by ``timeout``).
+        3. Send sentinel and join the dispatch thread.
+        """
         if self._dispatch_thread is None:
             return
         self._shutdown.set()
         assert self._dispatch_queue is not None
+        deadline = time.monotonic() + max(0.1, timeout)
+        # Wait for in-flight + queued work to drain before sentinel.
+        while self.dispatch_queue_depth > 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
         try:
             self._dispatch_queue.put_nowait(None)
         except queue.Full:
-            self._dispatch_queue.put(None)
-        self._dispatch_thread.join(timeout=5.0)
+            try:
+                self._dispatch_queue.put(None, timeout=max(0.05, deadline - time.monotonic()))
+            except queue.Full:
+                logger.error(
+                    "EventBus shutdown: could not enqueue sentinel; depth=%d",
+                    self.dispatch_queue_depth,
+                )
+        remaining = max(0.05, deadline - time.monotonic())
+        self._dispatch_thread.join(timeout=remaining)
+        if self._dispatch_thread.is_alive() or self.dispatch_queue_depth > 0:
+            logger.warning(
+                "EventBus shutdown incomplete: thread_alive=%s depth=%d",
+                self._dispatch_thread.is_alive(),
+                self.dispatch_queue_depth,
+            )
         self._dispatch_thread = None
         self._dispatch_queue = None

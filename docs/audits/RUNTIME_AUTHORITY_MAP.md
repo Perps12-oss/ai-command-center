@@ -1,7 +1,13 @@
 # Runtime Authority Map
 
-**Milestone:** PHASE R1 — Runtime Reconciliation  
-**Baseline:** `origin/main` @ `16f549e` (refreshed 2026-08-07; prior honesty pass @ `426c6b7` / #145)  
+**STATUS:** LIVE verification artifact (intake = ExecutionAuthority). Not an implementation queue.
+
+OperatorKernel path is **PAPER / RETIRED**. Do not restore it.
+
+Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Milestone:** PHASE R1 — Runtime Reconciliation (**COMPLETE**)  
+**Baseline:** `origin/main` @ `426c6b7` (map date); live path re-verified 2026-08-12 @ `b949f3e`  
 **Method:** Source + `service_factory.py` wiring only (not plan claims)  
 **Stop line:** [`R1_UNGATED_STOP_LINE.md`](R1_UNGATED_STOP_LINE.md)  
 **Hygiene disposition:** [`REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md`](REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md)
@@ -28,10 +34,10 @@ Bridging risks a **third bypass path**.
 ```text
 User / UI
     │
-    ▼ UI_COMMAND
-ExecutionAuthorityService          ← sole intake (ExecutionAuthorityService docstring)
-    │  StateAuthorityService.project (before plan)
-    ▼ GOAL_SUBMIT_REQUEST
+    ▼ UI_COMMAND   (incl. Hero New Goal → goal: <title>)
+ExecutionAuthorityService          ← sole intake (ADR-006)
+    │  EXECUTION_AUTHORITY_DECISION + StateAuthority.project + workspace gate
+    ▼ GOAL_SUBMIT_REQUEST   (authority_decision stamped; EA only)
 SingleGoalScheduler              ← goal queue + persistence
     │
     ├─ synthetic plan (skip_planner) ──► PLAN_GENERATED (internal)
@@ -107,9 +113,11 @@ Provider / Tools
 |--------|:-----:|-------|
 | `GoalEngine` + SQLite repo | ❌ | **RETIRED (ADR-012 A)** — not constructed in factory |
 | `SingleGoalScheduler` + Goal repo | ✅ | **Canonical live goals path** |
-| UI `GOAL_SUBMIT_REQUEST` | ✅ | ExecutionAuthority + Goal Dashboard |
+| UI `GOAL_SUBMIT_REQUEST` | ❌ | **Removed (B5 fork 1)** — Hero publishes `UI_COMMAND`; only EA emits `GOAL_SUBMIT_REQUEST` |
 
 Live durable goals SoT is `GoalRepository` only. Phase-9 `GoalEngine` remains in-tree for unit tests / future ADR; see `docs/architecture/SHADOW_SOT_INVENTORY.md`.
+
+**Publisher audit (B5):** production `GOAL_SUBMIT_REQUEST` publishers are EA `_submit_plan` only. Hero/Goal Dashboard was the sole UI publisher and was re-routed; no other UI publisher found.
 
 ---
 

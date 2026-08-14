@@ -1,7 +1,13 @@
 ﻿# Phase B UI Implementation Roadmap — Evolution Plan (Canon-corrected)
 
-**Status:** COMPLETE on `origin/main` (living historical roadmap — do not re-open E00–E13)  
-**Tip verified:** `origin/main` @ `16f549e` (2026-08-07)  
+**STATUS:** COMPLETE on `main` (#105) — **not Queue 1**
+
+**HISTORICAL / NON-AUTHORITATIVE as an open roadmap**
+
+Phase B UI program CONDITIONS are cleared. Do **not** treat remaining “incremental evolution” language as current implementation work. Do **not** re-open E00–E13.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+
 **Baseline:** `origin/main` only  
 **Handover:** [`docs/agents/DEVIN_UI_HANDOVER.md`](../agents/DEVIN_UI_HANDOVER.md)  
 **Audit gate:** [`docs/agents/CURSOR_AUDIT_GATE.md`](../agents/CURSOR_AUDIT_GATE.md)  
@@ -10,9 +16,9 @@
 **Authority:** ADR-006 (ExecutionAuthority canonical); [`REPOSITORY_TRUTH_CANON.md`](../audits/REPOSITORY_TRUTH_CANON.md)  
 **Hygiene disposition:** [`REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md`](../audits/REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md)
 
-This is the reconciled **evolution** version of the Phase B UI roadmap (not a rewrite plan). **E00–E13 shipped on `main`** via PRs #87–#103; Stage 1 Tom CONDITIONS cleared via #105. Sections below retain the original plan text as historical SoT; §4 is the tip-truth ship matrix.
+This is the reconciled **evolution** version of the Phase B UI roadmap (historical). **E00–E13 shipped on `main`** via PRs #87–#103; Stage 1 Tom CONDITIONS cleared via #105. Foundation, workspaces, and inspector/palette primitives exist on `main`. Sections below retain original plan text as historical SoT; §4 is the tip-truth ship matrix.
 
-> **Do not branch from `phase-11a-command-center`.** That branch is superseded. Inventory SoT is `origin/main`.
+> **Do not branch from `phase-11a-command-center`.** That branch is superseded.
 
 ---
 

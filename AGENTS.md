@@ -24,18 +24,24 @@ Implementation may not begin before pre-flight completion.
 
 See `docs/governance/PHASE_COMPLETION_RULE.md` and `.cursor/rules/phase-complete-on-main.mdc`.
 
+**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: Strategic Runtime Program** ([`STRATEGIC_RUNTIME_PROGRAM.md`](docs/governance/STRATEGIC_RUNTIME_PROGRAM.md)). Stream **code** is blocked until Gates 2–3. Do not invent extra tickets from historical inventories. 
+**Fossil / retired index:** [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md). 
+Historical roadmaps, Proposed ADRs, and old inventories are **not** implementation authority.
+
 ---
 
-## Default PR workflow — babysit (local + Cloud)
+## Default PR workflow — babysit (tool-neutral intent)
 
-**Babysit PR is the default end-to-end workflow**, not opt-in. Applies to **local Cursor agents** and **Cursor Cloud agents**.
+**Babysit PR is the default end-to-end workflow**, not opt-in. Applies to any implementation agent (Cursor, Claude Code, Cloud agents, humans).
 
 When work involves a feature branch or pull request:
 
 1. **Before commit** — If the branch has an open PR, triage unresolved review comments and latest CI; fix in-scope issues before committing.
-2. **After push / `gh pr create`** — Immediately babysit until merge-ready per `~/.cursor/skills-cursor/babysit/SKILL.md`: unresolved comments (filter resolved threads), merge conflicts, in-scope CI fixes; re-watch until mergeable and green.
+2. **After push / PR create** — Immediately babysit until merge-ready: unresolved comments (filter resolved threads), merge conflicts, in-scope CI fixes; re-watch until mergeable and green. Cursor agents may use `~/.cursor/skills-cursor/babysit/SKILL.md` when present; other agents satisfy the same intent via `gh` / CI without that skill.
 3. **Cloud agents** — Same default in-session; for long CI watch loops, start a Cloud background babysit subagent without waiting for the user to ask.
-4. **Hooks** — `.cursor/hooks.json` injects this reminder on `git commit`, `git push`, and `gh pr` commands when Cursor Hooks are enabled.
+4. **Hooks** — `.cursor/hooks.json` injects this reminder on `git commit`, `git push`, and `gh pr` commands when Cursor Hooks are enabled (adapter only — not a constitutional authority).
+
+No LLM or IDE is permanent implementation authority. Repository governance (`PROJECT_CONSTITUTION_V4.md`, Accepted ADRs, contracts) governs; tools are adapters. See `docs/ARCHITECTURE_ENFORCEMENT.md` for Level-2 enforcement directives (Article II basename; living path under `docs/`).
 
 Skip only when the user explicitly opts out or the task is clearly unrelated to any PR.
 

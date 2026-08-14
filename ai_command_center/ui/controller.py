@@ -21,7 +21,6 @@ from ai_command_center.core.events.topics import (
     GOAL_CANCEL_REQUEST,
     GOAL_PAUSE_REQUEST,
     GOAL_RESUME_REQUEST,
-    GOAL_SUBMIT_REQUEST,
     MEMORY_DELETE_REQUEST,
     MEMORY_REMEMBER,
     NOTE_SELECT,
@@ -825,18 +824,27 @@ class UIController:
         description: str = "",
         goal_id: str = "",
     ) -> None:
-        """Publish goal submit intent (GoalSchedulerService subscriber only)."""
+        """Publish Hero New Goal as EA intake (UI_COMMAND), never the scheduler topic.
+
+        ADR-006: ExecutionAuthority is sole user intake. The scheduler topic is
+        internal post-authority; UI must not publish it (B5 fork 1).
+        """
         text = str(title or "").strip() or "New Goal"
+        if not text.lower().startswith("goal:"):
+            text = f"goal: {text}"
         payload: dict[str, object] = {
-            "title": text,
-            "goal": text,
-            "description": str(description or ""),
+            "text": text,
             "priority": int(priority),
+            "description": str(description or ""),
         }
         gid = str(goal_id or "").strip()
         if gid:
             payload["goal_id"] = gid
-        self._bus.publish(GOAL_SUBMIT_REQUEST, payload, source="ui")
+        scope = self.current_workspace_scope()
+        for key, value in scope.items():
+            if key not in payload and value:
+                payload[key] = value
+        self._bus.publish(UI_COMMAND, payload, source="ui")
 
     def publish_goal_pause_request(self, goal_id: str) -> None:
         """Publish goal pause intent (scheduler owns GOAL_PAUSED fact)."""

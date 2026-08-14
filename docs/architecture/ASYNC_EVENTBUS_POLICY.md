@@ -1,6 +1,11 @@
 # Async EventBus Policy & Design (R4)
 
-**Status:** R4b implemented (optional dispatch queue); R4c implemented (per-handler async adapters, bounded queue)  
+**STATUS:** R4b/R4c **LIVE on main** (`async_dispatch=True` single queue). Multi-pool / R4d isolation = **PARKED**.
+
+This is a **design** document. Unchecked “future implementation PR” checklists below are **fossils**.  
+Do **not** implement `tiered_dispatch_policy.py` / `async_dispatch_queue.py` from this file.  
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+
 **Authority:** Subordinate to [PROJECT_CONSTITUTION_V4.md](../../PROJECT_CONSTITUTION_V4.md)  
 **Runtime reference:** `ai_command_center/core/event_bus.py`  
 **Topic registry:** `ai_command_center/core/events/topics.py`  
@@ -10,7 +15,9 @@
 
 ## Problem statement
 
-Today `EventBus.publish()` runs every subscriber **synchronously on the caller's thread**:
+**Historical (pre-R4b).** Current `main` uses `EventBus(..., async_dispatch=True)` — a **single** `event-dispatch` queue. The synchronous-on-caller-thread behaviour below is the **problem that R4b addressed**, not current live dispatch. Multi-pool / R4d isolation remains **PARKED**.
+
+Historically `EventBus.publish()` ran every subscriber **synchronously on the caller's thread**:
 
 ```155:186:ai_command_center/core/event_bus.py
     def publish(self, topic: str, payload: dict[str, Any] | None = None, *, source: str = "system") -> Event:
@@ -203,11 +210,24 @@ Current behavior (preserve):
 
 When dispatch queue depth exceeds threshold (R4c):
 
-1. **Drop policy (telemetry only)** — `telemetry.event` may drop oldest with counter metric
+1. **Drop policy (telemetry only)** — `telemetry.event` may drop with counter metric when `EVENTBUS_QUEUE_DROP_TELEMETRY=1`
 2. **Block policy (never for UI ingress)** — `ui.command`, `settings.set_request` must not block publisher
 3. **Coalesce policy (streaming)** — `chat.chunk` / `llm.chunk`: keep latest N per session in queue
 
 Default: unbounded queue in R4b prototype; bounded queue required before production enablement.
+
+### Caller observability (enforced)
+
+`EventBus.publish()` still returns `Event` (callers unchanged) but sets `Event.delivery`:
+
+| Value | Meaning |
+|-------|---------|
+| `delivered` | Sync handlers invoked inline |
+| `queued` | Accepted onto the dispatch queue |
+| `dropped` | Rejected by backpressure (check `dropped_events` / logs) |
+| `reentrant_dropped` | `ui.navigate` re-entrancy guard |
+
+Callers that must not lose work should inspect `event.delivery` after publish. Silent success after a drop is not the contract.
 
 ---
 
@@ -215,17 +235,21 @@ Default: unbounded queue in R4b prototype; bounded queue required before product
 
 Order (align with `ApplicationCore` teardown):
 
-1. Stop accepting new publishes (or drain flag)
-2. Signal service workers (`ObsidianService._index_stop`, Ollama loop stop)
-3. Join dispatch thread with timeout (R4b+)
+1. Stop accepting new async publishes (`_shutdown` → enqueue disabled)
+2. **Drain** the dispatch queue (process remaining jobs; bounded timeout)
+3. Signal sentinel and join dispatch thread (R4b+)
 4. Unsubscribe all / clear handlers
 5. Join remaining daemon threads
 
-Handlers must not publish after bus shutdown begins.
+Handlers must not publish after bus shutdown begins. Queued work that arrived
+before shutdown must not be abandoned when the flag is set.
 
 ---
 
-## Acceptance criteria (future implementation PR)
+## Acceptance criteria (historical — R4b/R4c already on `main`)
+
+**STATUS: COMPLETE / LIVE** for R4b single-queue + R4c adapters.  
+The unchecked boxes below are **historical**. They are not Queue 1. Feature flag on `create_application()` is `async_dispatch=True` (not “defaults to sync”).
 
 An R4b/R4c implementation PR is **done** when:
 

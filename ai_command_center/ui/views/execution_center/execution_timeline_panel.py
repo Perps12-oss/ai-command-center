@@ -83,6 +83,7 @@ class ExecutionTimelinePanel(ctk.CTkFrame):
                         "status": "ok",
                         "duration_ms": 0.0,
                         "detail": dict(event.payload),
+                        "event_id": str(getattr(event, "event_id", "") or ""),
                     }
                 )
         elif steps:
@@ -94,8 +95,41 @@ class ExecutionTimelinePanel(ctk.CTkFrame):
                         "status": step.status,
                         "duration_ms": 0.0,
                         "detail": {"error": step.error, "risk": step.risk},
+                        "event_id": str(getattr(step, "step_id", "") or ""),
                     }
                 )
+
+        scrub_index = (
+            scrub.scrub_index
+            if scrub.request_id == self._request_id
+            else max(0, len(timeline_steps) - 1)
+        )
+        current_id = plan.current_step_id if steps else ""
+        fingerprint = (
+            str(self._request_id or ""),
+            tuple(labels),
+            tuple(
+                (
+                    str(s.get("event_id", "") or ""),
+                    str(s.get("name", "") or ""),
+                    str(s.get("status", "") or ""),
+                )
+                for s in timeline_steps
+            ),
+            tuple(
+                (
+                    str(getattr(step, "step_id", "") or ""),
+                    str(getattr(step, "capability", "") or ""),
+                    str(getattr(step, "status", "") or ""),
+                )
+                for step in steps
+            ),
+            str(current_id or ""),
+            int(scrub_index),
+        )
+        if fingerprint == getattr(self, "_snapshot_fingerprint", None):
+            return
+        self._snapshot_fingerprint = fingerprint
 
         clear_children(self._step_list)
         if not steps and not timeline_steps:
@@ -123,7 +157,6 @@ class ExecutionTimelinePanel(ctk.CTkFrame):
             )()
             for s in timeline_steps
         ]
-        current_id = plan.current_step_id if steps else ""
         for step in display_steps:
             status = str(getattr(step, "status", "") or "")
             is_current = getattr(step, "step_id", "") == current_id and bool(current_id)
@@ -155,11 +188,6 @@ class ExecutionTimelinePanel(ctk.CTkFrame):
                 f"{counts['waiting']} waiting"
             )
         )
-        scrub_index = (
-            scrub.scrub_index
-            if scrub.request_id == self._request_id
-            else max(0, len(timeline_steps) - 1)
-        )
         self._dock.render(
             timeline_steps,
             scrub_labels=labels,
@@ -178,6 +206,8 @@ class ExecutionTimelinePanel(ctk.CTkFrame):
         """Compatibility path used by StateApplier scrubber projection."""
         del timeline_source
         self._request_id = request_id
+        # Live scrubber projection owns dock/step identity separately from apply_snapshot.
+        self._snapshot_fingerprint = None
         self._dock.render(
             list(timeline_steps),
             scrub_labels=list(scrub_labels),

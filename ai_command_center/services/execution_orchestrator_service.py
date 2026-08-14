@@ -13,6 +13,13 @@ from collections.abc import Callable
 from typing import Any
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
+from ai_command_center.core.control_plane import (
+    DEFAULT_AUTOMATION_ACTOR,
+    resolve_run_context,
+    resolve_tool_invoke_actor,
+    step_requires_human_approval,
+)
+from ai_command_center.core.security_policy import tool_requires_human_approval
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     AUTONOMY_SCORE_UPDATED,
@@ -31,6 +38,7 @@ from ai_command_center.core.events.topics import (
     EXECUTION_STEP_FAILED,
     EXECUTION_STEP_STARTED,
     LLM_STEP_REQUEST,
+    ORCHESTRATION_RECEIPT,
     PLAN_REPLAN_REQUEST,
     PLAN_REPLAN_RESULT,
     PLAN_REPLAN_STUCK,
@@ -87,10 +95,11 @@ def _is_agent_capability(capability: str) -> bool:
     return capability.strip().lower().startswith("agent.")
 
 
-def _step_needs_approval(step: PlanStep, *, auto_approve: bool) -> bool:
-    if auto_approve:
-        return False
-    return bool(step.require_approval)
+def _human_approval_fields(tool_name: str) -> dict[str, Any]:
+    """Stamp human_approved only after the orchestrator HITL gate has cleared."""
+    if tool_requires_human_approval(tool_name):
+        return {"human_approved": True}
+    return {}
 
 
 class ExecutionOrchestratorService(BaseService):
@@ -102,6 +111,9 @@ class ExecutionOrchestratorService(BaseService):
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
         self._runs: dict[str, dict[str, Any]] = {}
+        # G1 receipt boundary: correlation ids seen on ORCHESTRATION_RECEIPT.
+        # Success path emits receipt *before* EXECUTION_RUN_COMPLETE (fail-closed).
+        self._receipted_ids: set[str] = set()
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
@@ -131,12 +143,22 @@ class ExecutionOrchestratorService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(TOOL_DENIED, self._on_tool_denied)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(ORCHESTRATION_RECEIPT, self._on_orchestration_receipt)
+        )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
         self._runs.clear()
+        self._receipted_ids.clear()
+
+    def _on_orchestration_receipt(self, event: Event) -> None:
+        """Record receipt evidence so _complete_run can verify the G1 boundary."""
+        request_id = str(event.payload.get("request_id") or "").strip()
+        if request_id:
+            self._receipted_ids.add(request_id)
 
     def _on_run_request(self, event: Event) -> None:
         run_id = str(event.payload.get("run_id") or uuid.uuid4().hex)
@@ -180,7 +202,7 @@ class ExecutionOrchestratorService(BaseService):
             "receipts": receipts,
             "request_id": str(event.payload.get("request_id", "")),
             "correlation": CorrelationContext.from_payload(event.payload).to_payload(),
-            "auto_approve": bool(event.payload.get("auto_approve", False)),
+            **resolve_run_context(event.payload if isinstance(event.payload, dict) else {}),
             "paused": False,
             "replanning": False,
             "replan_attempts": 0,
@@ -345,7 +367,6 @@ class ExecutionOrchestratorService(BaseService):
             return
 
         step = plan.steps[index]
-        auto_approve = bool(run.get("auto_approve", False))
         self._bus.publish(
             EXECUTION_STEP_STARTED,
             {
@@ -357,7 +378,12 @@ class ExecutionOrchestratorService(BaseService):
             source=self.name,
         )
 
-        if _step_needs_approval(step, auto_approve=auto_approve):
+        # ADR-004 classification is enforced at the TOOL_INVOKE boundary in
+        # ToolExecutorService, where the tool name is concrete. Plan capability
+        # names are aliased (e.g. "create_note" -> "notes.create"), so rejecting
+        # on the capability label here would deny legitimate work while adding
+        # no security: nothing executes without passing the executor's gate.
+        if step_requires_human_approval(step, run=run):
             run["paused"] = True
             confirmation_id = f"{run_id}:{step.step_id}"
             self._publish_decision_and_autonomy(
@@ -518,7 +544,7 @@ class ExecutionOrchestratorService(BaseService):
             )
             return
 
-        actor_type = str(step.args.get("actor_type") or "user")
+        actor_type, interactive_user = resolve_tool_invoke_actor(run=run)
         tool_args = {
             k: v
             for k, v in dict(step.args).items()
@@ -538,8 +564,10 @@ class ExecutionOrchestratorService(BaseService):
                 "run_id": run_id,
                 "step_id": step.step_id,
                 "actor_type": actor_type,
+                "interactive_user": interactive_user,
                 "workspace_context": workspace_context,
                 "intention": intention.to_dict(),
+                **_human_approval_fields(step.capability),
                 **(
                     {"workflow_run_id": step.args["workflow_run_id"]}
                     if step.args.get("workflow_run_id")
@@ -571,6 +599,10 @@ class ExecutionOrchestratorService(BaseService):
                 "text": task,
                 "agent_id": args.get("agent_id"),
                 "request_id": request_id,
+                # Re-entering intake must not launder agent origin into
+                # interactive-user trust. ExecutionAuthority only ever
+                # de-escalates on this field, never escalates.
+                "actor_provenance": DEFAULT_AUTOMATION_ACTOR,
             }
             if workspace_context.get("workspace_id"):
                 payload["workspace_id"] = workspace_context["workspace_id"]
@@ -599,6 +631,7 @@ class ExecutionOrchestratorService(BaseService):
                 "task": str(args.get("task") or ""),
                 "pipeline_id": str(args.get("pipeline_id") or ""),
                 "workspace_context": workspace_context,
+                **_human_approval_fields(tool_name),
             },
             source=self.name,
         )
@@ -881,25 +914,101 @@ class ExecutionOrchestratorService(BaseService):
         self._fail_run(run_id, error)
 
     def _complete_run(self, run_id: str) -> None:
+        from ai_command_center.orchestration.receipts.boundary_emit import (
+            emit_execution_receipt,
+        )
+
         run = self._runs.pop(run_id, None)
         request_id = str(run.get("request_id", "")) if run else ""
         correlation = dict(run.get("correlation") or {}) if run else {}
         plan = run.get("plan") if run else None
-        self._bus.publish(
-            EXECUTION_RUN_COMPLETE,
-            {
-                "run_id": run_id,
-                "request_id": request_id,
-                "correlation": correlation,
-                "goal": getattr(plan, "goal", "") if plan else str(run.get("goal", "") if run else ""),
-                "success": True,
-                "step_outputs": list(run.get("step_outputs") or []) if run else [],
-                "observations": list(run.get("observations") or []) if run else [],
-                "plan": plan.to_dict() if isinstance(plan, ExecutionPlan) else {},
-                "workspace_context": dict(run.get("workspace_context") or {}) if run else {},
-            },
-            source=self.name,
+        step_outputs = list(run.get("step_outputs") or []) if run else []
+        observations = list(run.get("observations") or []) if run else []
+        plan_dict = plan.to_dict() if isinstance(plan, ExecutionPlan) else {}
+        workspace_context = dict(run.get("workspace_context") or {}) if run else {}
+        goal = (
+            getattr(plan, "goal", "")
+            if plan
+            else str(run.get("goal", "") if run else "")
         )
+
+        # Correlation ids a receipt for this run may legitimately carry.
+        correlating_ids = {i for i in (request_id, run_id) if i}
+        # Drop stale ledger entries before emitting fresh evidence for this run.
+        self._receipted_ids -= correlating_ids
+
+        completion_payload = {
+            "run_id": run_id,
+            "request_id": request_id,
+            "correlation": correlation,
+            "goal": goal,
+            "success": True,
+            "step_outputs": step_outputs,
+            "observations": observations,
+            "plan": plan_dict,
+            "workspace_context": workspace_context,
+        }
+
+        # G1 fail-closed: establish receipt evidence *before* any public success.
+        # Uses existing ORCHESTRATION_RECEIPT (SYNC_STANDARD) — no new bus topic.
+        evidence = emit_execution_receipt(
+            self._bus,
+            payload=completion_payload,
+            success=True,
+            error="",
+        )
+        receipted = bool(evidence) and bool(self._receipted_ids & correlating_ids)
+        if not receipted and evidence:
+            # Emit published a receipt whose request_id may have been synthesized.
+            rid = str(evidence.get("request_id") or "").strip()
+            receipted = bool(rid) and rid in self._receipted_ids
+            if receipted and not request_id:
+                request_id = rid
+                completion_payload["request_id"] = rid
+                correlating_ids.add(rid)
+
+        if not receipted:
+            _logger.error(
+                "execution.receipt_boundary_violation run_id=%s request_id=%s — "
+                "no ExecutionReceipt before COMPLETE; failing closed",
+                run_id,
+                request_id,
+            )
+            self._bus.publish(
+                EXECUTION_RUN_FAILED,
+                {
+                    "run_id": run_id,
+                    "request_id": request_id,
+                    "error": (
+                        "receipt boundary violation: execution completed without an "
+                        "ExecutionReceipt or TruthBoundary validation"
+                    ),
+                    "receipt_boundary_violation": True,
+                    "correlation": correlation,
+                    "goal": goal,
+                    "success": False,
+                    "step_outputs": step_outputs,
+                    "observations": observations,
+                    "plan": plan_dict,
+                    "workspace_context": workspace_context,
+                },
+                source=self.name,
+            )
+            self._receipted_ids -= correlating_ids
+            return
+
+        # Public success only after receipt evidence exists.
+        if evidence:
+            completion_payload["receipt_id"] = evidence.get("receipt_id")
+            completion_payload["receipt_already_emitted"] = True
+            completion_payload["truth_valid"] = evidence.get("truth_valid")
+            completion_payload["truth_detail"] = evidence.get("truth_detail")
+            completion_payload["response_source"] = evidence.get("response_source")
+            completion_payload["response_text"] = evidence.get("response_text")
+            completion_payload["primary_capability"] = evidence.get("primary_capability")
+            completion_payload["execution_facts"] = evidence.get("facts")
+        self._bus.publish(EXECUTION_RUN_COMPLETE, completion_payload, source=self.name)
+        self._receipted_ids -= correlating_ids
 
     def _fail_run(self, run_id: str, error: str) -> None:
         run = self._runs.pop(run_id, None)
@@ -922,3 +1031,6 @@ class ExecutionOrchestratorService(BaseService):
             },
             source=self.name,
         )
+        # Clear after publishing: the failure itself is receipted, and that entry
+        # must not accumulate or satisfy a later run reusing the same ids.
+        self._receipted_ids -= {i for i in (request_id, run_id) if i}

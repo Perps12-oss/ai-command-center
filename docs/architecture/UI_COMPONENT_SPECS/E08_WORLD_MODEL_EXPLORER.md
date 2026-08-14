@@ -1,7 +1,7 @@
 # E08 — World Model Explorer
 
 **Slice:** PR-UI-E08  
-**Status:** Implemented on feature branch (pending merge)
+**Status:** COMPLETE on `main` (#105) — **not Queue 1**. Historical spec; not pending merge.
 
 ## Purpose
 

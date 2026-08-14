@@ -35,7 +35,7 @@ class ToolRegistry:
         spec = self._tools.get(tool_name)
         if spec is None:
             return None
-        return {"name": spec.name, "description": spec.description}
+        return {"name": spec.name, "description": spec.description, "tier": spec.tier.value if spec.tier else None}
 
     def get_spec(self, tool_name: str) -> ToolSpec | None:
         return self._tools.get(tool_name)

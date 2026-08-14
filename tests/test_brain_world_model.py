@@ -329,7 +329,18 @@ def test_single_goal_scheduler_runs_goal_to_completion() -> None:
 
     bus.publish(
         GOAL_SUBMIT_REQUEST,
-        {"goal_id": "goal-1", "goal": "Organize Downloads", "priority": "high"},
+        {
+            "goal_id": "goal-1",
+            "goal": "Organize Downloads",
+            "priority": "high",
+            "authority_decision": {
+                "kind": "actionable",
+                "capability": "goal",
+                "reason": "test",
+            },
+            "interactive_user": True,
+            "actor_provenance": "ui",
+        },
         source="test",
     )
 
@@ -372,7 +383,15 @@ def test_scheduler_ignores_unrelated_execution_events() -> None:
 
     bus.publish(
         GOAL_SUBMIT_REQUEST,
-        {"goal_id": "goal-1", "goal": "Organize Downloads"},
+        {
+            "goal_id": "goal-1",
+            "goal": "Organize Downloads",
+            "authority_decision": {
+                "kind": "actionable",
+                "capability": "goal",
+                "reason": "test",
+            },
+        },
         source="test",
     )
     bus.publish(

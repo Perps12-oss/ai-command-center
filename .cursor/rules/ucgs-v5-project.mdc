@@ -12,7 +12,7 @@ This project uses **UCGS v5** executable architecture governance.
 | Layer | Location | Phase 1 behavior |
 |-------|----------|------------------|
 | CI | `.github/workflows/ucgs.yml` | Blocks on FAIL / S4 / S5 (Phase 3) |
-| Git | `tools/install_git_hooks.py` | Pre-commit warns only |
+| Git | `tools/install_git_hooks.py` | Pre-commit runs UCGS runner + gate (blocks when `enforcement_mode: block`) |
 | Cursor | `.cursor/hooks.json` | UCGS verdict + babysit reminder on `git commit` / `git push` / `gh pr` |
 | LLM fallback | `.cursor/rules/ucgs-v4-analysis.mdc` | When report incomplete |
 
@@ -34,9 +34,9 @@ python tools/install_git_hooks.py
 
 | Phase | Setting |
 |-------|---------|
-| 1 (default) | `enforcement_mode: warn` |
-| 2 | `enforcement_mode: block` locally |
-| 3 | `UCGS_ENFORCEMENT=block` in CI workflow |
+| Current (local) | `ucgs.config.yaml` → `enforcement_mode: block` |
+| CI | `UCGS_ENFORCEMENT=block` in `.github/workflows/ucgs.yml` |
+| Historical note | Early Phase 1 used warn-only locally; do not treat “warn by default” as current policy |
 
 ## Agent behavior
 

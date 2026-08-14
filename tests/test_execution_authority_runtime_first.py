@@ -239,6 +239,25 @@ def test_inv5_shell_single_execution_path() -> None:
     invokes: list[dict] = []
     bus.subscribe(TOOL_INVOKE, lambda e: invokes.append(dict(e.payload)))
 
+    def _auto_confirm(event) -> None:
+        cid = str(event.payload.get("confirmation_id") or "")
+        if not cid:
+            return
+        bus.publish(
+            TOOL_APPROVED,
+            {
+                "confirmation_id": cid,
+                "run_id": cid.split(":", 1)[0],
+                "step_id": cid.split(":", 1)[-1] if ":" in cid else "",
+                "approved": True,
+            },
+            source="ui",
+        )
+
+    from ai_command_center.core.events.topics import TOOL_APPROVED, TOOL_CONFIRMATION_REQUIRED
+
+    bus.subscribe(TOOL_CONFIRMATION_REQUIRED, _auto_confirm)
+
     bus.publish(
         UI_COMMAND,
         {"text": ">echo hi", "workspace_id": "ws-1"},
@@ -248,8 +267,7 @@ def test_inv5_shell_single_execution_path() -> None:
     shell_invokes = [item for item in invokes if item.get("tool") == "shell"]
     assert len(shell_invokes) == 1
     assert shell_invokes[0]["args"]["command"] == "echo hi"
-    assert shell_invokes[0]["source"] if False else True  # payload has no source
-    # Evidence: ExecutionOrchestrator is the only shell TOOL_INVOKE publisher.
+    assert shell_invokes[0].get("interactive_user") is True
 
 
 def test_inv6_kernel_supervises_typed_command() -> None:

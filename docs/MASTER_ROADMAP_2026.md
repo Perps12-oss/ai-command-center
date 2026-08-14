@@ -1,15 +1,26 @@
 # AI Command Center — Master Roadmap 2026
 
 **Generated:** 2026-07-11  
-**Status:** ACTIVE  
-**Authority:** `PROJECT_CONSTITUTION_V4.md`  
-**Supersedes:** `ARCHITECTURE_TRANSITION_PLAN.md` (Programs 1-4), archived `UNFINISHED_WORK_IMPLEMENTATION_PLAN.md`
+**STATUS:** HISTORICAL / NON-AUTHORITATIVE — **not** the canonical plan
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records previous sequencing (2026-07-11). It is **not** the current implementation plan.  
+**Do not implement from this document.**
+
+Canonical planned-work queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](governance/IMPLEMENTATION_GUIDE.md)  
+Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](governance/HISTORICAL_AND_RETIRED_WORK.md)
+
+OperatorKernel, GoalEngine, PlanningEngine, Phase 5 tiered EventBus, Knowledge Federation-as-SoT, and Chat C2–C4 **as programs** are **retired / parked / abandoned** — see the fossil index. This file’s “authoritative roadmap” claim is **revoked**.
+
+**Authority:** `PROJECT_CONSTITUTION_V4.md` (supreme); this file does not outrank Accepted ADRs or the Implementation Guide.  
+**Supersedes (historical):** `ARCHITECTURE_TRANSITION_PLAN.md` (Programs 1-4), archived `UNFINISHED_WORK_IMPLEMENTATION_PLAN.md`
 
 ---
 
 ## Executive Summary
 
-This document is the **single source of truth** for the AI Command Center development roadmap. It consolidates all prior program work into four coherent phases, identifies remaining deliverables, and provides clear exit criteria for each phase.
+This document is a **historical sequencing snapshot** (2026-07-11). It is **not** the repository’s source of truth and **not** the canonical planned-work queue. Constitution + Accepted ADRs + [`IMPLEMENTATION_GUIDE.md`](governance/IMPLEMENTATION_GUIDE.md) win.
 
 ```text
 Current State (2026-07-11)
@@ -18,10 +29,10 @@ Current State (2026-07-11)
 ✓ Program 3: Workspace Adoption                 — COMPLETE
 ✓ Program 4 Slices 1-3: Platform Improvements  — COMPLETE
 ✓ Program 5 Phases A-D: Reasoning Layer MVP    — COMPLETE
-⏳ Program 4 Slice 4: Phase 6 Async EventBus    — PARTIAL
-⏳ Program 5 Phase E: External Integrations     — IN PROGRESS
-⬜ Program 6: Multi-Agent Runtime               — GATED
-⬜ Program 7: Knowledge Federation              — FUTURE
+⏳ Program 4 Slice 4: Phase 6 Async EventBus    — PARTIAL (historical 2026-07; R4b single-queue now LIVE; tiered pools PARKED)
+⏳ Program 5 Phase E: External Integrations     — IN PROGRESS (historical 2026-07 snapshot)
+⬜ Program 6: Multi-Agent Runtime               — GATED (historical label)
+⬜ Program 7: Knowledge Federation              — FUTURE (historical label; program **ABANDONED** as unified SoT)
 ```
 
 ---
@@ -690,28 +701,32 @@ If any phase introduces regressions:
 
 ### Active Reference Documents
 
+**Note (2026-08-12):** This table is **historical**. Canonical plan = `docs/governance/IMPLEMENTATION_GUIDE.md`. Phase plans listed as “keep active” are **not** Queue 1.
+
 | Document | Role |
 |----------|------|
 | `PROJECT_CONSTITUTION_V4.md` | Supreme authority |
 | `AGENTS.md` | Layer ownership rules |
 | `docs/ARCHITECTURE.md` | Runtime architecture |
 | `docs/architecture/WORKSPACE_VISION.md` | Product north star |
-| `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` | **Active** — runtime reconciliation (strict priority order) |
+| `docs/governance/IMPLEMENTATION_GUIDE.md` | **Canonical planned-work queue** |
+| `docs/governance/HISTORICAL_AND_RETIRED_WORK.md` | Fossil index |
+| `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` | **COMPLETE** — not Queue 1 |
 | `docs/architecture/adr/ADR-006_EXECUTION_AUTHORITY_CANONICAL.md` | **Accepted** — ExecutionAuthority canonical |
-| `docs/architecture/STATE_AUTHORITY_CONTRACT.md` | **Active** — next architectural work |
+| `docs/architecture/STATE_AUTHORITY_CONTRACT.md` | Contract — SA.mutate track CLOSED |
 | `docs/plans/PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md` | Superseded by R1 |
 | `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md` | Exists / Wired / Tested matrix |
 | `docs/audits/RUNTIME_AUTHORITY_MAP.md` | Live vs paper execution paths |
-| `docs/audits/REPOSITORY_TRUTH_CANON.md` | UI inventory SoT |
-| `docs/plans/PHASE_5_ASYNC_EVENTBUS_PLAN.md` | Phase 5 (PARTIAL — keep active) |
-| `docs/plans/PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | Phase 6 (PARTIAL — keep active) |
+| `docs/audits/REPOSITORY_TRUTH_CANON.md` | HISTORICAL UI inventory @ `e128a72` |
+| `docs/plans/PHASE_5_ASYNC_EVENTBUS_PLAN.md` | PARKED / branch ABANDONED |
+| `docs/plans/PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | Bridge WIRED; extras not Queue 1 |
 | `docs/archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md` | Phase 7 (archived SUPERSEDED) |
-| `docs/plans/PHASE_8_OPERATOR_KERNEL_PLAN.md` | Phase 8 (PARTIAL — keep active) |
-| `docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | Phase 9 (PARTIAL — keep active) |
-| `docs/plans/PHASE_10_WORLD_MODEL_PLAN.md` | Phase 10 (PARTIAL — keep active) |
-| `docs/plans/PHASE_9_CROSS_PLATFORM_PLAN.md` | Cross-platform / roadmap Phase 11 (NOT_COMPLETE) |
+| `docs/plans/PHASE_8_OPERATOR_KERNEL_PLAN.md` | RETIRED (ADR-006) |
+| `docs/plans/PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | RETIRED (ADR-012/013) |
+| `docs/plans/PHASE_10_WORLD_MODEL_PLAN.md` | WM live; Predictive/Undo RETIRED |
+| `docs/plans/PHASE_9_CROSS_PLATFORM_PLAN.md` | GATED SKU — not current work |
 | `docs/governance/DOC_HYGIENE.md` | Active vs archive doc rules |
-| `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` | Code verification before archive |
+| `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` | HISTORICAL 2026-07-20 verification |
 
 ### Active Governance
 

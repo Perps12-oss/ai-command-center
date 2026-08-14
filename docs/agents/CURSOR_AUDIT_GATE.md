@@ -1,8 +1,12 @@
 # Cursor Audit Gate — Phase B UI Workflow
 
-**Status:** ACTIVE  
-**Audience:** Cursor / Tom (Repository Guardian) — sole coder + auditor as of 2026-07-22  
-**Trigger:** Every Phase B UI PR (one evolution slice per PR)
+**Status:** SUPERSEDED — historical Phase B staffing workflow (2026-07-22 era)  
+**Superseded-by:** Repository tool-neutral governance (`PROJECT_CONSTITUTION_V4.md`, `docs/governance/IMPLEMENTATION_GUIDE.md`); Tom auditor skill remains available without “sole coder” privilege  
+**Do-not-plan-from:** true for staffing/authority claims (“sole coder”, Cursor-as-only builder)  
+**Audience (historical):** Cursor / Tom during Phase B UI slices  
+**Trigger (historical):** Every Phase B UI PR (one evolution slice per PR)
+
+> **Note:** ACC does not designate Cursor, Devin, Claude, or any other LLM/tool as permanent implementation authority. Phase B audit *reports* under `docs/audits/` remain historical evidence and are not rewritten.
 
 ---
 

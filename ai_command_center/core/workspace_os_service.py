@@ -28,8 +28,6 @@ from ai_command_center.core.entity.entity_bus_handlers import RESOURCE_VALUE_KEY
 
 from ai_command_center.core.events.topics import (
 
-    ACTION_INVOKE_REQUEST,
-
     ACTION_INVOKE_RESULT,
 
     ENTITY_CREATE_REQUEST,
@@ -59,6 +57,8 @@ from ai_command_center.core.events.topics import (
     UI_LAUNCH_RESOURCE,
 
     UI_SEARCH_WORKSPACE_OS,
+
+    WORKFLOW_EXECUTION_REQUEST,
 
     WORKSPACE_ADD_ENTITY_REQUEST,
 
@@ -580,7 +580,17 @@ class WorkspaceOsService(BaseService):
 
     def _on_launch_resource(self, event: Any) -> None:
 
-        """Handle UI_LAUNCH_RESOURCE via action.invoke.request + timeline.record.request."""
+        """Handle UI_LAUNCH_RESOURCE through the canonical execution boundary (G2).
+
+        Launches previously went straight to ActionRegistry, producing real OS side
+        effects with no ExecutionAuthority decision, no ExecutionReceipt and no
+        TruthBoundary validation. They now enter ExecutionAuthority as an explicit
+        tool step, so the sole TOOL_INVOKE publisher dispatches them and the run is
+        receipted or fails closed.
+
+        ActionRegistry keeps no execution authority; the frozen launch handlers are
+        reused below the boundary via ``orchestration/workspace_launch_tools.py``.
+        """
 
         from ai_command_center.core.entity.entity import (
 
@@ -602,46 +612,35 @@ class WorkspaceOsService(BaseService):
 
 
 
-        action_name = {
+        tool_name, arg_key, action_name = {
 
-            RESOURCE_TYPE_FOLDER: "Open Folder",
+            RESOURCE_TYPE_FOLDER: (
 
-            RESOURCE_TYPE_COMMAND: "Execute Command",
+                "workspace_open_folder",
 
-        }.get(resource_type, "Launch URL")
+                "path",
 
+                "Open Folder",
 
+            ),
 
-        invoke_request_id = uuid.uuid4().hex
+            RESOURCE_TYPE_COMMAND: (
 
-        self._pending[invoke_request_id] = {}
+                "workspace_execute_command",
 
-        self._publish_request(
+                "command",
 
-            ACTION_INVOKE_REQUEST,
+                "Execute Command",
 
-            invoke_request_id,
+            ),
 
-            {
-
-                "action_type": "launch",
-
-                "action_name": action_name,
-
-                "parameters": {"url": value, "path": value, "command": value},
-
-            },
-
-        )
-
-        invoke_result = self._await_result(invoke_request_id)
-
-        if invoke_result.get("error"):
-
-            raise ValueError(str(invoke_result["error"]))
+        }.get(resource_type, ("workspace_open_url", "url", "Launch URL"))
 
 
 
+        # Record timeline *before* WORKFLOW_EXECUTION_REQUEST. Application EventBus
+        # uses async_dispatch=True, so TOOL_INVOKE runs on a worker thread and can
+        # race timeline SQLite writes if we record after enqueueing the run.
         timeline_request_id = uuid.uuid4().hex
 
         self._pending[timeline_request_id] = {}
@@ -665,6 +664,48 @@ class WorkspaceOsService(BaseService):
         )
 
         self._await_result(timeline_request_id)
+
+
+
+        run_id = uuid.uuid4().hex
+
+        self._bus.publish(
+
+            WORKFLOW_EXECUTION_REQUEST,
+
+            {
+
+                "run_id": run_id,
+
+                "request_id": run_id,
+
+                "workflow_id": f"workspace_os.launch.{resource_type}",
+
+                "workspace_id": payload.get("workspace_id", ""),
+
+                "entity_id": resource_id,
+
+                "steps": [
+
+                    {
+
+                        "id": "launch-1",
+
+                        "type": "tool",
+
+                        "tool": tool_name,
+
+                        "args": {arg_key: value},
+
+                    }
+
+                ],
+
+            },
+
+            source=self.name,
+
+        )
 
 
 

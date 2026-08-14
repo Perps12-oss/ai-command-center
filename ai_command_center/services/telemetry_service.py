@@ -3,6 +3,9 @@ Passive telemetry — observation only (Phase 5C+).
 
 All SQLite writes run on a dedicated worker with batching. Bus handlers only
 enqueue; they never block the publisher (UI / EventBus) on disk I/O.
+
+On unload the session is exported to JSON (see ``telemetry_export``). That is a
+read-back of already-persisted rows, so the observation-only contract holds.
 """
 
 from __future__ import annotations
@@ -159,6 +162,20 @@ class TelemetryService(BaseService):
         self._defer_thread = None
         if thread is not None and thread.is_alive():
             thread.join(timeout=2.0)
+        # Export only after the final batch has landed in SQLite.
+        self._export_session()
+
+    def _export_session(self) -> None:
+        """Materialize this session to disk. Never fails shutdown."""
+        try:
+            from ai_command_center.telemetry.session_export import export_session
+
+            path = export_session(self._repo, self._session_id)
+        except Exception:
+            logger.exception("Telemetry session export failed")
+            return
+        if path is not None:
+            logger.info("Telemetry session exported: %s", path)
 
     def _defer_worker(self) -> None:
         batch: list[tuple[str, dict[str, Any], str]] = []

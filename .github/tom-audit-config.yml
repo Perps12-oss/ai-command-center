@@ -1,6 +1,8 @@
-# Tom's Implementation Auditor Configuration
-# ============================================
-# This file configures Tom's automated PR review behavior.
+# PR Change Hygiene Checklist Configuration
+# ==========================================
+# Configures the lightweight PR hygiene workflow (`.github/workflows/tom-audit.yml`).
+# This is NOT the independent Tom auditor (`.agents/skills/tom-auditor/SKILL.md`)
+# and does NOT enforce `TOM_APPROVAL.lock` or constitution Closed-DoD scoring.
 
 # Trigger Settings
 trigger:

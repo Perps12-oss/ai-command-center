@@ -17,12 +17,50 @@ from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.services.execution_orchestrator_service import (
     ExecutionOrchestratorService,
 )
+from ai_command_center.services.orchestration_service import OrchestrationService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
+
+# Trusted interactive run context for tests that drive tool completion.
+_UI_RUN = {"interactive_user": True, "actor_provenance": "ui"}
+
+
+def _auto_confirm_shell(bus: EventBus) -> None:
+    from ai_command_center.core.events.topics import TOOL_APPROVED, TOOL_CONFIRMATION_REQUIRED
+
+    def _on_confirm(event) -> None:
+        cid = str(event.payload.get("confirmation_id") or "")
+        if not cid or ":" not in cid:
+            return
+        run_id, step_id = cid.split(":", 1)
+        bus.publish(
+            TOOL_APPROVED,
+            {
+                "confirmation_id": cid,
+                "run_id": run_id,
+                "step_id": step_id,
+                "approved": True,
+            },
+            source="ui",
+        )
+
+    bus.subscribe(TOOL_CONFIRMATION_REQUIRED, _on_confirm)
 
 
 def _noop_tool(_args: object) -> ToolResult:
     return ToolResult(success=True, output="done")
+
+
+def _wire_receipt_boundary(bus: EventBus) -> OrchestrationService:
+    """Compose the real receipt / truth observer.
+
+    ExecutionOrchestratorService fails closed (G1) when a run completes without an
+    ExecutionReceipt, so any test that drives a run to completion must compose the
+    receipt boundary — omitting it is itself the bypass the guard exists to catch.
+    """
+    service = OrchestrationService(bus)
+    service.start()
+    return service
 
 
 def _wire_tool_stack(bus: EventBus) -> ToolRegistry:
@@ -47,6 +85,7 @@ def test_execution_run_completes_low_risk_step() -> None:
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-1",
             "request_id": "req-1",
             "auto_approve": True,
@@ -86,6 +125,7 @@ def test_execution_pauses_for_approval() -> None:
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-2",
             "plan": {
                 "goal": "create note",
@@ -146,6 +186,7 @@ def test_execution_routes_external_capability() -> None:
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-3",
             "auto_approve": True,
             "plan": {
@@ -180,6 +221,7 @@ def test_tool_invoke_carries_run_and_step_ids() -> None:
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-4",
             "auto_approve": True,
             "plan": {
@@ -221,6 +263,7 @@ def test_intention_validation_failure_emits_topic() -> None:
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-val",
             "auto_approve": True,
             "known_capabilities": ["shell"],
@@ -295,9 +338,12 @@ def test_tool_failure_triggers_replan_request() -> None:
     bus.subscribe(EXECUTION_OBSERVATION, lambda e: observations.append(dict(e.payload)))
     bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
 
+    _auto_confirm_shell(bus)
+
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-replan",
             "auto_approve": True,
             "state_context": {
@@ -357,6 +403,7 @@ def test_multi_step_fail_then_replan_continues() -> None:
     registry.register_tool(ToolSpec(name="shell", description="shell", handler=_shell))
     ToolExecutorService(bus, registry).start()
     ExecutionOrchestratorService(bus).start()
+    _wire_receipt_boundary(bus)
 
     replans: list[dict] = []
     observations: list[dict] = []
@@ -397,9 +444,12 @@ def test_multi_step_fail_then_replan_continues() -> None:
     bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
     bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
 
+    _auto_confirm_shell(bus)
+
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-multi-replan",
             "auto_approve": True,
             "state_context": {
@@ -465,6 +515,7 @@ def test_synthesized_replan_state_context_refreshes_on_retry() -> None:
     registry.register_tool(ToolSpec(name="shell", description="shell", handler=_shell))
     ToolExecutorService(bus, registry).start()
     ExecutionOrchestratorService(bus).start()
+    _wire_receipt_boundary(bus)
 
     replans: list[dict] = []
     observations: list[dict] = []
@@ -513,9 +564,12 @@ def test_synthesized_replan_state_context_refreshes_on_retry() -> None:
     bus.subscribe(EXECUTION_RUN_COMPLETE, lambda e: completed.append(dict(e.payload)))
     bus.subscribe(EXECUTION_RUN_FAILED, lambda e: failed.append(dict(e.payload)))
 
+    _auto_confirm_shell(bus)
+
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **_UI_RUN,
             "run_id": "run-synth-refresh",
             "auto_approve": True,
             # Intentionally omit caller state_context so orchestrator synthesizes.

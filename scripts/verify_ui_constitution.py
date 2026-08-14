@@ -815,9 +815,22 @@ def _check_goal_dashboard_workspace(v: Violation) -> None:
     controller = _read(UI_ROOT / "controller.py")
     if "publish_goal_submit_request" not in controller:
         v.add("UIController missing publish_goal_submit_request")
-    if "GOAL_SUBMIT_REQUEST" not in controller:
-        v.add("UIController does not publish GOAL_SUBMIT_REQUEST")
+    if "UI_COMMAND" not in controller:
+        v.add("UIController does not reference UI_COMMAND")
+    # B5 fork 1: Hero must not import or publish the scheduler topic.
+    if "from ai_command_center.core.events.topics import" in controller:
+        # Narrow: forbid the symbol as an import/name binding, not prose.
+        import re as _re
 
+        if _re.search(
+            r"^\s*GOAL_SUBMIT_REQUEST\b|,\s*GOAL_SUBMIT_REQUEST\b|publish\(\s*GOAL_SUBMIT_REQUEST\b",
+            controller,
+            _re.M,
+        ):
+            v.add(
+                "UIController must not reference GOAL_SUBMIT_REQUEST "
+                "(Hero New Goal routes through UI_COMMAND / EA)"
+            )
     sidebar = _read(UI_ROOT / "components" / "sidebar.py")
     if '("goals", "Goal Dashboard")' not in sidebar:
         v.add("Sidebar label for goals is not 'Goal Dashboard'")
