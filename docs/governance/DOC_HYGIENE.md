@@ -11,7 +11,7 @@
 **`docs/plans/` may hold historical, parked, or complete-but-unarchived plans** if they are **bannered**.  
 **Completed or superseded plans may move to `docs/archive/`.**  
 **Code on `origin/main` is the only proof a plan may be archived as COMPLETE.**  
-**Agents may implement only from the canonical Queue 1** in [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) (Queue 1 is **EMPTY** as of 2026-08-12).
+**Agents may implement only from the canonical Queue 1** in [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) (Strategic Runtime Program; stream **code** requires Gates 2–3).
 
 Never archive a plan as COMPLETE because a status table, agent report, or stale branch says so.
 Never treat a PARTIAL plan as Queue 1.
@@ -70,7 +70,7 @@ Do-not-plan-from: true
 - `PROJECT_CONSTITUTION_V4.md`
 - `docs/UI_CONSTITUTION.md`
 - `docs/ARCHITECTURE.md` and current architecture contracts
-- Canonical planned-work queue: [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY** as of 2026-08-12)
+- Canonical planned-work queue: [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) (Queue 1 = Strategic Runtime Program; see [`STRATEGIC_RUNTIME_PROGRAM.md`](STRATEGIC_RUNTIME_PROGRAM.md))
 - Fossil index: [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md)
 
 There are **no** active phase / UI roadmaps driving implementation. `docs/plans/` holds bannered historical plans, not Queue 1.
@@ -93,7 +93,7 @@ When archiving:
 
 | Actor | Must |
 |-------|------|
-| Implementers | Implement **only** from [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) Queue 1 (currently **EMPTY**). Do not plan from `docs/plans/` unless Queue 1 names that plan. |
+| Implementers | Implement **only** from [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) Queue 1 (Strategic Runtime Program). Do **not** implement stream code until Gates 2–3. Do not plan from `docs/plans/` unless Queue 1 names that plan. |
 | Cursor / Tom | Refuse COMPLETE archive without `origin/main` code evidence |
 | Anyone | Treat `Do-not-plan-from: true` and HISTORICAL / NON-AUTHORITATIVE banners as hard stop |
 

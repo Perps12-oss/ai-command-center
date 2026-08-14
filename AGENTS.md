@@ -24,9 +24,9 @@ Implementation may not begin before pre-flight completion.
 
 See `docs/governance/PHASE_COMPLETION_RULE.md` and `.cursor/rules/phase-complete-on-main.mdc`.
 
-**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: EMPTY**.  
-**Fossil / retired index:** [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md).  
-Historical roadmaps, Proposed ADRs, and old inventories are **not** implementation authority. Do not invent tickets to fill Queue 1.
+**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: Strategic Runtime Program** ([`STRATEGIC_RUNTIME_PROGRAM.md`](docs/governance/STRATEGIC_RUNTIME_PROGRAM.md)). Stream **code** is blocked until Gates 2–3. Do not invent extra tickets from historical inventories. 
+**Fossil / retired index:** [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md). 
+Historical roadmaps, Proposed ADRs, and old inventories are **not** implementation authority.
 
 ---
 

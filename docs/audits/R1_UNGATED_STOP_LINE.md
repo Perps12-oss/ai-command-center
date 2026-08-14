@@ -2,8 +2,8 @@
 
 **STATUS:** COMPLETE / CLOSED — not an implementation queue
 
-This stop line is **closed**. Do not treat the parallel hard-stop table as Queue 1.  
-Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).  
+This stop line is **closed** for R1 / SA.mutate. It is **not** the current planned-work queue.  
+Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 = [Strategic Runtime Program](../governance/STRATEGIC_RUNTIME_PROGRAM.md)).  
 Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
 
 **Date:** 2026-08-04  
@@ -34,15 +34,17 @@ Explicitly **out** of SA.mutate (ADR-017): workflows, executions, agents.
 No further R1-blocking SA.mutate deepen. Optional extensions need new ADRs and
 are **not** required to close this stop line.
 
-## Parallel hard stops (other tracks — not this stop line)
+## Parallel tracks (superseded as “indefinite gates”)
 
-| Work | Gate |
-|------|------|
-| Phase 5 EventBus **pool isolation** (tiered dispatch) | **PARKED** — not Queue 1. Historical branch abandoned. Trigger: measured single-queue contention + Performance Investigation Report + owner (Art. VII/XII). Current main already has R4b **single-queue** `async_dispatch=True`. |
-| Goose / external patterns | Stage 3 + Integration Proposal + ADR — **GATED**, not Queue 1 |
-| Live-wire Predictive/Undo | ADR superseding ADR-014 — **RETIRED** until then |
+The table below is **historical R1 wording**. Current disposition is the Strategic Runtime Program:
+
+| Work | Now |
+|------|-----|
+| Phase 5 EventBus **pool isolation** | **Stream D** — measure first; abandoned branch is not a merge candidate. R4b single-queue remains live until a new ADR. |
+| Goose / external patterns | **Stream F** — Gate 1 IP-F; Adopt/Adapt/Reject. Not Goose compatibility. |
+| Live-wire Predictive/Undo | ADR superseding ADR-014 — **RETIRED** until then (not a program stream) |
 | OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator re-wire | ADR superseding 006 / 012 / 013 — **RETIRED**; do not restore |
-| Platform hotkey/tray live wire | Owner SKU decision — **GATED**, not Queue 1 |
+| Platform hotkey/tray | Standalone **macOS Hotkey dropped**. Cross-OS is **Stream G**, last strategic gate. |
 
 ## Optional ungated (not required)
 

@@ -134,19 +134,16 @@ Also:
 
 ## Current program
 
-**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: EMPTY**.
+**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: Strategic Runtime Program** ([`STRATEGIC_RUNTIME_PROGRAM.md`](docs/governance/STRATEGIC_RUNTIME_PROGRAM.md)).
 
-**Active implementation work:** none approved. Do not invent tickets from historical plans.
+**Active implementation work:** Wave 0–1 (gap matrix + Gate 1 proposals). Stream **code** is not approved until Gates 2–3. Do not invent extra tickets from historical plans.
 
-Section 9 of ADR-018–023 is **Accepted architecture already on `main`**. Remaining optional envelopes (ADR-021/022 extras) are **PARKED**, not Queue 1. Performance track under `PERFORMANCE_CONSTITUTION.md` does **not** authorize Phase 5 tiered pools.
+Section 9 of ADR-018–023 is **Accepted architecture already on `main`**. Remaining 021/022/023 envelopes are **Stream A–C** (checkpoints, not indefinite parking). EventBus isolation is **Stream D** (measure first; abandoned pool branch is not a merge candidate). Knowledge is **Stream E** (SoT ADR before any vector DB). Goose is **Stream F** (Adopt/Adapt/Reject). Cross-OS is the **only remaining strategic gate**. macOS Hotkey as a standalone strategic item is **dropped**.
 
-**Hard stops** (`docs/audits/R1_UNGATED_STOP_LINE.md`) — do not implement without the named gate; these are **not** a backlog:
+**Still retired / not in the six streams** (`docs/audits/R1_UNGATED_STOP_LINE.md`):
 
-- Phase 5 EventBus **pool isolation** → PARKED (R4b single-queue already live; branch abandoned)
-- Goose / external patterns → Stage 3 + Integration Proposal + ADR
 - Live Predictive/Undo → ADR superseding 014 (**RETIRED** until then)
 - Re-wire OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator → ADR superseding 006/012/013 (**RETIRED**; do not restore)
-- Platform hotkey/tray → owner SKU decision (**GATED**)
 
 Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md).
 

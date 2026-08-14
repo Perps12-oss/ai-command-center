@@ -3,7 +3,7 @@
 **Date:** 2026-08-12  
 **Baseline:** `cursor/runtime-integrity-closeout-4b28` (includes PR #175 control-plane remediation)  
 **Role:** Canonical post-audit closeout — **not** an implementation queue  
-**Canonical plan:** `docs/governance/IMPLEMENTATION_GUIDE.md` (Queue 1 **EMPTY**)
+**Canonical plan:** `docs/governance/IMPLEMENTATION_GUIDE.md` (Strategic Runtime Program; this ledger is not Queue 1)
 
 ---
 

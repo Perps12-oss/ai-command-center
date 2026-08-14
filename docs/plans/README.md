@@ -2,7 +2,7 @@
 
 **STATUS:** INDEX of historical / parked / complete plans — **not** an implementation queue
 
-Canonical planned-work document: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).  
+Canonical planned-work document: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 = [Strategic Runtime Program](../governance/STRATEGIC_RUNTIME_PROGRAM.md)).  
 Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)  
 Disposition: [`docs/audits/FOSSIL_DISPOSITION_AUDIT.md`](../audits/FOSSIL_DISPOSITION_AUDIT.md)
 
@@ -26,7 +26,7 @@ This directory holds **phase plans**. Most are **HISTORICAL**. Agents must **not
 
 **Superseded inventory (do not implement from):** [`docs/audits/PLANNED_WORK_INVENTORY.md`](../audits/PLANNED_WORK_INVENTORY.md)
 
-**SA.mutate track CLOSED** (ADR-015/016/017). Phase 5 tiered pools = **PARKED**. Goose = Stage 3 **GATED**.
+**SA.mutate track CLOSED** (ADR-015/016/017). EventBus pools = **Stream D** (measure first). Goose = **Stream F**. Cross-OS = **Stream G** (only remaining strategic gate). macOS Hotkey strategic item **dropped**.
 
 **SA.mutate track CLOSED** (ADR-015/016/017). Phase 5 tiered pools = **PARKED**. Goose = Stage 3 **GATED**.
 
@@ -58,14 +58,14 @@ Statuses below are **fossil disposition**, not “keep active / implement next.�
 
 | Phase | Document | Disposition | Archive? |
 |-------|----------|-------------|----------|
-| 5 | `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | R4b single-queue **LIVE**; tiered pools **PARKED**; branch **ABANDONED** | Keep as historical (bannered) |
+| 5 | `PHASE_5_ASYNC_EVENTBUS_PLAN.md` | R4b single-queue **LIVE**; isolation = program **Stream D**; branch **ABANDONED** | Keep as historical (bannered) |
 | 6 | `PHASE_6_EXTERNAL_CAPABILITY_BRIDGE_PLAN.md` | Bridge **WIRED**; remaining MCP extras **not Queue 1** | Historical extras |
 | 7 | ~~`PHASE_7_MULTI_AGENT_RUNTIME_PLAN.md`~~ | SUPERSEDED | [`../archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md`](../archive/PHASE_7_MULTI_AGENT_RUNTIME_PLAN_SUPERSEDED.md) |
 | 8 | `PHASE_8_OPERATOR_KERNEL_PLAN.md` | OperatorKernel **RETIRED** (ADR-006) | Historical |
-| 8b | `PHASE_8_KNOWLEDGE_FEDERATION_PLAN.md` | Unified SoT / vectors **ABANDONED** as program | Historical |
+| 8b | `PHASE_8_KNOWLEDGE_FEDERATION_PLAN.md` | Unified SoT / vectors **ABANDONED**; Stream E is SoT-first (new ADR) | Historical |
 | 9 | `PHASE_9_GOALS_MULTI_AGENT_PLAN.md` | GoalEngine / PlanningEngine / AgentCoordinator **RETIRED** | Historical |
 | 10 | `PHASE_10_WORLD_MODEL_PLAN.md` | WM core **LIVE**; Predictive/Undo **RETIRED** (ADR-014) | Historical |
-| 11 platform | `PHASE_9_CROSS_PLATFORM_PLAN.md` | macOS/Linux SKU **GATED**; Impl stubs **not** current work | Historical |
+| 11 platform | `PHASE_9_CROSS_PLATFORM_PLAN.md` | Cross-OS = **Stream G** (final gate); macOS hotkey strategic item **dropped**; Impl stubs **not** current work | Historical |
 
 ### Removed from active plans (do not plan from)
 
@@ -79,7 +79,7 @@ Statuses below are **fossil disposition**, not “keep active / implement next.�
 
 | Label | Meaning |
 |-------|---------|
-| Phase 11 (this folder / master roadmap) | Cross-platform macOS/Linux — **GATED / not Queue 1** |
+| Phase 11 (this folder / master roadmap) | Cross-platform — **Stream G / not opened**; not Queue 1 code |
 | Phase 11 frontend | `docs/PHASE_11_FRONTEND_IMPLEMENTATION.md` — UI 11A–11F largely on `main` |
 
 Do not treat frontend Phase 11 completeness as cross-platform Phase 11 completeness.
@@ -89,7 +89,7 @@ Do not treat frontend Phase 11 completeness as cross-platform Phase 11 completen
 ## Phase Dependencies (informational / historical)
 
 ```
-Phase 5 ──► PARKED (tiered pools); R4b single-queue already live
+Phase 5 ──► Stream D (measure then ADR); R4b single-queue already live
 Phase 6 ──► bridge wired; extras not Queue 1
 Phase 8 ──► Operator Kernel RETIRED from live — ADR-006
 Phase 9 ──► Goals ADR-012 A + Multi-Agent ADR-013 research-only

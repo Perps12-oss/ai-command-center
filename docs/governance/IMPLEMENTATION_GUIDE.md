@@ -7,6 +7,8 @@
 
 > **Canonical planned-work document:** This file is the **only** canonical active planning authority (Queue 1). Historical roadmaps, phase plans, and inventories are evidence, not implementation queues.
 >
+> **Active program:** [`STRATEGIC_RUNTIME_PROGRAM.md`](STRATEGIC_RUNTIME_PROGRAM.md) — six streams + Cross-OS as the only remaining strategic gate. Phase 0 baseline: [`docs/audits/STRATEGIC_GAP_MATRIX.md`](../audits/STRATEGIC_GAP_MATRIX.md).
+>
 > **Precedence of this document:** If anything here ever conflicts with `PROJECT_CONSTITUTION_V4.md`, an **Accepted** ADR, an architecture contract, or `PHASE_COMPLETION_RULE.md`, the higher-authority document always prevails and this guide is corrected. Changes to the underlying governance are made in those documents, not here. Historical roadmaps do not outrank this queue.
 
 ---
@@ -195,9 +197,9 @@ This prevents **research creep** and **external-project creep**.
 
 Incoming information is triaged into three classes:
 
-- **Class A — Repository Truth (Authoritative):** comes from the repo; the implementation agent trusts it. (e.g. Phase B CONDITIONS cleared on `main` (#105); Stage 2 soft-shadow + R1 P1–P4 + ADR-014–017 on `main`; SA.mutate track **CLOSED**; R4b single-queue EventBus **live**; Phase 5 **tiered pools PARKED** (not Queue 1); OperatorKernel / Predictive / Undo **retired from live**.)
-- **Class B — Engineering Intelligence (Reference):** e.g. Goose provider abstraction / extension system / runtime / desktop architecture. Reference material, **not** implementation instructions.
-- **Class C — Future Opportunities (Backlog):** parked ideas and owner-gated tracks. **Not** current Queue 1. See [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md).
+- **Class A — Repository Truth (Authoritative):** comes from the repo; the implementation agent trusts it. (e.g. Phase B CONDITIONS cleared on `main` (#105); Stage 2 soft-shadow + R1 P1–P4 + ADR-014–017 on `main`; SA.mutate track **CLOSED**; R4b single-queue EventBus **live**; OperatorKernel / Predictive / Undo **retired from live**.) Stream **code** for A–F is Class A only after Gates 2–3.
+- **Class B — Engineering Intelligence (Reference):** e.g. Goose expedition notes. Reference material, **not** implementation instructions. Goose **code** is Stream F after Gate 2 Adopt/Adapt only.
+- **Class C — Future Opportunities (Backlog):** Cross-OS (Stream G) remains the **only remaining strategic gate**. Other parked product ideas: see [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md).
 
 ---
 
@@ -205,9 +207,20 @@ Incoming information is triaged into three classes:
 
 ### Queue 1 — Must Do (blocks progress; from repository truth + approved plans)
 
-**Queue 1: EMPTY** — no approved implementation work currently outstanding.
+**Queue 1: ACC Strategic Runtime & Architecture Completion Program** — [`STRATEGIC_RUNTIME_PROGRAM.md`](STRATEGIC_RUNTIME_PROGRAM.md).
 
-That is intentional. Do **not** invent replacement tickets from historical inventories.
+This is owner-authorized. Do **not** invent extra tickets from historical inventories. Do **not** start stream **code** until that stream has Gate 2 ACCEPT (or remaining Section 9 confirmation) **and** Gate 3 Section 9 plan.
+
+| Wave | Work | Status |
+|------|------|--------|
+| 0 | Strategic Gap Matrix | Deliverable in [`docs/audits/STRATEGIC_GAP_MATRIX.md`](../audits/STRATEGIC_GAP_MATRIX.md). **COMPLETE only after merge to `main`.** |
+| 1 | Architecture closure (Gate 1–2) | Gate 1 drafts in [`docs/architecture/proposals/`](../architecture/proposals/). **No code.** Owner Gate 2 next. |
+| 2–5 | Runtime foundations → capability → Goose hardening → full-system verification | **Blocked** until Gates 2–3 per stream. |
+| 6 | Cross-OS (Stream G) | **Not opened.** Only remaining strategic gate. |
+
+Streams A–F (explainability, autonomy, model strategy, EventBus, knowledge, Goose) move through: Integration Proposal → ADR Decision → Section 9 → Implementation → Verification → Close-out. “Gated” means a checkpoint, not indefinite parking.
+
+**macOS Hotkey** as a standalone strategic item is **dropped** (Stream X).
 
 Completed (do not re-open):
 
@@ -215,29 +228,27 @@ Completed (do not re-open):
 2. **PHASE R1 — Runtime Reconciliation** — ✅ **COMPLETE**. P1–P4 passed; P5 Predictive/Undo disposition closed (ADR-014 research-only).
 3. **State Authority / SA.mutate** — ✅ **COMPLETE**. Live mutate = WM + Memory + Goals; workflows/executions/agents remain outside (ADR-017).
 
-Removed from Queue 1 (not “next”):
+Historical EventBus pool **branch** `cursor/phase5-async-eventbus-744e` remains **ABANDONED** (not a merge candidate). Stream D Stage 1 is measurement; do not resurrect that branch. Current main is R4b **single-queue** `async_dispatch=True`.
 
-4. **Phase 5 — tiered EventBus pools** — **STATUS: PARKED — NOT IMPLEMENTATION WORK.** Historical branch `cursor/phase5-async-eventbus-744e` is **ABANDONED** (not a merge candidate). Current main is R4b **single-queue** `async_dispatch=True`. Do not implement `tiered_dispatch_policy.py` / `async_dispatch_queue.py` without owner approval and a Performance Investigation Report based on **measured** single-queue contention (Art. VII/XII). See [`HISTORICAL_AND_RETIRED_WORK.md`](HISTORICAL_AND_RETIRED_WORK.md).
-
-Standing process (not a fossil ticket): verification gates on `main` per `PHASE_COMPLETION_RULE.md` whenever implementation work exists.
+Standing process: verification gates on `main` per `PHASE_COMPLETION_RULE.md`.
 
 > Historical inventory (superseded as a queue): [`PLANNED_WORK_INVENTORY.md`](../audits/PLANNED_WORK_INVENTORY.md). Do not implement from it.
 
-### Queue 2 — Evaluate (no implementation yet; Class B)
+### Queue 2 — Evaluate (subsumed)
 
-Goose / external patterns to assess **as reference only**: provider abstraction, plugin discovery, configuration, logging, desktop runtime. Each requires an Integration Proposal + ADR before any code.
+Goose / external pattern **evaluation** is **Stream F** inside Queue 1’s program (Gate 1 IP-F). Class B notes remain reference-only until Gate 2 Adopt/Adapt.
 
 ### Queue 3 — Future (long-term backlog; Class C)
 
-Pattern registry, plugin marketplace, advanced runtime, new UI ideas, performance. Platform hotkey/tray live wire = Phase 11 backlog (not R1 blocker).
+Pattern registry, plugin marketplace, advanced runtime, new UI ideas. **Cross-OS (Stream G)** is the only remaining **strategic** gate — last wave, separate effort envelope. Standalone macOS hotkey is **not** in this queue.
 
 ---
 
 ## Immediate roadmap
 
-1. **Stage 1 — Stabilization:** ✅ **COMPLETE** on `main` (#105). R1 P2 wire-or-retire **closed** (ADR-006/012/013/014). **No Goose integration.**
-2. **Stage 2 — State Authority / R1 closeout:** ✅ **COMPLETE**. SA.mutate track CLOSED (`R1_UNGATED_STOP_LINE.md`). Parallel tracks are **PARKED / GATED**, not Queue 1: Goose = Stage 3; EventBus pool isolation = parked; live-wire Predictive/Undo only with ADR superseding 014.
-3. **Stage 3 — Goose Review:** GATED. Only after owner checkpoint. Ask *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"* Do not implement Goose extras from research notes.
+1. **Stage 1 — Stabilization:** ✅ **COMPLETE** on `main` (#105). R1 P2 wire-or-retire **closed** (ADR-006/012/013/014).
+2. **Stage 2 — State Authority / R1 closeout:** ✅ **COMPLETE**. SA.mutate track CLOSED (`R1_UNGATED_STOP_LINE.md`). Predictive/Undo remain retired until an ADR superseding 014.
+3. **Strategic Runtime Program (current):** Wave 0–1 documentation; then Gates 2–3; then stream implementation in dependency order. Goose question remains *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"* Cross-OS stays last.
 
 ---
 

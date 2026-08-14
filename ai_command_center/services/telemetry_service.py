@@ -168,7 +168,7 @@ class TelemetryService(BaseService):
     def _export_session(self) -> None:
         """Materialize this session to disk. Never fails shutdown."""
         try:
-            from ai_command_center.services.telemetry_export import export_session
+            from ai_command_center.telemetry.session_export import export_session
 
             path = export_session(self._repo, self._session_id)
         except Exception:

@@ -52,9 +52,9 @@
 | [018](ADR-018_TOOL_INVOCATION_ARCHITECTURE.md) | Tool Invocation Architecture | Accepted — Hybrid B-primary | LIVE |
 | [019](ADR-019_PLANNING_ARCHITECTURE.md) | Planning Architecture | Accepted — B with explicit replan | LIVE |
 | [020](ADR-020_MEMORY_ARCHITECTURE.md) | Memory Architecture | Accepted — World Model canonical | LIVE |
-| [021](ADR-021_EXPLAINABILITY.md) | Explainability | Accepted — Decision Records | LIVE core; extra envelope **PARKED** (not Queue 1) |
-| [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence | LIVE core; threshold escalate **PARKED** (not Queue 1) |
-| [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent | LIVE (M1 docs); remaining milestones not Queue 1 |
+| [021](ADR-021_EXPLAINABILITY.md) | Explainability | Accepted — Decision Records | LIVE core; remainder **Stream A** (program; Gates 2–3 before code) |
+| [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence | LIVE core; remainder **Stream B** (thresholds from Gate 2) |
+| [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent | LIVE (M1 docs/settings); remainder **Stream C** (M2–M4 sequential) |
 
 ### Section 9 implementation notes
 
@@ -62,6 +62,7 @@
 - Memory boundary: [`docs/architecture/MEMORY_BOUNDARY.md`](../MEMORY_BOUNDARY.md)
 - Degrade modes: [`docs/architecture/MODEL_ORCHESTRATION.md`](../MODEL_ORCHESTRATION.md)
 - Pre-flight: [`docs/audits/CONSTITUTIONAL_PRE_FLIGHT_SECTION9_FOLLOWONS.md`](../../audits/CONSTITUTIONAL_PRE_FLIGHT_SECTION9_FOLLOWONS.md)
+- Remaining 021–023 envelopes + EventBus/Knowledge/Goose: [`STRATEGIC_RUNTIME_PROGRAM.md`](../../governance/STRATEGIC_RUNTIME_PROGRAM.md)
 
 ### Number collision (permanent labels)
 
