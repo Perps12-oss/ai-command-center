@@ -19,6 +19,7 @@ from ai_command_center.core.events.topics import (
     UI_COMMAND,
     WORKSPACE_ACTIVE,
 )
+from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.repositories.goal_repository import GoalRepository
@@ -130,6 +131,7 @@ class Phase5ToolTimelineTests(unittest.TestCase):
             ToolSpec(
                 name="demo",
                 description="demo tool",
+                tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
                 tier=SecurityTier.READ,
             )
@@ -177,6 +179,7 @@ class Phase5ToolTimelineTests(unittest.TestCase):
             ToolSpec(
                 name="demo",
                 description="demo tool",
+                tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
                 tier=SecurityTier.READ,
             )

@@ -5,9 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from ai_command_center.core.security_policy import (
-    normalize_tool_name,
-    resolve_tool_tier,
-    tier_requires_hitl,
+    is_classified,
+    tool_requires_human_approval,
 )
 from ai_command_center.domain.planner_plan import PlanStep
 
@@ -21,43 +20,55 @@ WORKFLOW_PROVENANCE = "workflow"
 
 
 def capability_requires_human_approval(capability: str) -> bool:
-    """Legacy helper — prefer ``step_requires_human_approval`` + SecurityTier."""
-    tool = normalize_tool_name(capability)
-    tier = resolve_tool_tier(tool)
-    return tier is not None and tier_requires_hitl(tier)
+    return capability.strip().lower() in COMMAND_TOOL_CAPABILITIES
 
 
 def effective_tool_for_step(step: PlanStep) -> str:
-    """Return the concrete tool a step will dispatch, not its capability label.
+    """Return the tool a step will actually dispatch, not its capability label.
 
-    ``agent.*`` capabilities read ``step.args["tool"]`` (default ``shell``).
-    ``agent.task`` re-enters intake and dispatches no tool.
+    ``agent.*`` capabilities are dispatched by
+    ``ExecutionOrchestratorService._dispatch_agent_step``, which reads the tool
+    from ``step.args["tool"]`` and **defaults to shell**. The capability label is
+    planner-authored, so it must never be the thing the approval gate keys on.
+    ``agent.task`` is the one agent capability that dispatches no tool (it
+    re-enters intake instead) and therefore resolves to no tool here.
     """
     cap = step.capability.strip().lower()
     if not cap.startswith("agent."):
-        return normalize_tool_name(cap)
+        return cap
     if cap == "agent.task":
         return ""
     args = step.args if isinstance(step.args, dict) else {}
-    return normalize_tool_name(str(args.get("tool") or "shell").strip() or "shell")
+    return str(args.get("tool") or "shell").strip().lower() or "shell"
+
+
+def step_is_classified(step: PlanStep) -> bool:
+    """Return True when the step's dispatched tool has an authoritative tier.
+
+    Steps that dispatch no tool (orchestration-only capabilities such as
+    ``llm``, ``goal``, ``workflow``, ``agent.task``) are not tool actions and
+    are outside ADR-004's classification requirement.
+    """
+    tool = effective_tool_for_step(step)
+    if not tool:
+        return True
+    return is_classified(tool)
 
 
 def step_requires_human_approval(step: PlanStep, *, run: dict[str, Any]) -> bool:
     """Return True when orchestrator must pause for tool.confirmation_required.
 
-    SecurityTier (ADR-004) drives HITL: ``WRITE_DESTROY`` always requires
-    explicit human approval regardless of actor provenance. ``auto_approve`` on
-    the run cannot suppress this gate.
+    ADR-004/ADR-022: approval is a property of the action's SecurityTier, not of
+    the actor. ``run`` is accepted for interface stability and deliberately not
+    consulted — provenance identifies the actor for PermissionService and grants
+    no approval authority.
+
+    Unclassified tools are rejected upstream by :func:`step_is_classified`, so
+    they never reach an approval decision.
     """
     if bool(step.require_approval):
         return True
-    tool = effective_tool_for_step(step)
-    if not tool:
-        return False
-    tier = resolve_tool_tier(tool)
-    if tier is None:
-        return False
-    return tier_requires_hitl(tier)
+    return tool_requires_human_approval(effective_tool_for_step(step))
 
 
 def intake_run_fields(*, intake: str) -> dict[str, Any]:

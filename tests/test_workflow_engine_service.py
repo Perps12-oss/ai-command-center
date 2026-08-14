@@ -12,6 +12,7 @@ from ai_command_center.core.events.topics import (
     WORKFLOW_STARTED,
 )
 from ai_command_center.core.permission.permission_service import PermissionService
+from ai_command_center.core.security_policy import READONLY_SHELL_TOOL
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
@@ -36,7 +37,7 @@ def _wire_workflow_stack(bus: EventBus) -> None:
     wire_auto_confirm_shell(bus)
     registry = ToolRegistry()
     registry.register_tool(
-        ToolSpec(name="shell", description="test shell", handler=_echo_tool)
+        ToolSpec(name=READONLY_SHELL_TOOL, description="test shell", handler=_echo_tool)
     )
     ToolRegistryService(bus, registry=registry).start()
     ToolExecutorService(bus, registry, permission_service=permission).start()
@@ -67,8 +68,8 @@ def test_two_step_tool_workflow_completes() -> None:
             "run_id": "run-1",
             "workspace_context": {"workspace_id": "ws-test"},
             "steps": [
-                {"id": "a", "type": "tool", "tool": "shell", "args": {"command": "echo 1"}},
-                {"id": "b", "type": "tool", "tool": "shell", "args": {"command": "echo 2"}},
+                {"id": "a", "type": "tool", "tool": READONLY_SHELL_TOOL, "args": {"command": "echo 1"}},
+                {"id": "b", "type": "tool", "tool": READONLY_SHELL_TOOL, "args": {"command": "echo 2"}},
             ],
         },
         source="test",
@@ -93,7 +94,7 @@ def test_workflow_start_publishes_started() -> None:
         {
             "run_id": "run-started",
             "workflow_id": "demo",
-            "steps": [{"id": "a", "type": "tool", "tool": "shell"}],
+            "steps": [{"id": "a", "type": "tool", "tool": READONLY_SHELL_TOOL}],
         },
         source="test",
     )
@@ -113,7 +114,7 @@ def test_workflow_engine_does_not_publish_tool_invoke() -> None:
         {
             "run_id": "run-no-exec",
             "workspace_context": {"workspace_id": "ws"},
-            "steps": [{"id": "a", "type": "tool", "tool": "shell", "args": {"command": "x"}}],
+            "steps": [{"id": "a", "type": "tool", "tool": READONLY_SHELL_TOOL, "args": {"command": "x"}}],
         },
         source="test",
     )

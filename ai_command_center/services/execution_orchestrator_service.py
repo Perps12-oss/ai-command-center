@@ -19,7 +19,6 @@ from ai_command_center.core.control_plane import (
     resolve_tool_invoke_actor,
     step_requires_human_approval,
 )
-from ai_command_center.core.security_policy import resolve_tool_tier, tier_requires_hitl
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     AUTONOMY_SCORE_UPDATED,
@@ -93,14 +92,6 @@ def _is_llm_capability(capability: str) -> bool:
 
 def _is_agent_capability(capability: str) -> bool:
     return capability.strip().lower().startswith("agent.")
-
-
-def _human_approval_fields(tool_name: str) -> dict[str, Any]:
-    """Orchestrator sets human_approved only after the HITL gate has cleared."""
-    tier = resolve_tool_tier(tool_name)
-    if tier is not None and tier_requires_hitl(tier):
-        return {"human_approved": True}
-    return {}
 
 
 class ExecutionOrchestratorService(BaseService):
@@ -379,6 +370,11 @@ class ExecutionOrchestratorService(BaseService):
             source=self.name,
         )
 
+        # ADR-004 classification is enforced at the TOOL_INVOKE boundary in
+        # ToolExecutorService, where the tool name is concrete. Plan capability
+        # names are aliased (e.g. "create_note" -> "notes.create"), so rejecting
+        # on the capability label here would deny legitimate work while adding
+        # no security: nothing executes without passing the executor's gate.
         if step_requires_human_approval(step, run=run):
             run["paused"] = True
             confirmation_id = f"{run_id}:{step.step_id}"
@@ -563,7 +559,6 @@ class ExecutionOrchestratorService(BaseService):
                 "interactive_user": interactive_user,
                 "workspace_context": workspace_context,
                 "intention": intention.to_dict(),
-                **_human_approval_fields(step.capability),
                 **(
                     {"workflow_run_id": step.args["workflow_run_id"]}
                     if step.args.get("workflow_run_id")
@@ -595,6 +590,9 @@ class ExecutionOrchestratorService(BaseService):
                 "text": task,
                 "agent_id": args.get("agent_id"),
                 "request_id": request_id,
+                # Re-entering intake must not launder agent origin into
+                # interactive-user trust. ExecutionAuthority only ever
+                # de-escalates on this field, never escalates.
                 "actor_provenance": DEFAULT_AUTOMATION_ACTOR,
             }
             if workspace_context.get("workspace_id"):
@@ -624,7 +622,6 @@ class ExecutionOrchestratorService(BaseService):
                 "task": str(args.get("task") or ""),
                 "pipeline_id": str(args.get("pipeline_id") or ""),
                 "workspace_context": workspace_context,
-                **_human_approval_fields(tool_name),
             },
             source=self.name,
         )

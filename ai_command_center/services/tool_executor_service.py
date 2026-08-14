@@ -9,10 +9,13 @@ import uuid
 from typing import TYPE_CHECKING, Any, Callable
 from uuid import UUID
 
-from ai_command_center.core.command_sandbox import (
-    READONLY_COMMAND_SANDBOX,
-    CommandSandbox,
-    SecurityError,
+from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
+from ai_command_center.core.security_policy import (
+    READONLY_SHELL_ALLOWLIST,
+    READONLY_SHELL_TOOL,
+    is_classified,
+    tier_requires_human_approval,
+    tool_requires_human_approval,
 )
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, is_valid_workspace_context
 from ai_command_center.core.event_bus import Event
@@ -25,9 +28,7 @@ from ai_command_center.core.events.topics import (
     TOOL_STARTED,
 )
 from ai_command_center.core.permission.permission import Permission, PermissionContext
-from ai_command_center.core.security_policy import resolve_tool_tier, tier_requires_hitl
 from ai_command_center.core.tools import ToolResult, ToolSpec
-from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.services.base import BaseService
 from ai_command_center.tools.tool_executor import ToolExecutor
 from ai_command_center.tools.tool_registry import ToolRegistry
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _SANDBOX = CommandSandbox()
+_READONLY_SANDBOX = CommandSandbox(allowlist=READONLY_SHELL_ALLOWLIST)
 _active_shell_proc: subprocess.Popen[str] | None = None
 _active_shell_lock = threading.Lock()
 
@@ -59,62 +61,29 @@ def cancel_active_shell() -> bool:
 
 
 def _run_shell_command(args: dict) -> ToolResult:
+    """Generic shell — arbitrary program execution (SecurityTier.WRITE_DESTROY)."""
+    return _execute_shell(args, _SANDBOX)
+
+
+def _run_readonly_shell_command(args: dict) -> ToolResult:
+    """Bounded read-only command runner (SecurityTier.READ).
+
+    Uses a sandbox whose allowlist excludes every interpreter, so this tool
+    cannot be turned into arbitrary execution by argument injection. That is
+    what makes a READ classification defensible here and not for ``shell``.
+    """
+    return _execute_shell(args, _READONLY_SANDBOX)
+
+
+def _execute_shell(args: dict, sandbox: CommandSandbox) -> ToolResult:
     global _active_shell_proc
     command = str(args.get("command", "")).strip()
     if not command:
         return ToolResult(success=False, output="", error="empty shell command")
     try:
-        argv = _SANDBOX.validate_command(command)
+        argv = sandbox.validate_command(command)
     except SecurityError as exc:
         logger.warning("shell command rejected by sandbox: %s", exc)
-        return ToolResult(success=False, output="", error=str(exc))
-    try:
-        with _active_shell_lock:
-            proc = subprocess.Popen(
-                argv,
-                shell=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            _active_shell_proc = proc
-        try:
-            stdout, stderr = proc.communicate(timeout=30)
-        finally:
-            with _active_shell_lock:
-                if _active_shell_proc is proc:
-                    _active_shell_proc = None
-        completed_stdout = (stdout or "").strip()
-        completed_stderr = (stderr or "").strip()
-        output = completed_stdout or completed_stderr
-        if proc.returncode != 0 and not output:
-            return ToolResult(
-                success=False,
-                output="",
-                error=completed_stderr or f"exit code {proc.returncode}",
-            )
-        return ToolResult(
-            success=proc.returncode == 0,
-            output=output,
-            error=completed_stderr or None,
-        )
-    except subprocess.TimeoutExpired:
-        cancel_active_shell()
-        return ToolResult(success=False, output="", error="shell command timed out")
-    except OSError as exc:
-        return ToolResult(success=False, output="", error=str(exc))
-
-
-def _run_shell_readonly_command(args: dict) -> ToolResult:
-    """Bounded READ sandbox — no python/git interpreters."""
-    global _active_shell_proc
-    command = str(args.get("command", "")).strip()
-    if not command:
-        return ToolResult(success=False, output="", error="empty shell command")
-    try:
-        argv = READONLY_COMMAND_SANDBOX.validate_command(command)
-    except SecurityError as exc:
-        logger.warning("readonly shell command rejected by sandbox: %s", exc)
         return ToolResult(success=False, output="", error=str(exc))
     try:
         with _active_shell_lock:
@@ -193,55 +162,48 @@ class ToolExecutorService(BaseService):
                 name="shell",
                 description="Run a single shell command",
                 handler=_run_shell_command,
-                tier=SecurityTier.WRITE_DESTROY,
             ),
             ToolSpec(
-                name="shell_readonly",
-                description="Run a bounded read-only shell command",
-                handler=_run_shell_readonly_command,
-                tier=SecurityTier.READ,
+                name=READONLY_SHELL_TOOL,
+                description="Run a bounded read-only command (no interpreters)",
+                handler=_run_readonly_shell_command,
             ),
             ToolSpec(
                 name="launch_application",
                 description="Launch a whitelisted desktop application",
                 handler=run_launch_application,
-                tier=SecurityTier.WRITE,
             ),
             ToolSpec(
                 name="system_time_query",
                 description="Query the current system time",
                 handler=run_system_time_query,
-                tier=SecurityTier.READ,
             ),
             ToolSpec(
                 name="calendar_query",
                 description="Query calendar events",
                 handler=run_calendar_query,
-                tier=SecurityTier.READ,
             ),
             ToolSpec(
                 name="calendar_event_create",
                 description="Create a calendar event",
                 handler=run_calendar_event_create,
-                tier=SecurityTier.WRITE,
             ),
+            # G2: Workspace OS launches dispatched via TOOL_INVOKE so they are
+            # receipted like any other capability. See workspace_launch_tools.
             ToolSpec(
                 name="workspace_open_url",
                 description="Open a workspace URL resource in the default browser",
                 handler=run_workspace_open_url,
-                tier=SecurityTier.WRITE,
             ),
             ToolSpec(
                 name="workspace_open_folder",
                 description="Open a workspace folder resource in the file manager",
                 handler=run_workspace_open_folder,
-                tier=SecurityTier.WRITE,
             ),
             ToolSpec(
                 name="workspace_execute_command",
                 description="Run a sandbox-validated workspace command resource",
                 handler=run_workspace_execute_command,
-                tier=SecurityTier.WRITE_DESTROY,
             ),
         )
         for spec in builtins:
@@ -265,7 +227,6 @@ class ToolExecutorService(BaseService):
         self._unsubscribers.clear()
 
     def _shell_allowed(self, payload: dict) -> bool:
-        """PermissionService authorization — independent of HITL (ADR-004)."""
         actor_type = str(payload.get("actor_type", "agent")).strip() or "agent"
         if actor_type == "user" and not bool(payload.get("interactive_user")):
             actor_type = "agent"
@@ -347,32 +308,6 @@ class ToolExecutorService(BaseService):
             source=self.name,
         )
 
-    def _publish_tool_rejected(
-        self,
-        payload: dict[str, Any],
-        *,
-        invoke_id: str,
-        tool_name: str,
-        message: str,
-        error: str,
-    ) -> None:
-        agent_id = payload.get("agent_id")
-        self._bus.publish(
-            TOOL_FAILED,
-            {
-                "contract_version": TOOL_CONTRACT_VERSION,
-                "invoke_id": invoke_id,
-                "tool": tool_name,
-                "message": message,
-                "run_id": payload.get("run_id"),
-                "step_id": payload.get("step_id"),
-                "success": False,
-                "error": error,
-                **({"agent_id": agent_id} if agent_id else {}),
-            },
-            source=self.name,
-        )
-
     def _on_tool_invoke(self, event: Event) -> None:
         payload = event.payload
         if payload.get("contract_version") != TOOL_CONTRACT_VERSION:
@@ -408,39 +343,69 @@ class ToolExecutorService(BaseService):
             )
             return
         tool_name = str(payload.get("tool", "")).strip()
-        invoke_id = str(payload.get("invoke_id", ""))
-        spec = self._registry_get(tool_name)
-        tier = resolve_tool_tier(tool_name, spec)
-        if tier is None:
-            self._publish_tool_rejected(
-                payload,
-                invoke_id=invoke_id,
-                tool_name=tool_name,
-                message="unclassified action rejected",
-                error="unclassified action rejected",
-            )
-            return
-
-        if tier_requires_hitl(tier) and not bool(payload.get("human_approved")):
-            self._publish_tool_rejected(
-                payload,
-                invoke_id=invoke_id,
-                tool_name=tool_name,
-                message="WRITE_DESTROY requires explicit human approval",
-                error="human approval required",
-            )
-            return
-
         args = payload.get("args") or {}
         if not isinstance(args, dict):
             args = {}
+        invoke_id = str(payload.get("invoke_id", ""))
         run_id = payload.get("run_id")
         step_id = payload.get("step_id")
         agent_id = payload.get("agent_id")
         workspace_context = self._workspace_context(payload)
 
-        # Shell-equivalent tools share the LAUNCH_TOOL permission boundary.
-        _COMMAND_TOOLS = frozenset({"shell", "workspace_execute_command"})
+        # ADR-004: "Actions without a declared tier are rejected." Enforced here
+        # independently of the orchestrator so a TOOL_INVOKE from any publisher
+        # cannot execute an unclassified tool. The tier is looked up by tool
+        # name in the authoritative registry and is never read from the payload,
+        # so a planner cannot declare its own classification.
+        _spec = self._registry_get(tool_name)
+        _declared_tier = getattr(_spec, "tier", None) if _spec is not None else None
+        if _declared_tier is None and not is_classified(tool_name):
+            self._bus.publish(
+                TOOL_FAILED,
+                {
+                    "contract_version": TOOL_CONTRACT_VERSION,
+                    "invoke_id": invoke_id,
+                    "tool": tool_name,
+                    "message": f"{tool_name!r} has no authoritative SecurityTier",
+                    "run_id": run_id,
+                    "step_id": step_id,
+                    "success": False,
+                    "error": "unclassified action rejected",
+                    **({"agent_id": agent_id} if agent_id else {}),
+                },
+                source=self.name,
+            )
+            return
+
+        hitl_required = tool_requires_human_approval(tool_name)
+        if _declared_tier is not None:
+            hitl_required = hitl_required or tier_requires_human_approval(
+                _declared_tier
+            )
+        if hitl_required and not bool(payload.get("human_approved")):
+            self._bus.publish(
+                TOOL_FAILED,
+                {
+                    "contract_version": TOOL_CONTRACT_VERSION,
+                    "invoke_id": invoke_id,
+                    "tool": tool_name,
+                    "message": "WRITE_DESTROY requires explicit human approval",
+                    "run_id": run_id,
+                    "step_id": step_id,
+                    "success": False,
+                    "error": "human approval required",
+                    **({"agent_id": agent_id} if agent_id else {}),
+                },
+                source=self.name,
+            )
+            return
+
+        # Subprocess-spawning tools share the LAUNCH_TOOL permission boundary.
+        # Authorization is independent of tier (ADR-022): the bounded READ
+        # runner still requires permission even though it needs no approval.
+        _COMMAND_TOOLS = frozenset(
+            {"shell", "workspace_execute_command", READONLY_SHELL_TOOL}
+        )
         if tool_name in _COMMAND_TOOLS and not self._shell_allowed(payload):
             self._bus.publish(
                 TOOL_FAILED,

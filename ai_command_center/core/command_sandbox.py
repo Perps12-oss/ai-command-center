@@ -31,6 +31,8 @@ _DEFAULT_ALLOWLIST = frozenset(
 )
 
 # Arguments that make an allowlisted program execute caller-supplied code.
+# ``git -c`` sets arbitrary config (core.fsmonitor, alias.x=!cmd) and
+# ``--upload-pack``/``--receive-pack``/``--exec`` name a program to run.
 _ARG_DENYLIST: dict[str, frozenset[str]] = {
     "python": frozenset({"-c", "--command", "-m"}),
     "git": frozenset(
@@ -44,11 +46,6 @@ _ARG_DENYLIST: dict[str, frozenset[str]] = {
         }
     ),
 }
-
-# Bounded READ-only sandbox: no interpreters (python/git) permitted.
-_READONLY_ALLOWLIST = frozenset(
-    {"echo", "cat", "type", "ls", "dir", "whoami", "hostname"}
-)
 
 
 class CommandSandbox:
@@ -99,7 +96,14 @@ class CommandSandbox:
 
     @staticmethod
     def _reject_code_bearing_arguments(program: str, argv: list[str]) -> None:
-        """Reject arguments that turn an allowlisted program into an interpreter."""
+        """Reject arguments that turn an allowlisted program into an interpreter.
+
+        Allowlisting ``argv[0]`` is not sufficient: ``python`` and ``git`` both
+        accept code or program paths as *arguments*, so ``shell=False`` provides
+        no protection. Values may be attached with ``=``
+        (``--upload-pack=calc``) or supplied as the next token (``-c cfg=val``),
+        so compare on the flag portion only.
+        """
         denied = _ARG_DENYLIST.get(program)
         if not denied:
             return
@@ -134,6 +138,3 @@ class CommandSandbox:
                 f"path {str(rel_path)!r} escapes vault root {self._vault_root}"
             ) from exc
         return resolved
-
-
-READONLY_COMMAND_SANDBOX = CommandSandbox(allowlist=_READONLY_ALLOWLIST)

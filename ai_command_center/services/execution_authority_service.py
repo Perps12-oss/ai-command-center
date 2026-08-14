@@ -206,8 +206,10 @@ class ExecutionAuthorityService(BaseService):
         """Resolve intake for UI_COMMAND, de-escalating only.
 
         ``UI_COMMAND`` is re-published by the orchestrator for ``agent.task``
-        steps. A payload may lower its own trust (``actor_provenance=agent``)
-        but must never raise it to interactive user.
+        steps, so an unconditional INTAKE_UI_COMMAND stamp would grant an
+        agent-authored step interactive-user identity. A payload may therefore
+        *lower* its own trust but never raise it: anything that does not
+        explicitly declare automation origin keeps the default UI intake.
         """
         declared = str(event.payload.get("actor_provenance") or "").strip().lower()
         if declared.startswith("agent"):
@@ -221,12 +223,12 @@ class ExecutionAuthorityService(BaseService):
         if not text:
             return
 
+        intake = self._ui_command_intake(event)
         request_id = uuid.uuid4().hex
         scope = self._workspace_scope(event)
         clipboard = event.payload.get("clipboard")
         state_context = self._project_state(text, scope.get("workspace_id", ""))
         decision = self.analyze(text, clipboard=clipboard, state_context=state_context)
-        intake = self._ui_command_intake(event)
 
         self._publish_decision(
             request_id=request_id,
