@@ -85,7 +85,7 @@ docs/architecture/MEMORY_BOUNDARY.md
 
 ## 5. Recommended next work (ungated) — **SUPERSEDED as a queue**
 
-**Do not start** from this list. Owner-authorized work is the Strategic Runtime Program only. Do not invent tickets from this section.
+**Do not implement.** This section is historical evidence only. It is **not Queue 1.** Do not start from this list. Owner-authorized work is the Strategic Runtime Program only. Do not invent tickets from this section.
 
 Original 2026-08-07 text (evidence only):
 
@@ -111,6 +111,8 @@ Produce Constitutional Pre-Flight (Art. X) before implementing.
 ---
 
 ## 6. Phase 5 (gated) — point summary **as of 2026-08-07** (stale)
+
+**Do not implement.** Pool isolation is **PARKED** (Stream D). This section is historical evidence only — not a plan and not Queue 1.
 
 - **Then:** PARTIAL; approval-gated; missing `tiered_dispatch_policy.py`, `async_dispatch_queue.py`, ucgs profile pools.
 - **Now:** R4b **single-queue** live on `main`. Pool isolation **PARKED** (Stream D). Abandoned branch `cursor/phase5-async-eventbus-744e` was **deleted** 2026-08-14; do not recover it.
