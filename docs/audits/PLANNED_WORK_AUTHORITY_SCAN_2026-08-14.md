@@ -7,7 +7,8 @@
 This document is a point-in-time read-only scan of the planned-work authority chain.
 It is **evidence**, not authority, and it creates no work. Do **not** implement from it.
 
-Canonical planned-work queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) — **Queue 1 is EMPTY**.
+Canonical planned-work queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) — **superseded as EMPTY**; current Queue 1 is the Strategic Runtime Program (2026-08-14).
+This scan remains **evidence**, not authority.
 Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
 Hygiene: [`docs/governance/DOC_HYGIENE.md`](../governance/DOC_HYGIENE.md)
 

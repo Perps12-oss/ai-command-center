@@ -8,14 +8,14 @@ This document records previous investigation/work. It is **not** the current imp
 **Do not implement from this document.**
 
 - Historical implementation / branch `cursor/phase5-async-eventbus-744e`: **ABANDONED — not a merge candidate**
-- Concept (multi-pool / `tiered_dispatch_policy.py` / `async_dispatch_queue.py`): **PARKED — NOT IMPLEMENTATION WORK**
+- Concept (multi-pool / `tiered_dispatch_policy.py` / `async_dispatch_queue.py`): **Stream D** of the Strategic Runtime Program (measure + new ADR). Do **not** implement from this historical plan. Abandoned branch is not a merge candidate.
 - Current `main`: `EventBus(..., async_dispatch=True)` **single** `event-dispatch` queue (R4b)
 - Future trigger: measured single-queue contention
 - Gate: PERFORMANCE_CONSTITUTION Art. VII/XII + owner approval
 
 Do **not** describe this as incomplete, nearly complete, ready, next, pending, or awaiting merge.
 
-Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).  
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Strategic Runtime Program; Stream D).  
 Index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
 
 **Priority:** historical  

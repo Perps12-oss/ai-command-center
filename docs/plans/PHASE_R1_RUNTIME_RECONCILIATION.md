@@ -7,7 +7,7 @@
 This document records the R1 program. It is **not** current Queue 1.  
 Do not re-open R1 as implementation work. Do not restore OperatorKernel from the “paper path” section.
 
-Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Strategic Runtime Program).
 
 **Supersedes:** `PHASE_0R_REPOSITORY_TRUTH_RECONCILIATION.md` (same intent, strict priority order)  
 **Baseline:** `origin/main`  

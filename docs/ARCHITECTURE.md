@@ -516,8 +516,8 @@ Settings re-export (`core/settings/settings_repository.py`), `tools/tool_executo
 
 **STATUS:** HISTORICAL snapshot. This table is **not** the current planned-work queue.  
 “Phase 5 complete” here is an **older program gate** (2026-06-20), **not** Async EventBus tiered pools.  
-Async EventBus on current `main` is R4b **single-queue** (`async_dispatch=True`). Tiered pools are **PARKED**.  
-Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+Async EventBus on current `main` is R4b **single-queue** (`async_dispatch=True`). Isolation is program **Stream D** (measure first).  
+Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](governance/IMPLEMENTATION_GUIDE.md) (Queue 1 = [Strategic Runtime Program](governance/STRATEGIC_RUNTIME_PROGRAM.md)).
 
 Current phase (this table, 2026-07 era): **Phase 6 — historical IN PROGRESS** (bridge now **wired**; extras not Queue 1)  
 Previous snapshot: Phase 5 complete at commit `3970aa5` / tag `phase-5-complete-20260620`

@@ -2,7 +2,7 @@
 
 **STATUS:** INDEX — not an implementation queue  
 **Authority:** Derives from `PROJECT_CONSTITUTION_V4.md`, Accepted ADRs, and [`FOSSIL_DISPOSITION_AUDIT.md`](../audits/FOSSIL_DISPOSITION_AUDIT.md)  
-**Canonical planned-work document:** [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md)
+**Canonical planned-work document:** [`IMPLEMENTATION_GUIDE.md`](IMPLEMENTATION_GUIDE.md) (Queue 1 = [Strategic Runtime Program](STRATEGIC_RUNTIME_PROGRAM.md))
 
 When you encounter old code, old plans, or Proposed ADRs, read this index first.  
 **These lists are not active implementation queues.**
@@ -31,24 +31,34 @@ Packages may still exist on disk. **Exists ≠ Wired ≠ Authoritative.**
 | Program | Status |
 |---------|--------|
 | Chat C2–C4 as a modernization program | ABANDONED as a program. Live chat is the AppState / `chat.*` path. Do not treat remaining spec checklists as Queue 1. |
-| Knowledge Federation as unified SoT / vectors | ABANDONED as a program. Vector DB remains constitutionally gated. |
+| Knowledge Federation as unified SoT / vectors | ABANDONED as a **vectors-as-SoT** program. Stream E of the Strategic Runtime Program may proceed only as **derived index** after a new ADR — never as SoT. |
 | Insights as unfinished product | ABANDONED as a product ticket. UI placeholder is intentional empty state. |
-| Goose extras / `provider_sdk` live-wire | ABANDONED as current work. Live substitute = AppState provider snapshot. |
-| macOS hotkey Impl as current work | ABANDONED as current work. `get_hotkey_provider()` returns a placeholder; `_start_tap()` is a log stub. SKU decision is GATED. |
+| Goose extras / `provider_sdk` live-wire | ABANDONED as live-wire. Stream F may **Adapt** patterns only; Goose is not a runtime SoT. |
+| macOS hotkey as a **strategic** item | **DROPPED**. Placeholder/`_start_tap()` log stub remain fossils. Not Queue 1. Hotkeys may return only as an optional Cross-OS **adapter** feature (Stream G). |
 
 ---
 
 ## PARKED IDEAS — NOT IMPLEMENTATION WORK
 
+Items **moved into** [`STRATEGIC_RUNTIME_PROGRAM.md`](STRATEGIC_RUNTIME_PROGRAM.md) (checkpoints, not indefinite parking):
+
+| Idea | Now |
+|------|-----|
+| EventBus pool isolation | Stream D — measurement then ADR; abandoned pool **branch** still not a merge candidate |
+| Read-only FederationService | Stream E — after SoT ADR |
+| ADR-021 ordinary-path DecisionRecord | Stream A — after Gates 2–3 |
+| ADR-022 threshold escalation | Stream B — thresholds from Gate 2, then code |
+| Goose pattern review | Stream F |
+
+Still **not** in the six streams (remain parked / owner product):
+
 | Idea | Gate |
 |------|------|
-| EventBus pool isolation (Phase 5 tiered dispatch) | Measured single-queue contention; Art. VII/XII + owner approval |
 | ADR-008 derived compaction | Owner product decision; ADR-020 forbids memory SoT |
-| Read-only FederationService | Owner; type exists, **not** in factory |
-| ADR-021 composed DecisionRecord on ordinary success/failure | Owner sequencing |
-| ADR-022 threshold escalation | Owner; not Queue 1 |
 
-**STATUS: PARKED.** Do not implement without owner approval and the named gate.
+Do **not** implement stream **code** from this table. Follow the program pipeline.
+
+**Cross-OS (Stream G)** is the only remaining **strategic gate** — last, separate envelope.
 
 ---
 
@@ -58,7 +68,7 @@ Packages may still exist on disk. **Exists ≠ Wired ≠ Authoritative.**
 |--------|--------|
 | `cursor/phase5-async-eventbus-744e` | ABANDONED — **not a merge candidate**. Conflicts with #170 backpressure. Isolation tests would break single-queue FIFO. |
 
-Current main: `async_dispatch=True` **single** queue. The branch is not incomplete-awaiting-merge.
+Current main: `async_dispatch=True` **single** queue. The branch is not incomplete-awaiting-merge. Stream D must not recover it.
 
 ---
 

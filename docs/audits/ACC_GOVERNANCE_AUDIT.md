@@ -183,19 +183,18 @@ Plan docs none of which are authorities. **`.windsurf/plans/UI_CONSTITUTION-ff00
 
 **Closed:** Phase B UI remediation (#105); R1 P1–P4; P5 via ADR-014; Stage 2 soft-shadow; SA.mutate track CLOSED (live = WM nodes/edges + `store_memory` + `submit_goal`; WEA outside per ADR-017); ADR-018–023 accepted.
 
-**Active implementation work:** **none** (Implementation Guide Queue 1 **EMPTY** as of 2026-08-12 fossil cleanup). Section 9 remaining envelopes and Phase 5 pool isolation are **PARKED**, not a backlog.
+**Active implementation work:** Strategic Runtime Program (Wave 0–1 docs; stream code after Gates 2–3). See [`IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md).
 
-**Hard stops** (from `R1_UNGATED_STOP_LINE.md`) — **not Queue 1**:
+**Program streams** (not indefinite parking): A Explainability, B Autonomy, C Model Strategy, D EventBus (measure first), E Knowledge (SoT first), F Goose patterns. **Cross-OS is the only remaining strategic gate.** macOS Hotkey standalone item **dropped**.
+
+**Still retired / not streams:**
 
 | Blocked | Gate |
 |---------|------|
-| Phase 5 EventBus pool isolation | **PARKED** — R4b single-queue already live; branch abandoned; measured contention + owner |
-| Goose / external patterns | Stage 3 + Integration Proposal + ADR |
 | Live-wire Predictive/Undo | ADR superseding ADR-014 (**RETIRED** until then) |
 | Re-wire OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator | ADR superseding 006/012/013 (**RETIRED**; do not restore) |
-| Platform hotkey/tray live wire | Owner SKU decision (**GATED**) |
 
-Feature branches that add Goose research ADRs while predating the governance layer are Class B / Queue 2 / Stage 3 — gated; do not treat as canon.
+Feature branches that add Goose research ADRs while predating the governance layer are Class B / Stream F inputs — not canon.
 
 ---
 

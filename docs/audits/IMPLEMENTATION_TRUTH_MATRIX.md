@@ -3,7 +3,7 @@
 **Milestone:** PHASE R1 — Runtime Reconciliation (+ Phase B UI surfaces)  
 **Baseline:** `origin/main` @ `b949f3e` (fossil disposition 2026-08-12; prior matrix baseline `426c6b7`)  
 **Rule:** Exists ≠ Wired ≠ Authoritative  
-**Canonical plan:** `docs/governance/IMPLEMENTATION_GUIDE.md` (Queue 1 **EMPTY**)  
+**Canonical plan:** `docs/governance/IMPLEMENTATION_GUIDE.md` (Queue 1 = Strategic Runtime Program)  
 **Fossil index:** `docs/governance/HISTORICAL_AND_RETIRED_WORK.md`  
 **Plans:** `docs/plans/PHASE_R1_RUNTIME_RECONCILIATION.md` (**COMPLETE**) · Phase B (**COMPLETE**)  
 **Prior:** PHASE 0R matrix @ `e128a72` (superseded baseline; composition rows retained)
@@ -32,10 +32,10 @@ This matrix is a **verification artifact**, not an implementation queue. RETIRED
 | GlobalContextBar | ✅ | ✅ (UI shell) | ✅ | ✅ UI | **WIRED** (UI) | `global_context_bar.py` + `GlobalContextSnapshot` incl. active goal |
 | OSPalette + provider registry | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | `palette_provider.py`; Ctrl+K |
 | Brain / Evidence / Operations / Graph / Insights views | ✅ | ✅ (UI) | ✅ | ✅ UI | **WIRED** (UI) | Phase B E06–E13 on main; Insights placeholder by plan |
-| Cross-platform hotkey (macOS) | ✅ Impl packages + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **GATED / NOT CURRENT WORK** | `get_hotkey_provider()` placeholder; Impl under `platform/macos|linux/` unwired — **not Queue 1**. `_start_tap()` is a log stub. |
-| Platform tray / notifications | ⚠️ stubs + working TrayController | ❌ platform_service | ❌ | ⚠️ partial | **GATED / NOT CURRENT WORK** | `NotImplementedError` in `platform_service.py`; `ui/tray` pystray path exists — not Queue 1 |
+| Cross-platform hotkey (macOS) | ✅ Impl packages + ❌ live getter | ⚠️ placeholder returned | ⚠️ | ❌ stub path | **DROPPED as strategic item** | Not Queue 1. `_start_tap()` log stub. Optional later only as Stream G adapter. |
+| Platform tray / notifications | ⚠️ stubs + working TrayController | ❌ platform_service | ❌ | ⚠️ partial | **Stream G (not opened)** | Adapter work; not a standalone hotkey milestone. |
 | Phase 5 Async EventBus (R4b single queue) | ✅ | ✅ `async_dispatch=True` | ✅ | ✅ single queue | **LIVE** | `application.py` `EventBus(..., async_dispatch=True)`; tests `test_eventbus_async_adapters.py`, `test_eventbus_dispatch_queue.py` |
-| Phase 5 tiered pools (`tiered_dispatch_policy` / `async_dispatch_queue`) | ❌ not on main | ❌ | ❌ | ❌ | **PARKED / BRANCH ABANDONED** | Not Queue 1. Branch `cursor/phase5-async-eventbus-744e` is **not a merge candidate**. Gate: measured contention + Art. VII/XII + owner. |
+| Phase 5 tiered pools (`tiered_dispatch_policy` / `async_dispatch_queue`) | ❌ not on main | ❌ | ❌ | ❌ | **Stream D** (measure + new ADR; branch abandoned) | Do not merge `cursor/phase5-async-eventbus-744e`. |
 
 Legend: ✅ yes · ❌ no · ⚠️ incomplete / unit-only / stub
 
