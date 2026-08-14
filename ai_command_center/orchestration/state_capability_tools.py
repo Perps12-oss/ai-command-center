@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from ai_command_center.core.events.topics import UI_NAVIGATE
 from ai_command_center.core.tools import ToolResult, ToolSpec
+from ai_command_center.domain.runtime_safety import SecurityTier
 
 
 class _NoteOps(Protocol):
@@ -108,10 +109,35 @@ def bind_state_capability_tools(
         return ToolResult(success=True, output=f"navigated:{view}")
 
     for spec in (
-        ToolSpec(name="notes.create", description="Create a vault note", handler=notes_create),
-        ToolSpec(name="notes.search", description="Search vault notes", handler=notes_search),
-        ToolSpec(name="memory.store", description="Store a memory item", handler=memory_store),
-        ToolSpec(name="memory.query", description="Query stored memories", handler=memory_query),
-        ToolSpec(name="navigate", description="Navigate to a UI view", handler=navigate),
+        ToolSpec(
+            name="notes.create",
+            description="Create a vault note",
+            handler=notes_create,
+            tier=SecurityTier.WRITE,
+        ),
+        ToolSpec(
+            name="notes.search",
+            description="Search vault notes",
+            handler=notes_search,
+            tier=SecurityTier.READ,
+        ),
+        ToolSpec(
+            name="memory.store",
+            description="Store a memory item",
+            handler=memory_store,
+            tier=SecurityTier.WRITE,
+        ),
+        ToolSpec(
+            name="memory.query",
+            description="Query stored memories",
+            handler=memory_query,
+            tier=SecurityTier.READ,
+        ),
+        ToolSpec(
+            name="navigate",
+            description="Navigate to a UI view",
+            handler=navigate,
+            tier=SecurityTier.READ,
+        ),
     ):
         _register(spec)

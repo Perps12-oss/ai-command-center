@@ -25,6 +25,14 @@ if str(PROJECT_ROOT) not in sys.path:
 if not os.environ.get("APPDATA"):
     os.environ["APPDATA"] = tempfile.mkdtemp(prefix="aicc-appdata-")
 
+# Any test that boots ApplicationCore and shuts it down triggers the telemetry
+# session export. Redirect it to a throwaway directory so the suite never writes
+# into the developer's real runtime data dir. Individual tests may override.
+os.environ.setdefault(
+    "ACC_TELEMETRY_EXPORT_DIR",
+    tempfile.mkdtemp(prefix="aicc-telemetry-"),
+)
+
 
 def _module_available(name: str) -> bool:
     import importlib.util

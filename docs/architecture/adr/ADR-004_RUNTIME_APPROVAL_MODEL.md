@@ -1,6 +1,7 @@
 # ADR-004: Runtime Approval Model
 
 **Status:** Proposed  
+**Disposition:** LIVE-IN-EFFECT — security tiers and HITL approval are on `origin/main`. Formal Status remains **Proposed** (not silently Accepted). This is not a future-work ticket.  
 **Date:** 2026-07-09
 
 ## Context

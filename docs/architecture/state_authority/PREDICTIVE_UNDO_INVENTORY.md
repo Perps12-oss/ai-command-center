@@ -1,7 +1,12 @@
 # PredictiveEngine & UndoReplay Inventory (State Authority / R1 P5)
 
-**Status:** ACTIVE — R1 P5 inventory + ADR-014  
-**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-005, ADR-006, ADR-014  
+**STATUS:** RETIRED FROM LIVE (ADR-014) — inventory only, **not Queue 1**
+
+**HISTORICAL / NON-AUTHORITATIVE as implementation work**
+
+PredictiveEngine and UndoReplay are **RETIRED / NON-CANONICAL**. Do not restore or wire them without a superseding ADR.
+
+**Authority:** `STATE_AUTHORITY_CONTRACT.md`, ADR-006, ADR-014 (ADR-005 original wording is SUPERSEDED)  
 **Date:** 2026-08-04  
 **Baseline:** `origin/main` @ `7d1065b`
 

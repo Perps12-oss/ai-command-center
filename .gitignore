@@ -35,6 +35,9 @@ credentials.json
 *.tom-invocation-token
 
 data/
+# ui-ux-pro-max skill catalogs live under .cursor/skills/**/data/
+!.cursor/skills/**/data/
+!.cursor/skills/**/data/**
 
 # Cursor - UCGS kit is tracked under .cursor/rules, .cursor/hooks, and .cursor/skills
 .cursor/*

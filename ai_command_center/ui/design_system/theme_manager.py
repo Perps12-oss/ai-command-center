@@ -25,6 +25,12 @@ _DEFAULT_TOKENS: dict[str, str] = {
     "TEXT_SECONDARY": T.TEXT_SECONDARY,
     "TEXT_MUTED": T.TEXT_MUTED,
     "ACCENT_DEFAULT": T.ACCENT_DEFAULT,
+    "MSG_USER_BG": T.MSG_USER_BG,
+    "MSG_USER_BORDER": T.MSG_USER_BORDER,
+    "MSG_USER_TEXT": T.MSG_USER_TEXT,
+    "MSG_ASSISTANT_BG": T.MSG_ASSISTANT_BG,
+    "MSG_ASSISTANT_BORDER": T.MSG_ASSISTANT_BORDER,
+    "MSG_ASSISTANT_TEXT": T.MSG_ASSISTANT_TEXT,
 }
 
 
@@ -66,6 +72,8 @@ def _normalize_theme(name: str) -> str:
         return "Light"
     if key in {"high contrast", "highcontrast", "hc", "contrast"}:
         return "High Contrast"
+    if key in {"golden hour", "golden_hour", "goldenhour"}:
+        return "Golden Hour"
     return "VS Dark"
 
 
@@ -90,6 +98,19 @@ def _apply_palette(preset: dict) -> None:
         T.ACCENT_DEFAULT = accent  # type: ignore[assignment]
         T.ACCENT_HOVER = accent  # type: ignore[assignment]
         T.ACCENT_PRIMARY = accent  # type: ignore[assignment]
+    T.MSG_USER_BG = str(preset.get("msg_user_bg", _DEFAULT_TOKENS["MSG_USER_BG"]))  # type: ignore[assignment]
+    T.MSG_USER_BORDER = str(preset.get("msg_user_border", _DEFAULT_TOKENS["MSG_USER_BORDER"]))  # type: ignore[assignment]
+    T.MSG_USER_TEXT = str(preset.get("msg_user_text", _DEFAULT_TOKENS["MSG_USER_TEXT"]))  # type: ignore[assignment]
+    T.MSG_ASSISTANT_BG = str(preset.get("msg_assistant_bg", _DEFAULT_TOKENS["MSG_ASSISTANT_BG"]))  # type: ignore[assignment]
+    T.MSG_ASSISTANT_BORDER = str(preset.get("msg_assistant_border", _DEFAULT_TOKENS["MSG_ASSISTANT_BORDER"]))  # type: ignore[assignment]
+    T.MSG_ASSISTANT_TEXT = str(preset.get("msg_assistant_text", _DEFAULT_TOKENS["MSG_ASSISTANT_TEXT"]))  # type: ignore[assignment]
+    appearance = str(preset.get("appearance", "dark"))
+    try:
+        import customtkinter as ctk
+
+        ctk.set_appearance_mode("light" if appearance == "light" else "dark")
+    except Exception:
+        pass
 
 
 def apply(window, *, theme_name: str | None = None, alpha: float | None = None) -> None:

@@ -14,6 +14,10 @@ from collections.abc import Callable
 from typing import Any
 
 from ai_command_center.core.command_classify import classify_command
+from ai_command_center.core.control_plane import (
+    intake_run_fields,
+    plan_step_require_approval_for_capability,
+)
 from ai_command_center.core.contracts import (
     COMMAND_DEFERRED_VERSION,
     INTAKE_AGENT,
@@ -197,11 +201,29 @@ class ExecutionAuthorityService(BaseService):
             return StateContext.empty(workspace_id=workspace_id, query_text=text)
         return self._state_authority.project(text=text, workspace_id=workspace_id)
 
+    @staticmethod
+    def _ui_command_intake(event: Event) -> str:
+        """Resolve intake for UI_COMMAND, de-escalating only.
+
+        ``UI_COMMAND`` is re-published by the orchestrator for ``agent.task``
+        steps, so an unconditional INTAKE_UI_COMMAND stamp would grant an
+        agent-authored step interactive-user identity. A payload may therefore
+        *lower* its own trust but never raise it: anything that does not
+        explicitly declare automation origin keeps the default UI intake.
+        """
+        declared = str(event.payload.get("actor_provenance") or "").strip().lower()
+        if declared.startswith("agent"):
+            return INTAKE_AGENT
+        if declared == "workflow":
+            return INTAKE_WORKFLOW
+        return INTAKE_UI_COMMAND
+
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
             return
 
+        intake = self._ui_command_intake(event)
         request_id = uuid.uuid4().hex
         scope = self._workspace_scope(event)
         clipboard = event.payload.get("clipboard")
@@ -210,7 +232,7 @@ class ExecutionAuthorityService(BaseService):
 
         self._publish_decision(
             request_id=request_id,
-            intake=INTAKE_UI_COMMAND,
+            intake=intake,
             decision=decision,
             scope=scope,
             state_context=state_context,
@@ -255,6 +277,7 @@ class ExecutionAuthorityService(BaseService):
                 scope=scope,
                 state_context=state_context,
                 skip_planner=False,
+                intake=intake,
                 extra_payload=extra or None,
             )
             return
@@ -282,6 +305,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=intake,
         )
 
     def _publish_decision(
@@ -408,6 +432,7 @@ class ExecutionAuthorityService(BaseService):
             scope=scope,
             state_context=state_context,
             workspace_context_override=workspace_context,
+            intake=INTAKE_WORKFLOW,
             extra_payload={"workflow_run_id": run_id, "workflow_id": workflow_id},
         )
 
@@ -457,6 +482,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=INTAKE_AGENT,
         )
 
     def _dispatch_agent(
@@ -505,6 +531,7 @@ class ExecutionAuthorityService(BaseService):
             plan=plan,
             scope=scope,
             state_context=state_context,
+            intake=INTAKE_AGENT,
         )
 
     def _submit_plan(
@@ -519,6 +546,7 @@ class ExecutionAuthorityService(BaseService):
         skip_planner: bool | None = None,
         workspace_context_override: dict[str, Any] | None = None,
         extra_payload: dict[str, Any] | None = None,
+        intake: str = INTAKE_UI_COMMAND,
     ) -> None:
         use_synthetic = decision.skip_planner if skip_planner is None else skip_planner
         correlation = CorrelationContext.new(goal_id=request_id).to_payload()
@@ -541,11 +569,11 @@ class ExecutionAuthorityService(BaseService):
             "description": decision.reason or decision.kind.value,
             "request_id": request_id,
             "correlation": correlation,
-            "auto_approve": True,
             "workspace_context": workspace_context,
             "workspace_id": scope.get("workspace_id", ""),
             "authority_decision": decision.to_payload(),
             "state_context": state_context.to_dict(),
+            **intake_run_fields(intake=intake),
         }
         if plan is not None and use_synthetic:
             payload["plan"] = plan.to_dict()
@@ -770,7 +798,9 @@ class ExecutionAuthorityService(BaseService):
                     step_id="step-1",
                     capability=decision.capability,
                     args=dict(decision.args),
-                    require_approval=False,
+                    require_approval=plan_step_require_approval_for_capability(
+                        decision.capability
+                    ),
                 ),
             ),
         )

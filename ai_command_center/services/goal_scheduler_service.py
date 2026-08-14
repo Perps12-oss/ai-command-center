@@ -301,6 +301,9 @@ class SingleGoalScheduler(BaseService):
             self._prebuilt_plans[goal_id] = dict(raw_plan)
         options: dict = {
             "auto_approve": bool(payload.get("auto_approve", False)),
+            "actor_provenance": str(payload.get("actor_provenance") or ""),
+            "interactive_user": bool(payload.get("interactive_user")),
+            "actor_type": str(payload.get("actor_type") or ""),
         }
         workspace_context = payload.get("workspace_context")
         if isinstance(workspace_context, dict):
@@ -397,7 +400,12 @@ class SingleGoalScheduler(BaseService):
             "plan": dict(event.payload.get("plan") or {}),
             "auto_approve": bool(options.get("auto_approve", False)),
             "correlation": self._active_goal.correlation.to_payload(),
+            "actor_provenance": str(options.get("actor_provenance") or ""),
+            "interactive_user": bool(options.get("interactive_user")),
         }
+        actor_type = str(options.get("actor_type") or "").strip()
+        if actor_type:
+            run_payload["actor_type"] = actor_type
         workspace_context = options.get("workspace_context")
         if isinstance(workspace_context, dict):
             run_payload["workspace_context"] = workspace_context

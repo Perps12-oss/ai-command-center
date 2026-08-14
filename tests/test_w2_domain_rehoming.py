@@ -272,6 +272,7 @@ class W2ToolContextContractTests(unittest.TestCase):
                 "tool": "shell",
                 "args": {"command": "echo ok"},
                 "actor_type": "user",
+                "interactive_user": True,
             },
             source="shell_tool",
         )

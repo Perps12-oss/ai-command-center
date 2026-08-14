@@ -1,6 +1,11 @@
 # Repository Registry
 
-Canonical list of repositories investigated by the ACC Engineering Intelligence Program.
+**STATUS:** RESEARCH REGISTRY — **not product Queue 1**
+
+Canonical list of repositories investigated by the ACC Engineering Intelligence Program (Class B).  
+“Queued” here means **research expedition queued**, not product implementation. Goose extras remain **GATED** (Stage 3).
+
+Product Queue 1: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../docs/governance/IMPLEMENTATION_GUIDE.md) (**EMPTY**).
 
 **ID lifecycle:** `exp-NNN` identifiers are **reserved when a row is added** (including `Queued`). The ID is immutable for that investigation. Folder name: `{exp-NNN}-{repo-name}/`.
 

@@ -399,6 +399,8 @@ class EventBus:
             self._topic_publish_counts[topic] += 1
         if topic == UI_NAVIGATE:
             self._note_navigate_publish_rate(source, event.payload)
+        if self._shutdown.is_set() and get_dispatch_tier(topic) is DispatchTier.ASYNC_ELIGIBLE:
+            return replace(event, delivery="dropped")
         if self._should_enqueue_topic(topic):
             if self._debug_mode:
                 logger.debug(
@@ -438,6 +440,11 @@ class EventBus:
                 "EventBus dropped reentrant ui.navigate (dispatch) source=%s",
                 event.source,
             )
+            return
+        if (
+            self._shutdown.is_set()
+            and get_dispatch_tier(event.topic) is DispatchTier.ASYNC_ELIGIBLE
+        ):
             return
         if self._should_enqueue_topic(event.topic):
             self._enqueue(event)
@@ -584,6 +591,7 @@ class EventBus:
         try:
             self._dispatch_queue.put_nowait(None)
         except queue.Full:
+<<<<<<< HEAD
             try:
                 self._dispatch_queue.put(None, timeout=max(0.05, deadline - time.monotonic()))
             except queue.Full:

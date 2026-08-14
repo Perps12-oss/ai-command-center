@@ -19,7 +19,9 @@ from ai_command_center.core.events.topics import (
     UI_COMMAND,
     WORKSPACE_ACTIVE,
 )
+from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.core.tools import ToolResult, ToolSpec
+from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.execution_orchestrator_service import (
@@ -28,11 +30,13 @@ from ai_command_center.services.execution_orchestrator_service import (
 from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.tools.tool_registry import ToolRegistry
+from tests.support.shell_confirmation import wire_auto_confirm_shell
 
 
 class Phase5ShellToolScopeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.bus = EventBus()
+        wire_auto_confirm_shell(self.bus)
         self.invokes: list[dict] = []
         self.bus.subscribe(TOOL_INVOKE, lambda e: self.invokes.append(dict(e.payload)))
         self.goals: list[dict] = []
@@ -127,7 +131,9 @@ class Phase5ToolTimelineTests(unittest.TestCase):
             ToolSpec(
                 name="demo",
                 description="demo tool",
+                tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
+                tier=SecurityTier.READ,
             )
         )
         executor = ToolExecutorService(bus, registry)
@@ -173,7 +179,9 @@ class Phase5ToolTimelineTests(unittest.TestCase):
             ToolSpec(
                 name="demo",
                 description="demo tool",
+                tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
+                tier=SecurityTier.READ,
             )
         )
         executor = ToolExecutorService(bus, registry)

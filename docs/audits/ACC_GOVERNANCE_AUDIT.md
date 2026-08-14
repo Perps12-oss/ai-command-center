@@ -183,17 +183,17 @@ Plan docs none of which are authorities. **`.windsurf/plans/UI_CONSTITUTION-ff00
 
 **Closed:** Phase B UI remediation (#105); R1 P1–P4; P5 via ADR-014; Stage 2 soft-shadow; SA.mutate track CLOSED (live = WM nodes/edges + `store_memory` + `submit_goal`; WEA outside per ADR-017); ADR-018–023 accepted.
 
-**Active:** Section 9 implementation of ADR-018–023; performance track (PERF-002/003/004) under `PERFORMANCE_CONSTITUTION.md`.
+**Active implementation work:** **none** (Implementation Guide Queue 1 **EMPTY** as of 2026-08-12 fossil cleanup). Section 9 remaining envelopes and Phase 5 pool isolation are **PARKED**, not a backlog.
 
-**Hard stops** (from `R1_UNGATED_STOP_LINE.md`):
+**Hard stops** (from `R1_UNGATED_STOP_LINE.md`) — **not Queue 1**:
 
 | Blocked | Gate |
 |---------|------|
-| Phase 5 Async EventBus | Performance Investigation Report + human approval |
+| Phase 5 EventBus pool isolation | **PARKED** — R4b single-queue already live; branch abandoned; measured contention + owner |
 | Goose / external patterns | Stage 3 + Integration Proposal + ADR |
-| Live-wire Predictive/Undo | ADR superseding ADR-014 |
-| Re-wire OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator | ADR superseding 006/012/013 |
-| Platform hotkey/tray live wire | Phase 11 backlog |
+| Live-wire Predictive/Undo | ADR superseding ADR-014 (**RETIRED** until then) |
+| Re-wire OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator | ADR superseding 006/012/013 (**RETIRED**; do not restore) |
+| Platform hotkey/tray live wire | Owner SKU decision (**GATED**) |
 
 Feature branches that add Goose research ADRs while predating the governance layer are Class B / Queue 2 / Stage 3 — gated; do not treat as canon.
 

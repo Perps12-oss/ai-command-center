@@ -11,41 +11,50 @@
 
 | Status | Meaning |
 |--------|---------|
-| Proposed | **Non-binding** — binding intent undecided or not yet Accepted |
+| Proposed | **Non-binding** — binding intent undecided or not yet Accepted. Do **not** implement from Proposed ADRs as if Accepted. |
 | Accepted | **Binding** under V4; implementers must follow (not a constitutional Level 2 identity) |
 | Accepted — disposition | Accepted with retire / research-only / remain-outside outcome |
 | Narrowed by | Later Accepted ADR constrains scope without full supersession |
+
+**Disposition** (2026-08-12 fossil cleanup) is honesty about live code vs formal Status. Disposition is **not** a silent Accept. See [`HISTORICAL_AND_RETIRED_WORK.md`](../../governance/HISTORICAL_AND_RETIRED_WORK.md).
+
+| Disposition | Meaning |
+|-------------|--------|
+| LIVE-IN-EFFECT | Implementation is on `main`; formal Status may still be Proposed |
+| SUPERSEDED | Original wording must not be Accepted; later ADRs win |
+| PARKED / NOT REQUIRED | Not Queue 1; do not implement without owner decision |
+| UNDECIDED PRODUCT IDEA | Proposed product; not implementation work |
 
 ---
 
 ## Index
 
-| ADR | Title | Status |
-|-----|-------|--------|
-| [001](ADR-001_PERSISTENCE_STRATEGY.md) | Persistence Strategy | Proposed |
-| [002](ADR-002_SCHEDULER_MODEL.md) | Scheduler Model | Proposed |
-| [003](ADR-003_OBSERVER_FLOW.md) | Observer Flow | Proposed |
-| [004](ADR-004_RUNTIME_APPROVAL_MODEL.md) | Runtime Approval Model | Proposed |
-| [005](ADR-005_WORLD_MODEL_AUTHORITY.md) | World Model Authority | Proposed |
-| [006](ADR-006_EXECUTION_AUTHORITY_CANONICAL.md) | Execution Authority Canonical | Accepted |
-| [007a](ADR-007_APPSTATE_NOTIFICATION_STORMS.md) | AppState Notification Storms | Accepted |
-| [007b](ADR-007_PROVIDER_REGISTRY.md) | Provider Registry | Proposed |
-| [008](ADR-008_CONVERSATION_COMPACTION.md) | Conversation Compaction | Proposed — **narrowed by ADR-020** |
-| [009](ADR-009_TOOL_CONFIRMATION_ROUTER.md) | Tool Confirmation Router | Proposed — **narrowed by ADR-018** |
-| [010](ADR-010_MODULAR_TOOL_INSPECTION.md) | Modular Tool Inspection | Proposed |
-| [011](ADR-011_TELEMETRY_BACKENDS.md) | Telemetry Backends | Proposed |
-| [012](ADR-012_GOALS_PHASE9_DISPOSITION.md) | Goals Phase 9 Disposition | Accepted — retire GoalEngine |
-| [013](ADR-013_PLANNING_AGENT_COORDINATOR_DISPOSITION.md) | Planning / AgentCoordinator Disposition | Accepted — research-only |
-| [014](ADR-014_PREDICTIVE_UNDO_DISPOSITION.md) | Predictive Undo Disposition | Accepted — research-only |
-| [015](ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md) | SA Mutate Memory | Accepted |
-| [016](ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md) | SA Mutate Goals | Accepted |
-| [017](ADR-017_SA_MUTATE_WORKFLOWS_EXECUTIONS_AGENTS_DISPOSITION.md) | SA Mutate WEA Disposition | Accepted — remain outside |
-| [018](ADR-018_TOOL_INVOCATION_ARCHITECTURE.md) | Tool Invocation Architecture | Accepted — Hybrid B-primary |
-| [019](ADR-019_PLANNING_ARCHITECTURE.md) | Planning Architecture | Accepted — B with explicit replan |
-| [020](ADR-020_MEMORY_ARCHITECTURE.md) | Memory Architecture | Accepted — World Model canonical |
-| [021](ADR-021_EXPLAINABILITY.md) | Explainability | Accepted — Decision Records |
-| [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence |
-| [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent |
+| ADR | Title | Status | Disposition |
+|-----|-------|--------|-------------|
+| [001](ADR-001_PERSISTENCE_STRATEGY.md) | Persistence Strategy | Proposed | **LIVE-IN-EFFECT** |
+| [002](ADR-002_SCHEDULER_MODEL.md) | Scheduler Model | Proposed | **LIVE-IN-EFFECT** |
+| [003](ADR-003_OBSERVER_FLOW.md) | Observer Flow | Proposed | **LIVE-IN-EFFECT** |
+| [004](ADR-004_RUNTIME_APPROVAL_MODEL.md) | Runtime Approval Model | Proposed | **LIVE-IN-EFFECT** |
+| [005](ADR-005_WORLD_MODEL_AUTHORITY.md) | World Model Authority | Proposed | **SUPERSEDED / REWRITE REQUIRED** (ADR-015–017) |
+| [006](ADR-006_EXECUTION_AUTHORITY_CANONICAL.md) | Execution Authority Canonical | Accepted | LIVE |
+| [007a](ADR-007_APPSTATE_NOTIFICATION_STORMS.md) | AppState Notification Storms | Accepted | LIVE |
+| [007b](ADR-007_PROVIDER_REGISTRY.md) | Provider Registry | Proposed | **LIVE SNAPSHOT** on AppState; Goose extras obsolete |
+| [008](ADR-008_CONVERSATION_COMPACTION.md) | Conversation Compaction | Proposed — **narrowed by ADR-020** | **UNDECIDED / PARKED** — not Queue 1 |
+| [009](ADR-009_TOOL_CONFIRMATION_ROUTER.md) | Tool Confirmation Router | Proposed — **narrowed by ADR-018** | **LIVE-IN-EFFECT** |
+| [010](ADR-010_MODULAR_TOOL_INSPECTION.md) | Modular Tool Inspection | Proposed | **PARKED / NOT REQUIRED** |
+| [011](ADR-011_TELEMETRY_BACKENDS.md) | Telemetry Backends | Proposed | **PARKED / NOT REQUIRED** |
+| [012](ADR-012_GOALS_PHASE9_DISPOSITION.md) | Goals Phase 9 Disposition | Accepted — retire GoalEngine | LIVE (retire) |
+| [013](ADR-013_PLANNING_AGENT_COORDINATOR_DISPOSITION.md) | Planning / AgentCoordinator Disposition | Accepted — research-only | LIVE (research-only) |
+| [014](ADR-014_PREDICTIVE_UNDO_DISPOSITION.md) | Predictive Undo Disposition | Accepted — research-only | LIVE (research-only) |
+| [015](ADR-015_STATE_AUTHORITY_MUTATE_MEMORY.md) | SA Mutate Memory | Accepted | LIVE |
+| [016](ADR-016_STATE_AUTHORITY_MUTATE_GOALS.md) | SA Mutate Goals | Accepted | LIVE |
+| [017](ADR-017_SA_MUTATE_WORKFLOWS_EXECUTIONS_AGENTS_DISPOSITION.md) | SA Mutate WEA Disposition | Accepted — remain outside | LIVE (remain outside) |
+| [018](ADR-018_TOOL_INVOCATION_ARCHITECTURE.md) | Tool Invocation Architecture | Accepted — Hybrid B-primary | LIVE |
+| [019](ADR-019_PLANNING_ARCHITECTURE.md) | Planning Architecture | Accepted — B with explicit replan | LIVE |
+| [020](ADR-020_MEMORY_ARCHITECTURE.md) | Memory Architecture | Accepted — World Model canonical | LIVE |
+| [021](ADR-021_EXPLAINABILITY.md) | Explainability | Accepted — Decision Records | LIVE core; extra envelope **PARKED** (not Queue 1) |
+| [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence | LIVE core; threshold escalate **PARKED** (not Queue 1) |
+| [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent | LIVE (M1 docs); remaining milestones not Queue 1 |
 
 ### Section 9 implementation notes
 

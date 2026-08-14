@@ -1,7 +1,7 @@
 # E06 — Brain Inspector
 
 **Slice:** PR-UI-E06  
-**Status:** On `main`
+**Status:** COMPLETE on `main` — **not Queue 1**.
 
 ## Purpose
 

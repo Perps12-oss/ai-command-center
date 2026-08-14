@@ -1,6 +1,16 @@
 # Chat Modernization Spec
 
-**Status:** Architecture Specification  
+**STATUS:** HISTORICAL / ABANDONED AS A PROGRAM (C2–C4)
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This spec records a chat-refactor program. **Chat C2–C4 as a program is abandoned.**  
+Live chat on `main` is the AppState / `chat.*` reducer path (`StateApplierMixin`).  
+Do **not** treat remaining checklists as Queue 1. Do not implement C2/C3/C4 from this document.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)  
+Index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
+
 **Vision ref:** [WORKSPACE_VISION.md](WORKSPACE_VISION.md) — Chat-as-tool  
 **Constitutional refs:** UI isolation; ContextManager gate; AppState projection
 

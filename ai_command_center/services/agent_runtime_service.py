@@ -39,6 +39,7 @@ from ai_command_center.core.events.topics import (
 from ai_command_center.core.permission.permission import Permission
 from ai_command_center.domain.agent_session import AgentState
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
+from ai_command_center.core.security_policy import READONLY_SHELL_TOOL
 from ai_command_center.services.base import BaseService
 
 _logger = logging.getLogger(__name__)
@@ -206,7 +207,7 @@ class AgentRuntimeService(BaseService):
                             step_id=f"agent-{role}-{index}",
                             capability="agent.shell",
                             args={
-                                "tool": "shell",
+                                "tool": READONLY_SHELL_TOOL,
                                 "command": command,
                                 "agent_id": agent_id,
                                 "spawn_role": role,
@@ -237,7 +238,7 @@ class AgentRuntimeService(BaseService):
                             step_id=f"agent-{role}-{index}",
                             capability="agent.shell",
                             args={
-                                "tool": "shell",
+                                "tool": READONLY_SHELL_TOOL,
                                 "command": command,
                                 "agent_id": agent_id,
                                 "spawn_role": role,
@@ -272,7 +273,7 @@ class AgentRuntimeService(BaseService):
                         step_id=f"agent-step-{index + 1}",
                         capability="agent.shell",
                         args={
-                            "tool": "shell",
+                            "tool": READONLY_SHELL_TOOL,
                             "command": command,
                             "agent_id": agent_id,
                             "spawn_role": spawn_role,
@@ -322,7 +323,7 @@ class AgentRuntimeService(BaseService):
                 step_id=f"agent-step-{index + 1}",
                 capability="agent.shell",
                 args={
-                    "tool": "shell",
+                    "tool": READONLY_SHELL_TOOL,
                     "command": command,
                     "agent_id": agent_id,
                     "spawn_role": spawn_role,

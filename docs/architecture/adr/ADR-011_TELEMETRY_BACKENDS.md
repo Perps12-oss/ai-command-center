@@ -1,6 +1,7 @@
 # ADR-011: Layered Telemetry Backends
 
 **Status:** Proposed  
+**Disposition:** PARKED / NOT REQUIRED — **NOT IMPLEMENTATION WORK.** Live telemetry is `TelemetryService` → EventBus. Do not implement OTel/PostHog/Langfuse exporters from this ADR.  
 **Date:** 2026-07-27  
 **Deciders:** Architecture Review (Tom)  
 **Supersedes:** —  

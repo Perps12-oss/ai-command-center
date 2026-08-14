@@ -1,6 +1,7 @@
 # ADR-009: Tool Confirmation Router Pipeline
 
 **Status:** Proposed — **narrowed by ADR-018**  
+**Disposition:** LIVE-IN-EFFECT — confirmation topics + ApprovalsView are on `origin/main` (see implementation note below). Formal Status remains **Proposed** (not silently Accepted). This is not a future-work ticket.  
 **Date:** 2026-07-27  
 **Deciders:** Architecture Review (Tom)  
 **Supersedes:** —  

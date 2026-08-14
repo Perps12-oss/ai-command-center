@@ -1,7 +1,7 @@
 # E13 — Insights Placeholder
 
 **Slice:** PR-UI-E13  
-**Status:** Implemented on feature branch (pending merge)
+**Status:** COMPLETE on `main` (#105) — intentional **placeholder**. Insights as unfinished product is **ABANDONED**. Not Queue 1. Not pending merge.
 
 ## Purpose
 
