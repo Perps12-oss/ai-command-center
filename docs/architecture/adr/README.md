@@ -52,9 +52,11 @@
 | [018](ADR-018_TOOL_INVOCATION_ARCHITECTURE.md) | Tool Invocation Architecture | Accepted — Hybrid B-primary | LIVE |
 | [019](ADR-019_PLANNING_ARCHITECTURE.md) | Planning Architecture | Accepted — B with explicit replan | LIVE |
 | [020](ADR-020_MEMORY_ARCHITECTURE.md) | Memory Architecture | Accepted — World Model canonical | LIVE |
-| [021](ADR-021_EXPLAINABILITY.md) | Explainability | Accepted — Decision Records | LIVE core; remainder **Stream A** (program; Gates 2–3 before code) |
-| [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence | LIVE core; remainder **Stream B** (thresholds from Gate 2) |
-| [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent | LIVE (M1 docs/settings); remainder **Stream C** (M2–M4 sequential) |
+| [021](ADR-021_EXPLAINABILITY.md) | Explainability | Accepted — Decision Records | LIVE core; **Stream A Gate 2 CLOSED 2026-08-14** (ACCEPT M2–M5, §11) — Gate 3 plan next |
+| [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence | LIVE core; **Stream B Gate 2 CLOSED 2026-08-14** (ACCEPT escalate-only bands, §11) — Gate 3 plan next |
+| [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent | LIVE (M1 docs/settings); **Stream C Gate 2 CLOSED 2026-08-14** (ACCEPT sequential M2–M4, §11) — Gate 3 plan next |
+| [024](ADR-024_KNOWLEDGE_FEDERATION_SOT.md) | Knowledge Federation SoT | Accepted — DEFER WITH CONDITION | **Stream E Gate 2 CLOSED 2026-08-14** — live-wire read-only federation only; no embeddings/vector index authorized |
+| [025](ADR-025_GOOSE_PATTERN_ADOPTION.md) | Goose Pattern Adoption | Accepted — Adopt/Adapt/Reject table | **Stream F Gate 2 CLOSED 2026-08-14** — Adapt rows implement in Wave 4, each behind own Gate 3 plan |
 
 ### Section 9 implementation notes
 
@@ -70,10 +72,14 @@
 
 ### Next free number
 
-**ADR-024**.
+**ADR-026.** (024 and 025 assigned 2026-08-14 to Streams E and F at Wave 1 Gate 2 closure — see [`WAVE_1_GATE_2_DECISIONS.md`](../proposals/WAVE_1_GATE_2_DECISIONS.md). 026 is informally reserved for Stream D's isolation ADR *if* a Stage 1 measurement report justifies one — re-check this line before drafting, as other work may claim it first.)
 
 ---
 
 ## Council-format series (018–023)
 
 These ADRs used the permanent multi-council framework. Informal roadmap labels “ADR-001 Tool Invocation” … “ADR-006 Model Strategy” map here as **018–023**, not to the historical 001–006 files.
+
+### Gate 2 decision series (024–025)
+
+ADR-024 and ADR-025 are **Gate 2 decision ADRs** under `STRATEGIC_RUNTIME_PROGRAM.md`, not fresh multi-council reviews — the underlying architecture debate for their streams either already happened in an earlier Accepted ADR (024, building on ADR-020) or is a research-track Adopt/Adapt/Reject call rather than a two-sided proposal fight (025). Both are still binding Accepted decisions; the lighter format only reflects that Gate 1 (the Integration Proposal in `docs/architecture/proposals/`) already did the "what exists / what's the boundary / what's rejected" work these ADRs formalize.

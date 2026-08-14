@@ -1,6 +1,6 @@
 # IP-A — Explainability (ADR-021 remainder)
 
-**Status:** GATE 1 DRAFT — awaiting owner Gate 2  
+**Status:** GATE 2 CLOSED 2026-08-14 — ACCEPT full M2–M5. Decision: [`ADR-021` §11](../adr/ADR-021_EXPLAINABILITY.md#11-gate-2-addendum--wave-1-closure-2026-08-14).  
 **Stream:** A  
 **Parent ADR:** [ADR-021](../adr/ADR-021_EXPLAINABILITY.md) **Accepted** (Decision Record architecture). This proposal does **not** reopen CoT-as-SoT.  
 **Baseline:** [STRATEGIC_GAP_MATRIX.md](../../audits/STRATEGIC_GAP_MATRIX.md) Stream A

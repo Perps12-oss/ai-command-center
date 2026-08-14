@@ -1,6 +1,7 @@
 # ADR-021: Explainability
 
 **Status:** Accepted — Decision Records (Evidence + Policy + Receipts + Verification)  
+**Gate 2 (Stream A remainder):** CLOSED 2026-08-14 — ACCEPT full M2–M5. See §11.  
 **Date:** 2026-08-05  
 **Deciders:** Multi-council Architecture Decision Framework  
 **Related:** ADR-004, TruthBoundary, Evidence UI, Brain Inspector  
@@ -138,9 +139,26 @@ Guardian **rejects A as primary explainability architecture**.
 
 ---
 
+## 11. Gate 2 Addendum — Wave 1 Closure (2026-08-14)
+
+**Proposal:** [`IP_A_EXPLAINABILITY.md`](../proposals/IP_A_EXPLAINABILITY.md)  
+**Decision:** **ACCEPT** — full remaining Section 9 scope, M2 through M5. No milestone deferred.
+
+1. Orchestrator emission of `DecisionRecord` extends from the current escalate-only paths (awaiting-approval, replan-stuck) to **every** ordinary execution step, on both **success and failure**.
+2. Each emitted record populates real `evidence` / `policy` / `receipt` / `verification` fields from the actual receipt, WM observation, and TruthBoundary result for that step. Where a field genuinely has nothing to report, the record must carry an **explicit missing/empty marker** — never a silently absent key that could be misread as "no evidence exists."
+3. Records must be inspectable historically, not only as an AppState latest-only projection. The Section 9 plan (Gate 3) decides the concrete persistence/index shape (e.g. reuse of existing receipt/telemetry storage vs. a dedicated table) — this Gate 2 only mandates that historical lookup is a requirement, not optional.
+4. M3's Evidence / Approvals / Mission Control surfacing and M4's `TruthBoundary` wiring proceed as scoped in §10.
+5. M5 (`DecisionCard` wiring) remains explicitly conditional: it ships **only after** M2–M4 are verified to produce truthful, non-fabricated records in tests. Do not wire DecisionCard against still-partial data.
+6. This addendum does not reopen §9 Council Decision. CoT/scratchpad remains non-authoritative; LLM composition of a record's text is allowed, fabrication of evidence is not (§10 "Out of scope" stands).
+
+**Next step:** Gate 3 Section 9 implementation plan for Stream A (files, interfaces, migrations, tests, rollback) before any code lands.
+
+---
+
 ## References
 
 - `ai_command_center/orchestration/verification/truth_boundary.py`
 - `docs/architecture/UI_COMPONENT_SPECS/E06_BRAIN_INSPECTOR.md`
 - `docs/architecture/UI_COMPONENT_SPECS/E10_EVIDENCE_WORKSPACE.md`
 - `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md`
+- `docs/architecture/proposals/IP_A_EXPLAINABILITY.md`
