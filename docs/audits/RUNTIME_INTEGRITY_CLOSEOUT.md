@@ -9,7 +9,7 @@
 
 ## Closeout verdict
 
-**COMPLETE WITH PARKED ITEMS**
+**COMPLETE WITH PARKED ITEMS** — §4 "NO bypass found" overturned by `docs/audits/TOOL_TIER_SECURITY_CLOSEOUT.md` (SecurityTier at `TOOL_INVOKE`; PR #177 superseded).
 
 Remediation of known audit findings is closed. Parked items are explicitly classified below and are **not** Queue 1 work.
 

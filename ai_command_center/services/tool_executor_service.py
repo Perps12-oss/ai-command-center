@@ -14,6 +14,8 @@ from ai_command_center.core.security_policy import (
     READONLY_SHELL_ALLOWLIST,
     READONLY_SHELL_TOOL,
     is_classified,
+    tier_requires_human_approval,
+    tool_requires_human_approval,
 )
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, is_valid_workspace_context
 from ai_command_center.core.event_bus import Event
@@ -369,6 +371,29 @@ class ToolExecutorService(BaseService):
                     "step_id": step_id,
                     "success": False,
                     "error": "unclassified action rejected",
+                    **({"agent_id": agent_id} if agent_id else {}),
+                },
+                source=self.name,
+            )
+            return
+
+        hitl_required = tool_requires_human_approval(tool_name)
+        if _declared_tier is not None:
+            hitl_required = hitl_required or tier_requires_human_approval(
+                _declared_tier
+            )
+        if hitl_required and not bool(payload.get("human_approved")):
+            self._bus.publish(
+                TOOL_FAILED,
+                {
+                    "contract_version": TOOL_CONTRACT_VERSION,
+                    "invoke_id": invoke_id,
+                    "tool": tool_name,
+                    "message": "WRITE_DESTROY requires explicit human approval",
+                    "run_id": run_id,
+                    "step_id": step_id,
+                    "success": False,
+                    "error": "human approval required",
                     **({"agent_id": agent_id} if agent_id else {}),
                 },
                 source=self.name,

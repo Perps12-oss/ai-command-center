@@ -21,6 +21,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.core.tools import ToolResult, ToolSpec
+from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.repositories.goal_repository import GoalRepository
 from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
 from ai_command_center.services.execution_orchestrator_service import (
@@ -132,6 +133,7 @@ class Phase5ToolTimelineTests(unittest.TestCase):
                 description="demo tool",
                 tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
+                tier=SecurityTier.READ,
             )
         )
         executor = ToolExecutorService(bus, registry)
@@ -179,6 +181,7 @@ class Phase5ToolTimelineTests(unittest.TestCase):
                 description="demo tool",
                 tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
+                tier=SecurityTier.READ,
             )
         )
         executor = ToolExecutorService(bus, registry)

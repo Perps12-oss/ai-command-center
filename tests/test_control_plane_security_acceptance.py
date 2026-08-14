@@ -524,8 +524,9 @@ def test_unknown_actor_denies_shell_invoke() -> None:
             "invoke_id": "unk-1",
             "tool": "workspace_execute_command",
             "args": {"command": "echo hi"},
-            "actor_type": "llm",
-            "workspace_context": {
+                "actor_type": "llm",
+                "human_approved": True,
+                "workspace_context": {
                 "workspace_id": str(uuid4()),
                 "entity_id": str(uuid4()),
             },
