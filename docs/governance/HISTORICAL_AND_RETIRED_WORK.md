@@ -64,11 +64,16 @@ Do **not** implement stream **code** from this table. Follow the program pipelin
 
 ## HISTORICAL BRANCHES
 
+Remote heads below were **deleted** 2026-08-14. Do not recreate them as merge candidates.
+
 | Branch | Status |
 |--------|--------|
-| `cursor/phase5-async-eventbus-744e` | ABANDONED — **not a merge candidate**. Conflicts with #170 backpressure. Isolation tests would break single-queue FIFO. |
+| `cursor/phase5-async-eventbus-744e` | **DELETED.** ABANDONED pool-isolation tree — **not a merge candidate**. Conflicts with #170 backpressure. Isolation tests would break single-queue FIFO. Stream D must not recover this branch. |
+| `cursor/runtime-identity-loud-30d3` | **DELETED.** Unsubmitted fail-loud identity delta. Recreate from current `main` only if owner wants it. |
+| `feature/planner-evolution-phase-c0-constitution` | **DELETED.** Stale 2026-07 planner C0 tree (~218 unique commits). Not a merge candidate. |
+| `cursor/section9-handover-621d` | **DELETED** after porting the unique file to [`HANDOVER_SECTION9_TO_NEXT_AGENT.md`](../audits/HANDOVER_SECTION9_TO_NEXT_AGENT.md) (HISTORICAL / not Queue 1). |
 
-Current main: `async_dispatch=True` **single** queue. The branch is not incomplete-awaiting-merge. Stream D must not recover it.
+Current main: `async_dispatch=True` **single** queue. Pool isolation is Stream D, not an incomplete-awaiting-merge branch.
 
 ---
 
@@ -82,6 +87,7 @@ These files still exist. They are **not** implementation queues:
 - `docs/architecture/UI_REFURBISHMENT_BACKLOG.md`
 - `docs/architecture/UI_COMPONENT_SPECS/` (E05–E13 landed on `main`; Insights placeholder is intentional)
 - `docs/audits/PLANNED_WORK_INVENTORY.md`
+- `docs/audits/HANDOVER_SECTION9_TO_NEXT_AGENT.md` (HISTORICAL; do-not-regress facts in §4 only)
 - `docs/PLACEHOLDER_AUDIT.md`
 - `docs/plans/*` phase plans (bannered in place)
 
