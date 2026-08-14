@@ -77,6 +77,50 @@ def test_publish_delivery_field_observable_on_sync_path() -> None:
     bus.shutdown()
 
 
+def test_shutdown_drains_queued_async_events() -> None:
+    """Queued work must run after shutdown is signalled (drain-on-shutdown)."""
+    bus = EventBus(async_dispatch=True)
+    started = threading.Event()
+    release = threading.Event()
+    processed: list[str] = []
+    lock = threading.Lock()
+
+    def slow_first(_event) -> None:
+        started.set()
+        release.wait(timeout=2.0)
+        with lock:
+            processed.append("first")
+
+    def record(event) -> None:
+        with lock:
+            processed.append(str(event.payload.get("name", "")))
+
+    bus.subscribe(CHAT_CHUNK, slow_first)
+    bus.publish(CHAT_CHUNK, {"name": "first"}, source="test")
+    assert started.wait(timeout=2.0)
+    # Queue additional work while first handler is blocked.
+    bus.subscribe(TELEMETRY_EVENT, record)
+    # Force telemetry onto async path via async_dispatch + ASYNC_ELIGIBLE.
+    for i in range(5):
+        bus.publish(TELEMETRY_EVENT, {"name": f"t{i}"}, source="test")
+    # Signal shutdown while work remains; then unblock first handler.
+    done = threading.Event()
+
+    def _shutdown() -> None:
+        bus.shutdown(timeout=3.0)
+        done.set()
+
+    threading.Thread(target=_shutdown, name="bus-shutdown", daemon=True).start()
+    time.sleep(0.05)
+    release.set()
+    assert done.wait(timeout=5.0)
+    with lock:
+        # first + all telemetry must have been processed (drained).
+        assert "first" in processed
+        for i in range(5):
+            assert f"t{i}" in processed
+
+
 def test_handler_duration_metrics_accumulate() -> None:
     bus = EventBus(debug_mode=True)
 

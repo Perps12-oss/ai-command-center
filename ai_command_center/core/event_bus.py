@@ -228,10 +228,14 @@ class EventBus:
 
     def _dispatch_worker(self) -> None:
         assert self._dispatch_queue is not None
+        # Drain-friendly loop: after shutdown is signalled, keep processing
+        # until the queue is empty (then exit). Do not abandon queued work.
         while True:
             try:
                 job = self._dispatch_queue.get(timeout=0.1)
             except queue.Empty:
+                if self._shutdown.is_set():
+                    break
                 continue
             if job is None:
                 self._dispatch_queue.task_done()
@@ -569,14 +573,38 @@ class EventBus:
                     logger.debug("Failed to publish handler duration metric", exc_info=True)
 
     def shutdown(self, *, timeout: float = 5.0) -> None:
+        """Stop accepting new async work, drain the dispatch queue, then join.
+
+        Order (ASYNC_EVENTBUS_POLICY Shutdown):
+        1. Set shutdown flag (``_should_enqueue_topic`` returns False).
+        2. Wait for queued jobs to finish (bounded by ``timeout``).
+        3. Send sentinel and join the dispatch thread.
+        """
         if self._dispatch_thread is None:
             return
         self._shutdown.set()
         assert self._dispatch_queue is not None
+        deadline = time.monotonic() + max(0.1, timeout)
+        # Wait for in-flight + queued work to drain before sentinel.
+        while self.dispatch_queue_depth > 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
         try:
             self._dispatch_queue.put_nowait(None)
         except queue.Full:
-            self._dispatch_queue.put(None, timeout=1.0)
-        self._dispatch_thread.join(timeout=timeout)
+            try:
+                self._dispatch_queue.put(None, timeout=max(0.05, deadline - time.monotonic()))
+            except queue.Full:
+                logger.error(
+                    "EventBus shutdown: could not enqueue sentinel; depth=%d",
+                    self.dispatch_queue_depth,
+                )
+        remaining = max(0.05, deadline - time.monotonic())
+        self._dispatch_thread.join(timeout=remaining)
+        if self._dispatch_thread.is_alive() or self.dispatch_queue_depth > 0:
+            logger.warning(
+                "EventBus shutdown incomplete: thread_alive=%s depth=%d",
+                self._dispatch_thread.is_alive(),
+                self.dispatch_queue_depth,
+            )
         self._dispatch_thread = None
         self._dispatch_queue = None

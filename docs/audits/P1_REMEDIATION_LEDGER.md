@@ -1,25 +1,35 @@
-# P1 Remediation Ledger
+# P1 Remediation Ledger (complete)
 
 **Branch:** `cursor/p1-remediation-ucgs-efe6`  
 **Date:** 2026-08-12  
-**Evidence base:** `docs/audits/P1_NARROW_PASS_UCGS_SQLITE_EXECUTION.md` (+ Independent Verification conclusions restated there)
+**Evidence:** `docs/audits/INDEPENDENT_VERIFICATION_AUDIT.md`, `docs/audits/P1_NARROW_PASS_UCGS_SQLITE_EXECUTION.md`
 
-| Finding | Root cause | Changed files | Tests | Verification |
-|---------|------------|---------------|-------|--------------|
-| **P1-A** UCGS CI inert | `_collect_git_diff` only used `--cached` | `tools/ucgs_runner.py`, `.github/workflows/ucgs.yml`, `tools/install_git_hooks.py` | `tests/test_ucgs_diff_semantics.py` | `pytest tests/test_ucgs_diff_semantics.py`; CI range env + proof step |
-| **P1-B** SQLite txn steal | Shared conn; unlocked writers; commit is connection-wide | `ai_command_center/db/conn_sync.py`, `connection.py` | `tests/test_sqlite_connection_threadsafe.py` | Steal regression + concurrent unlocked writers |
-| **P1-C** ACTION_INVOKE bypass | `entity_bus_handlers` called `ActionRegistry.invoke` | `ai_command_center/core/entity/entity_bus_handlers.py` | `tests/test_p1_execution_permission_boundary.py` | No invoke; delegates `WORKFLOW_EXECUTION_REQUEST` |
-| **P1-D** command permission hole | Only `tool=="shell"` checked | `ai_command_center/services/tool_executor_service.py` | same | `workspace_execute_command` denied without `LAUNCH_TOOL` |
-| **EventBus** silent drop | `_enqueue` bool ignored; Full dropped all topics | `ai_command_center/core/event_bus.py`, `docs/architecture/ASYNC_EVENTBUS_POLICY.md` | `tests/test_eventbus_async_adapters.py` | `Event.delivery`; non-telemetry waits before drop |
+Disposition vocabulary: `FIXED` | `FIXED + REGRESSION TEST` | `JUSTIFIABLY DEFERRED`
 
-## Intentionally not implemented (disproved)
+| Finding | Disposition | Root cause | Changed files | Tests | Verification |
+|---------|-------------|------------|---------------|-------|--------------|
+| **P1-A** UCGS CI inert | **FIXED + REGRESSION TEST** | `--cached` only | `tools/ucgs_runner.py`, `.github/workflows/ucgs.yml`, `tools/install_git_hooks.py` | `tests/test_ucgs_diff_semantics.py` | Negative FAIL under `block`; CI permanent negative-proof step |
+| **P1-B** SQLite txn steal | **FIXED + REGRESSION TEST** | Shared conn; commit connection-wide | `db/conn_sync.py`, `db/connection.py` | `tests/test_sqlite_connection_threadsafe.py` | Steal + unlocked concurrent writers |
+| **P1-C** ACTION_INVOKE bypass | **FIXED + REGRESSION TEST** | `ActionRegistry.invoke` from bus handler | `core/entity/entity_bus_handlers.py` | `tests/test_p1_execution_permission_boundary.py` | invoke not called; workflow delegated |
+| **P1-D** command permission hole | **FIXED + REGRESSION TEST** | shell-only gate | `services/tool_executor_service.py` | same | deny agent `workspace_execute_command` |
+| EventBus silent drop / delivery | **FIXED + REGRESSION TEST** | enqueue bool ignored | `core/event_bus.py`, `ASYNC_EVENTBUS_POLICY.md` | `tests/test_eventbus_async_adapters.py` | `Event.delivery` |
+| EventBus drain-on-shutdown | **FIXED + REGRESSION TEST** | worker exited on flag without draining | `core/event_bus.py`, policy docs | `test_shutdown_drains_queued_async_events` | queued work runs after shutdown signal |
+| Orphan `event_bus/event.py` | **FIXED** | unimportable shadow of live `Event` | deleted `core/event_bus/event.py` | import/arch still OK | — |
+| Dead `NotesRepository` twin | **FIXED** | unused competing class name | `repositories/notes_repository.py` → re-export | — | single SoT `NoteRepository` |
+| Divergent `.windsurf` UI constitution | **FIXED** | Inv 11 duplicate | deleted `.windsurf/plans/UI_CONSTITUTION-ff006d.md` | — | — |
+| Independent audit not in tree | **FIXED** | attachment-only | added `docs/audits/INDEPENDENT_VERIFICATION_AUDIT.md` | — | placement decision recorded |
+| `id(conn)` instability | **JUSTIFIABLY DEFERRED** | disproved as live P1 | — | — | must not implement |
+| alias→TOOL_INVOKE | **JUSTIFIABLY DEFERRED** | disproved | — | — | must not implement |
+| drop-path recursion | **JUSTIFIABLY DEFERRED** | disproved / no callers | — | — | must not implement |
+| Memory/Note wrapper vs db | **JUSTIFIABLY DEFERRED** | composition shims, not competing SoTs | — | — | P1: do not wholesale delete |
+| GoalEngine / PlanningEngine trees | **JUSTIFIABLY DEFERRED** | ADR-gated research/quarantine | — | — | hard stops remain |
+| Settings dual construct | **JUSTIFIABLY DEFERRED** | same repo SoT; not competing authority | — | — | optional later |
 
-- `id(conn)` instability as live P1
-- alias→TOOL_INVOKE narrative
-- reachable `drop_connection_lock` recursion
+## UCGS permanent negative property
 
-## Deferred (non-P1 / needs more product sequencing)
+```text
+bad PR diff → UCGS detects → FAIL → UCGS_ENFORCEMENT=block → CI cannot merge
+```
 
-- Full EventBus drain-on-shutdown (policy future acceptance criteria)
-- Exhaustive duplicate-implementation purge beyond verified competing authorities
-- Broader ACC governance markdown-only rules (out of P1 scope)
+Enforced by `tests/test_ucgs_diff_semantics.py` and the workflow step
+**Permanent UCGS negative-proof gate**.

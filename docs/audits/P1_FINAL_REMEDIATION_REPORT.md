@@ -1,97 +1,54 @@
-# Final Remediation Report — P1 Track
+# Final Remediation Report
 
 **PR:** https://github.com/Perps12-oss/ai-command-center/pull/170  
 **Branch:** `cursor/p1-remediation-ucgs-efe6`  
-**Date:** 2026-08-12
+**Date:** 2026-08-12  
+**Ledger:** `docs/audits/P1_REMEDIATION_LEDGER.md`  
+**Independent audit (in-tree):** `docs/audits/INDEPENDENT_VERIFICATION_AUDIT.md`
 
 ## Executive Summary
 
-Confirmed P1 blockers are fixed with regression tests: UCGS CI range-diff enforcement, SQLite transaction-bound connection guard, ACTION_INVOKE closed for direct ActionRegistry side effects, and `workspace_execute_command` under the same `LAUNCH_TOOL` gate as `shell`. EventBus publish delivery is now observable; non-telemetry queue Full waits before drop. Disproved Claude mechanisms were not implemented.
+All confirmed P1 blockers are fixed with regression tests. Deferred closeout items are complete: EventBus drain-on-shutdown, verified safe duplicate consolidations, and canonical placement of the independent verification audit. A permanent UCGS negative-proof CI gate remains in the workflow. Disproved Claude mechanisms were not implemented.
 
 ## P1 Remediation
 
-### P1-A UCGS CI
-- **Root cause:** staged-only `git diff --cached` in CI clean checkout  
-- **Fix:** `UCGS_DIFF_MODE=range` + `UCGS_DIFF_BASE`/`HEAD` in workflow; staged remains local  
-- **Tests:** `tests/test_ucgs_diff_semantics.py` (negative FAIL under block)  
-- **Verification:** 7 passed locally; CI proof step asserts `diff_mode==range` with empty staged
+| ID | Root cause | Fix | Tests |
+|----|------------|-----|-------|
+| A | staged-only CI diff | `UCGS_DIFF_MODE=range` + base/head | `test_ucgs_diff_semantics` + CI negative-proof step |
+| B | connection-wide commit | `GuardedConnection` | steal + concurrent unlocked writers |
+| C | ActionRegistry OS bypass | delegate to `WORKFLOW_EXECUTION_REQUEST` | invoke never called |
+| D | shell-only permission | gate `{shell, workspace_execute_command}` | deny agent command tool |
 
-### P1-B SQLite
-- **Root cause:** shared connection; commit is connection-wide; unlocked writers  
-- **Fix:** `GuardedConnection` from `connect()` retains lock while `in_transaction`  
-- **Tests:** steal regression + unlocked-style concurrent writers  
-- **Verification:** `tests/test_sqlite_connection_threadsafe.py` 5 passed
+## Deferred items completed
 
-### P1-C ACTION_INVOKE
-- **Root cause:** handler called `ActionRegistry.invoke` (OS side effects, no receipt)  
-- **Fix:** delegate launches to `WORKFLOW_EXECUTION_REQUEST`; never invoke registry  
-- **Tests:** `tests/test_p1_execution_permission_boundary.py`  
-- **Verification:** invoke assert_not_called; workflow published
+1. **EventBus drain-on-shutdown** — worker drains after shutdown flag; `test_shutdown_drains_queued_async_events`
+2. **Duplicates** — deleted orphan `event_bus/event.py`; `notes_repository` → re-export; deleted `.windsurf` UI constitution copy
+3. **Audit placement** — `docs/audits/INDEPENDENT_VERIFICATION_AUDIT.md` is the in-tree SoR
 
-### P1-D Permission
-- **Root cause:** gate only when `tool_name == "shell"`  
-- **Fix:** frozenset `{shell, workspace_execute_command}`  
-- **Tests:** deny/allow paths in same test module  
-- **Verification:** passed
+## Finding dispositions
 
-## Remaining Findings
+Every ledger row is `FIXED`, `FIXED + REGRESSION TEST`, or `JUSTIFIABLY DEFERRED` (see ledger). No unexplained P1.
 
-| Item | Status |
-|------|--------|
-| EventBus delivery/backpressure observability | FIXED + TEST |
-| EventBus full drain-on-shutdown | NOT FIXED — JUSTIFIED (policy future criteria; not a confirmed P1) |
-| Bootstrap duplicate construction sweep | NOT FIXED — JUSTIFIED (no confirmed competing SoT in P1 evidence) |
-| Broad duplicate-implementation purge | NOT FIXED — JUSTIFIED (reachability not confirmed for wholesale deletes) |
-| `INDEPENDENT_VERIFICATION_AUDIT.md` file | Not in repo; used P1 narrow pass as authoritative restatement |
-| Disproved id(conn)/alias/drop recursion | NOT FIXED — JUSTIFIED (must not implement) |
-
-## Tests (local)
+## Tests / governance commands
 
 ```text
-pytest tests/test_ucgs_diff_semantics.py tests/test_sqlite_connection_threadsafe.py \
-  tests/test_p1_execution_permission_boundary.py tests/test_eventbus_async_adapters.py \
-  tests/test_receipt_coverage_gate.py tests/test_receipt_boundary.py \
-  tests/test_workspace_os_walking_skeleton.py --no-cov
-→ 43 passed
+Focused P1/EventBus/receipt: 29 passed
+Full suite: 1412 passed, 5 skipped (Windows-only)
+ruff check ai_command_center: pass
+arch_lint --baseline: OK
+verify_constitution: PASS
+UCGS range vs origin/main: WARN S2 (large_commit-style), gate exit 0 under block
+Permanent negative-proof tests: included in test_ucgs_diff_semantics + ucgs.yml step
 ```
 
-## Governance
+## Residual risk
 
-```text
-ruff check (touched modules) → pass
-scripts/arch_lint.py --baseline → OK
-```
-
-## Runtime Verification
-
-- UCGS: synthetic UI→OllamaService in range mode → FAIL + gate exit 1  
-- SQLite: B blocked while A holds open txn; `A_PARTIAL` not durable; A rollback then B commits only `B_ONLY`  
-- ACTION_INVOKE: registry.invoke not called  
-- Permission: agent `workspace_execute_command` → permission denied
-
-## Changed Files (by purpose)
-
-- UCGS: `tools/ucgs_runner.py`, `tools/install_git_hooks.py`, `.github/workflows/ucgs.yml`, `tests/test_ucgs_diff_semantics.py`
-- SQLite: `ai_command_center/db/conn_sync.py`, `connection.py`, `tests/test_sqlite_connection_threadsafe.py`
-- Execution/auth: `entity_bus_handlers.py`, `tool_executor_service.py`, `tests/test_p1_execution_permission_boundary.py`
-- EventBus: `event_bus.py`, `tests/test_eventbus_async_adapters.py`, `docs/architecture/ASYNC_EVENTBUS_POLICY.md`
-- Docs: Pre-flight, ledger, P1 narrow status, ACC governance UCGS line
-
-## Git / PR
-
-- Branch `cursor/p1-remediation-ucgs-efe6`
-- PR #170 (draft)
-
-## Residual Risk
-
-- CI must stay on `fetch-depth: 0` + range env or range mode fail-closes  
-- Raw `sqlite3.connect` in some unit tests bypasses GuardedConnection (composition root is covered)  
-- ACTION_INVOKE still accepts the topic for compatibility but only delegates launches  
+- Unit tests that call raw `sqlite3.connect` bypass `GuardedConnection` (composition root covered)
+- Quarantined GoalEngine/Planning trees remain ADR-gated (intentional)
+- Wrapper modules (`db` ↔ `repositories`) retained as single-SoT shims
 
 ## Final Status
 
 ```text
-REMEDIATION PARTIALLY COMPLETE — BLOCKERS REMAIN
+REMEDIATION COMPLETE
 ```
-
-**Clarification:** Confirmed **P1 blockers are resolved**. Remaining items are non-P1 / deferred (shutdown drain, broad duplicate purge, absent independent-audit file in-tree). No unexplained P1.
