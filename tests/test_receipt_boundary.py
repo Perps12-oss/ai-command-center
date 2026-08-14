@@ -48,10 +48,15 @@ def _wire_tools(bus: EventBus) -> None:
     ToolExecutorService(bus, registry).start()
 
 
+from tests.support.shell_confirmation import TRUSTED_UI_RUN, wire_auto_confirm_shell
+
+
 def _run_plan(bus: EventBus, *, run_id: str = "run-g1", request_id: str = "req-g1") -> None:
+    wire_auto_confirm_shell(bus)
     bus.publish(
         EXECUTION_RUN_REQUEST,
         {
+            **TRUSTED_UI_RUN,
             "run_id": run_id,
             "request_id": request_id,
             "auto_approve": True,

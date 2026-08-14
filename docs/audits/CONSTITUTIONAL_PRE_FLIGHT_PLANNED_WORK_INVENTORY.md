@@ -1,5 +1,8 @@
 # Constitutional Pre-Flight — Planned Work Inventory
 
+**STATUS:** HISTORICAL / NON-AUTHORITATIVE — pre-flight for the superseded inventory only.  
+Do not implement from this document or from `PLANNED_WORK_INVENTORY.md`.
+
 **Date:** 2026-08-12  
 **Branch:** `cursor/planned-work-backlog-audit-4b28`  
 **Baseline:** `origin/main` @ `b949f3e` (PR #170)  

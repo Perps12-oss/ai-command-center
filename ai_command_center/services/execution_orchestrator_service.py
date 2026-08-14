@@ -13,6 +13,13 @@ from collections.abc import Callable
 from typing import Any
 
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
+from ai_command_center.core.control_plane import (
+    DEFAULT_AUTOMATION_ACTOR,
+    resolve_run_context,
+    resolve_tool_invoke_actor,
+    step_requires_human_approval,
+)
+from ai_command_center.core.security_policy import tool_requires_human_approval
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     AUTONOMY_SCORE_UPDATED,
@@ -88,10 +95,11 @@ def _is_agent_capability(capability: str) -> bool:
     return capability.strip().lower().startswith("agent.")
 
 
-def _step_needs_approval(step: PlanStep, *, auto_approve: bool) -> bool:
-    if auto_approve:
-        return False
-    return bool(step.require_approval)
+def _human_approval_fields(tool_name: str) -> dict[str, Any]:
+    """Stamp human_approved only after the orchestrator HITL gate has cleared."""
+    if tool_requires_human_approval(tool_name):
+        return {"human_approved": True}
+    return {}
 
 
 class ExecutionOrchestratorService(BaseService):
@@ -194,7 +202,7 @@ class ExecutionOrchestratorService(BaseService):
             "receipts": receipts,
             "request_id": str(event.payload.get("request_id", "")),
             "correlation": CorrelationContext.from_payload(event.payload).to_payload(),
-            "auto_approve": bool(event.payload.get("auto_approve", False)),
+            **resolve_run_context(event.payload if isinstance(event.payload, dict) else {}),
             "paused": False,
             "replanning": False,
             "replan_attempts": 0,
@@ -359,7 +367,6 @@ class ExecutionOrchestratorService(BaseService):
             return
 
         step = plan.steps[index]
-        auto_approve = bool(run.get("auto_approve", False))
         self._bus.publish(
             EXECUTION_STEP_STARTED,
             {
@@ -371,7 +378,12 @@ class ExecutionOrchestratorService(BaseService):
             source=self.name,
         )
 
-        if _step_needs_approval(step, auto_approve=auto_approve):
+        # ADR-004 classification is enforced at the TOOL_INVOKE boundary in
+        # ToolExecutorService, where the tool name is concrete. Plan capability
+        # names are aliased (e.g. "create_note" -> "notes.create"), so rejecting
+        # on the capability label here would deny legitimate work while adding
+        # no security: nothing executes without passing the executor's gate.
+        if step_requires_human_approval(step, run=run):
             run["paused"] = True
             confirmation_id = f"{run_id}:{step.step_id}"
             self._publish_decision_and_autonomy(
@@ -532,7 +544,7 @@ class ExecutionOrchestratorService(BaseService):
             )
             return
 
-        actor_type = str(step.args.get("actor_type") or "user")
+        actor_type, interactive_user = resolve_tool_invoke_actor(run=run)
         tool_args = {
             k: v
             for k, v in dict(step.args).items()
@@ -552,8 +564,10 @@ class ExecutionOrchestratorService(BaseService):
                 "run_id": run_id,
                 "step_id": step.step_id,
                 "actor_type": actor_type,
+                "interactive_user": interactive_user,
                 "workspace_context": workspace_context,
                 "intention": intention.to_dict(),
+                **_human_approval_fields(step.capability),
                 **(
                     {"workflow_run_id": step.args["workflow_run_id"]}
                     if step.args.get("workflow_run_id")
@@ -585,6 +599,10 @@ class ExecutionOrchestratorService(BaseService):
                 "text": task,
                 "agent_id": args.get("agent_id"),
                 "request_id": request_id,
+                # Re-entering intake must not launder agent origin into
+                # interactive-user trust. ExecutionAuthority only ever
+                # de-escalates on this field, never escalates.
+                "actor_provenance": DEFAULT_AUTOMATION_ACTOR,
             }
             if workspace_context.get("workspace_id"):
                 payload["workspace_id"] = workspace_context["workspace_id"]
@@ -613,6 +631,7 @@ class ExecutionOrchestratorService(BaseService):
                 "task": str(args.get("task") or ""),
                 "pipeline_id": str(args.get("pipeline_id") or ""),
                 "workspace_context": workspace_context,
+                **_human_approval_fields(tool_name),
             },
             source=self.name,
         )

@@ -1,6 +1,7 @@
 # ADR-007: Provider Registry Snapshot in AppState
 
 **Status:** Proposed  
+**Disposition:** LIVE SNAPSHOT SUBSTITUTE — `AppState.provider_registry` is live on `origin/main`. Goose catalog extras are **obsolete**. Formal Status remains **Proposed**. Not Queue 1. Do not live-wire `provider_sdk` from this ADR.  
 **Date:** 2026-07-27  
 **Deciders:** Architecture Review (Tom)  
 **Supersedes:** —  

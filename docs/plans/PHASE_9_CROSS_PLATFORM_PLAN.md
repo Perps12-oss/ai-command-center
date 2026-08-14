@@ -1,9 +1,15 @@
 # Phase 9: Cross-Platform Expansion
 
-**Status:** NOT_COMPLETE (code-verified 2026-07-20 — hotkey/tray stubs remain)  
-**Priority:** LOW  
-**Estimated Effort:** 8-12 weeks  
-**Dependencies:** Phase 5 (Async EventBus)  
+**STATUS:** GATED / OWNER SKU DECISION REQUIRED — **NOT QUEUE 1**
+
+**HISTORICAL / NON-AUTHORITATIVE as current work**
+
+macOS/Linux hotkey/tray Impl packages are **not** live. `get_hotkey_provider()` returns a placeholder; macOS `_start_tap()` is a **log stub**, not a real CGEvent tap.  
+Do **not** treat incomplete Impl as current implementation work. Do not implement a fake macOS path from this plan.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Priority:** historical  
 **Authority:** `PLATFORM_STRATEGY.md`, `PROJECT_CONSTITUTION_V4.md`  
 **Verification:** `docs/audits/PHASE_PLANS_ARCHIVE_VERIFICATION.md` — do not confuse with frontend Phase 11
 

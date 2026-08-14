@@ -1,7 +1,7 @@
 # E10 — Evidence Workspace
 
 **Slice:** PR-UI-E10  
-**Status:** Implemented on feature branch (pending merge)
+**Status:** COMPLETE on `main` (#105) — **not Queue 1**. Historical spec; not pending merge.
 
 ## Purpose
 

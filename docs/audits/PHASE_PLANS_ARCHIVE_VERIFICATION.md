@@ -1,5 +1,13 @@
 # Phase Plans Archive Verification
 
+**STATUS:** HISTORICAL / NON-AUTHORITATIVE (2026-07-20 snapshot)
+
+This document records previous investigation. It is **not** the current implementation plan.  
+**Do not implement from this document.** “Keep active” rows are **superseded** by the 2026-08-12 fossil disposition.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)  
+Disposition: [`docs/audits/FOSSIL_DISPOSITION_AUDIT.md`](FOSSIL_DISPOSITION_AUDIT.md)
+
 **Date:** 2026-07-20  
 **Baseline:** `origin/main` @ `e128a72` (guardian branch tip includes docs-only Canon commits)  
 **Authority:** `docs/governance/DOC_HYGIENE.md`, `docs/governance/PHASE_COMPLETION_RULE.md`  

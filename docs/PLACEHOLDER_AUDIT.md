@@ -1,8 +1,15 @@
 # Placeholder Audit — Phase 11 Remediation
 
+**STATUS:** HISTORICAL / NON-AUTHORITATIVE — **not Queue 1**
+
+This document records a 2026-07-18 UI placeholder sweep. It is **not** the current implementation plan.  
+**Do not implement from this document.** The “implement, remove, or justify every TODO” policy applied to that sweep only.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+
 Audit date: 2026-07-18  
 Scope: `ai_command_center/ui` Phase 11 workspaces + related shells  
-Policy: implement, remove, or justify every `TODO` / `FIXME` / `STUB` / `PLACEHOLDER` / “coming soon”
+Policy (historical, that sweep): implement, remove, or justify every `TODO` / `FIXME` / `STUB` / `PLACEHOLDER` / “coming soon”
 
 ---
 

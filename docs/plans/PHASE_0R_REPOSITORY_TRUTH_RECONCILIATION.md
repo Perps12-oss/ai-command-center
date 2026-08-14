@@ -1,9 +1,11 @@
 # PHASE 0R — Repository Truth Reconciliation
 
-> **Superseded by [`PHASE_R1_RUNTIME_RECONCILIATION.md`](PHASE_R1_RUNTIME_RECONCILIATION.md)** — same goal (make `main` truthful), with strict priority order and runtime authority decision gate.  
+> **Superseded by [`PHASE_R1_RUNTIME_RECONCILIATION.md`](PHASE_R1_RUNTIME_RECONCILIATION.md)** (itself **COMPLETE**).  
 > Keep this file as historical pointer only.
 
-**Status:** SUPERSEDED → see PHASE R1  
+**STATUS:** HISTORICAL / SUPERSEDED  
+**HISTORICAL / NON-AUTHORITATIVE** — Do not implement from this document.
+
 **Date:** 2026-07-20
 
 ---

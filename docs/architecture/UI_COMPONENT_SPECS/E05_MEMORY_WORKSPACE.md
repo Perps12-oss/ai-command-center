@@ -1,7 +1,7 @@
 # E05 — Memory Workspace
 
 **Slice:** PR-UI-E05  
-**Status:** On `main` (+ Tom CONDITIONS: `UI_MEMORY_SEARCH` wired)
+**Status:** COMPLETE on `main` — **not Queue 1**.
 
 ## Purpose
 

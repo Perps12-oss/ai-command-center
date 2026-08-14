@@ -1,8 +1,20 @@
 # Phase C Backlog — Governance-Layer Architectural Fossils
 
-**Status:** BACKLOG — record only. **Do not fix opportunistically.**
+**STATUS:** HISTORICAL RECORD of known UCGS fossils — **not Queue 1**
+
+**HISTORICAL / NON-AUTHORITATIVE as an implementation plan**
+
+This document records previous investigation. It is **not** the current implementation plan.  
+Do not “restore CommandRouter” because a UCGS remediation string says so. Live intake = ExecutionAuthority (ADR-006).
+
+F-1 / F-2 in `ucgs.profiles/ai-command-center.yaml` remain **reported** (pipeline.canonical + eventbus_bypass remediation still name CommandRouter). That is a governance-config honesty item, **not** product Queue 1. See remaining ambiguities in the fossil cleanup PR.
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
 **Origin:** Phase B was blocked by a UCGS rule requiring a contract retired ~3 weeks earlier
 (`docs/audits/UCGS_PROFILE_CORRECTION_COMMAND_ROUTED.md`).
+
+---
 
 **Owner direction:** *"We've now found evidence that the governance layer itself contains
 architectural fossils, and we should systematically identify those rather than fixing them

@@ -44,6 +44,7 @@ from ai_command_center.repositories.database_bootstrap_repository import (
     DatabaseBootstrapRepository,
 )
 from ai_command_center.repositories.telemetry_repository import TelemetryRepository
+from tests.support.shell_confirmation import wire_auto_confirm_shell
 from ai_command_center.services.session_service import SessionService
 from ai_command_center.services.telemetry_service import TelemetryService
 from ai_command_center.services.telemetry_summary import compute_session_summary
@@ -360,6 +361,7 @@ class ExitGateIntegrationTests(unittest.TestCase):
             active_id = str(ws.id)
             card_id = str(card.id)
             bus = app.bus
+            wire_auto_confirm_shell(bus)
 
             bus.publish(
                 WORKSPACE_ACTIVE,
@@ -466,6 +468,7 @@ class ExitGateToolTimelineTests(unittest.TestCase):
             lambda e: timeline_hits.append(dict(e.payload)),
         )
         try:
+            wire_auto_confirm_shell(app.bus)
             ws = app.workspace_os.entity_service.create(
                 entity_type=ENTITY_TYPE_WORKSPACE,
                 title="Tool WS",

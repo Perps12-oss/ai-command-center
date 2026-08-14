@@ -15,6 +15,8 @@ PROJECT_CONSTITUTION_V4.md
 
 This document **expands** runtime architecture; it does not supersede the Constitution. Accepted ADRs bind implementers under V4 but are not Article II Level 2.
 
+**Planned work:** the only canonical queue is [`docs/governance/IMPLEMENTATION_GUIDE.md`](governance/IMPLEMENTATION_GUIDE.md). Historical plans and retired packages: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](governance/HISTORICAL_AND_RETIRED_WORK.md).
+
 ---
 
 ## Mission summary
@@ -259,7 +261,7 @@ UI → ui.command (UI_COMMAND)
   → AppState → UI
 ```
 
-Legacy / research-only paper path (not factory-wired):
+Legacy / research-only paper path (**RETIRED / NON-CANONICAL** — not factory-wired; do not restore without a superseding ADR):
 
 ```text
 OperatorKernel → PlanningEngine → AgentCoordinator → …   # ADR-006 / ADR-013 research
@@ -512,7 +514,12 @@ Settings re-export (`core/settings/settings_repository.py`), `tools/tool_executo
 
 ## Gate history
 
-Current phase: **Phase 6 — IN PROGRESS**
+**STATUS:** HISTORICAL snapshot. This table is **not** the current planned-work queue.  
+“Phase 5 complete” here is an **older program gate** (2026-06-20), **not** Async EventBus tiered pools.  
+Async EventBus on current `main` is R4b **single-queue** (`async_dispatch=True`). Tiered pools are **PARKED**.  
+Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).
+
+Current phase (this table, 2026-07 era): **Phase 6 — historical IN PROGRESS** (bridge now **wired**; extras not Queue 1)  
 Previous snapshot: Phase 5 complete at commit `3970aa5` / tag `phase-5-complete-20260620`
 
 | Gate | Script | Result |

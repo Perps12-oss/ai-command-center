@@ -1,5 +1,11 @@
 # R1 Ungated / SA.mutate Stop Line
 
+**STATUS:** COMPLETE / CLOSED — not an implementation queue
+
+This stop line is **closed**. Do not treat the parallel hard-stop table as Queue 1.  
+Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 **EMPTY**).  
+Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)
+
 **Date:** 2026-08-04  
 **Tip baseline:** ADR-017 acceptance (workflows/executions/agents remain outside SA.mutate)
 
@@ -32,11 +38,11 @@ are **not** required to close this stop line.
 
 | Work | Gate |
 |------|------|
-| Phase 5 Async EventBus | Performance Investigation Report + human approval |
-| Goose / external patterns | Stage 3 + Integration Proposal + ADR |
-| Live-wire Predictive/Undo | ADR superseding ADR-014 |
-| OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator re-wire | ADR superseding 006 / 012 / 013 |
-| Platform hotkey/tray live wire | Phase 11 / plan dependency |
+| Phase 5 EventBus **pool isolation** (tiered dispatch) | **PARKED** — not Queue 1. Historical branch abandoned. Trigger: measured single-queue contention + Performance Investigation Report + owner (Art. VII/XII). Current main already has R4b **single-queue** `async_dispatch=True`. |
+| Goose / external patterns | Stage 3 + Integration Proposal + ADR — **GATED**, not Queue 1 |
+| Live-wire Predictive/Undo | ADR superseding ADR-014 — **RETIRED** until then |
+| OperatorKernel / GoalEngine / PlanningEngine / AgentCoordinator re-wire | ADR superseding 006 / 012 / 013 — **RETIRED**; do not restore |
+| Platform hotkey/tray live wire | Owner SKU decision — **GATED**, not Queue 1 |
 
 ## Optional ungated (not required)
 

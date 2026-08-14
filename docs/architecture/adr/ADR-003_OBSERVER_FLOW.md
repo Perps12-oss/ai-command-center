@@ -1,6 +1,7 @@
 # ADR-003: Observer Flow
 
 **Status:** Proposed  
+**Disposition:** LIVE-IN-EFFECT — observers emit to EventBus; they are not World Model authority. Formal Status remains **Proposed** (not silently Accepted). This is not a future-work ticket.  
 **Date:** 2026-07-09
 
 ## Context

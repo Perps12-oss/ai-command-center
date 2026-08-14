@@ -1,12 +1,19 @@
 # Phase B UI Implementation Handover
 
-**Status:** ACTIVE (roles updated 2026-07-22)  
-**Date:** 2026-07-21 (original); **role change:** 2026-07-22  
-**Audience:** Cursor (sole coder + Tom auditor)  
-**Baseline:** `origin/main` only — never `phase-11a-command-center`  
-**Governance on main:** PR #83–#84 merged (Canon, DOC_HYGIENE, ADR-006, R1, State Authority contract)
+**STATUS:** HISTORICAL — Phase B **COMPLETE** on `main` (#105)
 
-> **Devin retired (2026-07-22).** Cursor is the sole implementer **and** Tom auditor for Phase B UI. Historical Devin stop-gate wording below still describes the *process* (one slice → audit → merge → next); substitute Cursor for Devin as builder. Last Devin slice: E04 (#94). See `docs/agents/E04_NAVIGATION_SHELL.md` and `docs/audits/TOM_AUDIT_PR_UI_E04.md`.
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This handover records a completed UI program. It is **not** current Queue 1.  
+**Do not implement from this document.**
+
+Canonical queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md)
+
+**Date:** 2026-07-21 (original); **role change:** 2026-07-22  
+**Audience:** historical (Devin retired)  
+**Baseline:** `origin/main` only — never `phase-11a-command-center`
+
+> **Devin retired (2026-07-22).** Last Devin slice: E04 (#94). Phase B CONDITIONS later cleared on `main` (#105).
 
 ---
 

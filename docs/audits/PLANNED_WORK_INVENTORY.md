@@ -1,5 +1,20 @@
 # Planned Work Inventory — Unimplemented, Gated, Retired, and Lost to Scope Creep
 
+**STATUS:** HISTORICAL / SUPERSEDED — **NOT AN IMPLEMENTATION QUEUE**
+
+**HISTORICAL / NON-AUTHORITATIVE**
+
+This document records a 2026-08-12 inventory. It is **not** the current implementation plan.  
+**Do not implement from this document.**
+
+Canonical planned-work queue: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEMENTATION_GUIDE.md) (Queue 1 is **EMPTY**).  
+Fossil index: [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](../governance/HISTORICAL_AND_RETIRED_WORK.md)  
+Disposition: [`docs/audits/FOSSIL_DISPOSITION_AUDIT.md`](FOSSIL_DISPOSITION_AUDIT.md)
+
+The “UNGATED / what is actually next” tables below are **superseded**. They must not be treated as Queue 1. Phase 5 is **PARKED**, not gated-next. Retired packages are **ABANDONED** as live paths.
+
+---
+
 **Date:** 2026-08-12  
 **Baseline:** `origin/main` @ `b949f3e` (PR #170)  
 **Authority:** `PROJECT_CONSTITUTION_V4.md`; `docs/audits/IMPLEMENTATION_TRUTH_MATRIX.md`; `docs/audits/R1_UNGATED_STOP_LINE.md`  
