@@ -6,6 +6,8 @@ import re
 import shlex
 from pathlib import Path
 
+from ai_command_center.core.security_policy import READONLY_SHELL_ALLOWLIST
+
 
 class SecurityError(Exception):
     """Raised when a command/path is rejected by the sandbox."""
@@ -141,6 +143,4 @@ class CommandSandbox:
 
 
 # Bounded READ-only runner used by tests and the READONLY_SHELL_TOOL path.
-from ai_command_center.core.security_policy import READONLY_SHELL_ALLOWLIST
-
 READONLY_COMMAND_SANDBOX = CommandSandbox(allowlist=READONLY_SHELL_ALLOWLIST)

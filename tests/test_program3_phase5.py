@@ -133,7 +133,6 @@ class Phase5ToolTimelineTests(unittest.TestCase):
                 description="demo tool",
                 tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
-                tier=SecurityTier.READ,
             )
         )
         executor = ToolExecutorService(bus, registry)
@@ -181,7 +180,6 @@ class Phase5ToolTimelineTests(unittest.TestCase):
                 description="demo tool",
                 tier=SecurityTier.READ,
                 handler=lambda _args: ToolResult(success=True, output="ok"),
-                tier=SecurityTier.READ,
             )
         )
         executor = ToolExecutorService(bus, registry)

@@ -13,12 +13,17 @@ The original branch is **not** merged (squash or otherwise).
 
 ## In scope
 
-Documentation only:
+Documentation:
 
 1. Land the handover under `docs/audits/` with HISTORICAL / not-Queue-1 banners.
 2. Correct stale “next work” / Phase 5 / open-PR claims so they cannot be read
    as implementation authority (Strategic Runtime Program + stop line win).
 3. Index the deleted parked/stale remotes in `HISTORICAL_AND_RETIRED_WORK.md`.
+
+Babysit CI unblock (already broken on `origin/main` after #178 squash):
+
+4. Remove duplicate `tier=` kwargs in `tests/test_program3_phase5.py` (SyntaxError).
+5. Move `READONLY_SHELL_ALLOWLIST` import to the top of `command_sandbox.py` (Ruff E402).
 
 ## Explicitly gated / out of scope
 
