@@ -28,6 +28,8 @@ This directory holds **phase plans**. Most are **HISTORICAL**. Agents must **not
 
 **SA.mutate track CLOSED** (ADR-015/016/017). EventBus pools = **Stream D** (measure first). Goose = **Stream F**. Cross-OS = **Stream G** (only remaining strategic gate). macOS Hotkey strategic item **dropped**.
 
+**SA.mutate track CLOSED** (ADR-015/016/017). Phase 5 tiered pools = **PARKED**. Goose = Stage 3 **GATED**.
+
 ---
 
 ## Master Roadmap

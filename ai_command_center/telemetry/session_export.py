@@ -45,6 +45,13 @@ ENV_EXPORT_ENABLED = "ACC_TELEMETRY_EXPORT"
 STATS_CACHE_FILENAME = "stats-cache.json"
 STATS_CACHE_VERSION = 1
 
+# The export runs during shutdown, so its cost must stay bounded regardless of
+# how long the session ran. Summary/counts/models always cover every row; only
+# the verbatim event list is capped (most recent kept).
+MAX_EXPORTED_EVENTS = 5000
+# Rolling window of sessions retained in stats-cache.json (most recent kept).
+MAX_CACHED_SESSIONS = 100
+
 _DISABLED = frozenset({"0", "false", "no", "off"})
 # Payload keys that may carry a model identifier, in precedence order.
 _MODEL_KEYS = ("model", "model_name")
@@ -83,11 +90,17 @@ def _event_counts(rows: list[TelemetryEvent]) -> dict[str, int]:
 
 
 def build_session_export(session_id: str, rows: list[TelemetryEvent]) -> dict[str, Any]:
-    """Serializable session snapshot — summary, counts, models, raw events."""
+    """Serializable session snapshot — summary, counts, models, recent events.
+
+    ``event_count`` and every aggregate cover the whole session; ``events`` is
+    truncated to the most recent ``MAX_EXPORTED_EVENTS`` rows.
+    """
+    retained = rows[-MAX_EXPORTED_EVENTS:]
     return {
         "session_id": session_id,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "event_count": len(rows),
+        "events_truncated": len(retained) < len(rows),
         "models": _models_in(rows),
         "event_counts": _event_counts(rows),
         "summary": compute_session_summary(list(rows)),
@@ -97,7 +110,7 @@ def build_session_export(session_id: str, rows: list[TelemetryEvent]) -> dict[st
                 "timestamp": row.timestamp,
                 "payload": row.payload_dict(),
             }
-            for row in rows
+            for row in retained
         ],
     }
 
@@ -125,7 +138,11 @@ def update_stats_cache(
     session_id: str,
     export: dict[str, Any],
 ) -> Path:
-    """Merge one session into the rolling inventory and rewrite it."""
+    """Merge one session into the rolling inventory and rewrite it.
+
+    Only the most recent ``MAX_CACHED_SESSIONS`` sessions are retained; the
+    ``total_*`` and ``models`` fields describe that retained window.
+    """
     path = directory / STATS_CACHE_FILENAME
     cache = _load_stats_cache(path)
 
@@ -137,6 +154,11 @@ def update_stats_cache(
         "event_count": export["event_count"],
         "models": export["models"],
     }
+    if len(sessions) > MAX_CACHED_SESSIONS:
+        ordered = sorted(
+            sessions.items(), key=lambda kv: str(kv[1].get("exported_at", ""))
+        )
+        sessions = dict(ordered[-MAX_CACHED_SESSIONS:])
 
     models: set[str] = set()
     for entry in sessions.values():

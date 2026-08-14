@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ai_command_center.domain.runtime_safety import SecurityTier
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -16,6 +18,10 @@ class ToolSpec:
     name: str
     description: str
     handler: ToolHandler
+    # ADR-004 classification. When None the authoritative table in
+    # ``core.security_policy`` is consulted; if neither declares a tier the
+    # action is rejected rather than defaulted.
+    tier: SecurityTier | None = None
 
 
 @dataclass(frozen=True, slots=True)
