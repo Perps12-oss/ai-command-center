@@ -106,6 +106,46 @@ def test_stats_cache_accumulates_across_sessions(_isolated_export_dir: Path) -> 
     assert set(cache["sessions"]) == {"s-1", "s-2"}
 
 
+def test_events_truncated_but_aggregates_cover_whole_session(
+    _isolated_export_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(telemetry_export, "MAX_EXPORTED_EVENTS", 3)
+    repo = _repo()
+    repo.insert_many(
+        [
+            (UI_COMMAND, {"session_id": "s-1", "text": f"cmd-{i}"}, f"2026-08-14T00:00:0{i}+00:00")
+            for i in range(6)
+        ]
+    )
+
+    path = export_session(repo, "s-1")
+
+    assert path is not None
+    export = json.loads(path.read_text(encoding="utf-8"))
+    assert export["event_count"] == 6
+    assert export["events_truncated"] is True
+    assert len(export["events"]) == 3
+    assert export["event_counts"][UI_COMMAND] == 6
+    # Most recent rows are the ones kept.
+    assert export["events"][-1]["payload"]["text"] == "cmd-5"
+
+
+def test_stats_cache_retains_only_recent_sessions(
+    _isolated_export_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(telemetry_export, "MAX_CACHED_SESSIONS", 2)
+    repo = _repo()
+    for i in range(4):
+        repo.insert_many(
+            [(UI_COMMAND, {"session_id": f"s-{i}"}, f"2026-08-14T0{i}:00:00+00:00")]
+        )
+        export_session(repo, f"s-{i}")
+
+    cache = json.loads((_isolated_export_dir / STATS_CACHE_FILENAME).read_text(encoding="utf-8"))
+    assert set(cache["sessions"]) == {"s-2", "s-3"}
+    assert cache["total_sessions"] == 2
+
+
 def test_export_skipped_when_disabled(
     _isolated_export_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
