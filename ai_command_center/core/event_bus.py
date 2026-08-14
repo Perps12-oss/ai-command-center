@@ -591,7 +591,6 @@ class EventBus:
         try:
             self._dispatch_queue.put_nowait(None)
         except queue.Full:
-<<<<<<< HEAD
             try:
                 self._dispatch_queue.put(None, timeout=max(0.05, deadline - time.monotonic()))
             except queue.Full:
