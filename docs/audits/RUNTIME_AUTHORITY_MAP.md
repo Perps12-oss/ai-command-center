@@ -8,7 +8,9 @@ Canonical plan: [`docs/governance/IMPLEMENTATION_GUIDE.md`](../governance/IMPLEM
 
 **Milestone:** PHASE R1 — Runtime Reconciliation (**COMPLETE**)  
 **Baseline:** `origin/main` @ `426c6b7` (map date); live path re-verified 2026-08-12 @ `b949f3e`  
-**Method:** Source + `service_factory.py` wiring only (not plan claims)
+**Method:** Source + `service_factory.py` wiring only (not plan claims)  
+**Stop line:** [`R1_UNGATED_STOP_LINE.md`](R1_UNGATED_STOP_LINE.md)  
+**Hygiene disposition:** [`REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md`](REPO_STATE_HYGIENE_DISPOSITION_2026-08-07.md)
 
 ---
 
@@ -134,11 +136,21 @@ Live durable goals SoT is `GoalRepository` only. Phase-9 `GoalEngine` remains in
 
 **OperatorKernel** is non-canonical until a future ADR supersedes ADR-006 with factory wiring + superiority proof.
 
-### Secondary (active — Priority 3)
+### Secondary — **RESOLVED 2026-08-04 (R1 SA.mutate stop line)**
 
-1. Evolve **State Authority contract** — `docs/architecture/STATE_AUTHORITY_CONTRACT.md`  
-2. Mandatory state consumption before Planner (not chat-first planning)  
-3. Eliminate shadow SoT outside State Authority  
+Stage 2 + ADR-015/016/017 closed the live State Authority mutate surface and
+explicit non-mutate dispositions. See `R1_UNGATED_STOP_LINE.md`.
+
+| Item | Outcome |
+|------|---------|
+| State Authority contract | ✅ Living — `STATE_AUTHORITY_CONTRACT.md` |
+| Mandatory state projection before Planner | ✅ On live EA path |
+| SA.mutate World Model nodes/edges | ✅ Live |
+| SA.mutate `store_memory` | ✅ ADR-015 |
+| SA.mutate `submit_goal` | ✅ ADR-016 |
+| SA.mutate workflows / executions / agents | ❌ Explicitly **out** (ADR-017) |
+
+No further R1-blocking SA.mutate deepen without a new ADR.
 
 ---
 
@@ -158,4 +170,13 @@ No new wiring until the decision gate is recorded in:
 
 ## Next artifact
 
-Priority 1 deliverable after decision: **Runtime Authority Migration Plan** (events + services + retirement list) — implementation owned by Devin; Guardian verifies wiring matches chosen path.
+R1 runtime-authority decisioning is **closed** for the live EA path (ADR-006) and
+the SA.mutate stop line (ADR-015–017). Do not open a parallel “Runtime Authority
+Migration Plan” unless a new ADR supersedes 006 / 012 / 013 / 014 / 017.
+
+Optional parallel hard stops (other tracks — not this map):
+
+- Phase 5 Async EventBus (perf report + human approval)
+- Goose Stage 3 + Integration Proposal + ADR
+- Predictive/Undo live wire (ADR superseding ADR-014)
+- Platform hotkey/tray live wire
