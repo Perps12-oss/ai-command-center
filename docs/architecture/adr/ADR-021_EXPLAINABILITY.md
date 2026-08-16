@@ -2,6 +2,7 @@
 
 **Status:** Accepted — Decision Records (Evidence + Policy + Receipts + Verification)  
 **Gate 2 (Stream A remainder):** CLOSED 2026-08-14 — ACCEPT full M2–M5. See §11.  
+**Gate 3 (Section 9 plan):** §12 — docs only; Gate 4 code must follow §12 without inventing architecture.  
 **Date:** 2026-08-05  
 **Deciders:** Multi-council Architecture Decision Framework  
 **Related:** ADR-004, TruthBoundary, Evidence UI, Brain Inspector  
@@ -151,7 +152,64 @@ Guardian **rejects A as primary explainability architecture**.
 5. M5 (`DecisionCard` wiring) remains explicitly conditional: it ships **only after** M2–M4 are verified to produce truthful, non-fabricated records in tests. Do not wire DecisionCard against still-partial data.
 6. This addendum does not reopen §9 Council Decision. CoT/scratchpad remains non-authoritative; LLM composition of a record's text is allowed, fabrication of evidence is not (§10 "Out of scope" stands).
 
-**Next step:** Gate 3 Section 9 implementation plan for Stream A (files, interfaces, migrations, tests, rollback) before any code lands.
+**Next step:** Gate 4 implementation against **§12** only. Do not invent architecture in the code PR.
+
+---
+
+## 12. Gate 3 — Section 9 Implementation Plan (M2–M5)
+
+Program Gate 3 (“Section 9 plan”). This does **not** reopen §9 Council Decision. Depth follows ADR-018 §10 plus the required Gate 3 fields (files, interfaces, migrations, tests, wiring, docs, acceptance, rollback).
+
+**Missing-evidence marker (binding):** empty/unknown fields use the string `"__missing__"` as the dict value, or a one-key dict `{"status": "__missing__"}` when a nested object is required. Never omit the key. Never use `{}` to mean “checked and empty of evidence.”
+
+### M2 — Ordinary-path Decision Records
+
+| Field | Plan |
+|-------|------|
+| **Work** | Call `_publish_decision_and_autonomy` on **every** ordinary step completion (success and failure), not only awaiting-approval (`~389`) and replan-stuck (`~722`). Populate `evidence` / `policy` / `receipt` / `verification` from the step’s receipt, WM observations, SecurityTier/`require_approval`, and `TruthBoundary` result. |
+| **Files** | `services/execution_orchestrator_service.py`; `domain/decision_record.py` (optional helper for the marker); `core/app_state.py` (keep latest projection). |
+| **Interfaces** | Existing topic `decision.record.updated`. Payload remains `DecisionRecord.to_dict()`. No new execute API. |
+| **Migrations** | None for M2 latest-only. Historical inspectability: persist a copy as `ExecutionEvent` with a stable `kind` (e.g. `decision_record`) via `ExecutionEventService` / `ExecutionEventRepository` — **derived log**, receipts remain SoT. No new SoT table. |
+| **Wiring** | Orchestrator publishes; AppState already subscribes. EventBus only (no service→service). |
+| **Tests** | Emit on success; emit on failure; fields are a subset of actual receipt/WM/policy; contradiction between `summary` and receipt fails the test; omitted keys fail; historical lookup by `run_id`/`step_id` via execution events. Extend `tests/test_decision_autonomy_domain.py` plus orchestrator integration tests. |
+| **Docs** | This section; IP-A remains Gate 2 record. |
+| **Acceptance** | A successful tool step and a failed tool step each produce a record with real receipt/verification or `"__missing__"`. Escalate-only emission is gone. |
+| **Rollback** | Revert orchestrator call sites; leave domain dataclass. |
+
+### M3 — Evidence / Approvals / Mission Control surfaces
+
+| Field | Plan |
+|-------|------|
+| **Work** | Project Decision Record fields into Evidence workspace, Approvals, and Mission Control “Reasoning” copy. UI reads AppState only. Replace mode-derived Reasoning prose with record fields. |
+| **Files** | `ui/views/` Evidence / Approvals / mission_control `brain_panel.py`; AppState `decision_record`. Specs: `E10_EVIDENCE_WORKSPACE.md`, `E06_BRAIN_INSPECTOR.md`. |
+| **Interfaces** | No new topics. Renderer binds `decision_record` + historical events already on AppState. |
+| **Migrations** | None. |
+| **Tests** | UI projection tests: fields shown; `"__missing__"` visible as missing, not as blank success; no CoT/scratchpad as authority. |
+| **Acceptance** | Operator can see evidence/policy/receipt/verification for the latest step without opening chat. |
+| **Rollback** | Revert UI bindings; records still emit (M2). |
+
+### M4 — TruthBoundary on the live path
+
+| Field | Plan |
+|-------|------|
+| **Work** | Where orchestration still treats `truth_valid` as success-only, join `TruthBoundary.validate` output into the Decision Record `verification` field. Do not weaken TruthBoundary (Art. VII). Facts must continue `ToolResult.facts` → `TOOL_RESULT` → `step_outputs[].facts` (do not regress #161). |
+| **Files** | `orchestration/verification/truth_boundary.py`, `execution_truth.py`, orchestrator. |
+| **Tests** | Existing TruthBoundary goldens stay green; new test: failed validation appears on the Decision Record, not only in logs. |
+| **Acceptance** | Ungrounded success cannot present as a valid Decision Record. |
+| **Rollback** | Keep TruthBoundary live; drop only the record join. |
+
+### M5 — DecisionCard (conditional)
+
+| Field | Plan |
+|-------|------|
+| **Work** | Wire `ui/views/chat/decision_card.py` to pending-approval intents **only after** M2–M4 tests prove records are non-fabricated. Approvals view already constructs a card (`approvals_view.py`). |
+| **Invalid if** | Card ships against empty `{}` receipts. |
+| **Tests** | UI smoke/unit: card fields ⊂ Decision Record; no card on ordinary LOW-risk auto-execute unless an approval is actually pending. |
+| **Rollback** | Unbind card; leave widget file. |
+
+**Out of scope:** Forced `<SCRATCHPAD>`; CoT as SoT; new explainability SoT besides receipts/WM/policy.
+
+**Dependencies:** Stream B shares `_publish_decision_and_autonomy` — coordinate so M2 here and ADR-022 §12 ordinary-path scoring land without a second publisher.
 
 ---
 
