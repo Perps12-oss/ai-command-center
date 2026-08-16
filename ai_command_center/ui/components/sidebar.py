@@ -17,13 +17,13 @@ from ai_command_center.ui.mission_control.layout_prefs import LayoutPrefs
 
 NAV_GROUPS: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
     ("Workspace", (
-        ("command_center", "Dashboard"),
+        ("command_center", "Command Center"),
         ("workspace", "Workspace"),
         ("chat", "Chat"),
-        ("goals", "Goals"),
-        ("executions", "Execution"),
-        ("agents", "Agents"),
-        ("approvals", "Approvals"),
+        ("goals", "Goal Dashboard"),
+        ("executions", "Execution Center"),
+        ("agents", "Agent Monitor"),
+        ("approvals", "Approval Center"),
     )),
     ("Knowledge", (
         ("world_explorer", "World Model"),

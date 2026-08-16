@@ -37,6 +37,16 @@ def test_view_ids_starts_with_command_center_and_has_no_home():
     assert "home" not in VIEW_IDS
 
 
+def test_workspace_nav_labels_match_ui_constitution():
+    """Articles 9 / 13–16 + D5: sidebar uses canonical workspace titles."""
+    labels = {vid: label for _, items in NAV_GROUPS for vid, label in items}
+    assert labels["command_center"] == "Command Center"
+    assert labels["executions"] == "Execution Center"
+    assert labels["agents"] == "Agent Monitor"
+    assert labels["approvals"] == "Approval Center"
+    assert labels["goals"] == "Goal Dashboard"
+
+
 def test_nav_groups_define_expected_sections():
     sections = [name for name, _ in NAV_GROUPS]
     assert sections == ["Workspace", "Knowledge", "Monitoring", "System"]
@@ -98,7 +108,7 @@ def test_sidebar_compact_badges_do_not_restore_full_labels(sidebar):
         assert btn.cget("text") == ""
     sidebar.toggle_collapse()
     sidebar.set_badges({"approvals": 3})
-    assert "Approvals" in sidebar._buttons["approvals"].cget("text")
+    assert "Approval Center" in sidebar._buttons["approvals"].cget("text")
     assert "3" in sidebar._buttons["approvals"].cget("text")
 
 

@@ -188,19 +188,23 @@ def _check_top_bar_pills(v: Violation) -> None:
 
 def _check_hero_action(v: Violation) -> None:
     """Verify the Command Center hero exposes a primary action button."""
-    text = _read(UI_ROOT / "views" / "command_center_view.py")
-    if "_action_button" not in text:
+    shell = _read(UI_ROOT / "views" / "command_center_view.py")
+    hero = _read(UI_ROOT / "mission_control" / "mission_hero.py")
+    combined = shell + "\n" + hero
+    if "_action_button" not in combined:
         v.add("CommandCenterView missing hero action button (_action_button)")
-    if "_resolve_hero_action" not in text:
+    if "_resolve_hero_action" not in combined:
         v.add("CommandCenterView does not dynamically resolve hero action")
 
 
 def _check_ops_cards_timestamp(v: Violation) -> None:
     """Verify every operational card displays a timestamp."""
-    text = _read(UI_ROOT / "views" / "command_center_view.py")
-    if "_updated" not in text:
+    shell = _read(UI_ROOT / "views" / "command_center_view.py")
+    kpi = _read(UI_ROOT / "mission_control" / "kpi_card.py")
+    combined = shell + "\n" + kpi
+    if "_updated" not in combined:
         v.add("CommandCenterView ops cards missing timestamp label")
-    if "_format_relative" not in text:
+    if "_format_relative" not in combined:
         v.add("CommandCenterView ops cards missing relative-time formatter")
 
 
@@ -271,9 +275,11 @@ def _check_status_token_consolidation(v: Violation) -> None:
 def _check_command_center_naming(v: Violation) -> None:
     """Canonical workspace name is Command Center (not AI Command Center)."""
     shell = _read(UI_ROOT / "views" / "command_center_view.py")
-    if 'text="AI Command Center"' in shell:
+    hero = _read(UI_ROOT / "mission_control" / "mission_hero.py")
+    combined = shell + "\n" + hero
+    if 'text="AI Command Center"' in combined:
         v.add("Command Center hero title must be 'Command Center' (canonical)")
-    if 'text="Command Center"' not in shell:
+    if 'text="Command Center"' not in combined:
         v.add("Command Center hero title 'Command Center' missing")
     sidebar = _read(UI_ROOT / "components" / "sidebar.py")
     if '("command_center", "Command Center")' not in sidebar:

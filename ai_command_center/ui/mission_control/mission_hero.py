@@ -68,7 +68,7 @@ class MissionHeroPanel(GlassCard):
 
         ctk.CTkLabel(
             hero_top,
-            text="Current Mission",
+            text="Command Center",
             font=T.FONT_TITLE,
             text_color=T.TEXT_PRIMARY,
         ).pack(side="left")
