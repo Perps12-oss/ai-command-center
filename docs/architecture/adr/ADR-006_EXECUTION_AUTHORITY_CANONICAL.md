@@ -132,8 +132,55 @@ Passing this test means identity depends on **persistent state**, not conversati
 
 ---
 
+## 12. Gate addendum — B5 Fork 1 (Hero intake)
+
+**Date:** 2026-08-16  
+**Owner decision:** Fork 1 (closed on `main` by [#168](https://github.com/Perps12-oss/ai-command-center/pull/168), 2026-08-12).  
+**Does not supersede** this ADR. Records a boundary that was implied by “sole user intake” and is now explicit.
+
+### Decision
+
+`GOAL_SUBMIT_REQUEST` is an **internal post-authority** command. It is not a UI intake topic.
+
+1. User-facing “New Goal” (Command Center / Goal Dashboard Hero Immediate Action) publishes **`UI_COMMAND`** with a `goal:` prefix (plus optional priority, description, workspace scope).
+2. `ExecutionAuthorityService` remains the only production publisher of `GOAL_SUBMIT_REQUEST`, and only after `analyze` / `_publish_decision` / `_admit` (State Authority projection).
+3. `SingleGoalScheduler` **refuses** submits that lack a non-empty `authority_decision` dict. Direct UI (or any non-EA) publish cannot admit a goal.
+4. Goal lifecycle facts (`GOAL_ACTIVATED`, `GOAL_PAUSED`, `GOAL_CANCELLED`) remain service-owned. UI must not publish them.
+
+Forbidden:
+
+```text
+Hero Immediate Action → GOAL_SUBMIT_REQUEST → SingleGoalScheduler
+```
+
+Required:
+
+```text
+Hero Immediate Action
+  → UI_COMMAND (goal: <title>)
+  → ExecutionAuthorityService
+  → GOAL_SUBMIT_REQUEST (authority_decision stamped, source=execution_authority)
+  → SingleGoalScheduler
+```
+
+### What this does not change
+
+- OperatorKernel remains non-canonical (body of this ADR).
+- SA mutate (ADR-016) does not use `GOAL_SUBMIT_REQUEST`.
+- Broader publisher refactors beyond Hero New Goal are out of scope.
+
+### Verification
+
+- `tests/test_b5_hero_ea_intake.py`
+- `scripts/verify_ui_constitution.py` — UIController must not reference `GOAL_SUBMIT_REQUEST`
+- `docs/UI_CONSTITUTION.md` Articles 7, 8, 16
+- `docs/audits/B5_HERO_EA_INTAKE_CHANGE_NOTE.md`
+
+---
+
 ## Revision history
 
 | Date | Change |
 |------|--------|
 | 2026-07-21 | Accepted — Answer A (ExecutionAuthority canonical) |
+| 2026-08-16 | §12 — B5 Fork 1: Hero New Goal via `UI_COMMAND`; `GOAL_SUBMIT_REQUEST` is EA-only post-authority |
