@@ -4,7 +4,7 @@ Passive telemetry — observation only (Phase 5C+).
 All SQLite writes run on a dedicated worker with batching. Bus handlers only
 enqueue; they never block the publisher (UI / EventBus) on disk I/O.
 
-On unload the session is exported to JSON (see ``telemetry_export``). That is a
+On unload the session is exported to JSON (see ``telemetry.session_export``). That is a
 read-back of already-persisted rows, so the observation-only contract holds.
 """
 
@@ -120,6 +120,7 @@ class TelemetryService(BaseService):
         self._unsubscribers: list[Callable[[], None]] = []
         self._defer_queue: queue.SimpleQueue[Event | None] = queue.SimpleQueue()
         self._defer_thread: threading.Thread | None = None
+        self._last_export_monotonic: float = 0.0
 
     @property
     def session_id(self) -> str:
@@ -177,6 +178,19 @@ class TelemetryService(BaseService):
         if path is not None:
             logger.info("Telemetry session exported: %s", path)
 
+    def _maybe_periodic_export(self) -> None:
+        """Refresh JSON on a timer so a crashed process still left a snapshot."""
+        from ai_command_center.telemetry.session_export import export_interval_s
+
+        interval = export_interval_s()
+        if interval <= 0:
+            return
+        now = time.monotonic()
+        if self._last_export_monotonic and (now - self._last_export_monotonic) < interval:
+            return
+        self._export_session()
+        self._last_export_monotonic = now
+
     def _defer_worker(self) -> None:
         batch: list[tuple[str, dict[str, Any], str]] = []
         nest: list[tuple[str, dict[str, Any], float]] = []
@@ -190,6 +204,7 @@ class TelemetryService(BaseService):
                     logger.exception("Telemetry batch flush failed")
                 batch.clear()
                 nest.clear()
+                self._maybe_periodic_export()
                 continue
             if item is None:
                 try:
