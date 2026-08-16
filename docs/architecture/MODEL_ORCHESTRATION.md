@@ -100,6 +100,7 @@ See [AGENT_RUNTIME_INTERFACE.md](AGENT_RUNTIME_INTERFACE.md) (Invariant 13) and 
 | Risk | Mitigation |
 |------|------------|
 | Autonomous model switching | Explicit `reason` in every `model.selected` |
+| Telemetry as authorization | Selection telemetry is observational (ADR-023 M4); HITL/EA do not read it back |
 | Service→service bypass | UCGS layer check + code review |
 | Latency from extra bus hop | Single resolve per request; cache in ChatHandler pending map |
 
