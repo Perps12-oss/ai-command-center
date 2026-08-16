@@ -25,7 +25,7 @@ def _conn() -> sqlite3.Connection:
     return conn
 
 
-def test_hero_new_goal_publishes_ui_command_not_goal_submit() -> None:
+def test_goal_intake_hero_new_goal_publishes_ui_command_not_goal_submit() -> None:
     """Controller must not emit the scheduler topic (B5 fork 1)."""
     bus = EventBus()
     ctrl = UIController(bus, AppStateStore(bus), on_state=lambda: None)
@@ -44,7 +44,7 @@ def test_hero_new_goal_publishes_ui_command_not_goal_submit() -> None:
     assert submits == [], "UI must not publish GOAL_SUBMIT_REQUEST"
 
 
-def test_hero_goal_reaches_scheduler_only_after_ea_admission() -> None:
+def test_goal_intake_hero_reaches_scheduler_only_after_ea_admission() -> None:
     """Hero → UI_COMMAND → EXECUTION_AUTHORITY_DECISION → stamped GOAL_SUBMIT_REQUEST."""
     bus = EventBus()
     ExecutionAuthorityService(bus).start()
@@ -81,7 +81,7 @@ def test_hero_goal_reaches_scheduler_only_after_ea_admission() -> None:
     assert submitted_facts, "scheduler must accept EA-stamped submit"
 
 
-def test_direct_goal_submit_without_authority_decision_is_refused() -> None:
+def test_goal_intake_hero_direct_submit_without_authority_decision_is_refused() -> None:
     """Fail-closed: bypass publish cannot admit into SingleGoalScheduler."""
     bus = EventBus()
     SingleGoalScheduler(bus, GoalRepository(_conn())).start()
