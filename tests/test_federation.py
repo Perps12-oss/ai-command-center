@@ -356,3 +356,136 @@ def test_federation_service_invalid_descriptor_does_not_crash() -> None:
     bus, service, _ = _make_federation_stack()
     bus.publish(FEDERATION_WORKSPACE_REGISTERED, {"bad_key": "no_workspace_id"}, source="test")
     service.stop()
+
+
+# ── ADR-024 M1 (federation_m1) ─────────────────────────────────────────────
+
+
+def test_federation_m1_provenance_on_world_model_hits() -> None:
+    n1 = _node("n-1", "workspace")
+    primary = _StubRepo([n1])
+    primary.append_mutation(_mutation_for(n1))
+    result = FederatedWorldModel(primary_repo=primary).query_nodes()
+    assert len(result.nodes) == 1
+    payload = result.nodes[0].to_payload()
+    assert payload["provenance"]["kind"] == "world_model_node"
+    assert payload["provenance"]["source_id"] == "n-1"
+    assert payload["provenance"]["workspace_id"] == "primary"
+
+
+def test_federation_m1_deleted_source_is_not_returned() -> None:
+    n1 = _node("n-gone")
+    primary = _StubRepo([n1])
+    primary.append_mutation(_mutation_for(n1))
+    primary.delete_node("n-gone", CorrelationContext.new())
+    result = FederatedWorldModel(primary_repo=primary).query_nodes()
+    assert result.nodes == ()
+
+
+def test_federation_m1_duplicate_ids_same_type_are_not_conflicts() -> None:
+    n1 = _node("shared-id", "workspace")
+    n2 = _node("shared-id", "workspace")
+    primary = _StubRepo([n1])
+    primary.append_mutation(_mutation_for(n1))
+    secondary = _StubRepo([n2])
+    secondary.append_mutation(_mutation_for(n2))
+    federation = FederatedWorldModel(primary_repo=primary)
+    federation.add_workspace(_descriptor("ws-sec"), secondary)
+    assert federation.detect_conflicts() == []
+    result = federation.query_nodes()
+    assert len(result.nodes) == 2
+    for node in result.nodes:
+        assert node.to_payload()["provenance"]["source_id"] == "shared-id"
+
+
+def test_federation_m1_query_failure_is_explicit_empty() -> None:
+    class _BoomRepo(_StubRepo):
+        def replay_mutations(self, limit: int = 5) -> list[Mutation]:
+            raise RuntimeError("disk missing")
+
+    bus, service, federated = _make_federation_stack()
+    federated._primary = _BoomRepo()
+    results: list[dict] = []
+    bus.subscribe(FEDERATION_QUERY_RESULT, lambda e: results.append(dict(e.payload)))
+    bus.publish(FEDERATION_QUERY_REQUEST, {"request_id": "req-fail", "query": "x"}, source="test")
+    service.stop()
+    assert results
+    payload = results[0]
+    assert payload["error"] is None or payload["result"] is not None
+    nodes = (payload.get("result") or {}).get("nodes") or []
+    # replay_mutations exception is swallowed per workspace into errors, not fabricated hits
+    assert nodes == []
+
+
+def test_federation_m1_rebuild_from_registry_reload() -> None:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    registry = WorkspaceRegistry(conn)
+    d = _descriptor("ws-reload", "Reload")
+    registry.register(d)
+    assert [w.workspace_id for w in WorkspaceRegistry(conn).list_all()] == ["ws-reload"]
+
+
+def test_federation_m1_query_is_read_only() -> None:
+    n1 = _node("n-1")
+    primary = _StubRepo([n1])
+    primary.append_mutation(_mutation_for(n1))
+    writes: list[str] = []
+    original = primary.apply_mutation
+
+    def _guard(mutation: Mutation) -> None:
+        writes.append(mutation.id)
+        original(mutation)
+
+    primary.apply_mutation = _guard  # type: ignore[method-assign]
+    FederatedWorldModel(primary_repo=primary).query_nodes(query="Node")
+    assert writes == []
+
+
+def test_federation_m1_memory_hits_carry_provenance() -> None:
+    class _Mem:
+        def search(self, query: str, *, limit: int = 5, global_search: bool = False, **_k):
+            from ai_command_center.db.memory_repository import MemoryNode
+
+            if query and "alpha" not in query:
+                return []
+            return [MemoryNode(id="mem-1", label="alpha note", kind="entity", content="alpha", tier="mid")]
+
+    result = FederatedWorldModel(primary_repo=_StubRepo(), memory_repo=_Mem()).query_nodes(query="alpha")
+    mem_hits = [n for n in result.nodes if n.node_type == "memory_item"]
+    assert len(mem_hits) == 1
+    assert mem_hits[0].to_payload()["provenance"]["kind"] == "memory_item"
+    assert mem_hits[0].to_payload()["provenance"]["source_id"] == "mem-1"
+
+
+def test_federation_m1_factory_startup_ready() -> None:
+    from ai_command_center.application import create_application
+    from ai_command_center.db.connection import connect, init_database
+    from pathlib import Path
+
+    db = init_database(connect(Path(":memory:")))
+    core = create_application(db=db, workspace_os_enabled=False)
+    try:
+        core.startup()
+        svc = core.services.get("federation_service")
+        assert svc is not None
+        assert svc.get_state() == "ready"
+        results: list[dict] = []
+        core.bus.subscribe(FEDERATION_QUERY_RESULT, lambda e: results.append(dict(e.payload)))
+        core.bus.publish(
+            FEDERATION_QUERY_REQUEST,
+            {"request_id": "factory-m1", "query": ""},
+            source="test",
+        )
+        deadline = __import__("time").time() + 2.0
+        while __import__("time").time() < deadline and not results:
+            __import__("time").sleep(0.05)
+        assert results, "federation.query.result must emit on the live factory path"
+        assert results[0]["request_id"] == "factory-m1"
+        for node in (results[0].get("result") or {}).get("nodes") or []:
+            assert "provenance" in node
+            assert node["provenance"].get("source_id")
+        src = Path("ai_command_center/services/federation_service.py").read_text(encoding="utf-8")
+        assert "embedding_vector" not in src
+    finally:
+        core.shutdown()

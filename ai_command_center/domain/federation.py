@@ -93,6 +93,20 @@ class FederationSyncRecord:
         self.error = reason
 
 
+def provenance_pointer(
+    *,
+    kind: str,
+    source_id: str,
+    workspace_id: str,
+) -> dict[str, str]:
+    """Authoritative-source pointer required on every federation result row (ADR-024 §9)."""
+    return {
+        "kind": kind,
+        "source_id": source_id,
+        "workspace_id": workspace_id,
+    }
+
+
 @dataclass(frozen=True)
 class FederatedNode:
     """A node resolved from the federation, annotated with its source workspace."""
@@ -103,8 +117,14 @@ class FederatedNode:
     workspace_id: str
     workspace_name: str
     attributes: dict[str, Any] = field(default_factory=dict)
+    provenance: dict[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
+        provenance = dict(self.provenance) if self.provenance else provenance_pointer(
+            kind="world_model_node",
+            source_id=self.node_id,
+            workspace_id=self.workspace_id,
+        )
         return {
             "node_id": self.node_id,
             "node_type": self.node_type,
@@ -112,6 +132,7 @@ class FederatedNode:
             "workspace_id": self.workspace_id,
             "workspace_name": self.workspace_name,
             "attributes": dict(self.attributes),
+            "provenance": provenance,
         }
 
 
@@ -142,4 +163,5 @@ __all__ = [
     "SyncStatus",
     "WorkspaceDescriptor",
     "WorkspaceRole",
+    "provenance_pointer",
 ]
