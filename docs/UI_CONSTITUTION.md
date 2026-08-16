@@ -1,6 +1,6 @@
 # AI Command Center (ACC) UI Constitution
 
-Version: 1.0
+Version: 1.1
 Status: Authoritative UI Governance Document
 Scope: All ACC UI, UX, Visualization, Layout, Interaction, Themes, Navigation, and Operator Experience
 
@@ -364,6 +364,11 @@ Must contain:
 * Critical Summary
 * Immediate Action
 
+Immediate Action that **creates a goal** (Hero **New Goal**) is operator intake.
+It must publish `UI_COMMAND` with a `goal:` prefix only. It must never publish
+`GOAL_SUBMIT_REQUEST`. That topic is internal post-authority (ADR-006 §12);
+ExecutionAuthority alone emits it after decision and admission.
+
 ---
 
 ## Example
@@ -399,6 +404,9 @@ Displays:
 * Goal Status
 * Progress
 * Current Focus
+
+Hero Immediate Action on this zone, when it is **New Goal**, follows Article 7:
+`UI_COMMAND` / `goal:` prefix only (ADR-006 §12).
 
 ---
 
@@ -630,7 +638,7 @@ Accent token: `GOAL_AMBER` (defined in `theme_v2.py`). Goal Dashboard shell and 
 Hero Immediate Action **New Goal** publishes EA intake intent (`UI_COMMAND` with a
 `goal:` prefix) only — never `GOAL_SUBMIT_REQUEST`. Lifecycle facts
 (`GOAL_ACTIVATED`, `GOAL_PAUSED`, `GOAL_CANCELLED`) are service-owned and must not
-be published by UI. `GOAL_SUBMIT_REQUEST` is internal post-authority (ADR-006);
+be published by UI. `GOAL_SUBMIT_REQUEST` is internal post-authority (ADR-006 §12);
 ExecutionAuthority alone emits it after decision and admission.
 
 ---
@@ -747,4 +755,7 @@ Until then, the subsystem remains operationally incomplete.
 
 ---
 
-END OF ACC UI CONSTITUTION V1
+END OF ACC UI CONSTITUTION V1.1
+
+Amendment 2026-08-16: Articles 7–8 and 16 record B5 Fork 1 (ADR-006 §12) —
+Hero New Goal is EA intake, not a scheduler publish.
