@@ -17,7 +17,7 @@ Does anything in the Goose expedition strengthen ACC's own architecture, without
 
 ## 2. Decision
 
-**ACCEPT** the Adopt/Adapt/Reject table as drafted in IP-F, unedited:
+**ACCEPT** the Adopt/Adapt/Reject table from IP-F, with its one open row resolved (MCP bundled as SoT — IP-F listed this preliminarily as "Adapt/Reject per ADR"; this ADR is that ADR, and resolves it to **Reject**). Every other row matches IP-F's preliminary categorization; wording below is tightened for clarity but not changed in substance.
 
 | Goose pattern | ACC equivalent | Decision | Notes |
 |---|---|---|---|

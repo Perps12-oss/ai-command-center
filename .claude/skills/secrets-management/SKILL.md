@@ -10,8 +10,9 @@ Credential handling for ACC on `keyring>=24.0.0`.
 > Scope note: this is deliberately **not** a Vault / AWS Secrets Manager /
 > GitHub-Secrets skill. ACC's secret store is the OS keyring. Do not introduce a
 > cloud secret backend — that is an architecture decision requiring
-> `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md` and a new ADR (next free:
-> **ADR-024**).
+> `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md` and a new ADR (next free
+> number is tracked in `docs/architecture/adr/README.md` — 024/025 are already
+> taken as of 2026-08-14, do not assume they're free).
 
 ## ACC governance deference
 

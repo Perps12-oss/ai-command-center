@@ -31,7 +31,8 @@ From `docs/audits/R1_UNGATED_STOP_LINE.md`. These are **not** a backlog:
 
 If a concurrency problem seems to require either, that is an architecture
 decision: stop and use `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md`
-(next free ADR is **ADR-024**).
+(next free ADR number is tracked in `docs/architecture/adr/README.md` —
+024/025 are already taken as of 2026-08-14, do not assume they're free).
 
 ## Structural invariants
 

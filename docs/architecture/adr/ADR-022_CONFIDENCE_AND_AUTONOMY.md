@@ -148,7 +148,7 @@ Guardian **rejects A as primary**; composite may include optional debug signals 
 | Composite `AutonomyScore` | Band | Behavior |
 |---|------|----------|
 | `< 0.4` | HIGH risk | Escalate — **requires owner approval** before proceeding |
-| `0.4 – 0.7` | MEDIUM | **Constrained execution**: proceed only with an extra validation/verification step; still subject to all SecurityTier/policy gates |
+| `0.4 <= score < 0.7` | MEDIUM | **Constrained execution**: proceed only with an extra validation/verification step; still subject to all SecurityTier/policy gates |
 | `>= 0.7` | LOW | Auto-execute, within existing sandbox/tier limits — this is a permit to proceed at normal policy strictness, not a bypass of it |
 
 The existing code default `threshold=0.6` (`domain/autonomy_score.py`) falls inside MEDIUM under these bands; the Gate 3 Section 9 plan updates the constant/config to reflect the three-band structure rather than a single cutoff.
