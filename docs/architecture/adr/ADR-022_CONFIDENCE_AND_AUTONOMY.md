@@ -2,6 +2,7 @@
 
 **Status:** Accepted — Composite confidence (Evidence / Verification / Policy / Execution)  
 **Gate 2 (Stream B remainder):** CLOSED 2026-08-14 — ACCEPT escalate-only bands. See §11.  
+**Gate 3 (Section 9 plan):** §12 — docs only; Gate 4 code must follow §12 without inventing architecture.  
 **Date:** 2026-08-05  
 **Deciders:** Multi-council Architecture Decision Framework  
 **Related:** ADR-004, ADR-018, ADR-021, PermissionService, SecurityTier  
@@ -163,7 +164,40 @@ The existing code default `threshold=0.6` (`domain/autonomy_score.py`) falls ins
 - Policy override rules, timeout/denial mapping, and audit-trail shape are Gate 3 (Section 9 plan) concerns, not reopened here.
 - Ordinary-path scoring (computing a score on non-escalating steps too, for Stream A's Decision Records) is in scope for M2, consistent with §10.
 
-**Next step:** Gate 3 Section 9 implementation plan for Stream B before any code lands. Do not hand-implement these bands ahead of that plan.
+**Next step:** Gate 4 implementation against **§12** only. Do not hand-implement bands ahead of that plan.
+
+---
+
+## 12. Gate 3 — Section 9 Implementation Plan (bands + escalation)
+
+Program Gate 3. Does **not** reopen §9 Council Decision. Bands in §11 are binding numbers.
+
+### Confidence bands (replace single `threshold=0.6`)
+
+| Aggregate | Band | Runtime effect |
+|-----------|------|----------------|
+| `< 0.4` | HIGH | Set `require_approval` / HITL. Do **not** deny. |
+| `0.4 <= score < 0.7` | MEDIUM | Extra verification: run `TruthBoundary.validate` (or equivalent existing verification) **before** the step is treated as complete; still subject to SecurityTier. |
+| `>= 0.7` | LOW | Proceed at normal policy strictness. Not a bypass. |
+
+`WRITE_DESTROY` remains always-HITL regardless of band.
+
+### Specs
+
+| Field | Plan |
+|-------|------|
+| **Work** | (1) Replace `AutonomyScore.compute(..., threshold=0.6)` with band helpers (`band()`, `escalate` true only for HIGH or `hard_policy_block`). (2) Derive the four component scores from real signals (policy/tier, WM observations, TruthBoundary, execution/receipt success) — stop publishing heuristic constants (`0.2`/`0.9`, `0.5`/`0.5`) as if they were measured. (3) On HIGH, route through existing approval topics; never a second execute/deny API. (4) Ordinary-path scoring on the same orchestrator sites as ADR-021 §12 M2. (5) Project `autonomy_score` (already on AppState) into Approvals / Decision Record policy field. |
+| **Files** | `domain/autonomy_score.py`; `services/execution_orchestrator_service.py`; `core/app_state.py`; Approvals UI projection; optional settings keys for band edges (defaults **must** match §11 — settings may not silently retune architecture). |
+| **Interfaces** | Existing `autonomy.score.updated`. Add `band` (`high`/`medium`/`low`) to the published payload. No new intake topic. |
+| **Migrations** | Settings: if band edges are configurable, `schema_version` bump + `migration_manager.py` defaulting to §11 numbers. If constants-only, no migration. |
+| **Wiring** | Orchestrator publishes; AppState subscribes. Autonomy **never** calls ExecutionAuthority. Denial remains approval-timeout-deny or EA/SecurityTier refuse. |
+| **Tests** | Deterministic band fixtures (`0.39` HIGH, `0.40` MEDIUM, `0.69` MEDIUM, `0.70` LOW). HIGH produces pending approval, not a blocked run. MEDIUM invokes extra verification. LOW does not skip WRITE_DESTROY HITL. No EA bypass. Audit trail includes band + aggregate. Extend domain tests + orchestrator integration. |
+| **Docs** | This section; `docs/architecture/RUNTIME_SAFETY.md` one-line pointer if it still cites a single 0.6 cutoff. |
+| **Acceptance** | Live score uses §11 bands; heuristic-only components gone; score cannot independently block. |
+| **Rollback** | Restore `threshold=0.6` escalate boolean; leave dataclass. |
+| **Invalid if** | A low score denies execution; a high score bypasses SecurityTier; a new `autonomy.execute` path appears. |
+
+**Dependencies:** ADR-021 §12 M2 (shared publisher); ADR-004 tiers; ADR-006 intake.
 
 ---
 

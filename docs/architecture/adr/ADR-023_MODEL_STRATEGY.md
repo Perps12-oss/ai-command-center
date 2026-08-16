@@ -2,6 +2,7 @@
 
 **Status:** Accepted — Brain independent (quality tiers as settings, not architecture)  
 **Gate 2 (Stream C remainder):** CLOSED 2026-08-14 — ACCEPT sequential M2→M3→M4. See §11.  
+**Gate 3 (Section 9 plan):** §12 — sequential; Gate 4 starts at M2 only.  
 **Date:** 2026-08-05  
 **Deciders:** Multi-council Architecture Decision Framework  
 **Related:** Inv 13, ADR-007 Provider Registry, ModelRouterService, ARI  
@@ -155,7 +156,48 @@ Guardian **requires Accept B**; settings-backed quality maps are fine.
 
 Capability-registry extras — capability metadata schema, health/cost/latency as settings-backed routing policy, and router-vs-orchestrator ownership of fallback — are **not** accepted or rejected here. IP-C itself flags these as possibly requiring their own ADR "if they change architecture." They are deferred to a separate future Integration Proposal once M2–M4 are live and there is a concrete routing need to design against, rather than speculatively. If that proposal is written, the next available ADR number applies at that time (see `docs/architecture/adr/README.md` "Next free number").
 
-**Next step:** Gate 3 Section 9 implementation plan for Stream C (M2 first) before any code lands.
+**Next step:** Gate 4 against **§12**, **M2 first**. M3/M4 PRs require the previous milestone’s tests green on `main`.
+
+---
+
+## 12. Gate 3 — Section 9 Implementation Plan (M2 → M3 → M4)
+
+Program Gate 3. Sequential: each milestone’s tests must land on `main` before the next starts. Does **not** reopen §9. Capability-registry extras stay out of scope (§11).
+
+### M2 — Per-tier `model_tier_map` without Brain vendor branches
+
+| Field | Plan |
+|-------|------|
+| **Work** | Settings `model_tier_map` may differ per tier (`fast` / `balanced` / `reasoning` or the live key set). `ModelRouterService` resolves the map. Brain / orchestrator / WM / policy **must not** `if model_name.startswith("gpt")` (or any vendor string). `CONTEXT_OVER_BUDGET` may change a **tier hint** via existing `_TIER_DOWNGRADE_MAP` only — never control flow, never force a cloud vendor. |
+| **Files** | `services/model_router_service.py`; `domain/settings_snapshot.py`; `core/settings/settings_schema.py`; `platform/model_registry.py`; tests `tests/test_model_tier_map.py`, `tests/test_model_router_dispatch.py`. |
+| **Interfaces** | Existing `model.resolve.request` / `model.resolve.result` / `model.selected` / `settings.updated`. |
+| **Migrations** | Only if schema keys change; otherwise defaults may remain local (`llama3.2:3b` class). Users who want distinct tiers edit settings. |
+| **Tests** | Distinct per-tier IDs round-trip in settings and router; Brain/orchestrator tests fail if they import vendor SDKs or branch on vendor names; budget event changes hint, not authority. |
+| **Acceptance** | Two configured tiers can disagree; runtime still local-default if unset. |
+| **Rollback** | Revert router/settings; Brain contracts unchanged. |
+
+### M3 — Local-only replan / destroy
+
+| Field | Plan |
+|-------|------|
+| **Work** | Replan (`PLAN_REPLAN_REQUEST`) and WRITE_DESTROY paths must complete with a local-only `model_tier_map` (no cloud ID required). Missing/weak model → more HITL and fail closed, **runtime unchanged** (§9 point 3). HITL substitutes for cloud; cloud is never a hard requirement. |
+| **Files** | Orchestrator replan; BrainRuntime approval timeout-deny; ModelRouter degrade; `docs/architecture/MODEL_ORCHESTRATION.md`. |
+| **Tests** | Integration: local-only config, replan and destroy still produce a terminal run state + receipt; no test may skip by “requires OpenAI”. |
+| **Acceptance** | CI without network/cloud keys covers replan/destroy. |
+| **Rollback** | Revert degrade wiring; do not add a gpt-4o critical default. |
+| **Invalid if** | `critical = gpt-4o` (or any fixed cloud model) appears in Brain/policy. |
+
+### M4 — Telemetry never gates authority
+
+| Field | Plan |
+|-------|------|
+| **Work** | Record selected `model`, `provider`, and **reason** (settings map / budget hint / degrade / fallback) on `model.selected` / telemetry events. Selection telemetry must not be read back as an authorization signal. |
+| **Files** | `model_router_service.py`; `services/telemetry_service.py` (subscribe only if not already capturing `MODEL_SELECTED`); tests for reason codes. |
+| **Tests** | Payload includes model/provider/reason; a test that telemetry is down or empty still allows EA/orchestrator to proceed. |
+| **Acceptance** | Operators can see why a model was chosen; killing telemetry does not change HITL/EA outcomes. |
+| **Rollback** | Drop extra reason fields; keep existing `model.selected`. |
+
+**Out of scope:** Capability metadata schema; health/cost/latency as routing policy; router-vs-orchestrator fallback ownership (future IP).
 
 ---
 

@@ -1,6 +1,7 @@
 # ADR-024: Knowledge Federation SoT (Stream E — Gate 2)
 
 **Status:** Accepted — DEFER WITH CONDITION (live-wire read-only federation; no embeddings/vector index yet)
+**Gate 3 (Section 9 plan):** §9 — M1 read-only wiring only.
 **Date:** 2026-08-14
 **Deciders:** Owner (Gate 2), per `docs/governance/STRATEGIC_RUNTIME_PROGRAM.md`
 **Related:** ADR-020 (Memory Architecture, parent), ADR-015 (SA Mutate Memory), Inv 6 (ContextManager), Inv 11 (single SoT), UCGS `scope_embeddings`
@@ -69,7 +70,31 @@ Stale/deleted/changed source handling, duplicate handling, provenance (every res
 
 ## 8. Next step
 
-Gate 3 Section 9 implementation plan for the read-only federation wiring only (files, interfaces, tests, rollback). Vector/embedding work stays gated behind a future proposal + UCGS profile change and is explicitly **not** unlocked by this ADR.
+Gate 4 implementation against **§9** (read-only wiring only). Vector/embedding work stays gated behind a future proposal + UCGS profile change and is explicitly **not** unlocked by this ADR.
+
+---
+
+## 9. Gate 3 — Section 9 Implementation Plan (M1 — read-only federation)
+
+Program Gate 3 for the **authorized slice only**. This is not embeddings, not a vector index, not a new SoT.
+
+### Scope (M1)
+
+Wire the existing `FederationService` / `FederatedWorldModel` / `WorkspaceRegistry` into `service_factory.py` as a **read-only view** over World Model, MemoryGraph, and the conversation repository.
+
+| Field | Plan |
+|-------|------|
+| **Files** | `core/service_factory.py` (construct + `ServiceManager.register`); `services/federation_service.py`; `core/world_model/federation/federated_world_model.py`; `core/world_model/federation/workspace_registry.py`; `domain/federation.py`; existing topics in `core/events/topics.py`. **Do not** add `vector_store` / embedding services. |
+| **Interfaces** | Existing: `federation.query.request` → `federation.query.result`; register/unregister + sync started/completed; `federation.conflict.detected`. Every result row **must** include a pointer to the authoritative source (WM node id, MemoryGraph entry id, or conversation/transcript turn id). |
+| **Migrations** | None. Do not migrate, read, or write `Entity.embedding_vector`. Leave the column untouched. |
+| **Wiring** | Factory owns construction (composition root). Federation talks to canonical stores through `FederatedWorldModel` only — no UI, no ContextManager fork (Inv 6 unchanged). EventBus for all inter-service traffic. |
+| **Tests** | Extend `tests/test_federation.py` plus a factory/startup test that `create_application()` reports federation `READY`. Required cases from §6: stale/deleted/changed source no longer returned; duplicates; provenance present; query failure is explicit (empty result + error payload, not a fabricated hit); rebuild-from-scratch equivalence (registry reload); consistency with WM/Memory at read time. Arch-lint: no new service→service imports. |
+| **Docs** | This section; `STRATEGIC_GAP_MATRIX.md` Stream E “unwired” becomes stale after Gate 4 — update in the implementation PR, not here. |
+| **Acceptance** | Headless `create_application()` + `startup()` includes federation `READY`. A `FEDERATION_QUERY_REQUEST` returns sourced rows. No embedding call, no vector backend, UCGS `scope_embeddings` remains S5. |
+| **Rollback** | Unregister from `service_factory.py`; leave classes and tests that construct the service directly. |
+| **Invalid if** | Factory wiring writes any store; `embedding_vector` is read/written; search results lack provenance; a deleted WM node still “hits”; a second ContextManager path appears. |
+
+**Not in M1:** `FEATURE_VECTOR_SEARCH`, Chromadb/Pinecone, semantic search product UI, UCGS profile enablement.
 
 ---
 
