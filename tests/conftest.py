@@ -32,6 +32,10 @@ os.environ.setdefault(
     "ACC_TELEMETRY_EXPORT_DIR",
     tempfile.mkdtemp(prefix="aicc-telemetry-"),
 )
+# Pytest must not mirror into the real ~/.claude home directory.
+os.environ.setdefault("ACC_TELEMETRY_CLAUDE_MIRROR", "0")
+# Periodic in-session export is covered by a dedicated test; keep the suite idle.
+os.environ.setdefault("ACC_TELEMETRY_EXPORT_INTERVAL_S", "0")
 
 
 def _module_available(name: str) -> bool:

@@ -186,3 +186,82 @@ def test_service_stop_exports_session(_isolated_export_dir: Path) -> None:
     export = json.loads(path.read_text(encoding="utf-8"))
     assert export["event_count"] >= 1
     assert (_isolated_export_dir / STATS_CACHE_FILENAME).exists()
+
+
+def test_claude_mirror_merges_stats_cache_without_clobbering(
+    _isolated_export_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(telemetry_export.ENV_CLAUDE_MIRROR, "1")
+    claude = tmp_path / ".claude"
+    claude.mkdir()
+    monkeypatch.setattr(telemetry_export, "resolve_claude_home", lambda: claude)
+    stale = {
+        "models": ["claude-sonnet-4-6"],
+        "lastUpdate": "2026-05-08T00:00:00+00:00",
+        "vendor_field": "keep-me",
+    }
+    (claude / telemetry_export.STATS_CACHE_FILENAME).write_text(
+        json.dumps(stale), encoding="utf-8"
+    )
+
+    repo = _repo()
+    repo.insert_many(
+        [
+            (
+                CHAT_COMPLETE,
+                {"session_id": "s-1", "model": "llama3.2:3b"},
+                "2026-08-16T00:00:00+00:00",
+            ),
+            (
+                CHAT_COMPLETE,
+                {"session_id": "s-1", "model_name": "qwen2.5:7b"},
+                "2026-08-16T00:00:01+00:00",
+            ),
+        ]
+    )
+    path = export_session(repo, "s-1")
+    assert path is not None
+
+    mirrored = claude / "telemetry" / "session-s-1.json"
+    assert mirrored.exists()
+    assert json.loads(mirrored.read_text(encoding="utf-8"))["session_id"] == "s-1"
+
+    cache = json.loads((claude / telemetry_export.STATS_CACHE_FILENAME).read_text())
+    assert cache["vendor_field"] == "keep-me"
+    assert "claude-sonnet-4-6" in cache["models"]
+    assert "llama3.2:3b" in cache["models"]
+    assert "qwen2.5:7b" in cache["models"]
+    assert cache["last_update"] == cache["lastUpdate"]
+    assert cache["last_update"].startswith("2026-") or "T" in cache["last_update"]
+    assert cache["acc"]["total_sessions"] == 1
+
+
+def test_claude_mirror_skipped_when_disabled(
+    _isolated_export_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(telemetry_export.ENV_CLAUDE_MIRROR, "0")
+    monkeypatch.setattr(telemetry_export, "resolve_claude_home", lambda: tmp_path / ".claude")
+    repo = _repo()
+    repo.insert_many([(UI_COMMAND, {"session_id": "s-1"}, "2026-08-16T00:00:00+00:00")])
+    export_session(repo, "s-1")
+    assert not (tmp_path / ".claude" / "telemetry").exists()
+
+
+def test_periodic_export_writes_before_stop(
+    _isolated_export_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(telemetry_export.ENV_EXPORT_INTERVAL_S, "0.05")
+    bus = EventBus()
+    repo = _repo()
+    service = TelemetryService(bus, repo)
+    service.start()
+    try:
+        bus.publish(UI_COMMAND, {"text": "Summarize"}, source="ui")
+        _drain(repo, service.session_id, 1)
+        deadline = time.time() + 2.0
+        path = _isolated_export_dir / f"session-{service.session_id}.json"
+        while time.time() < deadline and not path.exists():
+            time.sleep(0.02)
+        assert path.exists(), "periodic export did not write before stop"
+    finally:
+        service.stop()
