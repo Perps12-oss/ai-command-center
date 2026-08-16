@@ -53,7 +53,7 @@ Integration Proposal → ADR Decision → Section 9 Implementation Plan
 
 **No implementation starts against an unresolved architectural ambiguity.**
 
-Existing Accepted ADRs (021–023) are **not** reopened by default. Gate 2 for those streams finalizes remaining Section 9 ambiguity (addendum or new ADR only if architecture must change). New numbers start at **ADR-024**.
+Existing Accepted ADRs (021–023) are **not** reopened by default. Gate 2 for those streams finalizes remaining Section 9 ambiguity (addendum or new ADR only if architecture must change). New numbers started at **ADR-024** — as of the Wave 1 closure on 2026-08-14, 024 and 025 are assigned (Streams E and F); the next free number is tracked in `docs/architecture/adr/README.md`, not restated here.
 
 ### Gate 1 questions (every proposal)
 

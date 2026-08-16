@@ -42,7 +42,7 @@ There is **no mechanical check** that Pre-Flight was written. Skipping it is a c
 
 - Major changes use `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md` (multi-council), not informal ADR drafts alone.  
 - Skill helpers such as `.agents/skills/` may assist review; they do not replace the framework.  
-- Next free ADR number: **ADR-024** (ADR-007 was assigned twice — disclosed in `adr/README.md`).  
+- Next free ADR number: **ADR-026** (024/025 assigned 2026-08-14 to Streams E/F at Wave 1 Gate 2 closure; ADR-007 was assigned twice historically — disclosed in `adr/README.md`). **This number will drift again** — `docs/architecture/adr/README.md` "Next free number" is the ultimate source; re-check it before trusting this line.  
 - Roadmap text saying “ADR-001 Tool Invocation … ADR-006 Model Strategy” maps to **ADR-018–023**, not files 001–006.  
 - Do not implement from **Proposed** ADRs as if Accepted.
 

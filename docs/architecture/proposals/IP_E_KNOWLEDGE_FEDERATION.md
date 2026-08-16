@@ -1,6 +1,6 @@
 # IP-E — Knowledge Federation (SoT first)
 
-**Status:** GATE 1 DRAFT — awaiting owner Gate 2  
+**Status:** GATE 2 CLOSED 2026-08-14 — DEFER WITH CONDITION: live-wire read-only federation now, no embeddings/vector index. Decision: [`ADR-024`](../adr/ADR-024_KNOWLEDGE_FEDERATION_SOT.md).  
 **Stream:** E  
 **Parent ADR:** [ADR-020](../adr/ADR-020_MEMORY_ARCHITECTURE.md) **Accepted** (WM + MemoryGraph canonical; summaries derived). Federation/index is **not** decided.  
 **UCGS:** `scope_embeddings` S5 still forbids embedding/vector DB **code** until profile enablement after Gate 2.  

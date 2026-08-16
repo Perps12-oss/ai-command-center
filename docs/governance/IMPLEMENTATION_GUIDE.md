@@ -214,8 +214,8 @@ This is owner-authorized. Do **not** invent extra tickets from historical invent
 | Wave | Work | Status |
 |------|------|--------|
 | 0 | Strategic Gap Matrix | Deliverable in [`docs/audits/STRATEGIC_GAP_MATRIX.md`](../audits/STRATEGIC_GAP_MATRIX.md). **COMPLETE only after merge to `main`.** |
-| 1 | Architecture closure (Gate 1–2) | Gate 1 drafts in [`docs/architecture/proposals/`](../architecture/proposals/). **No code.** Owner Gate 2 next. |
-| 2–5 | Runtime foundations → capability → Goose hardening → full-system verification | **Blocked** until Gates 2–3 per stream. |
+| 1 | Architecture closure (Gate 1–2) | Gate 2 decisions recorded 2026-08-14 — see [`WAVE_1_GATE_2_DECISIONS.md`](../architecture/proposals/WAVE_1_GATE_2_DECISIONS.md). A/B/C/E(read-only) ACCEPT; D/E(vectors) DEFER WITH CONDITION; F ACCEPT. **CLOSED only after merge to `main`.** **Still no code** — Gate 3 Section 9 plans are next, per stream. |
+| 2–5 | Runtime foundations → capability → Goose hardening → full-system verification | Gate 3 Section 9 plans unblocked for A, B, C, and E's read-only slice **once Wave 1 lands on `main`**. D stays at Stage 1 measurement. F stays parked until Wave 4. |
 | 6 | Cross-OS (Stream G) | **Not opened.** Only remaining strategic gate. |
 
 Streams A–F (explainability, autonomy, model strategy, EventBus, knowledge, Goose) move through: Integration Proposal → ADR Decision → Section 9 → Implementation → Verification → Close-out. “Gated” means a checkpoint, not indefinite parking.

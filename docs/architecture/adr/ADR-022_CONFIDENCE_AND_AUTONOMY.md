@@ -1,6 +1,7 @@
 # ADR-022: Confidence & Autonomy
 
 **Status:** Accepted — Composite confidence (Evidence / Verification / Policy / Execution)  
+**Gate 2 (Stream B remainder):** CLOSED 2026-08-14 — ACCEPT escalate-only bands. See §11.  
 **Date:** 2026-08-05  
 **Deciders:** Multi-council Architecture Decision Framework  
 **Related:** ADR-004, ADR-018, ADR-021, PermissionService, SecurityTier  
@@ -137,8 +138,38 @@ Guardian **rejects A as primary**; composite may include optional debug signals 
 
 ---
 
+## 11. Gate 2 Addendum — Wave 1 Closure (2026-08-14)
+
+**Proposal:** [`IP_B_AUTONOMY.md`](../proposals/IP_B_AUTONOMY.md)  
+**Decision:** **ACCEPT** — escalate-only model, bands below. Low score never independently blocks execution.
+
+### Bands
+
+| Composite `AutonomyScore` | Band | Behavior |
+|---|------|----------|
+| `< 0.4` | HIGH risk | Escalate — **requires owner approval** before proceeding |
+| `0.4 <= score < 0.7` | MEDIUM | **Constrained execution**: proceed only with an extra validation/verification step; still subject to all SecurityTier/policy gates |
+| `>= 0.7` | LOW | Auto-execute, within existing sandbox/tier limits — this is a permit to proceed at normal policy strictness, not a bypass of it |
+
+The existing code default `threshold=0.6` (`domain/autonomy_score.py`) falls inside MEDIUM under these bands; the Gate 3 Section 9 plan updates the constant/config to reflect the three-band structure rather than a single cutoff.
+
+### Blocking vs. escalation
+
+**A score below the HIGH-risk floor does not itself deny execution.** It routes the step to `require_approval` / HITL, exactly like any other policy-driven escalation. Denial, if it happens, still comes from the existing approval-timeout-deny path (§2 "BrainRuntime approval") or from `ExecutionAuthority`/`SecurityTier` refusing the action outright — never from `AutonomyScore` acting as an independent second gate. This preserves §9 Council Decision point 1 ("policy gates... remain hard constraints — not overridden by high confidence") symmetrically: a *low* score also does not create a new authority to override or duplicate ExecutionAuthority. See cross-stream conflict rule in `STRATEGIC_GAP_MATRIX.md`: "Autonomy never bypasses ExecutionAuthority."
+
+### Unconditional
+
+- `WRITE_DESTROY` remains always-HITL regardless of band, per §9 point 4 — the bands above never override this.
+- Policy override rules, timeout/denial mapping, and audit-trail shape are Gate 3 (Section 9 plan) concerns, not reopened here.
+- Ordinary-path scoring (computing a score on non-escalating steps too, for Stream A's Decision Records) is in scope for M2, consistent with §10.
+
+**Next step:** Gate 3 Section 9 implementation plan for Stream B before any code lands. Do not hand-implement these bands ahead of that plan.
+
+---
+
 ## References
 
 - `docs/architecture/adr/ADR-004_RUNTIME_APPROVAL_MODEL.md`
 - `docs/architecture/RUNTIME_SAFETY.md`
 - `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md`
+- `docs/architecture/proposals/IP_B_AUTONOMY.md`

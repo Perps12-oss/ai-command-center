@@ -1,6 +1,7 @@
 # ADR-023: Model Strategy
 
 **Status:** Accepted — Brain independent (quality tiers as settings, not architecture)  
+**Gate 2 (Stream C remainder):** CLOSED 2026-08-14 — ACCEPT sequential M2→M3→M4. See §11.  
 **Date:** 2026-08-05  
 **Deciders:** Multi-council Architecture Decision Framework  
 **Related:** Inv 13, ADR-007 Provider Registry, ModelRouterService, ARI  
@@ -140,6 +141,24 @@ Guardian **requires Accept B**; settings-backed quality maps are fine.
 
 ---
 
+## 11. Gate 2 Addendum — Wave 1 Closure (2026-08-14)
+
+**Proposal:** [`IP_C_MODEL_STRATEGY.md`](../proposals/IP_C_MODEL_STRATEGY.md)  
+**Decision:** **ACCEPT** — M2, M3, M4 proceed **sequentially and in full**, as already scoped in §10. No milestone deferred.
+
+1. M2: settings-backed `model_tier_map` may differ per tier without Brain branching on vendor names; context-budget-over-limit may influence a **tier hint** only, never control flow.
+2. M3: replan/destroy paths verified to work fully local-only (HITL substitutes for cloud, never a hard requirement).
+3. M4: telemetry records selected model/provider/reason; telemetry **never** gates authority on cloud availability.
+4. Each milestone ships with its own tests per §10's "Tests" row before the next milestone starts — sequential means gated, not "all at once."
+
+### Explicitly out of scope for this Gate 2
+
+Capability-registry extras — capability metadata schema, health/cost/latency as settings-backed routing policy, and router-vs-orchestrator ownership of fallback — are **not** accepted or rejected here. IP-C itself flags these as possibly requiring their own ADR "if they change architecture." They are deferred to a separate future Integration Proposal once M2–M4 are live and there is a concrete routing need to design against, rather than speculatively. If that proposal is written, the next available ADR number applies at that time (see `docs/architecture/adr/README.md` "Next free number").
+
+**Next step:** Gate 3 Section 9 implementation plan for Stream C (M2 first) before any code lands.
+
+---
+
 ## References
 
 - `docs/architecture/MODEL_ORCHESTRATION.md`
@@ -147,3 +166,4 @@ Guardian **requires Accept B**; settings-backed quality maps are fine.
 - `docs/architecture/adr/ADR-007_PROVIDER_REGISTRY.md`
 - `PROJECT_CONSTITUTION_V4.md` Invariant 13
 - `docs/governance/ARCHITECTURE_DECISION_FRAMEWORK.md`
+- `docs/architecture/proposals/IP_C_MODEL_STRATEGY.md`

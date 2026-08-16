@@ -1,6 +1,6 @@
 # IP-C — Model Strategy (ADR-023 remainder)
 
-**Status:** GATE 1 DRAFT — awaiting owner Gate 2  
+**Status:** GATE 2 CLOSED 2026-08-14 — ACCEPT sequential M2→M3→M4; capability-registry extras deferred (own future proposal). Decision: [`ADR-023` §11](../adr/ADR-023_MODEL_STRATEGY.md#11-gate-2-addendum--wave-1-closure-2026-08-14).  
 **Stream:** C  
 **Parent ADR:** [ADR-023](../adr/ADR-023_MODEL_STRATEGY.md) **Accepted** (brain-independent; tiers as settings).  
 **Baseline:** [STRATEGIC_GAP_MATRIX.md](../../audits/STRATEGIC_GAP_MATRIX.md) Stream C

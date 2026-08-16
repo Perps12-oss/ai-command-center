@@ -1,6 +1,6 @@
 # IP-F — Goose pattern adoption (selective)
 
-**Status:** GATE 1 DRAFT — awaiting owner Gate 2  
+**Status:** GATE 2 CLOSED 2026-08-14 — ACCEPT Adopt/Adapt/Reject table as drafted. Decision: [`ADR-025`](../adr/ADR-025_GOOSE_PATTERN_ADOPTION.md).  
 **Stream:** F  
 **Parent ADR:** none. Research only until Gate 2.  
 **Research:** [`legacy_goose_expedition_report.md`](../../../research/repositories/exp-001-goose/notes/legacy_goose_expedition_report.md)  

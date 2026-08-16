@@ -1,6 +1,6 @@
 # IP-B — Autonomy (ADR-022 remainder)
 
-**Status:** GATE 1 DRAFT — awaiting owner Gate 2  
+**Status:** GATE 2 CLOSED 2026-08-14 — ACCEPT escalate-only bands. Decision: [`ADR-022` §11](../adr/ADR-022_CONFIDENCE_AND_AUTONOMY.md#11-gate-2-addendum--wave-1-closure-2026-08-14).  
 **Stream:** B  
 **Parent ADR:** [ADR-022](../adr/ADR-022_CONFIDENCE_AND_AUTONOMY.md) **Accepted** (composite confidence, not logprobs).  
 **Baseline:** [STRATEGIC_GAP_MATRIX.md](../../audits/STRATEGIC_GAP_MATRIX.md) Stream B
