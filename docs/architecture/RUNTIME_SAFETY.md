@@ -125,3 +125,6 @@ Observers, planners, capabilities, and UI never mutate the World Model directly.
 - Planner output cannot call `worldModel.apply()`.
 - Runtime emits `ActionResult` with the same `CorrelationContext` received from the goal.
 - Failed World Model apply creates a failed action result and does not pretend success.
+
+Autonomy confidence uses ADR-022 §11 bands (`<0.4` HIGH HITL, `0.4–0.7` MEDIUM extra verification, `>=0.7` LOW). A low score does not independently deny execution.
+

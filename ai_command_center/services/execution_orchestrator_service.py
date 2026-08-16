@@ -96,6 +96,42 @@ def _is_agent_capability(capability: str) -> bool:
     return capability.strip().lower().startswith("agent.")
 
 
+def _autonomy_components(
+    run: dict[str, Any],
+    step: PlanStep,
+    *,
+    success: bool | None,
+    hard_policy_block: bool,
+) -> tuple[float, float, float, float]:
+    """Derive the four ADR-022 component scores from live run signals."""
+    truth = run.get("truth_valid")
+    if truth is False:
+        policy = 0.2
+    elif hard_policy_block:
+        policy = 0.35
+    else:
+        policy = 0.85
+    obs = list(run.get("observations") or [])
+    if not obs:
+        evidence = 0.55
+    else:
+        last = obs[-1] if isinstance(obs[-1], dict) else {}
+        evidence = 0.8 if last.get("success") else 0.35
+    if truth is True:
+        verification = 0.9
+    elif truth is False:
+        verification = 0.25
+    else:
+        verification = 0.6
+    if success is True:
+        execution = 0.9
+    elif success is False:
+        execution = 0.25
+    else:
+        execution = 0.65
+    return policy, evidence, verification, execution
+
+
 def _human_approval_fields(tool_name: str) -> dict[str, Any]:
     """Stamp human_approved only after the orchestrator HITL gate has cleared."""
     if tool_requires_human_approval(tool_name):
@@ -428,40 +464,21 @@ class ExecutionOrchestratorService(BaseService):
         # names are aliased (e.g. "create_note" -> "notes.create"), so rejecting
         # on the capability label here would deny legitimate work while adding
         # no security: nothing executes without passing the executor's gate.
-        if step_requires_human_approval(step, run=run):
-            run["paused"] = True
-            confirmation_id = f"{run_id}:{step.step_id}"
-            self._publish_decision_and_autonomy(
-                run_id=run_id,
-                step=step,
-                summary="awaiting approval",
-                hard_policy_block=True,
-                policy={**_step_policy(step), "require_approval": True},
-            )
-            self._bus.publish(
-                EXECUTION_STEP_AWAITING_APPROVAL,
-                {
-                    "run_id": run_id,
-                    "step_id": step.step_id,
-                    "capability": step.capability,
-                    "require_approval": True,
-                    "confirmation_id": confirmation_id,
-                },
-                source=self.name,
-            )
-            # ADR-009 alignment (ADR-018 narrowed): intention confirmation, not tool_call_id
-            self._bus.publish(
-                TOOL_CONFIRMATION_REQUIRED,
-                {
-                    "confirmation_id": confirmation_id,
-                    "run_id": run_id,
-                    "step_id": step.step_id,
-                    "capability": step.capability,
-                    "args": dict(step.args),
-                    "summary": f"Approve capability {step.capability}",
-                    "kind": "intention",
-                },
-                source=self.name,
+        policy_hitl = step_requires_human_approval(step, run=run)
+        pc, ec, vc, xc = _autonomy_components(
+            run, step, success=None, hard_policy_block=policy_hitl
+        )
+        preview = AutonomyScore.compute(
+            policy_confidence=pc,
+            evidence_confidence=ec,
+            verification_confidence=vc,
+            execution_confidence=xc,
+            hard_policy_block=policy_hitl,
+        )
+        run["_pending_band"] = preview.band
+        if policy_hitl or preview.band == "high":
+            self._pause_for_approval(
+                run_id, step, hard_policy_block=policy_hitl or preview.band == "high"
             )
             return
 
@@ -720,8 +737,23 @@ class ExecutionOrchestratorService(BaseService):
         evidence: dict[str, Any] | None = None,
         receipt: dict[str, Any] | None = None,
         verification: dict[str, Any] | None = None,
+        success: bool | None = None,
     ) -> None:
         run = self._runs.get(run_id) or {}
+        pc, ec, vc, xc = _autonomy_components(
+            run, step, success=success, hard_policy_block=hard_policy_block
+        )
+        score = AutonomyScore.compute(
+            policy_confidence=pc,
+            evidence_confidence=ec,
+            verification_confidence=vc,
+            execution_confidence=xc,
+            hard_policy_block=hard_policy_block,
+            reason=summary,
+        )
+        policy_payload = dict(policy)
+        policy_payload["autonomy_band"] = score.band
+        policy_payload["autonomy_aggregate"] = score.aggregate
         record = DecisionRecord(
             record_id=uuid.uuid4().hex,
             run_id=run_id,
@@ -730,23 +762,57 @@ class ExecutionOrchestratorService(BaseService):
             evidence=grounded_mapping(
                 evidence if evidence is not None else {"observations": list(run.get("observations") or [])}
             ),
-            policy=grounded_mapping(policy),
+            policy=grounded_mapping(policy_payload),
             receipt=grounded_mapping(receipt),
             verification=grounded_mapping(verification),
             summary=summary or MISSING_MARKER,
         )
         self._bus.publish(DECISION_RECORD_UPDATED, record.to_dict(), source=self.name)
-        score = AutonomyScore.compute(
-            policy_confidence=0.2 if hard_policy_block else 0.9,
-            evidence_confidence=0.7 if run.get("observations") else 0.4,
-            verification_confidence=0.5,
-            execution_confidence=0.5,
-            hard_policy_block=hard_policy_block,
-            reason=summary,
-        )
         self._bus.publish(
             AUTONOMY_SCORE_UPDATED,
-            {**score.to_dict(), "run_id": run_id, "step_id": step.step_id},
+            {
+                **score.to_dict(),
+                "run_id": run_id,
+                "step_id": step.step_id,
+                "band": score.band,
+            },
+            source=self.name,
+        )
+
+    def _pause_for_approval(self, run_id: str, step: PlanStep, *, hard_policy_block: bool) -> None:
+        run = self._runs[run_id]
+        run["paused"] = True
+        confirmation_id = f"{run_id}:{step.step_id}"
+        self._publish_decision_and_autonomy(
+            run_id=run_id,
+            step=step,
+            summary="awaiting approval",
+            hard_policy_block=hard_policy_block,
+            policy={**_step_policy(step), "require_approval": True},
+            success=None,
+        )
+        self._bus.publish(
+            EXECUTION_STEP_AWAITING_APPROVAL,
+            {
+                "run_id": run_id,
+                "step_id": step.step_id,
+                "capability": step.capability,
+                "require_approval": True,
+                "confirmation_id": confirmation_id,
+            },
+            source=self.name,
+        )
+        self._bus.publish(
+            TOOL_CONFIRMATION_REQUIRED,
+            {
+                "confirmation_id": confirmation_id,
+                "run_id": run_id,
+                "step_id": step.step_id,
+                "capability": step.capability,
+                "args": dict(step.args),
+                "summary": f"Approve capability {step.capability}",
+                "kind": "intention",
+            },
             source=self.name,
         )
 
@@ -906,6 +972,7 @@ class ExecutionOrchestratorService(BaseService):
             step_record["facts"] = dict(facts)
         outputs.append(step_record)
         run["step_outputs"] = outputs
+        extra = str(run.get("_pending_band") or "") == "medium"
         self._publish_decision_and_autonomy(
             run_id=run_id,
             step=step,
@@ -918,7 +985,9 @@ class ExecutionOrchestratorService(BaseService):
                 success=True,
                 output=output,
                 facts=facts,
+                extra=extra,
             ),
+            success=True,
         )
         self._bus.publish(
             EXECUTION_STEP_COMPLETED,
@@ -969,6 +1038,7 @@ class ExecutionOrchestratorService(BaseService):
             evidence={"observations": list(run.get("observations") or [])},
             receipt=fail_receipt,
             verification=_step_verification(success=False, output="", facts=None),
+            success=False,
         )
         self._bus.publish(
             EXECUTION_STEP_FAILED,
