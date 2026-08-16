@@ -6,6 +6,7 @@ from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.domain.decision_record import reasoning_copy
 from ai_command_center.ui.components.glass_card import GlassCard
 from ai_command_center.ui.design_system import theme_v2 as T
 from ai_command_center.ui.mission_control.modes import MissionMode, derive_mission_mode, mode_label
@@ -98,6 +99,7 @@ class BrainSituationPanel(GlassCard):
         }[mode]
         if plan and getattr(plan, "goal", ""):
             reasoning = f"{reasoning} · {getattr(plan, 'goal', '')}"[:72]
+        reasoning = reasoning_copy(getattr(snap, "decision_record", None) or None, fallback=reasoning)
 
         confidences: list[float] = []
         for o in observations:
@@ -111,6 +113,12 @@ class BrainSituationPanel(GlassCard):
             conf_pct = f"{int(confidence * 100)}%"
         else:
             conf_pct = "—"
+        autonomy = getattr(snap, "autonomy_score", None) or {}
+        if isinstance(autonomy, dict) and autonomy.get("aggregate") is not None:
+            try:
+                conf_pct = f"{int(float(autonomy['aggregate']) * 100)}%"
+            except (TypeError, ValueError):
+                pass
 
         memory_count = len(observations)
         # Prefer notes/memory snapshot counts when present

@@ -15,11 +15,12 @@ from typing import Any
 from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION, build_workspace_context
 from ai_command_center.core.control_plane import (
     DEFAULT_AUTOMATION_ACTOR,
+    effective_tool_for_step,
     resolve_run_context,
     resolve_tool_invoke_actor,
     step_requires_human_approval,
 )
-from ai_command_center.core.security_policy import tool_requires_human_approval
+from ai_command_center.core.security_policy import resolve_tool_tier, tool_requires_human_approval
 from ai_command_center.core.event_bus import Event
 from ai_command_center.core.events.topics import (
     AUTONOMY_SCORE_UPDATED,
@@ -55,7 +56,7 @@ from ai_command_center.core.intention_validation import validate_intention
 from ai_command_center.core.plan_similarity import is_stuck, serialize_plan
 from ai_command_center.domain.autonomy_score import AutonomyScore
 from ai_command_center.domain.correlation import CorrelationContext
-from ai_command_center.domain.decision_record import DecisionRecord
+from ai_command_center.domain.decision_record import DecisionRecord, MISSING_MARKER, grounded_mapping
 from ai_command_center.domain.execution_observation import ExecutionObservation
 from ai_command_center.domain.intention import Intention
 from ai_command_center.domain.planner_plan import ExecutionPlan, PlanStep
@@ -100,6 +101,50 @@ def _human_approval_fields(tool_name: str) -> dict[str, Any]:
     if tool_requires_human_approval(tool_name):
         return {"human_approved": True}
     return {}
+
+
+def _step_policy(step: PlanStep) -> dict[str, Any]:
+    tool = effective_tool_for_step(step)
+    tier = resolve_tool_tier(tool) if tool else None
+    return {
+        "require_approval": bool(step.require_approval) or (
+            bool(tool) and tool_requires_human_approval(tool)
+        ),
+        "security_tier": tier.value if tier is not None else MISSING_MARKER,
+        "tool": tool or MISSING_MARKER,
+    }
+
+
+def _step_verification(
+    *,
+    success: bool,
+    output: str = "",
+    facts: dict[str, Any] | None = None,
+    extra: bool = False,
+) -> dict[str, Any]:
+    """Join TruthBoundary-equivalent grounding into the Decision Record (ADR-021 M4)."""
+    if not success:
+        return {
+            "valid": False,
+            "detail": "step failed",
+            "source": "truth_boundary_equivalent",
+        }
+    grounded = bool(str(output).strip()) or bool(facts)
+    if not grounded:
+        detail = "ungrounded success" if extra else "no output or facts"
+        payload: dict[str, Any] = {
+            "valid": False,
+            "detail": detail,
+            "source": "truth_boundary_equivalent",
+        }
+        if not extra:
+            payload["status"] = MISSING_MARKER
+        return payload
+    return {
+        "valid": True,
+        "detail": "step output grounded",
+        "source": "truth_boundary_equivalent",
+    }
 
 
 class ExecutionOrchestratorService(BaseService):
@@ -391,7 +436,7 @@ class ExecutionOrchestratorService(BaseService):
                 step=step,
                 summary="awaiting approval",
                 hard_policy_block=True,
-                policy={"require_approval": True, "security_tier": "gated"},
+                policy={**_step_policy(step), "require_approval": True},
             )
             self._bus.publish(
                 EXECUTION_STEP_AWAITING_APPROVAL,
@@ -682,11 +727,13 @@ class ExecutionOrchestratorService(BaseService):
             run_id=run_id,
             step_id=step.step_id,
             capability=step.capability,
-            evidence=dict(evidence or {"observations": list(run.get("observations") or [])}),
-            policy=dict(policy),
-            receipt=dict(receipt or {}),
-            verification=dict(verification or {}),
-            summary=summary,
+            evidence=grounded_mapping(
+                evidence if evidence is not None else {"observations": list(run.get("observations") or [])}
+            ),
+            policy=grounded_mapping(policy),
+            receipt=grounded_mapping(receipt),
+            verification=grounded_mapping(verification),
+            summary=summary or MISSING_MARKER,
         )
         self._bus.publish(DECISION_RECORD_UPDATED, record.to_dict(), source=self.name)
         score = AutonomyScore.compute(
@@ -859,6 +906,20 @@ class ExecutionOrchestratorService(BaseService):
             step_record["facts"] = dict(facts)
         outputs.append(step_record)
         run["step_outputs"] = outputs
+        self._publish_decision_and_autonomy(
+            run_id=run_id,
+            step=step,
+            summary=f"step completed: {step.capability}",
+            hard_policy_block=False,
+            policy=_step_policy(step),
+            evidence={"observations": list(run.get("observations") or [])},
+            receipt=dict(step_record),
+            verification=_step_verification(
+                success=True,
+                output=output,
+                facts=facts,
+            ),
+        )
         self._bus.publish(
             EXECUTION_STEP_COMPLETED,
             {
@@ -892,6 +953,23 @@ class ExecutionOrchestratorService(BaseService):
             }
         )
         run["step_outputs"] = outputs
+        fail_receipt = {
+            "step_id": step.step_id,
+            "capability": step.capability,
+            "output": "",
+            "success": False,
+            "error": error,
+        }
+        self._publish_decision_and_autonomy(
+            run_id=run_id,
+            step=step,
+            summary=f"step failed: {step.capability}",
+            hard_policy_block=False,
+            policy=_step_policy(step),
+            evidence={"observations": list(run.get("observations") or [])},
+            receipt=fail_receipt,
+            verification=_step_verification(success=False, output="", facts=None),
+        )
         self._bus.publish(
             EXECUTION_STEP_FAILED,
             {

@@ -14,6 +14,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.core.app_state import AppState
+from ai_command_center.domain.decision_record import should_mount_decision_card
 from ai_command_center.domain.permission_check_snapshot import (
     PendingCheck,
     PermissionCheckSnapshot,
@@ -243,7 +244,7 @@ class ApprovalsView(ctk.CTkFrame):
             self._hero_action.configure(state="normal")
             if not self._focused_check_id:
                 self._focused_check_id = permission.pending.check_id
-            self._mount_decision_card(permission.pending)
+            self._mount_decision_card(permission.pending, snapshot)
         else:
             self._hero_hint.configure(
                 text=(
@@ -265,9 +266,11 @@ class ApprovalsView(ctk.CTkFrame):
         self._history.apply_snapshot(permission)
         self._stats.apply_snapshot(permission)
 
-    def _mount_decision_card(self, pending: PendingCheck) -> None:
-        """Wire DecisionCard for intention confirmations (ADR-021)."""
-        if pending.actor_type != "intention":
+    def _mount_decision_card(self, pending: PendingCheck, snapshot: AppState) -> None:
+        """Wire DecisionCard for intention confirmations (ADR-021 M5)."""
+        if not should_mount_decision_card(
+            actor_type=pending.actor_type, pending=True
+        ):
             self._clear_decision_card()
             return
         if (
@@ -276,12 +279,17 @@ class ApprovalsView(ctk.CTkFrame):
         ):
             return
         self._clear_decision_card()
+        record = dict(getattr(snapshot, "decision_record", None) or {})
         self._decision_card = DecisionCard(
             self._decision_host,
             decision_id=pending.check_id,
-            summary=pending.summary or pending.check_id,
+            summary=str(record.get("summary") or pending.summary or pending.check_id),
             on_approve=lambda _did: self._decide(pending, True),
             on_reject=lambda _did: self._decide(pending, False),
+            evidence=record.get("evidence"),
+            policy=record.get("policy"),
+            receipt=record.get("receipt"),
+            verification=record.get("verification"),
         )
         self._decision_card.pack(fill="x", pady=(0, 4))
 

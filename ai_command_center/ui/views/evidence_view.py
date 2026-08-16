@@ -225,6 +225,13 @@ class EvidenceView(ctk.CTkFrame):
             self._hint.configure(
                 text=f"Selected: {self._selected_request_id or claims[0].request_id or 'first claim'}"
             )
+        record = getattr(snapshot, "decision_record", None) or {}
+        if isinstance(record, dict) and record.get("summary"):
+            from ai_command_center.domain.decision_record import reasoning_copy
+
+            self._hint.configure(
+                text=reasoning_copy(record, fallback=self._hint.cget("text"))
+            )
 
         if not self._selected_request_id and claims:
             self._selected_request_id = str(getattr(claims[0], "request_id", "") or "")
