@@ -11,6 +11,7 @@ from ai_command_center.core.events.topics import (
     CHAT_COMPLETE,
     CHAT_ERROR,
     CHAT_STARTED,
+    DECISION_RECORD_UPDATED,
     EXECUTION_EVENT_APPENDED,
     EXECUTION_EVENTS_LOADED,
     ORCHESTRATION_RUN_SNAPSHOT,
@@ -33,6 +34,7 @@ _CAPTURED_TOPICS: tuple[str, ...] = (
     TOOL_COMPLETED,
     TOOL_FAILED,
     TOOL_RESULT,
+    DECISION_RECORD_UPDATED,
 )
 
 
@@ -83,6 +85,9 @@ class ExecutionEventService(BaseService):
         invoke_id = str(payload.get("invoke_id", "")).strip()
         if invoke_id:
             return invoke_id
+        run_id = str(payload.get("run_id", "")).strip()
+        if run_id:
+            return run_id
         return ""
 
     @staticmethod

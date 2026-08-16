@@ -14,6 +14,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ai_command_center.domain.decision import Decision
+from ai_command_center.domain.decision_record import format_missing_visible
 from ai_command_center.domain.inspectable import InspectableRef
 from ai_command_center.ui.components.inspector.inspect_gestures import bind_inspect_gestures
 from ai_command_center.ui.design_system import theme_v2 as T
@@ -39,6 +40,10 @@ class DecisionCard(ctk.CTkFrame):
         on_reject: Callable[[str], None] | None = None,
         on_inspect_select: Callable[[InspectableRef], None] | None = None,
         on_inspect_navigate: Callable[[InspectableRef], None] | None = None,
+        evidence: Any = None,
+        policy: Any = None,
+        receipt: Any = None,
+        verification: Any = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(
@@ -78,6 +83,24 @@ class DecisionCard(ctk.CTkFrame):
             anchor="w",
         )
         summary_lbl.pack(fill="x", padx=12, pady=(0, 8))
+
+        for label, value in (
+            ("Evidence", evidence),
+            ("Policy", policy),
+            ("Receipt", receipt),
+            ("Verification", verification),
+        ):
+            if value is None:
+                continue
+            ctk.CTkLabel(
+                self,
+                text=f"{label}: {format_missing_visible(value)[:160]}",
+                font=T.FONT_SMALL,
+                text_color=T.TEXT_SECONDARY,
+                wraplength=400,
+                justify="left",
+                anchor="w",
+            ).pack(fill="x", padx=12, pady=(0, 2))
 
         # Buttons
         btn_row = ctk.CTkFrame(self, fg_color="transparent")

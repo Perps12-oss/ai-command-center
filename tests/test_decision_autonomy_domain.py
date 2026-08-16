@@ -50,3 +50,40 @@ def test_decision_record_roundtrip() -> None:
     back = DecisionRecord.from_dict(data)
     assert back.record_id == "r1"
     assert back.policy["require_approval"] is True
+
+
+def test_decision_record_missing_marker_never_empty_dict() -> None:
+    from ai_command_center.domain.decision_record import MISSING_MARKER, is_missing
+
+    record = DecisionRecord(record_id="r2", summary="ok")
+    data = record.to_dict()
+    assert data["receipt"] == {"status": MISSING_MARKER}
+    assert data["verification"] == {"status": MISSING_MARKER}
+    assert "receipt" in data and "evidence" in data
+    assert is_missing(data["receipt"])
+    assert data["receipt"] != {}
+
+
+def test_decision_record_card_only_when_pending_intention() -> None:
+    from ai_command_center.domain.decision_record import should_mount_decision_card
+
+    assert should_mount_decision_card(actor_type="intention", pending=True)
+    assert not should_mount_decision_card(actor_type="intention", pending=False)
+    assert not should_mount_decision_card(actor_type="tool", pending=True)
+
+
+def test_decision_record_reasoning_shows_missing_not_blank_success() -> None:
+    from ai_command_center.domain.decision_record import MISSING_MARKER, reasoning_copy
+
+    text = reasoning_copy(
+        {
+            "summary": "step completed: notes.search",
+            "evidence": {"observations": []},
+            "policy": {"require_approval": False},
+            "receipt": {"status": MISSING_MARKER},
+            "verification": {"status": MISSING_MARKER},
+        },
+        fallback="mode prose",
+    )
+    assert "missing" in text
+    assert "blank" not in text
