@@ -26,7 +26,7 @@ from ai_command_center.core.events.topics import (
 )
 from ai_command_center.core.world_model.federation.federated_world_model import FederatedWorldModel
 from ai_command_center.core.world_model.federation.workspace_registry import WorkspaceRegistry
-from ai_command_center.domain.federation import WorkspaceDescriptor
+from ai_command_center.domain.federation import FederationQueryResult, WorkspaceDescriptor
 from ai_command_center.services.base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,11 @@ class FederationService(BaseService):
             logger.error("Federation query failed: %s", exc)
             self._bus.publish(
                 FEDERATION_QUERY_RESULT,
-                {"request_id": request_id, "result": None, "error": str(exc)},
+                {
+                    "request_id": request_id,
+                    "result": FederationQueryResult(query=query).to_payload(),
+                    "error": str(exc),
+                },
                 source=self.name,
             )
 

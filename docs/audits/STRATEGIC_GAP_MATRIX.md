@@ -85,12 +85,12 @@ For every stream: **Spec → ADR → implementation → tests → runtime eviden
 | Field | Answer |
 |-------|--------|
 | **Documented requirement** | ADR-020: World Model + MemoryGraph are canonical; summaries/indexes are derived. Historical Phase 8b treated vectors as product; that **unified SoT/vectors program is abandoned**. UCGS `scope_embeddings` S5 forbids embedding/vector DB strings without phase enablement ([`ucgs.profiles/ai-command-center.yaml`](../../ucgs.profiles/ai-command-center.yaml)). |
-| **Current implementation** | WM + MemoryGraph + conversation repo live. `FederationService` + `FederatedWorldModel` + `WorkspaceRegistry` **exist** ([`federation_service.py`](../../ai_command_center/services/federation_service.py)); **not** constructed in [`service_factory.py`](../../ai_command_center/core/service_factory.py). Tests in `tests/test_federation.py` build the service directly. Entity `embedding_vector` BLOB column exists; ContextManager forbids embeddings. `FEATURE_VECTOR_SEARCH` feature flag exists. No vector_store / vector_search_service on main. |
+| **Current implementation** | WM + MemoryGraph + conversation repo live. `FederationService` is **wired** in [`service_factory.py`](../../ai_command_center/core/service_factory.py) as a read-only query view (`federation.query.request` → `federation.query.result`) with provenance pointers. Vectors remain out of scope (UCGS `scope_embeddings` S5). Entity `embedding_vector` BLOB column exists but is not read or written by federation. `FEATURE_VECTOR_SEARCH` remains a flag only. |
 | **Architectural conflict** | “Vector DB contains it, therefore ACC knows it” vs ADR-020 SoT. Entity embedding column is a latent dual-SoT risk. Federation type-not-in-factory is Exists ≠ Wired. |
 | **Missing decision (Gate 2)** | Knowledge/Memory SoT layering (Authoritative State → Projection → Index → Search → Context Assembly). Whether to live-wire read-only FederationService. Whether vector index is allowed as **derived** retrieval (requires ADR-024+ and UCGS profile change). Freshness/invalidation/provenance. |
 | **Dependencies** | ADR-020, ADR-015, Inv 11, ContextManager, UCGS, Stream C (embeddings as capability not authority). |
 | **Implementation surface** | SoT ADR first; then federation interface, indexing pipeline, embedding **abstraction**, retrieval, invalidation, provenance — **not** Chromadb/Pinecone as SoT. |
-| **Verification surface** | Federation unit tests (unwired). Need: stale/deleted/changed source, duplicates, provenance, rebuild, authoritative consistency. |
+| **Verification surface** | `tests/test_federation.py` including `federation_m1` cases: stale/deleted source, duplicates, provenance, rebuild-from-registry, factory READY, read-only query. |
 | **Estimated effort** | Medium–Large |
 | **Trace** | Spec ADR-020 + abandoned Phase 8b → WM/Memory live, federation unwired, vectors gated → tests without factory → no SoT-for-index ADR. |
 

@@ -22,6 +22,7 @@ from ai_command_center.domain.federation import (
     FederationQueryResult,
     FederationSyncRecord,
     WorkspaceDescriptor,
+    provenance_pointer,
 )
 from ai_command_center.domain.world_model import Node
 from ai_command_center.repositories.world_model_repository import (
@@ -44,8 +45,16 @@ class FederatedWorldModel:
         result = federation.query_nodes(query="goal", limit=50)
     """
 
-    def __init__(self, primary_repo: IWorldModelRepository) -> None:
+    def __init__(
+        self,
+        primary_repo: IWorldModelRepository,
+        *,
+        memory_repo: Any | None = None,
+        conversation_repo: Any | None = None,
+    ) -> None:
         self._primary = primary_repo
+        self._memory_repo = memory_repo
+        self._conversation_repo = conversation_repo
         self._workspaces: dict[str, tuple[WorkspaceDescriptor, IWorldModelRepository]] = {}
         self._sync_records: dict[str, FederationSyncRecord] = {}
 
@@ -101,14 +110,21 @@ class FederatedWorldModel:
                     self._primary, query=query, node_type=node_type, limit=limit
                 )
                 for node in primary_nodes:
-                    results.append(FederatedNode(
-                        node_id=node.id,
-                        node_type=node.type,
-                        label=_node_label(node),
-                        workspace_id="primary",
-                        workspace_name="Primary",
-                        attributes=dict(node.attributes),
-                    ))
+                    results.append(
+                        FederatedNode(
+                            node_id=node.id,
+                            node_type=node.type,
+                            label=_node_label(node),
+                            workspace_id="primary",
+                            workspace_name="Primary",
+                            attributes=dict(node.attributes),
+                            provenance=provenance_pointer(
+                                kind="world_model_node",
+                                source_id=node.id,
+                                workspace_id="primary",
+                            ),
+                        )
+                    )
                 workspace_count += 1
             except Exception as exc:
                 errors.append(f"primary: {exc}")
@@ -122,14 +138,21 @@ class FederatedWorldModel:
                 )
                 record = self._sync_records.get(ws_id)
                 for node in remote_nodes:
-                    results.append(FederatedNode(
-                        node_id=node.id,
-                        node_type=node.type,
-                        label=_node_label(node),
-                        workspace_id=ws_id,
-                        workspace_name=descriptor.name,
-                        attributes=dict(node.attributes),
-                    ))
+                    results.append(
+                        FederatedNode(
+                            node_id=node.id,
+                            node_type=node.type,
+                            label=_node_label(node),
+                            workspace_id=ws_id,
+                            workspace_name=descriptor.name,
+                            attributes=dict(node.attributes),
+                            provenance=provenance_pointer(
+                                kind="world_model_node",
+                                source_id=node.id,
+                                workspace_id=ws_id,
+                            ),
+                        )
+                    )
                 if record:
                     record.mark_synced(len(remote_nodes), 0)
                 workspace_count += 1
@@ -139,6 +162,12 @@ class FederatedWorldModel:
                 if record:
                     record.mark_unreachable(str(exc))
 
+        if include_primary:
+            results.extend(self._query_memory_nodes(query=query, limit=limit, errors=errors))
+            results.extend(
+                self._query_conversation_nodes(query=query, limit=limit, errors=errors)
+            )
+
         duration_ms = (time.monotonic() - t0) * 1000
         return FederationQueryResult(
             query=query,
@@ -147,6 +176,96 @@ class FederatedWorldModel:
             duration_ms=duration_ms,
             errors=tuple(errors),
         )
+
+    def _query_memory_nodes(
+        self,
+        *,
+        query: str,
+        limit: int,
+        errors: list[str],
+    ) -> list[FederatedNode]:
+        repo = self._memory_repo
+        if repo is None or not hasattr(repo, "search"):
+            return []
+        try:
+            hits = repo.search(query, limit=limit, global_search=True)
+        except Exception as exc:
+            errors.append(f"memory: {exc}")
+            return []
+        nodes: list[FederatedNode] = []
+        for item in hits:
+            source_id = str(getattr(item, "id", "") or "")
+            if not source_id:
+                continue
+            label = str(getattr(item, "label", "") or source_id)
+            nodes.append(
+                FederatedNode(
+                    node_id=source_id,
+                    node_type="memory_item",
+                    label=label,
+                    workspace_id="primary",
+                    workspace_name="Primary",
+                    attributes={
+                        "kind": str(getattr(item, "kind", "") or ""),
+                        "content": str(getattr(item, "content", "") or ""),
+                    },
+                    provenance=provenance_pointer(
+                        kind="memory_item",
+                        source_id=source_id,
+                        workspace_id="primary",
+                    ),
+                )
+            )
+        return nodes
+
+    def _query_conversation_nodes(
+        self,
+        *,
+        query: str,
+        limit: int,
+        errors: list[str],
+    ) -> list[FederatedNode]:
+        repo = self._conversation_repo
+        if repo is None or not hasattr(repo, "list_conversations"):
+            return []
+        needle = query.lower().strip()
+        nodes: list[FederatedNode] = []
+        try:
+            conversations = repo.list_conversations(limit=limit)
+            for conv in conversations:
+                cid = str(conv.get("conversation_id") or "")
+                if not cid:
+                    continue
+                messages = repo.list_messages(cid) if hasattr(repo, "list_messages") else []
+                for index, msg in enumerate(messages):
+                    content = str(getattr(msg, "content", "") or "")
+                    if needle and needle not in content.lower() and needle not in cid.lower():
+                        continue
+                    created = str(getattr(msg, "created_at", index) or index)
+                    source_id = f"{cid}:{created}:{index}"
+                    nodes.append(
+                        FederatedNode(
+                            node_id=source_id,
+                            node_type="conversation_turn",
+                            label=content[:80] or cid,
+                            workspace_id="primary",
+                            workspace_name="Primary",
+                            attributes={
+                                "conversation_id": cid,
+                                "role": str(getattr(msg, "role", "") or ""),
+                            },
+                            provenance=provenance_pointer(
+                                kind="conversation_turn",
+                                source_id=source_id,
+                                workspace_id="primary",
+                            ),
+                        )
+                    )
+                    if len(nodes) >= limit:
+                        return nodes
+        except Exception as exc:
+            errors.append(f"conversation: {exc}")
+        return nodes
 
     def detect_conflicts(self) -> list[dict[str, Any]]:
         """Detect nodes that exist in multiple workspaces with the same ID but different types.

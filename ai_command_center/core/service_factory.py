@@ -39,6 +39,12 @@ from ai_command_center.core.snapshot.snapshot_service import SnapshotService
 from ai_command_center.core.timeline.timeline_repository import TimelineRepository
 from ai_command_center.core.timeline.timeline_service import TimelineService
 from ai_command_center.core.timeline.timeline_undo_handlers import register_timeline_undo_handlers
+from ai_command_center.core.world_model.federation.federated_world_model import (
+    FederatedWorldModel,
+)
+from ai_command_center.core.world_model.federation.workspace_registry import (
+    WorkspaceRegistry,
+)
 from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.core.workspace.workspace_service import WorkspaceService
 from ai_command_center.core.workspace_os_service import WorkspaceOsService
@@ -85,6 +91,7 @@ from ai_command_center.services.chat_export_service import ChatExportService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
 from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
+from ai_command_center.services.federation_service import FederationService
 from ai_command_center.services.memory_graph_service import MemoryGraphService
 from ai_command_center.services.model_router_service import ModelRouterService
 from ai_command_center.providers.provider_registry import ProviderRegistry, build_default_registry
@@ -163,6 +170,13 @@ def build_services(
     # ── shared singletons ─────────────────────────────────────────────────────
     context_manager = ContextManager()
     world_model = WorldModel(world_model_repo)
+    workspace_registry = WorkspaceRegistry(db)
+    federated_world_model = FederatedWorldModel(
+        primary_repo=world_model_repo,
+        memory_repo=memory_repo,
+        conversation_repo=conv_repo,
+    )
+    federation = FederationService(bus, workspace_registry, federated_world_model)
     shared_tool_registry = ToolRegistry()
     provider_registry = build_default_registry()
     ollama = OllamaHttpService(bus)
@@ -308,6 +322,7 @@ def build_services(
         SettingsService(bus, settings_repo),
         state_authority,
         execution_authority,
+        federation,
         CommandRouterService(bus),
         orchestration,
         runtime_provider_registry,
