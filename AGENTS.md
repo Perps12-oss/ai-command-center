@@ -24,7 +24,7 @@ Implementation may not begin before pre-flight completion.
 
 See `docs/governance/PHASE_COMPLETION_RULE.md` and `.cursor/rules/phase-complete-on-main.mdc`.
 
-**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: Strategic Runtime Program** ([`STRATEGIC_RUNTIME_PROGRAM.md`](docs/governance/STRATEGIC_RUNTIME_PROGRAM.md)). Stream **code** is blocked until Gates 2–3. Do not invent extra tickets from historical inventories. 
+**Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: Strategic Runtime Program** ([`STRATEGIC_RUNTIME_PROGRAM.md`](docs/governance/STRATEGIC_RUNTIME_PROGRAM.md)). Gate 4 stream **code** for A/B/C/E-M1/B5 is on `main`. Wave 5 close-out: [`docs/audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md`](docs/audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md) (**COMPLETE only on `main`**). Do not invent extra tickets from historical inventories. Stream D isolation, E vectors, F Adapt, and G Cross-OS remain gated as in the program charter. 
 **Fossil / retired index:** [`docs/governance/HISTORICAL_AND_RETIRED_WORK.md`](docs/governance/HISTORICAL_AND_RETIRED_WORK.md). 
 Historical roadmaps, Proposed ADRs, and old inventories are **not** implementation authority.
 
