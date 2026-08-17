@@ -3,8 +3,8 @@
 
 Risk area #2 - Concurrency & state violations.
 
-Enforces five rules from ``AGENTS.md`` / ``PROJECT_CONSTITUTION_V4.md``
-and ADR-018:
+Enforces eight rules from ``AGENTS.md`` / ``PROJECT_CONSTITUTION_V4.md``,
+ADR-018, and ADR-025 F1/F2:
 
 R1  No file under ``ui/`` may import from ``services/`` or ``backend/``.
 R2  Service classes (``*Service``) may only be *instantiated* inside the
@@ -17,6 +17,10 @@ R4  No file under ``services/`` may import a peer service module except
     roots ``service_factory.py`` / ``workspace_os_service.py`` instead).
 R5  Only ``ExecutionOrchestratorService`` may publish ``tool.invoke``
     (ADR-018 M3 — refuse LLM / peer → TOOL_INVOKE bypass).
+R6  ``runtime/`` must not import ``ui/`` or ``services/`` (ADR-025 F1).
+R7  ``domain/`` must not import ``ui/`` or ``services/`` (ADR-025 F1).
+R8  Concrete ``runtime.providers`` imports are limited to ``runtime/``,
+    composition roots, and the provider-wiring allowlist (ADR-025 F2).
 
 The linter is importable (``analyze_source`` / ``scan_tree``) so it can be unit
 tested against synthetic fixtures, and runnable as a CLI / pre-commit hook.
@@ -80,6 +84,15 @@ _TOOL_INVOKE_PUBLISHER_ALLOWLIST = frozenset(
 _TOOL_INVOKE_TOPIC = "tool.invoke"
 _TOOL_INVOKE_SYMBOL = "TOOL_INVOKE"
 
+# ADR-025 F2: services that may import concrete runtime.providers modules.
+_RUNTIME_PROVIDER_IMPORT_ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "services/runtime_provider_registry_service.py",
+        "services/runtime_capability_router_service.py",
+        "services/qwenpaw_sidecar_service.py",
+    }
+)
+
 
 @dataclass(frozen=True)
 class Violation:
@@ -120,6 +133,8 @@ class _Analyzer(ast.NodeVisitor):
         self.violations: list[Violation] = []
         self._in_ui = _is_under(rel_path, "ui")
         self._in_services = _is_under(rel_path, "services")
+        self._in_runtime = _is_under(rel_path, "runtime")
+        self._in_domain = _is_under(rel_path, "domain")
         self._in_appstate_module = rel_path.endswith("core/app_state.py") or rel_path.endswith(
             "core/state/app_state.py"
         )
@@ -143,6 +158,8 @@ class _Analyzer(ast.NodeVisitor):
             )
         if self._in_services:
             self._check_service_peer_import(node.module, node.lineno)
+        self._check_package_boundaries(node.module, node.lineno)
+        self._check_runtime_provider_import(node.module, node.lineno)
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
@@ -160,6 +177,9 @@ class _Analyzer(ast.NodeVisitor):
                             ),
                         )
                     )
+        for alias in node.names:
+            self._check_package_boundaries(alias.name, node.lineno)
+            self._check_runtime_provider_import(alias.name, node.lineno)
         self.generic_visit(node)
 
     # R2 - service classes may only be instantiated in services/ or a root.
@@ -247,6 +267,58 @@ class _Analyzer(ast.NodeVisitor):
                 message=(
                     f"service module imports peer service {module!r}; "
                     "route through EventBus or composition root"
+                ),
+            )
+        )
+
+    def _check_package_boundaries(self, module: str | None, lineno: int) -> None:
+        """ADR-025 F1 — runtime/domain must not reach UI or services."""
+        if not module:
+            return
+        if self._in_runtime and _module_targets_layer(module, ("ui", "services")):
+            self.violations.append(
+                Violation(
+                    rule="R6",
+                    file=self.rel_path,
+                    line=lineno,
+                    message=(
+                        f"runtime module imports forbidden layer {module!r}; "
+                        "runtime may depend on domain/core only"
+                    ),
+                )
+            )
+        if self._in_domain and _module_targets_layer(module, ("ui", "services")):
+            self.violations.append(
+                Violation(
+                    rule="R7",
+                    file=self.rel_path,
+                    line=lineno,
+                    message=(
+                        f"domain module imports forbidden layer {module!r}; "
+                        "domain contracts must stay free of UI/services"
+                    ),
+                )
+            )
+
+    def _check_runtime_provider_import(self, module: str | None, lineno: int) -> None:
+        """ADR-025 F2 — concrete runtime.providers imports are allow-listed."""
+        if not module:
+            return
+        prefix = f"{PACKAGE}.runtime.providers"
+        if not (module == prefix or module.startswith(prefix + ".")):
+            return
+        if self._in_runtime or self._is_composition_root:
+            return
+        if self._pkg_rel in _RUNTIME_PROVIDER_IMPORT_ALLOWLIST:
+            return
+        self.violations.append(
+            Violation(
+                rule="R8",
+                file=self.rel_path,
+                line=lineno,
+                message=(
+                    f"concrete runtime.providers import {module!r} outside "
+                    "runtime/, composition root, or provider-wiring allowlist"
                 ),
             )
         )

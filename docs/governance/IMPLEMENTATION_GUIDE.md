@@ -216,7 +216,7 @@ This is owner-authorized. Do **not** invent extra tickets from historical invent
 | 0 | Strategic Gap Matrix | [`docs/audits/STRATEGIC_GAP_MATRIX.md`](../audits/STRATEGIC_GAP_MATRIX.md). **COMPLETE** on `main`. |
 | 1 | Architecture closure (Gate 1–2) | [`WAVE_1_GATE_2_DECISIONS.md`](../architecture/proposals/WAVE_1_GATE_2_DECISIONS.md). **COMPLETE** on `main`. |
 | 2–3 | Runtime foundations + capability | Gate 4 code for A, B, C, E-M1, B5 on `main`. D isolation not unlocked. E vectors still deferred. |
-| 4 | Goose hardening (Stream F Adapt) | **Gate 3 §9 written** — [ADR-025 §9](../architecture/adr/ADR-025_GOOSE_PATTERN_ADOPTION.md) F1–F4. Gate 4 code **not started**. Sequential: F1 → F2 → F3 → F4. |
+| 4 | Goose hardening (Stream F Adapt) | **Gate 4 F1–F4 implemented** against [ADR-025 §9](../architecture/adr/ADR-025_GOOSE_PATTERN_ADOPTION.md). Gate 5/6 next. |
 | 5 | Full-system verification | Close-out [`WAVE_5_FULL_SYSTEM_VERIFICATION.md`](../audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md). **COMPLETE only after that file is on `main`.** |
 | 6 | Cross-OS (Stream G) | **Not opened.** Wave 4 is still open. |
 

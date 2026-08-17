@@ -266,6 +266,8 @@ EXECUTION_RUN_REQUEST = "execution.run.request"
 EXECUTION_RUN_STARTED = "execution.run.started"
 EXECUTION_RUN_COMPLETE = "execution.run.complete"
 EXECUTION_RUN_FAILED = "execution.run.failed"
+# ADR-025 F3 — cancel an in-flight orchestration run by run_id (EventBus only)
+EXECUTION_RUN_CANCEL = "execution.run.cancel"
 EXECUTION_STEP_STARTED = "execution.step.started"
 EXECUTION_STEP_AWAITING_APPROVAL = "execution.step.awaiting_approval"
 EXECUTION_STEP_APPROVED = "execution.step.approved"
@@ -656,6 +658,7 @@ __all__ = [
     "EXECUTION_RUN_STARTED",
     "EXECUTION_RUN_COMPLETE",
     "EXECUTION_RUN_FAILED",
+    "EXECUTION_RUN_CANCEL",
     "EXECUTION_STEP_STARTED",
     "EXECUTION_STEP_AWAITING_APPROVAL",
     "EXECUTION_STEP_APPROVED",

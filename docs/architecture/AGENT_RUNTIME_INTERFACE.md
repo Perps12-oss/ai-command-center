@@ -29,6 +29,7 @@ AI Command Center (ACC) is the **host platform**. External runtimes (QwenPaw, Op
 | Tools (desktop) | ACC (`ToolExecutorService`) | May request tool invoke via bus; never call shell directly |
 | Permissions | ACC (`PermissionService`) | Must pass permission gate before side effects |
 | Telemetry | ACC (`TelemetryService`) | Emit events; ACC records |
+| Runtime provider adapters | ACC `ai_command_center/runtime/` + domain contracts (ADR-025 F2) | Concrete providers under `runtime/providers/`; composition root / allow-listed wiring services only. Dormant `provider_sdk/` must not be live-wired. |
 
 ---
 

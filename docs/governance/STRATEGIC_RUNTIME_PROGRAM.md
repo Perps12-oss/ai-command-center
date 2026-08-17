@@ -114,7 +114,7 @@ Parallelism is allowed **inside a wave** only when dependencies remain explicit.
 | 1 | Architecture closure | Finalize Gate 1–2 for A–F | COMPLETE on `main` (`WAVE_1_GATE_2_DECISIONS.md`) |
 | 2 | Runtime foundations | Provider/model boundary; autonomy policy; explainability envelope; EventBus **measurement** (+ isolation only if justified) | Gate 4 A/B/C/E-M1 on `main`; D isolation **not** unlocked |
 | 3 | Capability completion | Knowledge federation after SoT ADR; model M2–M4; autonomy escalation; explainability evidence surfaces | Gate 4 A/B/C/E-M1 on `main`; E vectors still deferred |
-| 4 | External pattern hardening | Goose Adopt/Adapt only; cleanup; regression | **Gate 3 §9 written** ([ADR-025 §9](../architecture/adr/ADR-025_GOOSE_PATTERN_ADOPTION.md) F1–F4). Gate 4 code **not started**. |
+| 4 | External pattern hardening | Goose Adopt/Adapt only; cleanup; regression | **Gate 4 Adapt F1–F4 implemented** (this branch / after merge). Gate 5/6 verification+close-out next. |
 | 5 | Full-system verification | Intent → routing → authorization → execution → verification → receipt → state projection → timeline → explanation | **COMPLETE when** [`WAVE_5_FULL_SYSTEM_VERIFICATION.md`](../audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md) is on `main` |
 | 6 | Cross-OS gate | Windows → Linux → macOS via **platform adapters**, not `if windows` in core | **Not opened** |
 

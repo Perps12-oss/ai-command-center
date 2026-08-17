@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
 
@@ -29,6 +30,7 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_RUNTIME_REQUEST,
     DECISION_RECORD_UPDATED,
     EXECUTION_OBSERVATION,
+    EXECUTION_RUN_CANCEL,
     EXECUTION_RUN_COMPLETE,
     EXECUTION_RUN_FAILED,
     EXECUTION_RUN_REQUEST,
@@ -69,6 +71,9 @@ _logger = logging.getLogger(__name__)
 _EXTERNAL_PREFIXES = ("mcp.", "external.", "mcp:")
 _LLM_CAPABILITIES = frozenset({"llm", "chat"})
 _MAX_REPLAN_ATTEMPTS = 2
+# ADR-025 F4 — explicit bound on in-flight run working set (LRU eviction).
+_MAX_ACTIVE_RUNS = 64
+_MAX_RECEIPTED_IDS = 512
 # Marks orchestrator-built StateContext projections so replan attempts regenerate
 # them from the latest observations instead of freezing the first failure summary.
 _ORCHESTRATOR_SYNTHESIZED_STATE_CONTEXT = "_orchestrator_synthesized"
@@ -191,14 +196,18 @@ class ExecutionOrchestratorService(BaseService):
     def __init__(self, bus) -> None:
         super().__init__(bus)
         self._unsubscribers: list[Callable[[], None]] = []
-        self._runs: dict[str, dict[str, Any]] = {}
+        # ADR-025 F4 — OrderedDict for LRU eviction of in-flight runs.
+        self._runs: OrderedDict[str, dict[str, Any]] = OrderedDict()
         # G1 receipt boundary: correlation ids seen on ORCHESTRATION_RECEIPT.
         # Success path emits receipt *before* EXECUTION_RUN_COMPLETE (fail-closed).
-        self._receipted_ids: set[str] = set()
+        self._receipted_ids: OrderedDict[str, None] = OrderedDict()
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
             self._bus.subscribe(EXECUTION_RUN_REQUEST, self._on_run_request)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_RUN_CANCEL, self._on_run_cancel)
         )
         self._unsubscribers.append(
             self._bus.subscribe(EXECUTION_STEP_APPROVED, self._on_step_approved)
@@ -239,10 +248,68 @@ class ExecutionOrchestratorService(BaseService):
         """Record receipt evidence so _complete_run can verify the G1 boundary."""
         request_id = str(event.payload.get("request_id") or "").strip()
         if request_id:
-            self._receipted_ids.add(request_id)
+            self._remember_receipt_id(request_id)
+
+    def _touch_run(self, run_id: str) -> dict[str, Any] | None:
+        """Return run and mark it most-recently used (ADR-025 F4)."""
+        run = self._runs.get(run_id)
+        if run is not None:
+            self._runs.move_to_end(run_id)
+        return run
+
+    def _remember_receipt_id(self, request_id: str) -> None:
+        if not request_id:
+            return
+        if request_id in self._receipted_ids:
+            self._receipted_ids.move_to_end(request_id)
+        else:
+            self._receipted_ids[request_id] = None
+        while len(self._receipted_ids) > _MAX_RECEIPTED_IDS:
+            self._receipted_ids.popitem(last=False)
+
+    def _forget_receipt_ids(self, ids: set[str]) -> None:
+        for rid in ids:
+            self._receipted_ids.pop(rid, None)
+
+    def _has_receipt_ids(self, ids: set[str]) -> bool:
+        return any(rid in self._receipted_ids for rid in ids)
+
+    def _evict_oldest_runs_if_needed(self) -> None:
+        """Fail oldest active runs until under the explicit bound (ADR-025 F4)."""
+        while len(self._runs) >= _MAX_ACTIVE_RUNS:
+            old_id = next(iter(self._runs))
+            self._fail_run(old_id, "evicted: active run cache bound exceeded")
+
+    def _on_run_cancel(self, event: Event) -> None:
+        """ADR-025 F3 — cancel an in-flight run via EventBus (no service globals)."""
+        run_id = str(event.payload.get("run_id") or "").strip()
+        if not run_id or run_id not in self._runs:
+            return
+        reason = str(event.payload.get("reason") or "cancelled").strip() or "cancelled"
+        self._fail_run(run_id, reason)
 
     def _on_run_request(self, event: Event) -> None:
         run_id = str(event.payload.get("run_id") or uuid.uuid4().hex)
+        # ADR-025 F3 — creation lock: refuse double-start of the same run_id.
+        if run_id in self._runs:
+            self._bus.publish(
+                EXECUTION_RUN_FAILED,
+                {
+                    "run_id": run_id,
+                    "request_id": str(event.payload.get("request_id", "")),
+                    "error": "run already active",
+                    "correlation": CorrelationContext.from_payload(event.payload).to_payload(),
+                    "goal": "",
+                    "success": False,
+                    "step_outputs": [],
+                    "observations": [],
+                    "plan": {},
+                    "workspace_context": {},
+                },
+                source=self.name,
+            )
+            return
+
         raw_plan = event.payload.get("plan")
         if not isinstance(raw_plan, dict):
             self._fail_run(run_id, "plan payload is required")
@@ -275,6 +342,7 @@ class ExecutionOrchestratorService(BaseService):
             else []
         )
 
+        self._evict_oldest_runs_if_needed()
         self._runs[run_id] = {
             "plan": plan,
             "index": 0,
@@ -293,6 +361,7 @@ class ExecutionOrchestratorService(BaseService):
             "step_outputs": [],
             "goal": plan.goal,
         }
+        self._runs.move_to_end(run_id)
         _logger.info("execution.run.started run_id=%s steps=%d", run_id, len(plan.steps))
         self._bus.publish(
             EXECUTION_RUN_STARTED,
@@ -438,9 +507,9 @@ class ExecutionOrchestratorService(BaseService):
         self._advance_run(run_id)
 
     def _advance_run(self, run_id: str) -> None:
-        if run_id not in self._runs:
+        run = self._touch_run(run_id)
+        if run is None:
             return
-        run = self._runs[run_id]
         plan: ExecutionPlan = run["plan"]
         index = int(run["index"])
         if index >= len(plan.steps):
@@ -1083,7 +1152,7 @@ class ExecutionOrchestratorService(BaseService):
         # Correlation ids a receipt for this run may legitimately carry.
         correlating_ids = {i for i in (request_id, run_id) if i}
         # Drop stale ledger entries before emitting fresh evidence for this run.
-        self._receipted_ids -= correlating_ids
+        self._forget_receipt_ids(correlating_ids)
 
         completion_payload = {
             "run_id": run_id,
@@ -1105,7 +1174,7 @@ class ExecutionOrchestratorService(BaseService):
             success=True,
             error="",
         )
-        receipted = bool(evidence) and bool(self._receipted_ids & correlating_ids)
+        receipted = bool(evidence) and self._has_receipt_ids(correlating_ids)
         if not receipted and evidence:
             # Emit published a receipt whose request_id may have been synthesized.
             rid = str(evidence.get("request_id") or "").strip()
@@ -1142,7 +1211,7 @@ class ExecutionOrchestratorService(BaseService):
                 },
                 source=self.name,
             )
-            self._receipted_ids -= correlating_ids
+            self._forget_receipt_ids(correlating_ids)
             return
 
         # Public success only after receipt evidence exists.
@@ -1156,7 +1225,7 @@ class ExecutionOrchestratorService(BaseService):
             completion_payload["primary_capability"] = evidence.get("primary_capability")
             completion_payload["execution_facts"] = evidence.get("facts")
         self._bus.publish(EXECUTION_RUN_COMPLETE, completion_payload, source=self.name)
-        self._receipted_ids -= correlating_ids
+        self._forget_receipt_ids(correlating_ids)
 
     def _fail_run(self, run_id: str, error: str) -> None:
         run = self._runs.pop(run_id, None)
@@ -1181,4 +1250,4 @@ class ExecutionOrchestratorService(BaseService):
         )
         # Clear after publishing: the failure itself is receipted, and that entry
         # must not accumulate or satisfy a later run reusing the same ids.
-        self._receipted_ids -= {i for i in (request_id, run_id) if i}
+        self._forget_receipt_ids({i for i in (request_id, run_id) if i})
