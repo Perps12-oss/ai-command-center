@@ -9,7 +9,7 @@
 
 **Verdict: PASS** — all Gate 4 keyword tests, canonical architecture/constitution/UCGS gates, and headless `create_application()` succeeded.
 
-This ledger is **Linux verification only**. It does not declare Wave 5 / Gate 5 complete: Windows ARM64 GUI close-out remains out of scope on this host (`main.py` exits when `is_arm64()` is false).
+This ledger is **Linux verification only**. Windows ARM64 GUI is recorded separately as operator-attested PASS in `docs/audits/GATE5_WINDOWS_ARM64_GUI_VERIFICATION.md`. Wave 5 full-system soak and EventBus isolation remain out of scope. Gate 5 stream verification is not complete until these audits exist on `main`.
 
 ## Command results
 
@@ -60,9 +60,11 @@ PASS: constitutional authority files present and governance checks clean
 
 ## What this does not close
 
-- Windows ARM64 desktop GUI Gate 5 checks
 - EventBus isolation / ADR-026 (Stage 1 did not unlock isolation)
+- Wave 5 full-system soak (Intent → routing → authorization → execution → verification → receipt → state projection → timeline → explanation)
 - Phase completion (`PHASE_COMPLETION_RULE.md` — main-only; this branch is a ledger PR)
+
+Windows ARM64 GUI: see `docs/audits/GATE5_WINDOWS_ARM64_GUI_VERIFICATION.md` (operator-attested PASS, 2026-08-17).
 
 ## Reproduction
 
