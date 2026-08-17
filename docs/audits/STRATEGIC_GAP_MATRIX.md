@@ -1,6 +1,6 @@
 # Strategic Gap Matrix — Phase 0 Baseline
 
-**Status:** PHASE 0 DELIVERABLE — baseline for the Strategic Runtime & Architecture Completion Program  
+**Status:** PHASE 0 DELIVERABLE — baseline for the Strategic Runtime & Architecture Completion Program (snapshot 2026-08-14; **not** live implementation status). Wave 5 close-out: [`WAVE_5_FULL_SYSTEM_VERIFICATION.md`](WAVE_5_FULL_SYSTEM_VERIFICATION.md).  
 **Date:** 2026-08-14  
 **Baseline:** `origin/main` @ `2f6c88b`  
 **Program:** [`docs/governance/STRATEGIC_RUNTIME_PROGRAM.md`](../governance/STRATEGIC_RUNTIME_PROGRAM.md)  

@@ -102,21 +102,21 @@ Gate 1 drafts: [`docs/architecture/proposals/`](../architecture/proposals/).
                     Cross-OS Architecture Gate
 ```
 
-Parallelism is allowed **inside a wave** only when dependencies remain explicit. Do not start Stream D isolation before measurement. Do not install a vector database before Stream E SoT ADR. Do not copy Goose into the runtime. Do not open Stream G before Waves 0–5 are closed on `main`.
+Parallelism is allowed **inside a wave** only when dependencies remain explicit. Do not start Stream D isolation before measurement. Do not install a vector database before Stream E SoT ADR. Do not copy Goose into the runtime. Do not open Stream G before Waves 0–5 are closed on `main`. Wave 5 close-out does **not** close Wave 4 (Goose Adapt); Stream G stays closed.
 
 ---
 
 ## Waves
 
-| Wave | Name | Queue 1 meaning |
-|------|------|-----------------|
-| 0 | Baseline | Strategic Gap Matrix (this establishment change) |
-| 1 | Architecture closure | Finalize Gate 1–2 for A–F |
-| 2 | Runtime foundations | Provider/model boundary; autonomy policy; explainability envelope; EventBus **measurement** (+ isolation only if justified) |
-| 3 | Capability completion | Knowledge federation after SoT ADR; model M2–M4; autonomy escalation; explainability evidence surfaces |
-| 4 | External pattern hardening | Goose Adopt/Adapt only; cleanup; regression |
-| 5 | Full-system verification | Intent → routing → authorization → execution → verification → receipt → state projection → timeline → explanation |
-| 6 | Cross-OS gate | Windows → Linux → macOS via **platform adapters**, not `if windows` in core |
+| Wave | Name | Queue 1 meaning | Status |
+|------|------|-----------------|--------|
+| 0 | Baseline | Strategic Gap Matrix (this establishment change) | COMPLETE on `main` |
+| 1 | Architecture closure | Finalize Gate 1–2 for A–F | COMPLETE on `main` (`WAVE_1_GATE_2_DECISIONS.md`) |
+| 2 | Runtime foundations | Provider/model boundary; autonomy policy; explainability envelope; EventBus **measurement** (+ isolation only if justified) | Gate 4 A/B/C/E-M1 on `main`; D isolation **not** unlocked |
+| 3 | Capability completion | Knowledge federation after SoT ADR; model M2–M4; autonomy escalation; explainability evidence surfaces | Gate 4 A/B/C/E-M1 on `main`; E vectors still deferred |
+| 4 | External pattern hardening | Goose Adopt/Adapt only; cleanup; regression | **Not started** (ADR-025 Adapt rows remain Wave 4) |
+| 5 | Full-system verification | Intent → routing → authorization → execution → verification → receipt → state projection → timeline → explanation | **COMPLETE when** [`WAVE_5_FULL_SYSTEM_VERIFICATION.md`](../audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md) is on `main` |
+| 6 | Cross-OS gate | Windows → Linux → macOS via **platform adapters**, not `if windows` in core | **Not opened** |
 
 Wave 0 and Gate 1 drafts may land together. **Stream code is Wave 2+ and is not authorized until Gates 2–3.**
 

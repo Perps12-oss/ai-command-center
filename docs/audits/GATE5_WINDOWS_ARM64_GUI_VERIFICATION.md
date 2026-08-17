@@ -14,12 +14,11 @@ This Cloud environment cannot launch `main.py` (x86_64; `is_arm64()` returns fal
 
 Gate 5 runtime GUI for Streams A/B/C/E-M1/B5 is the Windows ARM64 desktop app: DecisionCard / Brain Reasoning / Hero New Goal surfaces that Linux headless `create_application()` does not render.
 
-This attestation closes the **Windows ARM64 GUI runtime row** that Linux verification left open. It does not by itself:
+This attestation closes the **Windows ARM64 GUI runtime row** that Linux verification left open. Wave 5 program close-out is `docs/audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md` (**COMPLETE only on `main`**). It does not:
 
-- merge evidence onto `main` (`PHASE_COMPLETION_RULE.md`)
-- declare Wave 5 full-system verification complete
 - unlock Stream D EventBus isolation
-- close Stream G Cross-OS
+- close Wave 4 Goose Adapt
+- open Stream G Cross-OS
 
 ## Evidence classes
 

@@ -9,7 +9,7 @@
 
 **Verdict: PASS** — all Gate 4 keyword tests, canonical architecture/constitution/UCGS gates, and headless `create_application()` succeeded.
 
-This ledger is **Linux verification only**. Windows ARM64 GUI is recorded separately as operator-attested PASS in `docs/audits/GATE5_WINDOWS_ARM64_GUI_VERIFICATION.md`. Wave 5 full-system soak and EventBus isolation remain out of scope. Gate 5 stream verification is not complete until these audits exist on `main`.
+This ledger is **Linux verification** for Wave 5. Windows ARM64 GUI is operator-attested PASS in `docs/audits/GATE5_WINDOWS_ARM64_GUI_VERIFICATION.md`. Wave 5 close-out: `docs/audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md` (**COMPLETE only on `main`**). EventBus isolation remains out of scope.
 
 ## Command results
 
@@ -61,8 +61,9 @@ PASS: constitutional authority files present and governance checks clean
 ## What this does not close
 
 - EventBus isolation / ADR-026 (Stage 1 did not unlock isolation)
-- Wave 5 full-system soak (Intent → routing → authorization → execution → verification → receipt → state projection → timeline → explanation)
-- Phase completion (`PHASE_COMPLETION_RULE.md` — main-only; this branch is a ledger PR)
+- Wave 4 Goose Adapt
+- Wave 6 / Stream G Cross-OS
+- Phase completion of Wave 5 until `WAVE_5_FULL_SYSTEM_VERIFICATION.md` is on `main`
 
 Windows ARM64 GUI: see `docs/audits/GATE5_WINDOWS_ARM64_GUI_VERIFICATION.md` (operator-attested PASS, 2026-08-17).
 

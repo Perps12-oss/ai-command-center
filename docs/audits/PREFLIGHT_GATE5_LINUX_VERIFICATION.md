@@ -10,7 +10,7 @@ Record Linux (x86_64 Cloud) results for the Gate 5 verification commands the ope
 
 ## What this change is not
 
-- Not Wave 5 full-system close-out.
+- Not Wave 4 Goose Adapt or Stream G.
 - Not Windows ARM64 GUI execution on this host (operator attestation is a separate ledger file).
 - Not EventBus isolation ADR.
 - Not Stream code unless a listed check fails and the defect is an in-scope Gate 4 regression.

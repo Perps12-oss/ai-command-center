@@ -10,7 +10,7 @@ Record the operator statement that the Windows ARM64 desktop GUI is working and 
 
 ## What this change is not
 
-- Not Wave 5 full-system soak (Intent → … → explanation).
+- Not opening Stream G / Wave 6.
 - Not EventBus isolation / ADR-026.
 - Not Stream G Cross-OS.
 - Not a claim that this Cloud agent executed the GUI.
