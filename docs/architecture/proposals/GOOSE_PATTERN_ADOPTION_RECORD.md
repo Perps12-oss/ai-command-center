@@ -1,6 +1,6 @@
 # Goose Pattern Adoption Record
 
-**Status:** Gate 2 CLOSED 2026-08-14. Gate 3 §9 on `main`. Gate 4 Adapt F1–F4 **implemented** on this branch (merge to `main` completes Gate 4).
+**Status:** Gate 2 CLOSED. Gate 3 §9 on `main`. Gate 4 Adapt F1–F4 on this PR. Gate 5 PASS ([`WAVE_4_GATE_5_VERIFICATION.md`](../../audits/WAVE_4_GATE_5_VERIFICATION.md)). Gate 6 close-out ([`WAVE_4_CLOSEOUT.md`](../../audits/WAVE_4_CLOSEOUT.md)) — Wave 4 COMPLETE on `main` after merge.
 **Authority:** [`ADR-025_GOOSE_PATTERN_ADOPTION.md`](../adr/ADR-025_GOOSE_PATTERN_ADOPTION.md) — **Accepted** (§9 Gate 3 plan)
 **Proposal:** [IP_F_GOOSE_PATTERN_ADOPTION.md](IP_F_GOOSE_PATTERN_ADOPTION.md)
 

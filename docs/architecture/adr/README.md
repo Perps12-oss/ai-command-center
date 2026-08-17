@@ -56,7 +56,7 @@
 | [022](ADR-022_CONFIDENCE_AND_AUTONOMY.md) | Confidence & Autonomy | Accepted — composite confidence | LIVE core; **Stream B Gate 2 CLOSED 2026-08-14** (ACCEPT escalate-only bands, §11) — Gate 3 plan next |
 | [023](ADR-023_MODEL_STRATEGY.md) | Model Strategy | Accepted — brain-independent | LIVE (M1 docs/settings); **Stream C Gate 2 CLOSED 2026-08-14** (ACCEPT sequential M2–M4, §11) — Gate 3 plan next |
 | [024](ADR-024_KNOWLEDGE_FEDERATION_SOT.md) | Knowledge Federation SoT | Accepted — DEFER WITH CONDITION | **Stream E Gate 2 CLOSED 2026-08-14** — live-wire read-only federation only; no embeddings/vector index authorized |
-| [025](ADR-025_GOOSE_PATTERN_ADOPTION.md) | Goose Pattern Adoption | Accepted — Adopt/Adapt/Reject table | **Stream F Gate 2 CLOSED**; Gate 3 §9 F1–F4 written — Gate 4 Wave 4 Adapt not started |
+| [025](ADR-025_GOOSE_PATTERN_ADOPTION.md) | Goose Pattern Adoption | Accepted — Adopt/Adapt/Reject table | Stream F Gate 2–3 on `main`; Gate 4–6 close-out in Wave 4 package (**COMPLETE on `main` after merge**) |
 
 ### Section 9 implementation notes
 
