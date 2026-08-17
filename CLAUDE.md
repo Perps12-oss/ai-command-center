@@ -136,7 +136,7 @@ Also:
 
 **Canonical planned-work queue:** [`docs/governance/IMPLEMENTATION_GUIDE.md`](docs/governance/IMPLEMENTATION_GUIDE.md) — **Queue 1: Strategic Runtime Program** ([`STRATEGIC_RUNTIME_PROGRAM.md`](docs/governance/STRATEGIC_RUNTIME_PROGRAM.md)).
 
-**Active implementation work:** Gate 4 A/B/C/E-M1/B5 is on `main`. Wave 5 full-system verification close-out is [`docs/audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md`](docs/audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md) (**COMPLETE only on `main`**). Do not invent extra tickets from historical plans. Wave 4 Goose Adapt is not started. Stream G is not opened.
+**Active implementation work:** Gate 4 A/B/C/E-M1/B5 is on `main`. Wave 5 is **COMPLETE** on `main`. Wave 4 Goose Adapt: Gate 3 §9 written ([ADR-025 §9](docs/architecture/adr/ADR-025_GOOSE_PATTERN_ADOPTION.md) F1–F4); Gate 4 code **not started**. Stream G is not opened. Do not invent extra tickets from historical plans.
 
 Section 9 of ADR-018–023 is **Accepted architecture already on `main`**. Remaining 021/022/023 envelopes are **Stream A–C** (checkpoints, not indefinite parking). EventBus isolation is **Stream D** (measure first; abandoned pool branch is not a merge candidate). Knowledge is **Stream E** (SoT ADR before any vector DB). Goose is **Stream F** (Adopt/Adapt/Reject). Cross-OS is the **only remaining strategic gate**. macOS Hotkey as a standalone strategic item is **dropped**.
 
