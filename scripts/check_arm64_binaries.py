@@ -77,6 +77,39 @@ def machine_name(machine: int | None) -> str:
     return _MACHINE_NAMES.get(machine, f"UNKNOWN_0x{machine:04X}")
 
 
+def is_toolchain_noise_pe(path: Path) -> bool:
+    """True for CPython/pip distribution PE that is not an ACC runtime image.
+
+    GitHub ``windows-11-arm`` Python 3.12 toolcache ships an x86 installer SFX,
+    pip distlib cross-arch venv helpers, a tcl nmake helper, and (observed)
+    an AMD64 ``vcruntime140_1.dll`` next to a native ARM64 ``python.exe``.
+    Those files are not product wheels and must not trip the two-tier FAIL.
+    """
+    parts = [part.lower() for part in path.parts]
+    name = path.name.lower()
+
+    if "site-packages" in parts:
+        if "distlib" in parts and any(
+            part in {"pip", "setuptools", "virtualenv"} for part in parts
+        ):
+            return True
+        if name.endswith(".exe") and "_vendor" in parts and "pip" in parts:
+            return True
+        return False
+
+    if "tcl" in parts and "nmake" in parts:
+        return True
+    if (
+        name.startswith("python-")
+        and name.endswith(".exe")
+        and name not in {"python.exe", "pythonw.exe"}
+    ):
+        return True
+    if name == "vcruntime140_1.dll":
+        return True
+    return False
+
+
 def default_scan_roots() -> list[Path]:
     """Interpreter prefix plus all known site-packages directories."""
     roots: list[Path] = [Path(sys.prefix)]
@@ -125,6 +158,8 @@ def scan(roots: list[Path], allow: set[str]) -> dict:
     scanned = 0
     for path in iter_pe_files(roots):
         if path.name.lower() in allow:
+            continue
+        if is_toolchain_noise_pe(path):
             continue
         machine = read_pe_machine(path)
         if machine is None:

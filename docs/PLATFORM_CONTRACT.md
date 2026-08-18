@@ -37,6 +37,6 @@ New dependencies default to **FAIL** if they ship AMD64 PE. Do not add to the al
 |------|------|
 | `main.py` `is_arm64()` | Runtime process gate |
 | `validate_ollama_arm64_native()` | Phase 0 Ollama PE |
-| `scripts/check_arm64_binaries.py` | Env PE scan, two-tier |
+| `scripts/check_arm64_binaries.py` | Env PE scan, two-tier (skips CPython/pip toolchain noise; still FAILs `python.exe` / site-packages) |
 | `wheel_audit.py` | Phase 0 package rows |
 | `.github/workflows/arm64-gate.yml` | CI on `windows-11-arm` |

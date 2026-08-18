@@ -89,6 +89,45 @@ def test_two_tier_allowlist_passes_aiohttp_amd64(tmp_path: Path) -> None:
     assert rc == 0
 
 
+def test_toolchain_noise_is_skipped_but_core_and_wheels_still_gated(
+    tmp_path: Path,
+) -> None:
+    """CPython/pip vendor PE must not FAIL; python.exe and mystery wheels must."""
+    prefix = tmp_path / "Python" / "3.12.10" / "arm64"
+    prefix.mkdir(parents=True)
+    site_pkg = prefix / "Lib" / "site-packages"
+    distlib = site_pkg / "pip" / "_vendor" / "distlib"
+    distlib.mkdir(parents=True)
+    nmake = prefix / "tcl" / "nmake"
+    nmake.mkdir(parents=True)
+
+    (prefix / "python.exe").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_ARM64))
+    (prefix / "python-3.12.10-arm64.exe").write_bytes(
+        _make_pe(scanner.IMAGE_FILE_MACHINE_I386)
+    )
+    (prefix / "vcruntime140_1.dll").write_bytes(
+        _make_pe(scanner.IMAGE_FILE_MACHINE_AMD64)
+    )
+    (distlib / "t64.exe").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+    (nmake / "x86_64-w64-mingw32-nmakehlp.exe").write_bytes(
+        _make_pe(scanner.IMAGE_FILE_MACHINE_AMD64)
+    )
+    (site_pkg / "mystery.pyd").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+
+    report = scanner.scan([prefix], allow=set())
+    offending = sorted(Path(o["path"]).name for o in report["offenders"])
+    assert offending == ["mystery.pyd"]
+
+    (prefix / "python.exe").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+    report_exe = scanner.scan([prefix], allow=set())
+    names = {Path(o["path"]).name for o in report_exe["offenders"]}
+    assert "python.exe" in names
+    assert "mystery.pyd" in names
+    assert "t64.exe" not in names
+    assert "python-3.12.10-arm64.exe" not in names
+    assert "vcruntime140_1.dll" not in names
+
+
 def test_two_tier_still_fails_unknown_amd64(tmp_path: Path) -> None:
     mystery = tmp_path / "mystery.pyd"
     mystery.write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
