@@ -21,7 +21,7 @@ Job `Native ARM64 verification` run `32196710055` on `windows-11-arm`, Python `3
 
 ## Follow-up (same PR)
 
-After toolchain skip, PE scan passed on `windows-11-arm`. Full pytest failed one capture-script unit test that hard-coded `not_a_native_arm64_release_environment` (true on Linux/x64; false on native ARM64 Python). Test now asserts the claim matches the host; capture script policy is unchanged.
+PE scan passed after the toolchain skip. pytest then failed (1) ISA capture unit test that hard-coded a non-native release claim, and (2) `test_tool_result_chains_parent_event_id` when equal timestamps made `ORDER BY timestamp, event_id` put CHAT first. Capture test now matches host; chain test asserts parent links by event type.
 
 ## Invariants
 
