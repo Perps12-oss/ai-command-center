@@ -57,7 +57,6 @@ jobs:
         # Hosted runners are x64; two-tier scan still FAILs python.exe AMD64 here.
         # Hard gate is arm64-gate.yml on windows-11-arm.
         continue-on-error: true
-        continue-on-error: true
         run: python scripts/check_arm64_binaries.py
 
       - name: Upload coverage
