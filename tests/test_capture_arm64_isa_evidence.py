@@ -23,10 +23,21 @@ def test_allowlist_candidates_are_pending_never_allow() -> None:
         assert row["runtime_impact"] == "unestablished"
 
 
-def test_collect_payload_does_not_claim_linux_as_arm64_release(tmp_path: Path) -> None:
+def test_collect_payload_release_environment_claim_matches_host(tmp_path: Path) -> None:
     payload = capture.collect_payload(include_scanner=True)
     assert payload["schema"] == "acc.arm64_isa_evidence.v1"
-    assert payload["release_environment_claim"] == "not_a_native_arm64_release_environment"
+    python = payload["python"]
+    native_release = (
+        payload["host"]["sys_platform"] == "win32"
+        and python["is_arm64_fn"] is True
+        and python["pe_machine"] == "ARM64"
+    )
+    expected_claim = (
+        "valid_only_on_windows_arm64_native_python"
+        if native_release
+        else "not_a_native_arm64_release_environment"
+    )
+    assert payload["release_environment_claim"] == expected_claim
     assert "WARN is not a grant" in payload["policy_note"]
     out = tmp_path / "isa_evidence.json"
     rc = capture.main(["--out", str(out), "--skip-preflight", "--skip-scanner"])

@@ -19,6 +19,10 @@ Narrow `scripts/check_arm64_binaries.py` so the env scan does not FAIL on CPytho
 
 Job `Native ARM64 verification` run `32196710055` on `windows-11-arm`, Python `3.12.10` arm64 toolcache. Interpreter check passed (`platform.machine()==ARM64`). Scan offenders were all under `C:\hostedtoolcache\windows\Python\3.12.10\arm64\` (installer exe, `vcruntime140_1.dll`, pip distlib `t32/t64/w32/w64.exe`, tcl nmake helper).
 
+## Follow-up (same PR)
+
+After toolchain skip, PE scan passed on `windows-11-arm`. Full pytest failed one capture-script unit test that hard-coded `not_a_native_arm64_release_environment` (true on Linux/x64; false on native ARM64 Python). Test now asserts the claim matches the host; capture script policy is unchanged.
+
 ## Invariants
 
 No EventBus/UI/storage changes. Two-tier allowlist unchanged. Core process PE must still be `0xAA64`.
