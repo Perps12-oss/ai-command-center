@@ -3,7 +3,7 @@
 **Class:** B operator ledger (fields supplied for v1.0 close-out; not a Cloud-executed GUI/PE session)  
 **Plan:** [`ARM64_PLATFORM_CONTRACT_REMEDIATION_PLAN.md`](ARM64_PLATFORM_CONTRACT_REMEDIATION_PLAN.md) steps 2–3 evidence + step 4 alignment  
 **Wave 5 GUI:** [`GATE5_WINDOWS_ARM64_GUI_VERIFICATION.md`](GATE5_WINDOWS_ARM64_GUI_VERIFICATION.md) (2026-08-17 attestation; same SKU)  
-**Close-out tree:** this branch (git SHA recorded in [`V1_0_RELEASE_LEDGER.md`](V1_0_RELEASE_LEDGER.md) at merge)
+**Close-out package tip:** `26df9cd` (this branch). **Release SHA / tag:** only after merge to `main`.
 
 ## Environment
 

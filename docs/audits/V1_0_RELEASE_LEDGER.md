@@ -1,6 +1,6 @@
 # v1.0 close-out ledger — Windows ARM64 two-tier
 
-**Package date:** 2026-08-18  
+**Package tip:** `26df9cd` on `cursor/multi-arch-windows-feasibility-audit-9f49`  
 **SKU:** Windows ARM64 desktop (native Python + native Ollama)  
 **Rule:** [`PHASE_COMPLETION_RULE.md`](../governance/PHASE_COMPLETION_RULE.md) — **COMPLETE only after this package is on `main`**. Do not treat a feature-branch tip as the release.
 
