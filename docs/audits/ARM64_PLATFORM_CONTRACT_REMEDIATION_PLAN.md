@@ -9,7 +9,7 @@
 
 This document is the ARM64 remediation plan. It is **not** an x86-64 plan.
 
-**Execution status (2026-08-18):** Sequence **step 1 done**. Steps **2–3 tooling** added: `scripts/capture_arm64_isa_evidence.py` + [`ARM64_ISA_EVIDENCE_SESSION.md`](ARM64_ISA_EVIDENCE_SESSION.md). **Operator Windows ARM64 session still required.** Step 4+ not started. Allowlist still `pending`.
+**Execution status (2026-08-18 close-out):** Owner supplied 2026-08-16 ISA fields. Sequence **step 4** alignment is in this change (`arm64_policy.py`, scanner, wheel_audit, matrix, docs). Step 5 = enabled `arm64-gate.yml` (success recorded when `windows-11-arm` is green). Allowlist **granted in code** for named utilities after that operator statement. PERF Art XV **not** pulled into this gate.
 
 ---
 
