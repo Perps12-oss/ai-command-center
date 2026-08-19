@@ -15,7 +15,7 @@
 - [x] Preflight: Phase 0 PASS (operator)
 - [x] Two-tier policy encoded in `arm64_policy.py` (scanner + wheel_audit + matrix)
 - [x] `arm64-gate.yml` enabled on PR/push (`windows-11-arm`)
-- [ ] `arm64-gate` first green run — fill when Actions completes
+- [x] `arm64-gate` first green run — [32199598840](https://github.com/Perps12-oss/ai-command-center/actions/runs/32199598840) on `windows-11-arm`
 - [ ] `v1.0` git tag — only on `main` after merge
 
 ## Explicitly not claimed

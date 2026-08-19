@@ -17,4 +17,12 @@ PR/push triggers are **on**. The job runs:
 
 ## First successful run
 
-Recorded when GitHub Actions completes `windows-11-arm` for this close-out PR. Until that job is green, this file is **enablement only**, not a Class A PE proof. Operator 2026-08-16 remains the desktop ISA ledger.
+| Field | Value |
+|-------|--------|
+| Date | 2026-08-19 |
+| Runner | `windows-11-arm` |
+| Python | 3.12.10 arm64 (`platform.machine()==ARM64`) |
+| Result | **pass** |
+| Example | [run 32199598840](https://github.com/Perps12-oss/ai-command-center/actions/runs/32199598840) (7m34s) on tip `1f8205d` |
+
+Operator 2026-08-16 remains the desktop ISA ledger (Python 3.14). CI proves native ARM64 3.12 + two-tier PE scan + pytest.
