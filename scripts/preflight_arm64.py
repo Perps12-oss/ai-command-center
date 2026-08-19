@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""Comprehensive ARM64 preflight checks for AI Command Center (Phase 0)."""
+"""Phase 0 ARM64 preflight (two-tier contract).
+
+Validates: Python >=3.11, process ``platform.machine()==ARM64``, baseline.json,
+Ollama HTTP, Ollama PE 0xAA64, critical imports, and wheel_audit severities.
+
+Two-tier: inference-critical + Ollama + this process must be native ARM64.
+Allowlisted utilities (see ``arm64_policy.ALLOWLIST_EMULATION``) may be AMD64
+and audit as PASS. Non-allowlisted AMD64 wheels FAIL.
+
+Not imported by ``main.py`` — operator/release evidence, not GUI startup.
+Ollama HTTP down is a service-availability fail, distinct from PE mismatch.
+"""
 
 from __future__ import annotations
 
@@ -173,7 +184,7 @@ def main() -> int:
         warnings += 1
 
     wheel_rows = audit_all_deps()
-    print("[INFO] Wheel architecture audit (emulated x64 = WARN unless inference-critical):")
+    print("[INFO] Wheel architecture audit (two-tier: allowlisted AMD64 = PASS):")
     for row in wheel_rows:
         sev = row["severity"]
         print(

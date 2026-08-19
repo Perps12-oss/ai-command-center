@@ -1,6 +1,8 @@
 # AI Command Center
 
-Local AI command surface for **Windows ARM64** — canonical repository.
+Local AI command surface for **Windows ARM64** — **v1.0 SKU: native ARM64 Python + native ARM64 Ollama**.
+
+Two-tier architecture policy: core native; named utilities may be emulated. See [`docs/PLATFORM_CONTRACT.md`](docs/PLATFORM_CONTRACT.md) and [`docs/audits/ARM64_ISA_EVIDENCE_2026-08-16.md`](docs/audits/ARM64_ISA_EVIDENCE_2026-08-16.md).
 
 ## Project home
 
