@@ -168,7 +168,7 @@ def scan(roots: list[Path], allow: set[str]) -> dict:
         if machine == IMAGE_FILE_MACHINE_ARM64:
             continue
         row = {"path": str(path), "machine": machine_name(machine)}
-        if is_allowlisted_emulation_path(path):
+        if machine == IMAGE_FILE_MACHINE_AMD64 and is_allowlisted_emulation_path(path):
             allowlisted.append(row)
         else:
             offenders.append(row)

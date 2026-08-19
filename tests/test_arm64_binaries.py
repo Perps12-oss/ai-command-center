@@ -89,6 +89,16 @@ def test_two_tier_allowlist_passes_aiohttp_amd64(tmp_path: Path) -> None:
     assert rc == 0
 
 
+def test_two_tier_allowlist_rejects_i386_in_aiohttp(tmp_path: Path) -> None:
+    pkg = tmp_path / "site-packages" / "aiohttp"
+    pkg.mkdir(parents=True)
+    (pkg / "ext.pyd").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_I386))
+    report = scanner.scan([tmp_path], allow=set())
+    assert [Path(o["path"]).name for o in report["offenders"]] == ["ext.pyd"]
+    assert report["allowlisted"] == []
+    assert scanner.main([str(tmp_path)]) == 1
+
+
 def test_toolchain_noise_is_skipped_but_core_and_wheels_still_gated(
     tmp_path: Path,
 ) -> None:
