@@ -20,33 +20,11 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-import json
-import time
 from typing import Any
 
 # sqlite3.Connection is not weakref-able; drop entries explicitly on close if needed.
 _LOCKS: dict[int, threading.RLock] = {}
 _LOCKS_GUARD = threading.Lock()
-_DEBUG_LOG_PATH = "/opt/cursor/logs/debug.log"
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
-    try:
-        open(_DEBUG_LOG_PATH, "a", encoding="utf-8").write(
-            json.dumps(
-                {
-                    "hypothesisId": hypothesis_id,
-                    "location": location,
-                    "message": message,
-                    "data": data,
-                    "timestamp": int(time.time() * 1000),
-                },
-                separators=(",", ":"),
-            )
-            + "\n"
-        )
-    except Exception:
-        return
 
 
 def _raw_conn(conn: sqlite3.Connection | GuardedConnection) -> sqlite3.Connection:
@@ -99,29 +77,13 @@ class GuardedConnection:
         with self._gate:
             if self._owner == tid:
                 return
-        wait_start = time.perf_counter()
         self._lock.acquire()
-        wait_ms = (time.perf_counter() - wait_start) * 1000.0
         with self._gate:
             if self._owner is None:
                 self._owner = tid
             elif self._owner != tid:
                 self._lock.release()
                 raise RuntimeError("sqlite connection lock ownership corruption")
-        if wait_ms >= 25.0:
-            # region agent log
-            _debug_log(
-                "A",
-                "conn_sync.py:_enter",
-                "sqlite lock wait observed",
-                {
-                    "threadId": tid,
-                    "waitMs": round(wait_ms, 3),
-                    "inTransaction": bool(self._raw.in_transaction),
-                    "owner": self._owner,
-                },
-            )
-            # endregion
 
     def _leave(self) -> None:
         """Drop ownership/lock only when the underlying transaction is closed."""
@@ -140,26 +102,10 @@ class GuardedConnection:
     def _terminal(self, *, commit: bool) -> None:
         self._enter()
         try:
-            try:
-                if commit:
-                    self._raw.commit()
-                else:
-                    self._raw.rollback()
-            except sqlite3.Error as exc:
-                # region agent log
-                _debug_log(
-                    "A",
-                    "conn_sync.py:_terminal",
-                    "sqlite terminal operation failed",
-                    {
-                        "threadId": self._thread_id(),
-                        "commit": bool(commit),
-                        "error": str(exc),
-                        "inTransactionAfterError": bool(self._raw.in_transaction),
-                    },
-                )
-                # endregion
-                raise
+            if commit:
+                self._raw.commit()
+            else:
+                self._raw.rollback()
         finally:
             tid = self._thread_id()
             with self._gate:
@@ -173,24 +119,7 @@ class GuardedConnection:
     def execute(self, *args: Any, **kwargs: Any) -> sqlite3.Cursor:
         self._enter()
         try:
-            try:
-                return self._raw.execute(*args, **kwargs)
-            except sqlite3.Error as exc:
-                sql = str(args[0]) if args else ""
-                # region agent log
-                _debug_log(
-                    "B",
-                    "conn_sync.py:execute",
-                    "sqlite execute failed",
-                    {
-                        "threadId": self._thread_id(),
-                        "error": str(exc),
-                        "sqlPrefix": sql[:120],
-                        "inTransaction": bool(self._raw.in_transaction),
-                    },
-                )
-                # endregion
-                raise
+            return self._raw.execute(*args, **kwargs)
         finally:
             self._leave()
 
@@ -223,18 +152,6 @@ class GuardedConnection:
         self._terminal(commit=False)
 
     def close(self) -> None:
-        # region agent log
-        _debug_log(
-            "C",
-            "conn_sync.py:close",
-            "sqlite connection close requested",
-            {
-                "threadId": self._thread_id(),
-                "inTransaction": bool(self._raw.in_transaction),
-                "owner": self._owner,
-            },
-        )
-        # endregion
         try:
             if self._raw.in_transaction:
                 self.rollback()

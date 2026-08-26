@@ -6,9 +6,7 @@ Add new services there; this file only orchestrates startup/shutdown.
 
 from __future__ import annotations
 
-import json
 import sqlite3
-import time
 from dataclasses import dataclass, field
 
 import customtkinter as ctk
@@ -21,27 +19,6 @@ from ai_command_center.core.state.system_snapshot_builder import SystemSnapshotB
 from ai_command_center.core.workspace_os_service import WorkspaceOsService
 from ai_command_center.db.connection import init_database
 from ai_command_center.platform.hero_assets import load_hero_ctk_image
-
-_DEBUG_LOG_PATH = "/opt/cursor/logs/debug.log"
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict[str, object]) -> None:
-    try:
-        open(_DEBUG_LOG_PATH, "a", encoding="utf-8").write(
-            json.dumps(
-                {
-                    "hypothesisId": hypothesis_id,
-                    "location": location,
-                    "message": message,
-                    "data": data,
-                    "timestamp": int(time.time() * 1000),
-                },
-                separators=(",", ":"),
-            )
-            + "\n"
-        )
-    except Exception:
-        return
 
 
 @dataclass
@@ -65,38 +42,11 @@ class ApplicationCore:
         self.bus.publish("app.phase", {"phase": "ready"}, source="application")
 
     def shutdown(self) -> None:
-        # region agent log
-        _debug_log(
-            "C",
-            "application.py:shutdown",
-            "shutdown start",
-            {
-                "dispatchQueueDepth": self.bus.dispatch_queue_depth,
-                "dbInTransaction": bool(getattr(self.db, "in_transaction", False)),
-            },
-        )
-        # endregion
         self.services.shutdown()
         self.state_store.close()
         self.bus.publish("app.phase", {"phase": "stopped"}, source="application")
         self.bus.shutdown()
-        # region agent log
-        _debug_log(
-            "C",
-            "application.py:shutdown",
-            "event bus shutdown completed",
-            {"dispatchQueueDepth": self.bus.dispatch_queue_depth},
-        )
-        # endregion
         self.db.close()
-        # region agent log
-        _debug_log(
-            "C",
-            "application.py:shutdown",
-            "db closed after event bus shutdown",
-            {"dispatchQueueDepth": self.bus.dispatch_queue_depth},
-        )
-        # endregion
 
 
 def create_application(
