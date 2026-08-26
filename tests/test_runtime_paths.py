@@ -30,6 +30,7 @@ def test_runtime_data_dir_windows_uses_appdata(tmp_path) -> None:
 
 def test_runtime_data_dir_macos_uses_application_support(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.delenv("APPDATA", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     path = runtime_paths.get_runtime_data_dir()
     assert path == tmp_path / "Library" / "Application Support" / "AICommandCenter"
@@ -39,7 +40,11 @@ def test_runtime_data_dir_macos_uses_application_support(tmp_path, monkeypatch) 
 def test_runtime_data_dir_linux_uses_xdg_data_home(tmp_path) -> None:
     xdg = tmp_path / "xdg"
     with patch.object(sys, "platform", "linux"):
-        with patch.dict(os.environ, {"XDG_DATA_HOME": str(xdg)}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"XDG_DATA_HOME": str(xdg), "APPDATA": ""},
+            clear=False,
+        ):
             path = runtime_paths.get_runtime_data_dir()
     assert path == xdg / "AICommandCenter"
     assert path.is_dir()
@@ -62,6 +67,7 @@ def test_runtime_data_dir_linux_prefers_appdata_override(tmp_path) -> None:
 def test_runtime_data_dir_linux_default_local_share(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.delenv("APPDATA", raising=False)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     path = runtime_paths.get_runtime_data_dir()
     assert path == tmp_path / ".local" / "share" / "AICommandCenter"
