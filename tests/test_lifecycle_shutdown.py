@@ -41,6 +41,53 @@ def test_application_shutdown_closes_state_store() -> None:
     assert core.state_store._unsubscribers == []
 
 
+def test_application_shutdown_stops_bus_before_db_close() -> None:
+    order: list[str] = []
+
+    class _Bus:
+        dispatch_queue_depth = 0
+
+        def publish(self, *_args, **_kwargs):
+            order.append("publish")
+            class _Event:
+                delivery = "delivered"
+            return _Event()
+
+        def shutdown(self, **_kwargs):
+            order.append("bus.shutdown")
+
+    class _Services:
+        def shutdown(self):
+            order.append("services.shutdown")
+
+    class _State:
+        def close(self):
+            order.append("state.close")
+
+    class _DB:
+        in_transaction = False
+
+        def close(self):
+            order.append("db.close")
+
+    from ai_command_center.application import ApplicationCore
+
+    core = ApplicationCore(
+        bus=_Bus(),  # type: ignore[arg-type]
+        state_store=_State(),  # type: ignore[arg-type]
+        services=_Services(),  # type: ignore[arg-type]
+        db=_DB(),  # type: ignore[arg-type]
+    )
+    core.shutdown()
+    assert order == [
+        "services.shutdown",
+        "state.close",
+        "publish",
+        "bus.shutdown",
+        "db.close",
+    ]
+
+
 def test_application_tool_invoke_dispatch_does_not_block_publisher() -> None:
     db = init_database(connect(Path(":memory:")))
     core = create_application(db=db, workspace_os_enabled=False)
