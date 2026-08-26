@@ -103,7 +103,13 @@ class SettingsService:
                 validated = self._schema.fields[key].default
         if isinstance(validated, dict):
             validated = json.dumps(validated, sort_keys=True, separators=(",", ":"))
-        self._repo.set(key, validated)
+        current_raw = self._repo.get(key, "")
+        if isinstance(validated, bool):
+            target_raw = "1" if validated else "0"
+        else:
+            target_raw = str(validated)
+        if current_raw != target_raw:
+            self._repo.set(key, validated)
         if publish and self._bus is not None:
             self._bus.publish(SETTINGS_UPDATED, {"key": key, "value": validated}, source="settings")
             self._bus.publish(SETTINGS_SNAPSHOT, self.get_snapshot().to_payload(), source="settings")

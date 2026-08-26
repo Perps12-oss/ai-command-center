@@ -17,6 +17,7 @@ from ai_command_center.core.events.topics import (
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
     SETTINGS_SNAPSHOT,
+    OPENAI_STATUS,
 )
 from ai_command_center.providers.provider_registry import build_default_registry
 from ai_command_center.services.chat_handler_service import ChatHandlerService
@@ -190,6 +191,11 @@ def test_chat_handler_uses_model_router_before_llm_dispatch() -> None:
         bus.publish(
             SETTINGS_SNAPSHOT,
             {"default_model": "gpt-4o-mini", "provider": "openai"},
+            source="test",
+        )
+        bus.publish(
+            OPENAI_STATUS,
+            {"online": True, "configured": True, "detail": ""},
             source="test",
         )
         bus.publish(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import statistics
 import time
 
@@ -28,11 +29,19 @@ from ai_command_center.platform.secret_store import (
 
 
 @pytest.fixture()
-def core():
+def core(tmp_path):
+    previous_appdata = os.environ.get("APPDATA")
+    os.environ["APPDATA"] = str(tmp_path)
     app = create_application()
     app.startup()
-    yield app
-    app.shutdown()
+    try:
+        yield app
+    finally:
+        app.shutdown()
+        if previous_appdata is None:
+            os.environ.pop("APPDATA", None)
+        else:
+            os.environ["APPDATA"] = previous_appdata
 
 
 def test_reducer_index_narrows_system_snapshot() -> None:
@@ -98,7 +107,16 @@ def test_settings_single_snapshot(core) -> None:
         settings = reg.get("settings")
     assert settings is not None
     before = len(snaps)
-    settings.set("theme", core.state_store.snapshot.settings.theme)
+    for _ in range(20):
+        try:
+            settings.set("theme", core.state_store.snapshot.settings.theme)
+            break
+        except sqlite3.OperationalError as exc:
+            if "database is locked" not in str(exc).lower():
+                raise
+            time.sleep(0.05)
+    else:
+        raise AssertionError("settings write remained locked after retries")
     # Allow nested publishes to settle
     time.sleep(0.05)
     assert len(snaps) - before == 1
