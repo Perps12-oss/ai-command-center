@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+import json
+import time
 from pathlib import Path
 
 from ai_command_center.db.conn_sync import GuardedConnection, connection_lock
@@ -16,6 +18,26 @@ __all__ = [
     "get_database_path",
     "init_database",
 ]
+_DEBUG_LOG_PATH = "/opt/cursor/logs/debug.log"
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict[str, object]) -> None:
+    try:
+        open(_DEBUG_LOG_PATH, "a", encoding="utf-8").write(
+            json.dumps(
+                {
+                    "hypothesisId": hypothesis_id,
+                    "location": location,
+                    "message": message,
+                    "data": data,
+                    "timestamp": int(time.time() * 1000),
+                },
+                separators=(",", ":"),
+            )
+            + "\n"
+        )
+    except Exception:
+        return
 
 
 def get_database_path() -> Path:
@@ -39,6 +61,14 @@ def connect(db_path: Path | None = None) -> GuardedConnection:
         except sqlite3.Error:
             pass
     # Composition-root handle: transaction-bound serialization (P1-B).
+    # region agent log
+    _debug_log(
+        "D",
+        "connection.py:connect",
+        "sqlite primary connection created",
+        {"dbPath": str(path), "rawId": id(raw)},
+    )
+    # endregion
     return GuardedConnection(raw)
 
 

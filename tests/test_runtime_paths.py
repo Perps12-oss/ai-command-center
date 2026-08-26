@@ -45,6 +45,20 @@ def test_runtime_data_dir_linux_uses_xdg_data_home(tmp_path) -> None:
     assert path.is_dir()
 
 
+def test_runtime_data_dir_linux_prefers_appdata_override(tmp_path) -> None:
+    appdata = tmp_path / "appdata_override"
+    xdg = tmp_path / "xdg"
+    with patch.object(sys, "platform", "linux"):
+        with patch.dict(
+            os.environ,
+            {"APPDATA": str(appdata), "XDG_DATA_HOME": str(xdg)},
+            clear=False,
+        ):
+            path = runtime_paths.get_runtime_data_dir()
+    assert path == appdata / "AICommandCenter"
+    assert path.is_dir()
+
+
 def test_runtime_data_dir_linux_default_local_share(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
