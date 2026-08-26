@@ -92,7 +92,11 @@ class GuardedConnection:
         with self._gate:
             if self._owner != tid:
                 return
-            if self._raw.in_transaction:
+            try:
+                in_transaction = bool(self._raw.in_transaction)
+            except sqlite3.ProgrammingError:
+                in_transaction = False
+            if in_transaction:
                 return
             self._owner = None
             release = True
@@ -152,12 +156,23 @@ class GuardedConnection:
         self._terminal(commit=False)
 
     def close(self) -> None:
+        # Serialize close with all SQLite operations to avoid closing the
+        # underlying handle while another worker thread is mid-statement.
+        self._enter()
         try:
             if self._raw.in_transaction:
-                self.rollback()
-        finally:
+                self._raw.rollback()
             drop_connection_lock(self._raw)
             self._raw.close()
+        finally:
+            tid = self._thread_id()
+            with self._gate:
+                if self._owner == tid:
+                    self._owner = None
+            try:
+                self._lock.release()
+            except RuntimeError:
+                pass
 
     def cursor(self, *args: Any, **kwargs: Any) -> sqlite3.Cursor:
         self._enter()

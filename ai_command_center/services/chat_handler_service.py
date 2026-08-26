@@ -22,6 +22,7 @@ from ai_command_center.core.events.topics import (
     APP_WARNING,
     CAPABILITY_COMPLETE,
     CAPABILITY_ERROR,
+    CAPABILITY_PROVIDERS_READY,
     CHAT_COMPLETE,
     CHAT_ERROR,
     CONTEXT_COMPLETE,
@@ -30,15 +31,23 @@ from ai_command_center.core.events.topics import (
     CONTEXT_TRIMMED,
     LLM_REQUEST,
     LLM_STEP_REQUEST,
+    OLLAMA_STATUS,
+    OPENAI_STATUS,
+    ORCHESTRATION_PROVIDER_HEALTH,
     SESSION_UPDATE_REQUEST,
     SETTINGS_SNAPSHOT,
 )
+from ai_command_center.providers.defaults import provider_display_name
 from ai_command_center.platform.model_registry import model_warning
 from ai_command_center.services.base import BaseService
 
 logger = logging.getLogger(__name__)
 
 _LLM_CAPABILITIES = frozenset({"llm", "chat"})
+_SETUP_LABELS = {
+    "ollama": "Ollama",
+    "openai": "OpenAI",
+}
 
 
 class ChatHandlerService(BaseService):
@@ -72,6 +81,7 @@ class ChatHandlerService(BaseService):
         )
         self._unsubscribers: list[Callable[[], None]] = []
         self._pending_steps: dict[str, dict[str, str]] = {}
+        self._provider_health: dict[str, tuple[bool, str]] = {}
 
     def _on_load(self) -> None:
         self._unsubscribers.append(
@@ -86,12 +96,25 @@ class ChatHandlerService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(CHAT_ERROR, self._on_chat_error)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(OLLAMA_STATUS, self._on_ollama_status)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(OPENAI_STATUS, self._on_openai_status)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(CAPABILITY_PROVIDERS_READY, self._on_capability_providers_ready)
+        )
+        self._unsubscribers.append(
+            self._bus.subscribe(ORCHESTRATION_PROVIDER_HEALTH, self._on_orchestration_provider_health)
+        )
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
         self._pending_steps.clear()
+        self._provider_health.clear()
 
     def _on_settings_snapshot(self, event: Event) -> None:
         self._default_model = str(
@@ -100,6 +123,53 @@ class ChatHandlerService(BaseService):
         self._provider = str(event.payload.get("provider", self._provider)).strip() or "ollama"
         self._assembler._default_model = self._default_model
         self._assembler._default_provider = self._provider
+
+    def _on_ollama_status(self, event: Event) -> None:
+        online = bool(event.payload.get("online", False))
+        detail = str(event.payload.get("detail", "")).strip()
+        self._provider_health["ollama"] = (online, detail)
+
+    def _on_openai_status(self, event: Event) -> None:
+        online = bool(event.payload.get("online", False))
+        detail = str(event.payload.get("detail", "")).strip()
+        self._provider_health["openai"] = (online, detail)
+
+    def _on_capability_providers_ready(self, event: Event) -> None:
+        for item in event.payload.get("providers") or []:
+            if not isinstance(item, dict):
+                continue
+            provider_id = str(item.get("id", "")).strip()
+            if not provider_id:
+                continue
+            health_raw = str(item.get("health_state", "")).strip().lower()
+            healthy = health_raw in {"ready", "healthy"}
+            detail = str(item.get("health_detail", "")).strip()
+            self._provider_health[provider_id] = (healthy, detail)
+
+    def _on_orchestration_provider_health(self, event: Event) -> None:
+        provider_id = str(event.payload.get("provider_id", "")).strip()
+        if not provider_id:
+            return
+        healthy = bool(event.payload.get("healthy", False))
+        detail = str(event.payload.get("detail", "")).strip()
+        self._provider_health[provider_id] = (healthy, detail)
+
+    def _provider_ready(self, provider: str) -> tuple[bool, str]:
+        key = provider.strip().lower()
+        status = self._provider_health.get(key)
+        if status is None:
+            return False, "provider status unknown"
+        return status
+
+    def _provider_unavailable_message(self, provider: str, detail: str) -> str:
+        display = provider_display_name(provider)
+        setup_label = _SETUP_LABELS.get(provider.strip().lower(), display)
+        detail_text = detail.strip()
+        detail_line = f" {display} isn't available ({detail_text})." if detail_text else f" {display} isn't available."
+        return (
+            f"I need an AI provider to answer that.{detail_line}\n\n"
+            f"[Set up {setup_label}] Open Settings > Providers (or run: settings)."
+        )
 
     def _on_llm_step_request(self, event: Event) -> None:
         capability = str(event.payload.get("capability", "llm")).strip().lower()
@@ -140,6 +210,24 @@ class ChatHandlerService(BaseService):
                 "run_id": run_id,
                 "step_id": step_id,
             }
+
+        provider_ready, provider_detail = self._provider_ready(self._provider)
+        if not provider_ready:
+            self._bus.publish(
+                CAPABILITY_COMPLETE,
+                {
+                    "request_id": request_id,
+                    "run_id": run_id,
+                    "step_id": step_id,
+                    "output": self._provider_unavailable_message(
+                        self._provider,
+                        provider_detail,
+                    ),
+                    "capability": "llm",
+                },
+                source=self.name,
+            )
+            return
 
         logger.info(
             "chat.llm_step_started request_id=%s run_id=%s step_id=%s query_len=%d",
