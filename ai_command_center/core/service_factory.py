@@ -117,6 +117,7 @@ from ai_command_center.services.execution_query_service import ExecutionQuerySer
 from ai_command_center.telemetry.tracing_service import TracingService
 from ai_command_center.services.tool_executor_service import ToolExecutorService
 from ai_command_center.services.tool_registry_service import ToolRegistryService
+from ai_command_center.services.workspace_bootstrap_service import WorkspaceBootstrapService
 from ai_command_center.services.workflow_engine_service import WorkflowEngineService
 from ai_command_center.services.operation_indexer_service import OperationIndexerService
 from ai_command_center.services.workflow_persistence_service import WorkflowPersistenceService
@@ -322,6 +323,7 @@ def build_services(
         SettingsService(bus, settings_repo),
         state_authority,
         execution_authority,
+        WorkspaceBootstrapService(bus),
         federation,
         CommandRouterService(bus),
         orchestration,

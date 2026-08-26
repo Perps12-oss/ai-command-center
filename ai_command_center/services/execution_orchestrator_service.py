@@ -1120,7 +1120,8 @@ class ExecutionOrchestratorService(BaseService):
             },
             source=self.name,
         )
-        if allow_replan and self._request_replan(run_id, error):
+        allow_replan_for_step = allow_replan and not _is_llm_capability(step.capability)
+        if allow_replan_for_step and self._request_replan(run_id, error):
             # EventBus is sync: if PlannerService handled the replan, replanning is cleared.
             # If still set, no handler answered — fail the run instead of hanging.
             current = self._runs.get(run_id)

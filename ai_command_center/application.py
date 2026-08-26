@@ -44,9 +44,9 @@ class ApplicationCore:
     def shutdown(self) -> None:
         self.services.shutdown()
         self.state_store.close()
-        self.db.close()
         self.bus.publish("app.phase", {"phase": "stopped"}, source="application")
         self.bus.shutdown()
+        self.db.close()
 
 
 def create_application(
