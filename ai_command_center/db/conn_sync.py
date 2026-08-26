@@ -92,7 +92,11 @@ class GuardedConnection:
         with self._gate:
             if self._owner != tid:
                 return
-            if self._raw.in_transaction:
+            try:
+                in_transaction = bool(self._raw.in_transaction)
+            except sqlite3.ProgrammingError:
+                in_transaction = False
+            if in_transaction:
                 return
             self._owner = None
             release = True
