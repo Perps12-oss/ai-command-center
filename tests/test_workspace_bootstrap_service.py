@@ -49,6 +49,7 @@ def test_workspace_bootstrap_creates_workspace_then_replays_command() -> None:
         _create_result(bus, create_events[0], "ws-1")
         assert len(command_events) == 1
         assert command_events[0]["text"] == "> echo hello"
+        assert command_events[0]["request_id"] == "req-1"
         assert command_events[0]["replayed_from_workspace_bootstrap"] is True
         assert command_events[0]["bootstrap_workspace_id"] == "ws-1"
         assert not service.bootstrap_inflight
@@ -143,7 +144,11 @@ def test_bootstrap_timeout_clears_pending_without_executing() -> None:
         assert not service.bootstrap_inflight
         assert service.pending_command_count == 0
         assert not command_events
-        assert errors and "timed out" in str(errors[-1]["message"])
+        # Snapshot before assert: timer-thread appends race pytest's rewriter
+        # on Windows/py3.12 (UnboundLocalError @py_assertN).
+        error_messages = [str(item.get("message", "")) for item in list(errors)]
+        assert error_messages
+        assert any("timed out" in message for message in error_messages)
     finally:
         service.stop()
 
