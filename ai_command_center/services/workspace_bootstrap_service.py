@@ -16,7 +16,9 @@ Bootstrap is an explicit state machine with an identity (``bootstrap_id``):
 
 Only the result carrying the in-flight ``bootstrap_id`` resolves the attempt,
 so an unrelated workspace activation can never authorize replay of commands
-issued for a different context.
+issued for a different context. Transitions arrive on bus threads and on the
+timeout timer thread, so exactly one of them may claim an attempt: whoever
+claims it owns its deferred commands.
 """
 
 from __future__ import annotations
@@ -70,6 +72,7 @@ class WorkspaceBootstrapService(BaseService):
         self._unsubscribers: list[Callable[[], None]] = []
         self._active_workspace_id: str = ""
         self._timeout_s = timeout_s
+        self._lock = threading.RLock()
         self._bootstrap: _Bootstrap | None = None
 
     def _on_load(self) -> None:
@@ -90,7 +93,7 @@ class WorkspaceBootstrapService(BaseService):
         for unsubscribe in self._unsubscribers:
             unsubscribe()
         self._unsubscribers.clear()
-        self._clear_bootstrap()
+        self._take_bootstrap()
         self._active_workspace_id = ""
 
     @property
@@ -99,28 +102,40 @@ class WorkspaceBootstrapService(BaseService):
 
     @property
     def pending_command_count(self) -> int:
-        return len(self._bootstrap.commands) if self._bootstrap else 0
+        with self._lock:
+            return len(self._bootstrap.commands) if self._bootstrap else 0
 
-    def _clear_bootstrap(self) -> None:
-        bootstrap = self._bootstrap
-        self._bootstrap = None
-        if bootstrap is None:
-            return
+    def _take_bootstrap(self, bootstrap_id: str = "") -> _Bootstrap | None:
+        """Claim the in-flight attempt, or None when another thread claimed it.
+
+        A terminal transition (resolve, failure, timeout) must happen once:
+        claiming the attempt hands its deferred commands to exactly one caller,
+        so a create result landing as the timeout fires cannot both replay and
+        fail the same command.
+        """
+        with self._lock:
+            bootstrap = self._bootstrap
+            if bootstrap is None:
+                return None
+            if bootstrap_id and bootstrap.bootstrap_id != bootstrap_id:
+                return None
+            self._bootstrap = None
         if bootstrap.timer is not None:
             bootstrap.timer.cancel()
-        bootstrap.commands.clear()
+        return bootstrap
 
     def _on_workspace_active(self, event: Event) -> None:
         workspace_id = str(event.payload.get("workspace_id", "")).strip()
         if not workspace_id:
             return
         self._active_workspace_id = workspace_id
-        bootstrap = self._bootstrap
-        if bootstrap is None:
-            return
-        if bootstrap.workspace_id and bootstrap.workspace_id == workspace_id:
+        with self._lock:
+            bootstrap = self._bootstrap
             # Only the workspace this bootstrap created authorizes replay.
-            self._resolve_bootstrap(workspace_id)
+            if bootstrap is None or bootstrap.workspace_id != workspace_id:
+                return
+            bootstrap_id = bootstrap.bootstrap_id
+        self._resolve_bootstrap(workspace_id, bootstrap_id=bootstrap_id)
 
     def _on_workspace_deactivated(self, event: Event) -> None:
         workspace_id = str(event.payload.get("workspace_id", "")).strip()
@@ -128,25 +143,31 @@ class WorkspaceBootstrapService(BaseService):
             self._active_workspace_id = ""
 
     def _on_workspace_create_result(self, event: Event) -> None:
-        bootstrap = self._bootstrap
-        if bootstrap is None:
-            return
+        # A workspace created for some other reason never resolves this attempt.
         bootstrap_id = str(event.payload.get("bootstrap_id", "")).strip()
-        if bootstrap_id != bootstrap.bootstrap_id:
-            # A workspace created for some other reason never resolves this one.
+        if not bootstrap_id:
             return
         error = str(event.payload.get("error", "")).strip()
         if error:
-            self._fail_bootstrap(f"Could not create a workspace: {error}")
+            self._fail_bootstrap(
+                f"Could not create a workspace: {error}",
+                bootstrap_id=bootstrap_id,
+            )
             return
         workspace_id = str(event.payload.get("workspace_id", "")).strip()
         if not workspace_id:
-            self._fail_bootstrap("Workspace creation returned no workspace id.")
+            self._fail_bootstrap(
+                "Workspace creation returned no workspace id.",
+                bootstrap_id=bootstrap_id,
+            )
             return
-        bootstrap.workspace_id = workspace_id
+        with self._lock:
+            bootstrap = self._bootstrap
+            if bootstrap is not None and bootstrap.bootstrap_id == bootstrap_id:
+                bootstrap.workspace_id = workspace_id
         # The creating handler activates the workspace it created, so the
         # matching result is the authorization to replay.
-        self._resolve_bootstrap(workspace_id)
+        self._resolve_bootstrap(workspace_id, bootstrap_id=bootstrap_id)
 
     def _on_workspace_required(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
@@ -159,13 +180,14 @@ class WorkspaceBootstrapService(BaseService):
             self._replay([command], self._active_workspace_id)
             return
 
-        bootstrap = self._bootstrap
-        if bootstrap is not None:
-            self._enqueue(bootstrap, command)
-            return
-
-        bootstrap = _Bootstrap(bootstrap_id=uuid.uuid4().hex, commands=[command])
-        self._bootstrap = bootstrap
+        with self._lock:
+            bootstrap = self._bootstrap
+            if bootstrap is None:
+                bootstrap = _Bootstrap(bootstrap_id=uuid.uuid4().hex, commands=[command])
+                self._bootstrap = bootstrap
+            else:
+                self._enqueue(bootstrap, command)
+                return
         if self._timeout_s > 0:
             bootstrap.timer = threading.Timer(
                 self._timeout_s,
@@ -190,6 +212,7 @@ class WorkspaceBootstrapService(BaseService):
         )
 
     def _enqueue(self, bootstrap: _Bootstrap, command: dict[str, str]) -> None:
+        """Append under ``self._lock``, shedding the oldest past the bound."""
         bootstrap.commands.append(command)
         while len(bootstrap.commands) > MAX_PENDING_COMMANDS:
             dropped = bootstrap.commands.pop(0)
@@ -211,13 +234,10 @@ class WorkspaceBootstrapService(BaseService):
             )
 
     def _on_bootstrap_timeout(self, bootstrap_id: str) -> None:
-        bootstrap = self._bootstrap
-        if bootstrap is None or bootstrap.bootstrap_id != bootstrap_id:
-            return
-        self._fail_bootstrap("Workspace creation timed out.")
+        self._fail_bootstrap("Workspace creation timed out.", bootstrap_id=bootstrap_id)
 
-    def _fail_bootstrap(self, message: str) -> None:
-        bootstrap = self._bootstrap
+    def _fail_bootstrap(self, message: str, *, bootstrap_id: str = "") -> None:
+        bootstrap = self._take_bootstrap(bootstrap_id)
         if bootstrap is None:
             return
         pending = list(bootstrap.commands)
@@ -227,7 +247,6 @@ class WorkspaceBootstrapService(BaseService):
             len(pending),
             message,
         )
-        self._clear_bootstrap()
         for item in pending:
             payload: dict[str, object] = {
                 "message": f"{message} Your command was not run.",
@@ -238,13 +257,11 @@ class WorkspaceBootstrapService(BaseService):
         if not pending:
             self._bus.publish(APP_ERROR, {"message": message}, source=self.name)
 
-    def _resolve_bootstrap(self, workspace_id: str) -> None:
-        bootstrap = self._bootstrap
+    def _resolve_bootstrap(self, workspace_id: str, *, bootstrap_id: str = "") -> None:
+        bootstrap = self._take_bootstrap(bootstrap_id)
         if bootstrap is None:
             return
-        pending = list(bootstrap.commands)
-        self._clear_bootstrap()
-        self._replay(pending, workspace_id)
+        self._replay(list(bootstrap.commands), workspace_id)
 
     def _replay(self, commands: list[dict[str, str]], workspace_id: str) -> None:
         for item in commands:
