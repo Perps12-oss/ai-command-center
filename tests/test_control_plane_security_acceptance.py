@@ -37,7 +37,7 @@ from ai_command_center.core.events.topics import (
     TOOL_INVOKE,
     UI_COMMAND,
 )
-from ai_command_center.core.permission.permission import Permission, PermissionContext
+from ai_command_center.core.permission.permission import PermissionContext
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.domain.runtime_safety import SecurityTier
 from ai_command_center.repositories.goal_repository import GoalRepository
@@ -440,8 +440,8 @@ def test_llm_shell_primitives_require_authorization(command: str) -> None:
 
 
 def test_sandbox_python_c_inline_execution_is_blocked() -> None:
-    """Sandbox must reject python -c even when python is allowlisted."""
-    sandbox = CommandSandbox()
+    """Sandbox must reject python -c even when python is explicitly allowlisted."""
+    sandbox = CommandSandbox(allowlist=frozenset({"python", "echo"}))
     with pytest.raises(Exception, match="inline execution"):
         sandbox.validate_command('python -c "import os"')
 

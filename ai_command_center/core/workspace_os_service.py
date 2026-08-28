@@ -394,19 +394,30 @@ class WorkspaceOsService(BaseService):
 
         self._pending[request_id] = {}
 
+        create_payload: dict[str, object] = {
+
+            "title": payload["title"],
+
+            "description": payload.get("description", ""),
+
+        }
+
+        # Carry the caller's bootstrap correlation so only the matching attempt
+        # can be resolved by the result.
+
+        bootstrap_id = str(payload.get("bootstrap_id", "")).strip()
+
+        if bootstrap_id:
+
+            create_payload["bootstrap_id"] = bootstrap_id
+
         self._publish_request(
 
             WORKSPACE_CREATE_REQUEST,
 
             request_id,
 
-            {
-
-                "title": payload["title"],
-
-                "description": payload.get("description", ""),
-
-            },
+            create_payload,
 
         )
 

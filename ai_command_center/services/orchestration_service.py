@@ -275,16 +275,9 @@ class OrchestrationService(BaseService):
             },
             source=self.name,
         )
-        self._bus.publish(
-            SESSION_UPDATE_REQUEST,
-            {
-                "request_id": request_id,
-                "role": "assistant",
-                "content": response_text,
-                **scope_fields,
-            },
-            source=self.name,
-        )
+        # No assistant SESSION_UPDATE_REQUEST here: SessionService already
+        # persists the assistant turn from CHAT_COMPLETE. Publishing both wrote
+        # the same answer twice, double-weighting it in later LLM context.
         self._bus.publish(
             TELEMETRY_EVENT,
             {

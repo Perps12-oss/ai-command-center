@@ -105,6 +105,8 @@ _UI_COMMAND_PUBLISH_ALLOWLIST = frozenset(
         _PKG_ROOT / "services" / "agent_runtime_service.py",
         # agent.task plan steps re-enter intake through ExecutionAuthority.
         _PKG_ROOT / "services" / "execution_orchestrator_service.py",
+        # First-command bootstrap replays deferred intake into the created workspace.
+        _PKG_ROOT / "services" / "workspace_bootstrap_service.py",
     }
 )
 

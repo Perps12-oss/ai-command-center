@@ -36,9 +36,12 @@ READONLY_SHELL_TOOL = "shell_readonly"
 
 # Programs permitted by READONLY_SHELL_TOOL. Deliberately excludes python and
 # git: both accept code or a program path as an argument, so neither can be
-# classified READ regardless of the subcommand used.
+# classified READ regardless of the subcommand used. Also excludes ``cat`` /
+# ``type``: unconstrained path arguments would allow unapproved arbitrary file
+# reads (e.g. the settings DB that may hold API keys). Use a path-validated
+# file tool for content reads inside the vault/workspace.
 READONLY_SHELL_ALLOWLIST: frozenset[str] = frozenset(
-    {"echo", "whoami", "hostname", "ls", "dir", "cat", "type"}
+    {"echo", "whoami", "hostname", "ls", "dir"}
 )
 
 # ---------------------------------------------------------------------------

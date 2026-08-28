@@ -97,8 +97,31 @@ ASYNC_ELIGIBLE_TOPICS: frozenset[str] = frozenset(
         T.WORKFLOW_COMPLETED,
         T.WORKFLOW_FAILED,
         T.WORKFLOW_RUNS_LOADED,
+        T.UI_COMMAND_REPLAY,
     }
 )
+
+# Outcome evidence: topics whose loss would leave a *receipt without its
+# outcome* (audit asymmetry — the receipt is SYNC_STANDARD and survives while
+# the async outcome is dropped). These are delivered inline during shutdown
+# instead of dropped. Streaming/progress topics stay droppable.
+SHUTDOWN_INLINE_TOPICS: frozenset[str] = frozenset(
+    {
+        T.TOOL_RESULT,
+        T.TOOL_COMPLETED,
+        T.TOOL_FAILED,
+        T.LLM_COMPLETE,
+        T.LLM_ERROR,
+        T.CHAT_COMPLETE,
+        T.CHAT_ERROR,
+    }
+)
+
+
+def delivers_inline_during_shutdown(topic: str) -> bool:
+    """Return True when *topic* must still be delivered after shutdown starts."""
+    return topic in SHUTDOWN_INLINE_TOPICS
+
 
 _TOPIC_TIER: dict[str, DispatchTier] = {
     **{t: DispatchTier.SYNC_CRITICAL for t in SYNC_CRITICAL_TOPICS},
@@ -137,6 +160,8 @@ __all__ = [
     "ASYNC_ELIGIBLE_TOPICS",
     "ASYNC_ENQUEUE_BUDGET_MS",
     "DispatchTier",
+    "SHUTDOWN_INLINE_TOPICS",
+    "delivers_inline_during_shutdown",
     "SYNC_CRITICAL_BUDGET_MS",
     "SYNC_CRITICAL_TOPICS",
     "SYNC_STANDARD_BUDGET_MS",

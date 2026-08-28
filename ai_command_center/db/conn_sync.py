@@ -18,9 +18,15 @@ handle returned by ``connect()``.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# Bounded wait for the owning thread to end its transaction before close().
+CLOSE_WAIT_TIMEOUT_S = 2.0
 
 # sqlite3.Connection is not weakref-able; drop entries explicitly on close if needed.
 _LOCKS: dict[int, threading.RLock] = {}
@@ -42,6 +48,15 @@ def connection_lock(conn: sqlite3.Connection | GuardedConnection) -> threading.R
             lock = threading.RLock()
             _LOCKS[key] = lock
         return lock
+
+
+class ConnectionCloseTimeout(RuntimeError):
+    """Raised when a connection cannot be closed because work still owns it.
+
+    Shutdown must be bounded: rather than blocking forever on the connection
+    lock (or closing the handle underneath another thread's open transaction),
+    ``GuardedConnection.close()`` gives up and reports a lifecycle failure.
+    """
 
 
 def drop_connection_lock(conn: sqlite3.Connection | GuardedConnection) -> None:
@@ -72,18 +87,23 @@ class GuardedConnection:
     def _thread_id(self) -> int:
         return threading.get_ident()
 
-    def _enter(self) -> None:
+    def _enter(self, timeout: float | None = None) -> bool:
+        """Acquire ownership. Returns False only when a bounded wait expires."""
         tid = self._thread_id()
         with self._gate:
             if self._owner == tid:
-                return
-        self._lock.acquire()
+                return True
+        if timeout is None:
+            self._lock.acquire()
+        elif not self._lock.acquire(timeout=max(0.0, timeout)):
+            return False
         with self._gate:
             if self._owner is None:
                 self._owner = tid
             elif self._owner != tid:
                 self._lock.release()
                 raise RuntimeError("sqlite connection lock ownership corruption")
+        return True
 
     def _leave(self) -> None:
         """Drop ownership/lock only when the underlying transaction is closed."""
@@ -155,10 +175,33 @@ class GuardedConnection:
     def rollback(self) -> None:
         self._terminal(commit=False)
 
-    def close(self) -> None:
-        # Serialize close with all SQLite operations to avoid closing the
-        # underlying handle while another worker thread is mid-statement.
-        self._enter()
+    def close(self, *, timeout: float = CLOSE_WAIT_TIMEOUT_S) -> None:
+        """Close the connection once no other thread owns it.
+
+        Serializing close with all SQLite operations avoids closing the handle
+        while another worker is mid-statement. The wait is bounded: an owner
+        that never ends its transaction raises ``ConnectionCloseTimeout``
+        instead of hanging shutdown. The handle is left open in that case —
+        force-closing an actively owned transaction would trade a hang for a
+        corruption/race risk.
+        """
+        if not self._enter(timeout):
+            # The interrupt aborts an in-flight statement so the owning thread
+            # can unwind and release; retry the bounded wait once.
+            try:
+                self._raw.interrupt()
+            except Exception:  # noqa: BLE001 - interrupt is best effort
+                logger.debug("sqlite interrupt failed during close", exc_info=True)
+            if not self._enter(timeout):
+                owner = self._owner
+                logger.error(
+                    "sqlite close blocked: connection still owned by thread=%s",
+                    owner,
+                )
+                raise ConnectionCloseTimeout(
+                    f"sqlite connection still owned by thread {owner} after "
+                    f"{timeout * 2:.1f}s; connection left open"
+                )
         try:
             if self._raw.in_transaction:
                 self._raw.rollback()
