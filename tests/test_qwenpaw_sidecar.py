@@ -12,6 +12,7 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_RUNTIME_REQUEST,
     LLM_REQUEST,
     LLM_STEP_REQUEST,
+    OLLAMA_STATUS,
     SETTINGS_SNAPSHOT,
 )
 from ai_command_center.core.context_manager import ContextManager
@@ -88,6 +89,12 @@ def test_chat_handler_llm_step_publishes_llm_request() -> None:
     bus.subscribe(LLM_REQUEST, lambda e: llm_requests.append(dict(e.payload)))
     chat.start()
     try:
+        # Unknown provider status is fail-closed; announce readiness explicitly.
+        bus.publish(
+            OLLAMA_STATUS,
+            {"online": True, "detail": "", "url": "http://localhost:11434"},
+            source="test",
+        )
         bus.publish(
             LLM_STEP_REQUEST,
             {

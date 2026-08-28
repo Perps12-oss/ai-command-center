@@ -23,6 +23,7 @@ from ai_command_center.core.events.topics import (
     MODEL_RESOLVE_REQUEST,
     MODEL_RESOLVE_RESULT,
     NOTES_INDEXED,
+    OLLAMA_STATUS,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
     TOOL_FAILED,
@@ -321,6 +322,11 @@ class W2ChatHandlerSessionScopeTests(unittest.TestCase):
 
         handler = ChatHandlerService(bus, ContextManager(max_context_tokens=4096))
         handler.load()
+        bus.publish(
+            OLLAMA_STATUS,
+            {"online": True, "detail": "", "url": "http://localhost:11434"},
+            source="tests",
+        )
         bus.publish(
             LLM_STEP_REQUEST,
             {
