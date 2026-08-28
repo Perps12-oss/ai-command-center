@@ -11,6 +11,7 @@ from ai_command_center.platform.secret_store import (
     openai_api_key_source,
     resolve_openai_api_key,
     store_openai_api_key,
+    SecretStoreError,
 )
 
 
@@ -30,6 +31,15 @@ class SecretStoreTests(unittest.TestCase):
     def test_store_empty_clears_without_keyring(self) -> None:
         stored = store_openai_api_key("")
         self.assertEqual(stored, "")
+
+    def test_store_nonempty_fails_closed_without_keyring(self) -> None:
+        import ai_command_center.platform.secret_store as secret_store
+        from ai_command_center.platform.secret_store import SecretStoreError
+
+        secret_store._keyring_module = None
+        secret_store._keyring_unavailable = True
+        with self.assertRaises(SecretStoreError):
+            store_openai_api_key("sk-test")
 
     def test_missing_keyring_logs_once(self) -> None:
         import ai_command_center.platform.secret_store as secret_store
