@@ -1,8 +1,7 @@
-"""System monitor — CPU/RAM/Disk/Net meters, sparkline, top processes, tool log, error log."""
+"""System monitor — meters/logs projected from SystemMonitorService (no UI psutil)."""
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections import deque
 from collections.abc import Callable
@@ -162,10 +161,9 @@ class _ServiceHealthTimeline(ctk.CTkFrame):
 
 
 try:
-    import psutil as _psutil
+    import psutil as _psutil_probe  # noqa: F401 — probe only; UI never samples host
     _PSUTIL = True
 except ImportError:
-    _psutil = None  # type: ignore[assignment]
     _PSUTIL = False
 
 
@@ -430,12 +428,7 @@ class SystemView(ctk.CTkFrame):
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._ui_queue = ui_queue
-        self._active        = False
-        self._poll_in_flight = False
-        self._poll_generation = 0
-        self._prev_disk     = None
-        self._prev_net      = None
-        self._prev_ts       = None
+        self._active = False
         self._build()
 
     def _schedule_on_ui(self, callback: Callable[[], None]) -> None:
@@ -461,11 +454,10 @@ class SystemView(ctk.CTkFrame):
         if not _PSUTIL:
             ctk.CTkLabel(
                 scroll,
-                text="psutil not available — install with: pip install psutil",
+                text="Host metrics require psutil in SystemMonitorService. UI does not sample the host.",
                 font=T.FONT_BODY,
                 text_color=T.TEXT_MUTED,
-            ).pack(padx=T.PAD, pady=T.PAD)
-            return
+            ).pack(padx=T.PAD, pady=(T.PAD, 0))
 
         # ── Resource meters + sparklines ───────────────────────────────────────
         meters_card = GlassCard(scroll)
@@ -529,176 +521,48 @@ class SystemView(ctk.CTkFrame):
         )
         self._error_log.pack(fill="x", padx=T.PAD, pady=(0, T.PAD))
 
-    def _poll_live(self, generation: int) -> bool:
-        """True when this poll generation is still allowed to run."""
-        return bool(self._active) and generation == self._poll_generation
-
-    def _start_polling(self) -> None:
-        if not self._active:
-            self._active = True
-        generation = self._poll_generation
-        self.after(100, lambda: self._poll(generation))
-
-    def _poll(self, generation: int) -> None:
-        if not _PSUTIL or not self._poll_live(generation):
-            return
-        if getattr(self, "_poll_in_flight", False):
-            self.after(self._POLL_MS, lambda: self._poll(generation))
-            return
-        self._poll_in_flight = True
-        threading.Thread(
-            target=self._collect, args=(generation,), daemon=True
-        ).start()
-
-    def _collect(self, generation: int) -> None:
-        try:
-            if not self._poll_live(generation):
-                return
-            now  = time.monotonic()
-            if not self._poll_live(generation):
-                return
-            cpu  = _psutil.cpu_percent(interval=0)
-            if not self._poll_live(generation):
-                return
-            vm   = _psutil.virtual_memory()
-            if not self._poll_live(generation):
-                return
-            proc = _psutil.Process()
-            proc_mem = proc.memory_info().rss / 1024 / 1024
-            proc_cpu = proc.cpu_percent(interval=0)
-            if not self._poll_live(generation):
-                return
-
-            procs: list[tuple[int, float, float, str]] = []
-            for p in _psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
-                try:
-                    procs.append((
-                        p.info["pid"],
-                        p.info["cpu_percent"] or 0.0,
-                        p.info["memory_percent"] or 0.0,
-                        str(p.info["name"] or ""),
-                    ))
-                except Exception:
-                    logger.debug("SystemView: skip process row", exc_info=True)
-
-            # Disk I/O delta
-            disk_delta = (None, None)
-            try:
-                dk = _psutil.disk_io_counters()
-                if dk and self._prev_disk and self._prev_ts:
-                    dt = max(now - self._prev_ts, 0.001)
-                    read_s  = (dk.read_bytes  - self._prev_disk.read_bytes)  / dt
-                    write_s = (dk.write_bytes - self._prev_disk.write_bytes) / dt
-                    disk_delta = (read_s, write_s)
-                self._prev_disk = dk
-            except Exception:
-                logger.debug("SystemView: disk I/O sample failed", exc_info=True)
-
-            # Net I/O delta
-            net_delta = (None, None)
-            try:
-                nt = _psutil.net_io_counters()
-                if nt and self._prev_net and self._prev_ts:
-                    dt = max(now - self._prev_ts, 0.001)
-                    recv_s = (nt.bytes_recv - self._prev_net.bytes_recv) / dt
-                    sent_s = (nt.bytes_sent - self._prev_net.bytes_sent) / dt
-                    net_delta = (recv_s, sent_s)
-                self._prev_net = nt
-            except Exception:
-                logger.debug("SystemView: net I/O sample failed", exc_info=True)
-
-            self._prev_ts = now
-
-            if self._poll_live(generation):
-                self._schedule_on_ui(
-                    lambda g=generation, c=cpu, v=vm, pc=proc_cpu, pm=proc_mem, pr=procs, dd=disk_delta, nd=net_delta: self._update_ui_if_active(
-                        g, c, v, pc, pm, pr, dd, nd
-                    )
-                )
-        except Exception:
-            logger.exception("SystemView poll collect failed")
-        finally:
-            self._poll_in_flight = False
-        if self._poll_live(generation):
-            # Never call Tk .after() from this worker thread — hop to UI first.
-            self._schedule_on_ui(
-                lambda g=generation: self.after(self._POLL_MS, lambda: self._poll(g))
-            )
-
-    def _update_ui_if_active(
-        self,
-        generation: int,
-        cpu: float,
-        vm,
-        proc_cpu: float,
-        proc_mem: float,
-        procs: list[tuple[int, float, float, str]],
-        disk_delta: tuple,
-        net_delta: tuple,
-    ) -> None:
-        if not self._poll_live(generation):
-            return
-        self._update_ui(cpu, vm, proc_cpu, proc_mem, procs, disk_delta, net_delta)
-
-    def _update_ui(
-        self,
-        cpu: float,
-        vm,
-        proc_cpu: float,
-        proc_mem: float,
-        procs: list[tuple[int, float, float, str]],
-        disk_delta: tuple,
-        net_delta: tuple,
-    ) -> None:
-        if not _PSUTIL:
-            return
-
-        self._cpu_bar.update(cpu, f"{cpu:.0f}%")
-        self._cpu_spark.push(cpu)
-
-        ram_pct   = vm.percent
-        ram_used  = vm.used  / 1024 ** 3
-        ram_total = vm.total / 1024 ** 3
-        self._ram_bar.update(ram_pct, f"{ram_used:.1f} / {ram_total:.1f} GB")
-        self._ram_spark.push(ram_pct)
-
-        warnings: list[str] = []
-        if cpu >= 85:
-            warnings.append(f"CPU {cpu:.0f}%")
-        if ram_pct >= 85:
-            warnings.append(f"RAM {ram_pct:.0f}%")
-        warn_text = "  ·  ".join(warnings)
-        self._proc_lbl.configure(
-            text=f"This process — CPU: {proc_cpu:.1f}%   RAM: {proc_mem:.0f} MB"
-            + (f"   ⚠ {warn_text}" if warn_text else ""),
-            text_color=T.STATUS_ERROR if warnings else T.TEXT_SECONDARY,
-        )
-
-        self._top_table.set_data(procs)
-        self._refresh_lbl.configure(text=f"Updated {time.strftime('%H:%M:%S')}")
-
-        # Disk
-        read_s, write_s = disk_delta
-        if read_s is not None:
-            self._disk_tile.update(_human_bytes(read_s), _human_bytes(write_s))
-
-        # Net
-        recv_s, sent_s = net_delta
-        if recv_s is not None:
-            self._net_tile.update(_human_bytes(recv_s), _human_bytes(sent_s))
-
     def apply_system_snapshot(self, snapshot) -> None:
-        """Update meters from the architecture's SystemSnapshot event."""
-        cpu = float(getattr(snapshot, "cpu_percent", 0.0))
-        ram = float(getattr(snapshot, "ram_percent", 0.0))
+        """Project SystemMonitorService metrics (no local psutil)."""
+        if not hasattr(self, "_cpu_bar"):
+            return
+        cpu = float(getattr(snapshot, "cpu_percent", 0.0) or 0.0)
+        ram = float(getattr(snapshot, "ram_percent", 0.0) or 0.0)
         self._cpu_bar.update(cpu, f"{cpu:.0f}%")
         self._cpu_spark.push(cpu)
         self._ram_bar.update(ram, f"{ram:.0f}%")
         self._ram_spark.push(ram)
-        phase = str(getattr(snapshot, "phase", "idle"))
-        self._proc_lbl.configure(
-            text=f"System phase: {phase.title()}  ·  Source: SystemSnapshot"
-        )
+        extra = getattr(snapshot, "extra", None) or {}
+        if not isinstance(extra, dict):
+            extra = {}
+        phase = str(getattr(snapshot, "phase", "idle") or "idle")
+        proc_bits = [f"System phase: {phase.title()}", "Source: SystemSnapshot"]
+        if extra.get("proc_mem_mb") is not None:
+            proc_bits.append(f"RSS {extra.get('proc_mem_mb')} MB")
+        if extra.get("proc_cpu") is not None:
+            proc_bits.append(f"proc CPU {extra.get('proc_cpu')}%")
+        self._proc_lbl.configure(text="  ·  ".join(proc_bits))
+        disk_r, disk_w = extra.get("disk_read_bps"), extra.get("disk_write_bps")
+        if disk_r is not None and disk_w is not None:
+            self._disk_tile.update(_human_bytes(float(disk_r)), _human_bytes(float(disk_w)))
+        net_r, net_s = extra.get("net_recv_bps"), extra.get("net_sent_bps")
+        if net_r is not None and net_s is not None:
+            self._net_tile.update(_human_bytes(float(net_r)), _human_bytes(float(net_s)))
+        top = extra.get("top_processes") or []
+        if hasattr(self, "_top_table") and isinstance(top, list):
+            rows = []
+            for item in top:
+                if not isinstance(item, dict):
+                    continue
+                rows.append(
+                    (
+                        int(item.get("pid") or 0),
+                        float(item.get("cpu") or 0.0),
+                        float(item.get("mem") or 0.0),
+                        str(item.get("name") or ""),
+                    )
+                )
+            self._top_table.set_data(rows)
+        self._refresh_lbl.configure(text=time.strftime("%H:%M:%S"))
 
     def push_service_state(self, service: str, state: str) -> None:
         """Record a service state tick on the health timeline."""
@@ -763,9 +627,6 @@ class SystemView(ctk.CTkFrame):
 
     def on_hide(self) -> None:
         self._active = False
-        self._poll_generation += 1
-        self._poll_in_flight = False
 
     def on_show(self) -> None:
-        self._poll_generation += 1
-        self._start_polling()
+        self._active = True
