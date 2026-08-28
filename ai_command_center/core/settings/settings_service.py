@@ -13,7 +13,11 @@ import json
 from typing import Any
 
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.topics import SETTINGS_SNAPSHOT, SETTINGS_UPDATED
+from ai_command_center.core.events.topics import (
+    SETTINGS_ERROR,
+    SETTINGS_SNAPSHOT,
+    SETTINGS_UPDATED,
+)
 from ai_command_center.core.settings.migration_manager import MigrationManager
 from ai_command_center.core.settings.settings_repository import SettingsRepository
 from ai_command_center.core.settings.settings_schema import SettingsSchema
@@ -99,8 +103,21 @@ class SettingsService:
         if key in self._schema.fields:
             try:
                 validated = self._schema.validate(key, value)
-            except (TypeError, ValueError):
-                validated = self._schema.fields[key].default
+            except (TypeError, ValueError) as exc:
+                # Do not silently write the schema default as if the user value
+                # was accepted — that shadows misconfiguration (audit B9).
+                if publish and self._bus is not None:
+                    self._bus.publish(
+                        SETTINGS_ERROR,
+                        {
+                            "key": key,
+                            "value": value,
+                            "error": str(exc),
+                            "default": self._schema.fields[key].default,
+                        },
+                        source="settings",
+                    )
+                raise
         if isinstance(validated, dict):
             validated = json.dumps(validated, sort_keys=True, separators=(",", ":"))
         current_raw = self._repo.get(key, "")

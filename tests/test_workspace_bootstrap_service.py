@@ -49,6 +49,7 @@ def test_workspace_bootstrap_creates_workspace_then_replays_command() -> None:
         _create_result(bus, create_events[0], "ws-1")
         assert len(command_events) == 1
         assert command_events[0]["text"] == "> echo hello"
+        assert command_events[0]["request_id"] == "req-1"
         assert command_events[0]["replayed_from_workspace_bootstrap"] is True
         assert command_events[0]["bootstrap_workspace_id"] == "ws-1"
         assert not service.bootstrap_inflight

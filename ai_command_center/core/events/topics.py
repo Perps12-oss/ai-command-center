@@ -34,6 +34,7 @@ SETTINGS_UPDATED = "settings.updated"
 SETTINGS_SNAPSHOT = "settings.snapshot"
 SETTINGS_CHANGED = "settings.changed"
 SETTINGS_SET_REQUEST = "settings.set_request"
+SETTINGS_ERROR = "settings.error"
 
 SERVICE_STARTED = "service.started"
 SERVICE_READY = "service.ready"
@@ -63,6 +64,7 @@ APP_WARNING = "app.warning"
 BUS_HANDLER_ERROR = "bus.handler_error"
 COMMAND_DEFERRED = "command.deferred"
 UI_COMMAND = "ui.command"
+UI_COMMAND_REPLAY = "ui.command.replay"
 UI_WORKSPACE_REQUIRED = "ui.workspace.required"
 UI_NAVIGATE = "ui.navigate"
 UI_PALETTE_OPEN = "ui.palette_open"
@@ -486,6 +488,7 @@ __all__ = [
     "SETTINGS_SNAPSHOT",
     "SETTINGS_CHANGED",
     "SETTINGS_SET_REQUEST",
+    "SETTINGS_ERROR",
     "SERVICE_STARTED",
     "SERVICE_READY",
     "SERVICE_STOPPED",
@@ -510,6 +513,7 @@ __all__ = [
     "BUS_HANDLER_ERROR",
     "COMMAND_DEFERRED",
     "UI_COMMAND",
+    "UI_COMMAND_REPLAY",
     "UI_WORKSPACE_REQUIRED",
     "UI_NAVIGATE",
     "UI_PALETTE_OPEN",

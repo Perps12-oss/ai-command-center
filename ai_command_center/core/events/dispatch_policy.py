@@ -97,6 +97,7 @@ ASYNC_ELIGIBLE_TOPICS: frozenset[str] = frozenset(
         T.WORKFLOW_COMPLETED,
         T.WORKFLOW_FAILED,
         T.WORKFLOW_RUNS_LOADED,
+        T.UI_COMMAND_REPLAY,
     }
 )
 

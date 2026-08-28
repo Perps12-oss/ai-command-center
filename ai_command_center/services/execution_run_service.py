@@ -48,18 +48,41 @@ class ExecutionRunService(BaseService):
             EXECUTION_RUNS_LOADED,
             {
                 "runs": [
-                    {
-                        "run_id": run.run_id,
-                        "request_id": run.request_id,
-                        "source": run.source,
-                        "created_at": run.created_at,
-                        "summary": run.snapshot.get("goal", "") if run.snapshot else "",
-                    }
-                    for run in runs
+                    self._rehydrate_entry(run) for run in runs
                 ]
             },
             source=self.name,
         )
+
+    @staticmethod
+    def _rehydrate_entry(run) -> dict[str, object]:
+        """Preserve success attribution from the durable snapshot (audit B14)."""
+        snap = run.snapshot if isinstance(run.snapshot, dict) else {}
+        success = snap.get("execution_success")
+        if success is False:
+            status = "error"
+        elif success is True:
+            status = "complete"
+        else:
+            # Legacy rows without the field: keep prior "complete" default but
+            # surface success as None so consumers can distinguish.
+            status = "complete"
+        summary = (
+            str(snap.get("query") or "").strip()
+            or str(snap.get("goal") or "").strip()
+            or str(snap.get("text") or "").strip()
+        )
+        return {
+            "run_id": run.run_id,
+            "request_id": run.request_id,
+            "source": run.source,
+            "created_at": run.created_at,
+            "summary": summary,
+            "status": status,
+            "success": success if isinstance(success, bool) else None,
+            "truth_valid": snap.get("truth_valid"),
+            "truth_detail": str(snap.get("truth_detail") or ""),
+        }
 
     def _on_orchestration_snapshot(self, event: Event) -> None:
         payload = event.payload

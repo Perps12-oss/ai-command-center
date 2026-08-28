@@ -218,13 +218,26 @@ class ExecutionAuthorityService(BaseService):
             return INTAKE_WORKFLOW
         return INTAKE_UI_COMMAND
 
+    @staticmethod
+    def _validated_request_id(raw: object) -> str:
+        """Reuse a caller-supplied request id when it is a bounded safe token."""
+        value = str(raw or "").strip()
+        if (
+            8 <= len(value) <= 128
+            and all(ch.isalnum() or ch in "-_" for ch in value)
+        ):
+            return value
+        return uuid.uuid4().hex
+
     def _on_ui_command(self, event: Event) -> None:
         text = str(event.payload.get("text", "")).strip()
         if not text:
             return
 
         intake = self._ui_command_intake(event)
-        request_id = uuid.uuid4().hex
+        # Preserve caller-supplied correlation ids (bootstrap replay, agent
+        # re-entry) so deferred→executed trails stay reconstructable.
+        request_id = self._validated_request_id(event.payload.get("request_id"))
         scope = self._workspace_scope(event)
         clipboard = event.payload.get("clipboard")
         state_context = self._project_state(text, scope.get("workspace_id", ""))

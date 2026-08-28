@@ -6,7 +6,11 @@ import subprocess
 import threading
 from typing import TYPE_CHECKING, Any, Callable
 
-from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
+from ai_command_center.core.command_sandbox import (
+    ORCHESTRATION_SHELL_ALLOWLIST,
+    CommandSandbox,
+    SecurityError,
+)
 from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
 from ai_command_center.orchestration.providers.execution_result import ProviderExecutionResult
 
@@ -39,7 +43,9 @@ ShellRunFn = Callable[[str], dict[str, Any]]
 
 
 def _default_run(command: str) -> dict[str, Any]:
-    sandbox = CommandSandbox()
+    # Explicit policy — never the library default (which historically admitted
+    # interpreters). Approval for WRITE_DESTROY must match what can actually run.
+    sandbox = CommandSandbox(allowlist=ORCHESTRATION_SHELL_ALLOWLIST)
     try:
         argv = sandbox.validate_command(command)
     except SecurityError as exc:
