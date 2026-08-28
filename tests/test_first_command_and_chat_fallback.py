@@ -82,7 +82,8 @@ def test_deterministic_time_query_works_without_provider() -> None:
         core.bus.publish(topics.UI_COMMAND, {"text": "What time is it?"}, source="test")
         assert _wait_for(lambda: len(chat_complete) > start, timeout_s=8.0)
         assert not llm_requests
-        assert "utc" in str(chat_complete[-1].get("text", "")).lower()
+        answer = str(chat_complete[-1].get("text", "")).lower()
+        assert "utc" in answer or "coordinated universal time" in answer
     finally:
         for unsub in unsubs:
             unsub()
