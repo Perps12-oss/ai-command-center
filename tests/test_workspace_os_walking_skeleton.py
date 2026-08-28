@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import unittest
 import webbrowser
 from pathlib import Path
@@ -146,6 +148,7 @@ class WorkspaceOsWalkingSkeletonTests(unittest.TestCase):
             self.assertEqual(1, len(url_actions))
 
             action = url_actions[0]
+            os.environ["ACC_ALLOW_ACTION_REGISTRY_INVOKE"] = "1"
             result = wos.action_registry.invoke(
                 action_id=action.id,
                 parameters={"url": "https://example.com/test-launch"},

@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Runtime executes approved actions and is the only component allowed to call `worldModel.apply()`.
+Runtime executes approved actions. Live World Model mutation is owned by `StateAuthorityService.mutate` and `BrainRuntimeService` (ADR-015/016 / State Authority); observers and planners never call `worldModel.apply()`.
 
 Planner outputs intent. Scheduler selects work. Runtime performs gated execution. World Model records truth.
 
