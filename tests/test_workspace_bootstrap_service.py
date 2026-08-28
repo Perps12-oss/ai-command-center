@@ -144,7 +144,11 @@ def test_bootstrap_timeout_clears_pending_without_executing() -> None:
         assert not service.bootstrap_inflight
         assert service.pending_command_count == 0
         assert not command_events
-        assert errors and "timed out" in str(errors[-1]["message"])
+        # Snapshot before assert: timer-thread appends race pytest's rewriter
+        # on Windows/py3.12 (UnboundLocalError @py_assertN).
+        error_messages = [str(item.get("message", "")) for item in list(errors)]
+        assert error_messages
+        assert any("timed out" in message for message in error_messages)
     finally:
         service.stop()
 
