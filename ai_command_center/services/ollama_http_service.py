@@ -25,6 +25,7 @@ from ai_command_center.core.events.topics import (
     LLM_ERROR,
     LLM_REQUEST,
     OLLAMA_STATUS,
+    PROVIDER_STATUS_QUERY,
     SETTINGS_SNAPSHOT,
     UI_CHAT_CANCEL,
 )
@@ -83,8 +84,35 @@ class OllamaHttpService(OllamaServiceBase):
         self._unsubscribers.append(
             self._bus.subscribe(LLM_REQUEST, self._on_llm_request)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(PROVIDER_STATUS_QUERY, self._on_status_query)
+        )
         self._health_task = asyncio.run_coroutine_threadsafe(
             self._delayed_health_check(), self._loop
+        )
+
+    def _on_status_query(self, event: Event) -> None:
+        """Re-announce readiness for consumers holding a stale/empty projection.
+
+        Status publishes are coalesced, so a consumer that subscribed late (or
+        restarted) never sees an unchanged healthy state. This service stays the
+        authority; the query only replays what it already knows.
+        """
+        requested = str(event.payload.get("provider", "")).strip().lower()
+        if requested and requested != "ollama":
+            return
+        if self._last_status_key is None:
+            return
+        online, detail = self._last_status_key
+        self._bus.publish(
+            OLLAMA_STATUS,
+            {
+                "online": online,
+                "detail": detail,
+                "url": self._base_url,
+                "reannounced": True,
+            },
+            source=self.name,
         )
 
     async def _delayed_health_check(self) -> None:
@@ -419,6 +447,8 @@ class OllamaHttpService(OllamaServiceBase):
             "Ollama is not running. Start Ollama (ollama serve) and try again."
         )
         self._publish_error(request_id, message)
+        # Keep the announced status and the re-announce source in step.
+        self._last_status_key = (False, "connection refused")
         self._bus.publish(
             OLLAMA_STATUS,
             {"online": False, "detail": "connection refused", "url": self._base_url},

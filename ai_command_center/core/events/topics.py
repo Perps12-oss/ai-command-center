@@ -145,6 +145,11 @@ CLIPBOARD_CONTENT = "clipboard.content"
 
 OLLAMA_STATUS = "ollama.status"
 OPENAI_STATUS = "openai.status"
+# Readiness reconciliation: consumers that hold a *projection* of provider
+# health (never the authority) ask the owning provider service to re-announce
+# its current status. Providers coalesce status publishes, so a late or
+# restarted consumer would otherwise never learn an unchanged healthy state.
+PROVIDER_STATUS_QUERY = "provider.status.query"
 OLLAMA_MODEL_LOADED = "ollama.model_loaded"
 OLLAMA_MODEL_UNLOADED = "ollama.model_unloaded"
 
@@ -562,6 +567,7 @@ __all__ = [
     "CLIPBOARD_CONTENT",
     "OLLAMA_STATUS",
     "OPENAI_STATUS",
+    "PROVIDER_STATUS_QUERY",
     "OLLAMA_MODEL_LOADED",
     "OLLAMA_MODEL_UNLOADED",
     "MODEL_SELECTED",

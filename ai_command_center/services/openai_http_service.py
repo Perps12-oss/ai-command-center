@@ -25,6 +25,7 @@ from ai_command_center.core.events.topics import (
     LLM_ERROR,
     LLM_REQUEST,
     OPENAI_STATUS,
+    PROVIDER_STATUS_QUERY,
     SETTINGS_SNAPSHOT,
     UI_CHAT_CANCEL,
 )
@@ -80,8 +81,31 @@ class OpenAIHttpService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(LLM_REQUEST, self._on_llm_request)
         )
+        self._unsubscribers.append(
+            self._bus.subscribe(PROVIDER_STATUS_QUERY, self._on_status_query)
+        )
         self._health_task = asyncio.run_coroutine_threadsafe(
             self._delayed_health_check(), self._loop
+        )
+
+    def _on_status_query(self, event: Event) -> None:
+        """Re-announce last known readiness (see OllamaHttpService._on_status_query)."""
+        requested = str(event.payload.get("provider", "")).strip().lower()
+        if requested and requested != "openai":
+            return
+        if self._last_status_key is None:
+            return
+        online, configured, detail = self._last_status_key
+        self._bus.publish(
+            OPENAI_STATUS,
+            {
+                "online": online,
+                "configured": configured,
+                "detail": detail,
+                "url": self._base_url,
+                "reannounced": True,
+            },
+            source=self.name,
         )
 
     async def _delayed_health_check(self) -> None:

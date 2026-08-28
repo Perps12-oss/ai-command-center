@@ -34,6 +34,7 @@ from ai_command_center.core.events.topics import (
     OLLAMA_STATUS,
     OPENAI_STATUS,
     ORCHESTRATION_PROVIDER_HEALTH,
+    PROVIDER_STATUS_QUERY,
     SESSION_UPDATE_REQUEST,
     SETTINGS_SNAPSHOT,
 )
@@ -108,6 +109,10 @@ class ChatHandlerService(BaseService):
         self._unsubscribers.append(
             self._bus.subscribe(ORCHESTRATION_PROVIDER_HEALTH, self._on_orchestration_provider_health)
         )
+        # Provider services own readiness and coalesce status publishes, so a
+        # handler that starts (or restarts) after a status was announced would
+        # otherwise never learn it. Ask the owners to re-announce.
+        self._request_provider_status()
 
     def _on_unload(self) -> None:
         for unsub in self._unsubscribers:
@@ -154,9 +159,26 @@ class ChatHandlerService(BaseService):
         detail = str(event.payload.get("detail", "")).strip()
         self._provider_health[provider_id] = (healthy, detail)
 
+    def _request_provider_status(self, provider: str = "") -> None:
+        """Ask the owning provider service(s) to re-announce current readiness."""
+        self._bus.publish(
+            PROVIDER_STATUS_QUERY,
+            {"provider": provider.strip().lower(), "requested_by": self.name},
+            source=self.name,
+        )
+
     def _provider_ready(self, provider: str) -> tuple[bool, str]:
+        """Read the local readiness *projection*; reconcile on a cache miss.
+
+        ``_provider_health`` is a cache of provider-owned state, never the
+        authority: an empty entry means "unknown to this projection", which is
+        reconciled against the owner before it is treated as not ready.
+        """
         key = provider.strip().lower()
         status = self._provider_health.get(key)
+        if status is None:
+            self._request_provider_status(key)
+            status = self._provider_health.get(key)
         if status is None:
             return False, "provider status unknown"
         return status
@@ -213,17 +235,23 @@ class ChatHandlerService(BaseService):
 
         provider_ready, provider_detail = self._provider_ready(self._provider)
         if not provider_ready:
+            # An unavailable provider is a capability *failure*. The user-facing
+            # explanation travels as the failure message so the run, receipt and
+            # truth validation all record that no LLM answer was produced.
+            self._pending_steps.pop(request_id, None)
             self._bus.publish(
-                CAPABILITY_COMPLETE,
+                CAPABILITY_ERROR,
                 {
                     "request_id": request_id,
                     "run_id": run_id,
                     "step_id": step_id,
-                    "output": self._provider_unavailable_message(
+                    "message": self._provider_unavailable_message(
                         self._provider,
                         provider_detail,
                     ),
                     "capability": "llm",
+                    "reason": "provider_unavailable",
+                    "provider": self._provider,
                 },
                 source=self.name,
             )

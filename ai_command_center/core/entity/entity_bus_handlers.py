@@ -421,6 +421,12 @@ def register_entity_bus_handlers(
     def on_workspace_create_request(event: Event) -> None:
         rid = _request_id(event)
         payload = event.payload
+        # Echo the requester's correlation so only the attempt that asked for
+        # this workspace can be resolved by the result.
+        correlation: dict[str, object] = {}
+        bootstrap_id = str(payload.get("bootstrap_id", "")).strip()
+        if bootstrap_id:
+            correlation["bootstrap_id"] = bootstrap_id
         try:
             workspace = workspace_service.create(
                 title=str(payload["title"]),
@@ -434,6 +440,7 @@ def register_entity_bus_handlers(
                 {
                     "workspace_id": str(workspace.id),
                     "title": workspace.title,
+                    **correlation,
                 },
                 source=source,
             )
@@ -442,7 +449,7 @@ def register_entity_bus_handlers(
                 bus,
                 WORKSPACE_CREATE_RESULT,
                 rid,
-                {"error": str(exc)},
+                {"error": str(exc), **correlation},
                 source=source,
             )
 
