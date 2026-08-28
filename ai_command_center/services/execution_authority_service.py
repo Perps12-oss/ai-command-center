@@ -38,6 +38,7 @@ from ai_command_center.core.events.topics import (
     AGENT_SPAWN_REQUEST,
     COMMAND_DEFERRED,
     EXECUTION_AUTHORITY_DECISION,
+    EXECUTION_DISPATCH_REQUEST,
     GOAL_SUBMIT_REQUEST,
     UI_COMMAND,
     UI_WORKSPACE_REQUIRED,
@@ -135,6 +136,9 @@ class ExecutionAuthorityService(BaseService):
     def _on_load(self) -> None:
         self._unsubscribers.append(self._bus.subscribe(UI_COMMAND, self._on_ui_command))
         self._unsubscribers.append(
+            self._bus.subscribe(EXECUTION_DISPATCH_REQUEST, self._on_execution_dispatch)
+        )
+        self._unsubscribers.append(
             self._bus.subscribe(WORKFLOW_EXECUTION_REQUEST, self._on_workflow_execution_request)
         )
         self._unsubscribers.append(
@@ -196,9 +200,27 @@ class ExecutionAuthorityService(BaseService):
                 scope[key] = value
         return scope
 
-    def _project_state(self, text: str, workspace_id: str) -> StateContext:
+    def _project_state(
+        self,
+        text: str,
+        workspace_id: str,
+        *,
+        light: bool = False,
+    ) -> StateContext:
         if self._state_authority is None:
             return StateContext.empty(workspace_id=workspace_id, query_text=text)
+        if light:
+            from ai_command_center.domain.state_authority import StateQuery
+
+            return self._state_authority.query(
+                StateQuery(
+                    workspace_id=workspace_id,
+                    text=text,
+                    include_memories=False,
+                    include_goals=False,
+                    light=True,
+                )
+            )
         return self._state_authority.project(text=text, workspace_id=workspace_id)
 
     @staticmethod
@@ -240,7 +262,9 @@ class ExecutionAuthorityService(BaseService):
         request_id = self._validated_request_id(event.payload.get("request_id"))
         scope = self._workspace_scope(event)
         clipboard = event.payload.get("clipboard")
-        state_context = self._project_state(text, scope.get("workspace_id", ""))
+        state_context = self._project_state(
+            text, scope.get("workspace_id", ""), light=True
+        )
         decision = self.analyze(text, clipboard=clipboard, state_context=state_context)
 
         self._publish_decision(
@@ -259,6 +283,40 @@ class ExecutionAuthorityService(BaseService):
         ):
             return
 
+        # Keep SYNC_CRITICAL intake thin: defer goal/plan cascade (SQLite +
+        # nested publishes) onto ASYNC_ELIGIBLE execution.dispatch.request.
+        self._bus.publish(
+            EXECUTION_DISPATCH_REQUEST,
+            {
+                "request_id": request_id,
+                "text": text,
+                "intake": intake,
+                "decision": decision.to_payload(),
+                "scope": scope,
+                "state_context": state_context.to_dict(),
+                "priority": event.payload.get("priority"),
+                "description": event.payload.get("description"),
+            },
+            source=self.name,
+        )
+
+    def _on_execution_dispatch(self, event: Event) -> None:
+        """ASYNC_ELIGIBLE post-admit dispatch (goal submit / agent / plan)."""
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        request_id = self._validated_request_id(payload.get("request_id"))
+        text = str(payload.get("text") or "").strip()
+        if not text:
+            return
+        intake = str(payload.get("intake") or INTAKE_UI_COMMAND).strip() or INTAKE_UI_COMMAND
+        raw_decision = payload.get("decision")
+        if not isinstance(raw_decision, dict):
+            return
+        decision = self._decision_from_payload(raw_decision)
+        scope = payload.get("scope") if isinstance(payload.get("scope"), dict) else {}
+        scope = {str(k): str(v) for k, v in scope.items() if v is not None}
+        # Full projection on ASYNC path (memories/goals/WM recover as needed).
+        state_context = self._project_state(text, scope.get("workspace_id", ""))
+
         if (decision.capability or "").startswith("agent"):
             self._dispatch_agent(
                 request_id=request_id,
@@ -270,16 +328,14 @@ class ExecutionAuthorityService(BaseService):
             return
 
         if decision.capability == "goal":
-            # Free-text goals go through planner with World Model context.
-            # Prefer decision.text (prefix stripped) over raw UI_COMMAND text.
             goal_title = str(decision.text or text).strip() or text
             extra: dict[str, Any] = {}
-            if "priority" in event.payload:
+            if "priority" in payload and payload.get("priority") is not None:
                 try:
-                    extra["priority"] = int(event.payload.get("priority") or 0)
+                    extra["priority"] = int(payload.get("priority") or 0)
                 except (TypeError, ValueError):
                     extra["priority"] = 0
-            description = str(event.payload.get("description") or "").strip()
+            description = str(payload.get("description") or "").strip()
             if description:
                 extra["description"] = description
             self._submit_plan(
@@ -297,7 +353,6 @@ class ExecutionAuthorityService(BaseService):
 
         plan = self._plan_for_decision(decision)
         if decision.capability == "llm" and state_context.summary:
-            # Inject state into conversational args for ChatHandler.
             args = dict(decision.args)
             snippets = state_context.to_planner_snippets()
             if snippets:
@@ -319,6 +374,22 @@ class ExecutionAuthorityService(BaseService):
             scope=scope,
             state_context=state_context,
             intake=intake,
+        )
+
+    @staticmethod
+    def _decision_from_payload(raw: dict[str, Any]) -> ExecutionDecision:
+        kind_raw = str(raw.get("kind") or DecisionKind.CONVERSATIONAL.value)
+        try:
+            kind = DecisionKind(kind_raw)
+        except ValueError:
+            kind = DecisionKind.CONVERSATIONAL
+        return ExecutionDecision(
+            kind=kind,
+            text=str(raw.get("text") or ""),
+            capability=str(raw.get("capability") or ""),
+            args=dict(raw.get("args") or {}) if isinstance(raw.get("args"), dict) else {},
+            reason=str(raw.get("reason") or ""),
+            skip_planner=bool(raw.get("skip_planner", False)),
         )
 
     def _publish_decision(

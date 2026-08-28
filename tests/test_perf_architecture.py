@@ -92,8 +92,8 @@ def test_appstate_reduce_under_budget(core) -> None:
             )()
         )
         times.append((time.perf_counter() - st) * 1000.0)
-    assert statistics.mean(times) < 2.0
-    assert max(times) < 10.0
+    assert statistics.mean(times) < 0.75
+    assert max(times) < 5.0
 
 
 def test_settings_single_snapshot(core) -> None:
@@ -153,6 +153,6 @@ def test_ui_command_publish_budget(core) -> None:
         st = time.perf_counter()
         core.bus.publish(UI_COMMAND, {"text": f"ping {i}"}, source="ui")
         times.append((time.perf_counter() - st) * 1000.0)
-    # Deferred workspace / bootstrap path is heavier than bare intake; keep a
-    # CI-tolerant ceiling well under a perceptible interactive stall.
-    assert statistics.mean(times) < 24.0
+    # Art IV SYNC_CRITICAL target is <5 ms. Post-admit dispatch is ASYNC; CI
+    # uses a slightly looser mean floor for machine variance.
+    assert statistics.mean(times) < 8.0

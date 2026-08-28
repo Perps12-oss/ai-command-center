@@ -197,8 +197,9 @@ class StateAuthorityService(BaseService):
         relationships: list[dict[str, Any]] = []
 
         # Prefer live cache; recover lightly if empty (restart path).
+        # Light queries (SYNC_CRITICAL intake) never pay recover cost.
         cached = self._world_model.iter_cached_nodes()
-        if not cached:
+        if not cached and not query.light:
             self._world_model.recover(replay_limit=500)
             cached = self._world_model.iter_cached_nodes()
 
@@ -273,18 +274,19 @@ class StateAuthorityService(BaseService):
             summary="; ".join(summary_parts),
             query_text=text,
         )
-        self._bus.publish(
-            STATE_CONTEXT_BUILT,
-            context.to_dict(),
-            source=self.name,
-        )
-        _logger.info(
-            "state_authority.query workspace=%s entities=%d memories=%d goals=%d",
-            ws,
-            len(context.entities),
-            len(context.memories),
-            len(context.goals),
-        )
+        if not query.light:
+            self._bus.publish(
+                STATE_CONTEXT_BUILT,
+                context.to_dict(),
+                source=self.name,
+            )
+            _logger.info(
+                "state_authority.query workspace=%s entities=%d memories=%d goals=%d",
+                ws,
+                len(context.entities),
+                len(context.memories),
+                len(context.goals),
+            )
         return context
 
     def project(
