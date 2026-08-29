@@ -80,23 +80,21 @@ def test_sandbox_blocks_non_allowlisted_even_if_clean() -> None:
 
 def test_production_pipeline_should_refuse_dangerous_command(event_bus, monkeypatch) -> None:
     """The real ToolExecutorService should not spawn an injected command."""
+    from ai_command_center.core import sandboxed_shell
     from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
     from ai_command_center.core.events.topics import TOOL_INVOKE
     from ai_command_center.services import tool_executor_service as tes
     from ai_command_center.tools.tool_registry import ToolRegistry
 
-    calls: list[str] = []
+    calls: list[object] = []
 
-    class _Completed:
-        returncode = 0
-        stdout = ""
-        stderr = ""
-
-    def _spy_run(command, *args, **kwargs):
+    def _spy_popen(command, *args, **kwargs):
         calls.append(command)
-        return _Completed()
+        raise AssertionError("dangerous command reached subprocess.Popen")
 
-    monkeypatch.setattr(tes.subprocess, "run", _spy_run)
+    # Shell spawning lives in sandboxed_shell (ToolExecutorService no longer
+    # imports subprocess at module scope after the offload closeout).
+    monkeypatch.setattr(sandboxed_shell.subprocess, "Popen", _spy_popen)
 
     service = tes.ToolExecutorService(event_bus, ToolRegistry())
     service.start()
