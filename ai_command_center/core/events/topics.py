@@ -141,6 +141,12 @@ CHAT_REQUEST = "chat.request"
 CHAT_EXPORT_REQUEST = "chat.export_request"
 CHAT_EXPORT_RESULT = "chat.export_result"
 CHAT_EXPORT_ERROR = "chat.export_error"
+WORKFLOW_EXPORT_REQUEST = "workflow.export_request"
+WORKFLOW_EXPORT_RESULT = "workflow.export_result"
+WORKFLOW_EXPORT_ERROR = "workflow.export_error"
+WORKFLOW_IMPORT_REQUEST = "workflow.import_request"
+WORKFLOW_IMPORT_RESULT = "workflow.import_result"
+WORKFLOW_IMPORT_ERROR = "workflow.import_error"
 
 CLIPBOARD_REQUEST = "clipboard.request"
 CLIPBOARD_CONTENT = "clipboard.content"
@@ -270,6 +276,10 @@ PLAN_REPLAN_STUCK = "plan.replan.stuck"
 
 # Execution orchestrator (vNext L5 — approved plan execution with gates)
 EXECUTION_RUN_REQUEST = "execution.run.request"
+# Post-admit handoff from SYNC_CRITICAL UI_COMMAND (EA keeps intake/decision
+# sync; goal/plan submit runs ASYNC_ELIGIBLE so nested SQLite/cascade work does
+# not inflate the SYNC_CRITICAL budget).
+EXECUTION_DISPATCH_REQUEST = "execution.dispatch.request"
 EXECUTION_RUN_STARTED = "execution.run.started"
 EXECUTION_RUN_COMPLETE = "execution.run.complete"
 EXECUTION_RUN_FAILED = "execution.run.failed"
@@ -567,6 +577,12 @@ __all__ = [
     "CHAT_EXPORT_REQUEST",
     "CHAT_EXPORT_RESULT",
     "CHAT_EXPORT_ERROR",
+    "WORKFLOW_EXPORT_REQUEST",
+    "WORKFLOW_EXPORT_RESULT",
+    "WORKFLOW_EXPORT_ERROR",
+    "WORKFLOW_IMPORT_REQUEST",
+    "WORKFLOW_IMPORT_RESULT",
+    "WORKFLOW_IMPORT_ERROR",
     "CLIPBOARD_REQUEST",
     "CLIPBOARD_CONTENT",
     "OLLAMA_STATUS",
@@ -665,6 +681,7 @@ __all__ = [
     "PLAN_REPLAN_RESULT",
     "PLAN_REPLAN_STUCK",
     "EXECUTION_RUN_REQUEST",
+    "EXECUTION_DISPATCH_REQUEST",
     "EXECUTION_RUN_STARTED",
     "EXECUTION_RUN_COMPLETE",
     "EXECUTION_RUN_FAILED",

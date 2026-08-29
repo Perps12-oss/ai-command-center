@@ -94,7 +94,17 @@ class ActionRegistry:
         return action
 
     def invoke(self, action_id: UUID, parameters: dict[str, Any] | None = None) -> Any:
-        """Invoke an action by ID."""
+        """Invoke an action by ID.
+
+        Direct invoke is closed outside explicit test/demo opt-in. Live execution
+        uses WORKFLOW_EXECUTION_REQUEST / TOOL_INVOKE (ADR-006 / ADR-018).
+        """
+        import os
+
+        if os.environ.get("ACC_ALLOW_ACTION_REGISTRY_INVOKE") != "1":
+            raise RuntimeError(
+                "ActionRegistry.invoke is closed; use WORKFLOW_EXECUTION_REQUEST / TOOL_INVOKE"
+            )
         action = self._actions.get(action_id)
         if action is None:
             raise ValueError(f"Action not found: {action_id}")

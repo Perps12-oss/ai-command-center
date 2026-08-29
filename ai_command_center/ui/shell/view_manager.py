@@ -192,6 +192,7 @@ class ViewManagerMixin:
             on_node_move=self._on_workflow_node_move,
             on_compare=self._on_workflow_compare,
             on_scrub=self._on_workflow_timeline_scrub,
+            bus=self._bus,
         )
         self._view_registry["automation"] = lambda: AutomationWorkspaceView(
             self._content,

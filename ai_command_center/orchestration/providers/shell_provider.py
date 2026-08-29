@@ -1,16 +1,19 @@
-"""Shell provider — executes sandboxed shell commands with receipts and truth facts."""
+"""Shell provider — executes sandboxed shell commands with receipts and truth facts.
+
+Latent / paper orchestration path. Live shell side effects enter via
+TOOL_INVOKE → ToolExecutorService. This provider shares ``run_sandboxed_command``
+so allowlist/Popen/cancel cannot drift.
+"""
 
 from __future__ import annotations
 
-import subprocess
-import threading
 from typing import TYPE_CHECKING, Any, Callable
 
 from ai_command_center.core.command_sandbox import (
     ORCHESTRATION_SHELL_ALLOWLIST,
     CommandSandbox,
-    SecurityError,
 )
+from ai_command_center.core.sandboxed_shell import run_sandboxed_command
 from ai_command_center.orchestration.intents.intent_types import OrchestrationIntent
 from ai_command_center.orchestration.providers.execution_result import ProviderExecutionResult
 
@@ -19,25 +22,7 @@ if TYPE_CHECKING:
 
 _logger = __import__("logging").getLogger(__name__)
 
-_active_shell_proc: subprocess.Popen[str] | None = None
-_active_shell_lock = threading.Lock()
-
-
-def _cancel_active_shell() -> bool:
-    """Kill the in-flight shell subprocess, if any."""
-    global _active_shell_proc
-    with _active_shell_lock:
-        proc = _active_shell_proc
-    if proc is None or proc.poll() is not None:
-        return False
-    try:
-        proc.kill()
-        proc.wait(timeout=2.0)
-        return True
-    except Exception:
-        _logger.exception("failed to kill active shell subprocess")
-        return False
-
+_ORCH_SANDBOX = CommandSandbox(allowlist=ORCHESTRATION_SHELL_ALLOWLIST)
 
 ShellRunFn = Callable[[str], dict[str, Any]]
 
@@ -45,52 +30,7 @@ ShellRunFn = Callable[[str], dict[str, Any]]
 def _default_run(command: str) -> dict[str, Any]:
     # Explicit policy — never the library default (which historically admitted
     # interpreters). Approval for WRITE_DESTROY must match what can actually run.
-    sandbox = CommandSandbox(allowlist=ORCHESTRATION_SHELL_ALLOWLIST)
-    try:
-        argv = sandbox.validate_command(command)
-    except SecurityError as exc:
-        _logger.warning("shell command rejected by sandbox: %s", exc)
-        return {"success": False, "error": str(exc)}
-    try:
-        with _active_shell_lock:
-            proc = subprocess.Popen(
-                argv,
-                shell=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            global _active_shell_proc
-            _active_shell_proc = proc
-        try:
-            stdout, stderr = proc.communicate(timeout=30)
-        finally:
-            with _active_shell_lock:
-                if _active_shell_proc is proc:
-                    _active_shell_proc = None
-        completed_stdout = (stdout or "").strip()
-        completed_stderr = (stderr or "").strip()
-        output = completed_stdout or completed_stderr
-        if proc.returncode != 0 and not output:
-            return {
-                "success": False,
-                "exit_code": proc.returncode,
-                "output": "",
-                "error": completed_stderr or f"exit code {proc.returncode}",
-            }
-        return {
-            "success": proc.returncode == 0,
-            "exit_code": proc.returncode,
-            "output": output,
-            "stdout": completed_stdout,
-            "stderr": completed_stderr,
-            "error": completed_stderr or None,
-        }
-    except subprocess.TimeoutExpired:
-        _cancel_active_shell()
-        return {"success": False, "error": "shell command timed out"}
-    except OSError as exc:
-        return {"success": False, "error": str(exc)}
+    return run_sandboxed_command(command, _ORCH_SANDBOX)
 
 
 class ShellProvider:

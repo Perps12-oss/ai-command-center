@@ -26,6 +26,7 @@ from ai_command_center.domain.capability_provider_settings import (
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
 from ai_command_center.platform.model_registry import normalize_tier_map
+from ai_command_center.platform.secret_store import bus_value_for_secret_key
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -128,8 +129,16 @@ class SettingsService:
         if current_raw != target_raw:
             self._repo.set(key, validated)
         if publish and self._bus is not None:
-            self._bus.publish(SETTINGS_UPDATED, {"key": key, "value": validated}, source="settings")
-            self._bus.publish(SETTINGS_SNAPSHOT, self.get_snapshot().to_payload(), source="settings")
+            self._bus.publish(
+                SETTINGS_UPDATED,
+                {"key": key, "value": bus_value_for_secret_key(key, validated)},
+                source="settings",
+            )
+            self._bus.publish(
+                SETTINGS_SNAPSHOT,
+                self.get_snapshot().to_payload(redact_secrets=True),
+                source="settings",
+            )
 
     def set_many(self, values: dict[str, Any], *, publish: bool = True) -> None:
         """Apply multiple keys with at most one settings.snapshot publish."""
@@ -142,12 +151,15 @@ class SettingsService:
         if publish and self._bus is not None and values:
             self._bus.publish(
                 SETTINGS_UPDATED,
-                {"key": last_key, "value": last_value},
+                {
+                    "key": last_key,
+                    "value": bus_value_for_secret_key(last_key, last_value),
+                },
                 source="settings",
             )
             self._bus.publish(
                 SETTINGS_SNAPSHOT,
-                self.get_snapshot().to_payload(),
+                self.get_snapshot().to_payload(redact_secrets=True),
                 source="settings",
             )
 

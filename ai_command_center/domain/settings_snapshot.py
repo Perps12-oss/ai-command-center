@@ -55,8 +55,8 @@ class SettingsSnapshot:
     mcp_servers: dict[str, dict[str, object]] = field(default_factory=dict)
     mission_layout_prefs: dict[str, object] = field(default_factory=dict)
 
-    def to_payload(self) -> dict[str, Any]:
-        return {
+    def to_payload(self, *, redact_secrets: bool = True) -> dict[str, Any]:
+        payload = {
             "theme": self.theme,
             "accent": self.accent,
             "default_model": self.default_model,
@@ -93,3 +93,9 @@ class SettingsSnapshot:
             "mcp_servers": dict(self.mcp_servers),
             "mission_layout_prefs": dict(self.mission_layout_prefs),
         }
+        if redact_secrets:
+            from ai_command_center.platform.secret_store import redact_settings_payload
+
+            return redact_settings_payload(payload)
+        return payload
+

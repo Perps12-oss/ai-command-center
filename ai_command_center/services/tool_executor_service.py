@@ -1,15 +1,23 @@
-﻿"""Runs one tool per tool.invoke by delegating to ToolExecutor (Phase 4B)."""
+﻿"""Runs one tool per tool.invoke by delegating to ToolExecutor (Phase 4B).
+
+Blocking tool bodies (shell communicate, OS launch) run on a dedicated worker
+so the EventBus async dispatch thread is never held for up to 30s.
+"""
 
 from __future__ import annotations
 
 import logging
-import subprocess
+import queue
 import threading
 import uuid
 from typing import TYPE_CHECKING, Any, Callable
 from uuid import UUID
 
-from ai_command_center.core.command_sandbox import CommandSandbox, SecurityError
+from ai_command_center.core.command_sandbox import CommandSandbox
+from ai_command_center.core.sandboxed_shell import (
+    cancel_active_shell,
+    run_sandboxed_command,
+)
 from ai_command_center.core.security_policy import (
     READONLY_SHELL_ALLOWLIST,
     READONLY_SHELL_TOOL,
@@ -40,24 +48,6 @@ logger = logging.getLogger(__name__)
 
 _SANDBOX = CommandSandbox()
 _READONLY_SANDBOX = CommandSandbox(allowlist=READONLY_SHELL_ALLOWLIST)
-_active_shell_proc: subprocess.Popen[str] | None = None
-_active_shell_lock = threading.Lock()
-
-
-def cancel_active_shell() -> bool:
-    """Kill the in-flight shell subprocess, if any."""
-    global _active_shell_proc
-    with _active_shell_lock:
-        proc = _active_shell_proc
-    if proc is None or proc.poll() is not None:
-        return False
-    try:
-        proc.kill()
-        proc.wait(timeout=2.0)
-        return True
-    except Exception:
-        logger.exception("failed to kill active shell subprocess")
-        return False
 
 
 def _run_shell_command(args: dict) -> ToolResult:
@@ -76,50 +66,12 @@ def _run_readonly_shell_command(args: dict) -> ToolResult:
 
 
 def _execute_shell(args: dict, sandbox: CommandSandbox) -> ToolResult:
-    global _active_shell_proc
-    command = str(args.get("command", "")).strip()
-    if not command:
-        return ToolResult(success=False, output="", error="empty shell command")
-    try:
-        argv = sandbox.validate_command(command)
-    except SecurityError as exc:
-        logger.warning("shell command rejected by sandbox: %s", exc)
-        return ToolResult(success=False, output="", error=str(exc))
-    try:
-        with _active_shell_lock:
-            proc = subprocess.Popen(
-                argv,
-                shell=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            _active_shell_proc = proc
-        try:
-            stdout, stderr = proc.communicate(timeout=30)
-        finally:
-            with _active_shell_lock:
-                if _active_shell_proc is proc:
-                    _active_shell_proc = None
-        completed_stdout = (stdout or "").strip()
-        completed_stderr = (stderr or "").strip()
-        output = completed_stdout or completed_stderr
-        if proc.returncode != 0 and not output:
-            return ToolResult(
-                success=False,
-                output="",
-                error=completed_stderr or f"exit code {proc.returncode}",
-            )
-        return ToolResult(
-            success=proc.returncode == 0,
-            output=output,
-            error=completed_stderr or None,
-        )
-    except subprocess.TimeoutExpired:
-        cancel_active_shell()
-        return ToolResult(success=False, output="", error="shell command timed out")
-    except OSError as exc:
-        return ToolResult(success=False, output="", error=str(exc))
+    outcome = run_sandboxed_command(str(args.get("command", "")), sandbox)
+    return ToolResult(
+        success=bool(outcome.get("success")),
+        output=str(outcome.get("output") or ""),
+        error=outcome.get("error"),
+    )
 
 
 class ToolExecutorService(BaseService):
@@ -137,9 +89,19 @@ class ToolExecutorService(BaseService):
         self._permission = permission_service
         self._unsubscribers: list[Callable[[], None]] = []
         self._executor = ToolExecutor(registry)
+        self._exec_queue: queue.SimpleQueue[tuple[str, dict[str, Any], dict[str, Any]] | None] = (
+            queue.SimpleQueue()
+        )
+        self._exec_thread: threading.Thread | None = None
 
     def _on_load(self) -> None:
         self._ensure_builtin_tools()
+        self._exec_thread = threading.Thread(
+            target=self._exec_worker,
+            name="tool-executor-worker",
+            daemon=True,
+        )
+        self._exec_thread.start()
         self._unsubscribers.append(
             self._bus.subscribe(TOOL_INVOKE, self._on_tool_invoke)
         )
@@ -222,9 +184,125 @@ class ToolExecutorService(BaseService):
 
     def _on_unload(self) -> None:
         cancel_active_shell()
+        self._exec_queue.put(None)
+        thread = self._exec_thread
+        self._exec_thread = None
+        if thread is not None and thread.is_alive():
+            thread.join(timeout=5.0)
         for unsub in self._unsubscribers:
             unsub()
         self._unsubscribers.clear()
+
+    def _exec_worker(self) -> None:
+        while True:
+            item = self._exec_queue.get()
+            if item is None:
+                break
+            tool_name, args, meta = item
+            try:
+                self._run_and_publish(tool_name, args, meta)
+            except Exception:
+                logger.exception("tool executor worker failed for %s", tool_name)
+                self._bus.publish(
+                    TOOL_FAILED,
+                    {
+                        "contract_version": TOOL_CONTRACT_VERSION,
+                        "invoke_id": meta.get("invoke_id"),
+                        "tool": tool_name,
+                        "message": "tool worker failure",
+                        "run_id": meta.get("run_id"),
+                        "step_id": meta.get("step_id"),
+                        "success": False,
+                        "error": "tool worker failure",
+                        "workspace_context": meta.get("workspace_context") or {},
+                        **(
+                            {"agent_id": meta["agent_id"]}
+                            if meta.get("agent_id")
+                            else {}
+                        ),
+                    },
+                    source=self.name,
+                )
+
+    def _run_and_publish(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        meta: dict[str, Any],
+    ) -> None:
+        invoke_id = str(meta.get("invoke_id") or "")
+        run_id = meta.get("run_id")
+        step_id = meta.get("step_id")
+        agent_id = meta.get("agent_id")
+        workspace_context = meta.get("workspace_context") or {}
+        if not isinstance(workspace_context, dict):
+            workspace_context = {}
+
+        execution = self._executor.execute(tool_name, **args)
+
+        if execution.status == "failed":
+            error = execution.error or "tool failed"
+            failed_payload: dict[str, Any] = {
+                "contract_version": TOOL_CONTRACT_VERSION,
+                "invoke_id": invoke_id,
+                "tool": tool_name,
+                "message": error,
+                "run_id": run_id,
+                "step_id": step_id,
+                "success": False,
+                "error": error,
+                "workspace_context": workspace_context,
+                **({"agent_id": agent_id} if agent_id else {}),
+            }
+            if execution.facts:
+                failed_payload["facts"] = dict(execution.facts)
+            self._bus.publish(
+                TOOL_FAILED,
+                failed_payload,
+                source=self.name,
+            )
+            self._record_tool_timeline(
+                workspace_context,
+                tool_name=tool_name,
+                invoke_id=invoke_id,
+                success=False,
+                error=error,
+            )
+            return
+
+        output = execution.outputs[0] if execution.outputs else ""
+        result_payload: dict[str, Any] = {
+            "contract_version": TOOL_CONTRACT_VERSION,
+            "invoke_id": invoke_id,
+            "tool": tool_name,
+            "success": True,
+            "output": output,
+            "error": execution.error,
+            "run_id": run_id,
+            "step_id": step_id,
+            "workspace_context": workspace_context,
+            **({"agent_id": agent_id} if agent_id else {}),
+        }
+        if execution.facts:
+            result_payload["facts"] = dict(execution.facts)
+        self._bus.publish(
+            TOOL_RESULT,
+            result_payload,
+            source=self.name,
+        )
+        self._record_tool_timeline(
+            workspace_context,
+            tool_name=tool_name,
+            invoke_id=invoke_id,
+            success=True,
+            output=str(output),
+            error=execution.error,
+        )
+        self._bus.publish(
+            TOOL_COMPLETED,
+            {"tool": tool_name, "invoke_id": invoke_id},
+            source=self.name,
+        )
 
     def _shell_allowed(self, payload: dict) -> bool:
         actor_type = str(payload.get("actor_type", "agent")).strip() or "agent"
@@ -429,68 +507,27 @@ class ToolExecutorService(BaseService):
             {"tool": tool_name, "invoke_id": invoke_id},
             source=self.name,
         )
-        execution = self._executor.execute(tool_name, **args)
-
-        if execution.status == "failed":
-            error = execution.error or "tool failed"
-            failed_payload: dict[str, Any] = {
-                "contract_version": TOOL_CONTRACT_VERSION,
+        job = (
+            tool_name,
+            dict(args),
+            {
                 "invoke_id": invoke_id,
-                "tool": tool_name,
-                "message": error,
                 "run_id": run_id,
                 "step_id": step_id,
-                "success": False,
-                "error": error,
+                "agent_id": agent_id,
                 "workspace_context": workspace_context,
-                **({"agent_id": agent_id} if agent_id else {}),
-            }
-            if execution.facts:
-                failed_payload["facts"] = dict(execution.facts)
-            self._bus.publish(
-                TOOL_FAILED,
-                failed_payload,
-                source=self.name,
-            )
-            self._record_tool_timeline(
-                workspace_context,
-                tool_name=tool_name,
-                invoke_id=invoke_id,
-                success=False,
-                error=error,
-            )
-            return
+            },
+        )
+        # Offload blocking execute (shell communicate / OS launch) so the
+        # EventBus async dispatch thread is not held for up to 30s.
+        # Tests may set ACC_TOOL_EXEC_INLINE=1 for deterministic sync completion.
+        import os
 
-        output = execution.outputs[0] if execution.outputs else ""
-        result_payload: dict[str, Any] = {
-            "contract_version": TOOL_CONTRACT_VERSION,
-            "invoke_id": invoke_id,
-            "tool": tool_name,
-            "success": True,
-            "output": output,
-            "error": execution.error,
-            "run_id": run_id,
-            "step_id": step_id,
-            "workspace_context": workspace_context,
-            **({"agent_id": agent_id} if agent_id else {}),
-        }
-        if execution.facts:
-            result_payload["facts"] = dict(execution.facts)
-        self._bus.publish(
-            TOOL_RESULT,
-            result_payload,
-            source=self.name,
-        )
-        self._record_tool_timeline(
-            workspace_context,
-            tool_name=tool_name,
-            invoke_id=invoke_id,
-            success=True,
-            output=str(output),
-            error=execution.error,
-        )
-        self._bus.publish(
-            TOOL_COMPLETED,
-            {"tool": tool_name, "invoke_id": invoke_id},
-            source=self.name,
-        )
+        if os.environ.get("ACC_TOOL_EXEC_INLINE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            self._run_and_publish(*job)
+        else:
+            self._exec_queue.put(job)

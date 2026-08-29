@@ -172,89 +172,48 @@ def test_eventbus_topic_counts_in_system_snapshot() -> None:
 
 
 @_WIN_TK
-def test_system_view_on_hide_stops_psutil_activity(monkeypatch) -> None:
-    """S4 — after on_hide(), psutil collection must not continue."""
-    from ai_command_center.ui.views import system_view as sv_mod
+def test_system_view_does_not_sample_psutil(monkeypatch) -> None:
+    """UI isolation — SystemView projects snapshots; it must not call psutil."""
+    from ai_command_center.domain.system_snapshot import SystemSnapshot
     from ai_command_center.ui.views.system_view import SystemView
-
-    if not sv_mod._PSUTIL:
-        pytest.skip("psutil not available")
-
-    monkeypatch.setattr(SystemView, "_POLL_MS", 50)
-
-    psutil_calls = {"n": 0}
-
-    class _VM:
-        percent = 10.0
-        used = 1
-        total = 8
-
-    class _Proc:
-        def memory_info(self):
-            class _Mem:
-                rss = 50 * 1024 * 1024
-
-            return _Mem()
-
-        def cpu_percent(self, interval=0):
-            return 1.0
-
-    def _bump_cpu(*_args, **_kwargs):
-        psutil_calls["n"] += 1
-        return 5.0
-
-    monkeypatch.setattr(sv_mod._psutil, "cpu_percent", _bump_cpu)
-    monkeypatch.setattr(sv_mod._psutil, "virtual_memory", lambda: _VM())
-    monkeypatch.setattr(sv_mod._psutil, "Process", _Proc)
-    monkeypatch.setattr(sv_mod._psutil, "process_iter", lambda *_a, **_k: iter([]))
-    monkeypatch.setattr(sv_mod._psutil, "disk_io_counters", lambda: None)
-    monkeypatch.setattr(sv_mod._psutil, "net_io_counters", lambda: None)
 
     root = _ctk_root_or_skip()
     try:
         view = SystemView(root)
         view.on_show()
-        for _ in range(40):
-            root.update()
-            if psutil_calls["n"] > 0:
-                break
-            root.after(25)
-        assert psutil_calls["n"] > 0, "expected psutil activity while visible"
-
-        view.on_hide()
-        # Drain in-flight collector before sampling the post-hide baseline.
-        for _ in range(60):
-            root.update()
-            if not getattr(view, "_poll_in_flight", False):
-                break
-            root.after(25)
-        count_at_hide = psutil_calls["n"]
-
-        for _ in range(60):
-            root.update()
-            root.after(25)
-
-        assert psutil_calls["n"] == count_at_hide, (
-            f"psutil kept running after on_hide: {psutil_calls['n']} vs {count_at_hide}"
+        view.apply_system_snapshot(
+            SystemSnapshot(
+                cpu_percent=12.0,
+                ram_percent=34.0,
+                extra={
+                    "proc_mem_mb": 100.0,
+                    "proc_cpu": 1.0,
+                    "top_processes": [{"pid": 1, "cpu": 1.0, "mem": 0.5, "name": "init"}],
+                    "disk_read_bps": 10.0,
+                    "disk_write_bps": 20.0,
+                    "net_recv_bps": 30.0,
+                    "net_sent_bps": 40.0,
+                },
+            )
         )
+        assert view._active is True
+        view.on_hide()
         assert view._active is False
     finally:
         root.destroy()
 
 
 @_WIN_TK
-def test_system_view_on_hide_stops_poll_generation() -> None:
+def test_system_view_on_hide_clears_active() -> None:
     from ai_command_center.ui.views.system_view import SystemView
 
     root = _ctk_root_or_skip()
     try:
         view = SystemView(root)
-        gen_before = view._poll_generation
         view.on_show()
         assert view._active is True
         view.on_hide()
         assert view._active is False
-        assert view._poll_generation > gen_before
     finally:
         root.destroy()
 

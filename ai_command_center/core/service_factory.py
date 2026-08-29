@@ -88,6 +88,7 @@ from ai_command_center.services.external_capability_bridge_service import (
 from ai_command_center.services.planner_service import PlannerService
 from ai_command_center.services.goal_scheduler_service import SingleGoalScheduler
 from ai_command_center.services.chat_export_service import ChatExportService
+from ai_command_center.services.workflow_io_service import WorkflowIoService
 from ai_command_center.services.chat_handler_service import ChatHandlerService
 from ai_command_center.services.command_router_service import CommandRouterService
 from ai_command_center.services.execution_authority_service import ExecutionAuthorityService
@@ -238,6 +239,7 @@ def build_services(
     execution_event = ExecutionEventService(bus, repo=execution_event_repo)
     system_monitor = SystemMonitorService(bus)
     chat_export = ChatExportService(bus)
+    workflow_io = WorkflowIoService(bus)
 
     model_router = ModelRouterService(bus, provider_registry)
     agent_runtime = AgentRuntimeService(bus)
@@ -319,6 +321,7 @@ def build_services(
         artifact,
         execution_event,
         chat_export,
+        workflow_io,
         system_monitor,
         SettingsService(bus, settings_repo),
         state_authority,
