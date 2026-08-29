@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import threading
 import time
 
@@ -12,7 +11,6 @@ from ai_command_center.core.contracts import TOOL_CONTRACT_VERSION
 from ai_command_center.core.event_bus import EventBus
 from ai_command_center.core.events.topics import (
     EXECUTION_DISPATCH_REQUEST,
-    TOOL_COMPLETED,
     TOOL_INVOKE,
     TOOL_RESULT,
     TOOL_STARTED,

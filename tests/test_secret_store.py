@@ -34,7 +34,6 @@ class SecretStoreTests(unittest.TestCase):
 
     def test_store_nonempty_fails_closed_without_keyring(self) -> None:
         import ai_command_center.platform.secret_store as secret_store
-        from ai_command_center.platform.secret_store import SecretStoreError
 
         secret_store._keyring_module = None
         secret_store._keyring_unavailable = True
