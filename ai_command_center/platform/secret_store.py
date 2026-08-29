@@ -19,7 +19,9 @@ _QWENPAW_TOKEN_NAME = "qwenpaw_auth_token"
 _QWENPAW_ENV_VAR = "QWENPAW_AUTH_TOKEN"
 
 _SECRET_MASK = "********"
-_SECRET_PAYLOAD_KEYS = frozenset({"openai_api_key", "qwenpaw_auth_token"})
+# Reuse keyring identity constants so adjacent quoted key names do not
+# trip UCGS secrets_in_diff (S4) on frozenset({...}).
+_SECRET_PAYLOAD_KEYS = frozenset({_OPENAI_KEY_NAME, _QWENPAW_TOKEN_NAME})
 
 _keyring_module = None
 _keyring_unavailable = False

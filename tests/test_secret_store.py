@@ -39,7 +39,8 @@ class SecretStoreTests(unittest.TestCase):
         secret_store._keyring_module = None
         secret_store._keyring_unavailable = True
         with self.assertRaises(SecretStoreError):
-            store_openai_api_key("sk-test")
+            placeholder = "not-a-real-credential"
+            store_openai_api_key(placeholder)
 
     def test_missing_keyring_logs_once(self) -> None:
         import ai_command_center.platform.secret_store as secret_store

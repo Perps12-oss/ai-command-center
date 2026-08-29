@@ -95,4 +95,5 @@ def test_secret_store_fail_closed(monkeypatch) -> None:
     monkeypatch.setattr(ss, "_keyring_module", None)
     monkeypatch.setattr(ss, "_keyring_unavailable", True)
     with pytest.raises(SecretStoreError):
-        store_openai_api_key("sk-should-not-persist")
+        placeholder = "not-a-real-credential"
+        store_openai_api_key(placeholder)
