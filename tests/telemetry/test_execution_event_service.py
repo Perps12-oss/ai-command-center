@@ -80,8 +80,12 @@ def test_tool_result_chains_parent_event_id() -> None:
             service.stop()
             rows = repo.list_by_request("req-tool")
             assert len(rows) == 2
-            assert rows[0].parent_event_id is None
-            assert rows[1].parent_event_id == rows[0].event_id
+            by_type = {row.event_type: row for row in rows}
+            tool_row = by_type[TOOL_RESULT]
+            chat_row = by_type[CHAT_COMPLETE]
+            # timestamp+event_id order is not a chain proof when timestamps collide.
+            assert tool_row.parent_event_id is None
+            assert chat_row.parent_event_id == tool_row.event_id
         finally:
             conn.close()
 
