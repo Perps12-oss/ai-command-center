@@ -74,9 +74,9 @@ For every stream: **Spec → ADR → implementation → tests → runtime eviden
 | **Missing decision (Gate 2)** | After a Performance Investigation Report: isolate or not; if yes, topology and ordering guarantees; shutdown; priority inversion policy. |
 | **Dependencies** | Art. VII/XII, PERFORMANCE_CONSTITUTION, existing R4b queue, UIQueue (no ≤100 ms polling). |
 | **Implementation surface** | First: instrumentation + load tests. Then smallest isolation **if justified**. |
-| **Verification surface** | `tests/test_eventbus_dispatch_queue.py`, `test_eventbus_shutdown.py`, `test_eventbus_async_adapters.py`. Need contention/burst/starvation/UI-impact evidence (headless CI ≠ Windows GUI; PERF constitution Art V). |
+| **Verification surface** | `tests/test_eventbus_dispatch_queue.py`, `test_eventbus_shutdown.py`, `test_eventbus_async_adapters.py`, **`tests/test_eventbus_stage1_contention.py`**. Stage 1 report: [`EVENTBUS_STAGE1_CONTENTION_REPORT.md`](EVENTBUS_STAGE1_CONTENTION_REPORT.md) — isolation **not** unlocked. Windows ARM64 GUI soak still required for UI budgets (PERF Art. V). |
 | **Estimated effort** | Medium (measurement + maybe isolation) |
-| **Trace** | Spec Phase 5 / PERF constitution → R4b live, pools absent → dispatch tests exist, **no contention report** → no isolation ADR. |
+| **Trace** | Spec Phase 5 / PERF constitution → R4b live, pools absent → dispatch tests exist → **Stage 1 contention report 2026-08-16: no isolation ADR**. |
 
 ---
 
@@ -156,11 +156,11 @@ For every stream: **Spec → ADR → implementation → tests → runtime eviden
 
 | Stream | Spec | ADR | Code | Tests | Runtime evidence | Next gate |
 |--------|------|-----|------|-------|------------------|-----------|
-| A | ADR-021 §10 | Accepted | Partial (escalate-only emit) | Domain | Escalate paths only | Gate 1–2 remaining M2–M5 |
-| B | ADR-022 §10 | Accepted | Score not an authority gate | Domain | Heuristic publish only | Gate 1–2 thresholds |
-| C | ADR-023 §10 | Accepted | M1 settings | Partial | Local undifferentiated defaults | Gate 1–2 M2–M4 |
-| D | PERF + Phase 5 hist. | **No isolation ADR** | R4b single queue | Dispatch tests | No contention report | Gate 1–2 after measurement plan |
-| E | ADR-020; Phase 8b abandoned | **No federation/index ADR** | Unwired FederationService | Unwired unit | WM/Memory only | Gate 1–2 SoT |
-| F | Queue 2 + expedition | **None** | None from Goose | N/A | N/A | Gate 1–2 Adopt/Adapt/Reject |
+| A | ADR-021 §10–12 | Accepted | Gate 4 ordinary-path records | `-k decision_record` | Headless emit + projection | Gate 5 verification (GUI on Win ARM64) |
+| B | ADR-022 §10–12 | Accepted | Gate 4 bands escalate-only | `-k autonomy_escalation` | Headless HITL not deny | Gate 5 |
+| C | ADR-023 §10–12 | Accepted | M1–M4 on main | `-k model_degradation` / mix | Local-only replan/destroy | Gate 5 |
+| D | PERF + IP-D | **No isolation ADR** | R4b single queue | Dispatch + Stage 1 harness | [`EVENTBUS_STAGE1_CONTENTION_REPORT.md`](EVENTBUS_STAGE1_CONTENTION_REPORT.md) — isolation not unlocked | Stage 2 blocked; GUI soak separate |
+| E | ADR-024 | DEFER vectors | M1 FederationService wired | `-k federation_m1` | Factory READY, provenance | Gate 5 for M1; vectors still deferred |
+| F | ADR-025 | Accepted Adopt/Adapt/Reject | None from Goose | N/A | N/A | Wave 4 Adapt Gate 3 |
 | G | Phase 9 hist. | **Closed until Wave 6** | Windows SKU | Partial | Linux headless only | Remain gated |
 | X | — | — | Stub fossils | Placeholder tests | Unsupported | **Dropped** |
