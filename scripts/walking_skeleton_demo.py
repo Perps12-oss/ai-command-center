@@ -1,3 +1,4 @@
+import os
 """
 Walking Skeleton Demo - Workspace OS Phase 2
 
@@ -98,6 +99,7 @@ def run() -> int:
         print(f"Found launch action: {launch_action.id}")
 
         # 6. Invoke the action with the URL from the entity
+        os.environ["ACC_ALLOW_ACTION_REGISTRY_INVOKE"] = "1"
         result = wos.action_registry.invoke(
             action_id=launch_action.id,
             parameters={"url": DEMO_URL},

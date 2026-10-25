@@ -29,13 +29,15 @@ _DANGEROUS_PATTERNS: tuple[re.Pattern[str], ...] = (
 _SHELL_METACHARS = set(";&|`$><\n\r")
 
 _DEFAULT_ALLOWLIST = frozenset(
-    {"echo", "cat", "type", "ls", "dir", "whoami", "hostname", "python", "git"}
+    {"echo", "cat", "type", "ls", "dir", "whoami", "hostname", "git"}
 )
 
-# Arguments that make an allowlisted program execute caller-supplied code.
-# ``git -c`` sets arbitrary config (core.fsmonitor, alias.x=!cmd) and
-# ``--upload-pack``/``--receive-pack``/``--exec`` name a program to run.
+# Arguments / subcommands that turn an allowlisted program into an interpreter
+# or deferred-execution installer. ``git -c`` / ``git config`` set arbitrary
+# config (core.fsmonitor, alias.x=!cmd); ``--upload-pack``/``--receive-pack``/
+# ``--exec`` name a program to run; ``-C`` / ``--git-dir`` relocate the repo.
 _ARG_DENYLIST: dict[str, frozenset[str]] = {
+    # Retained for callers that explicitly allowlist python.
     "python": frozenset({"-c", "--command", "-m"}),
     "git": frozenset(
         {
@@ -45,9 +47,20 @@ _ARG_DENYLIST: dict[str, frozenset[str]] = {
             "--exec-path",
             "--receive-pack",
             "--upload-pack",
+            "-C",
+            "--git-dir",
+            "--work-tree",
+            "--namespace",
+            "config",
         }
     ),
 }
+
+# Explicit allowlist for orchestration ShellProvider (WRITE_DESTROY with
+# approval). No interpreters; git is present but subcommand-filtered above.
+ORCHESTRATION_SHELL_ALLOWLIST: frozenset[str] = frozenset(
+    {"echo", "ls", "dir", "whoami", "hostname", "git", "cat", "type"}
+)
 
 
 class CommandSandbox:
@@ -100,11 +113,11 @@ class CommandSandbox:
     def _reject_code_bearing_arguments(program: str, argv: list[str]) -> None:
         """Reject arguments that turn an allowlisted program into an interpreter.
 
-        Allowlisting ``argv[0]`` is not sufficient: ``python`` and ``git`` both
-        accept code or program paths as *arguments*, so ``shell=False`` provides
-        no protection. Values may be attached with ``=``
-        (``--upload-pack=calc``) or supplied as the next token (``-c cfg=val``),
-        so compare on the flag portion only.
+        Allowlisting ``argv[0]`` is not sufficient: ``git`` accepts config and
+        program paths as *arguments*, so ``shell=False`` provides no protection.
+        Values may be attached with ``=`` (``--upload-pack=calc``) or supplied
+        as the next token (``-c cfg=val``), so compare on the flag portion only.
+        Named git subcommands such as ``config`` are also denied.
         """
         denied = _ARG_DENYLIST.get(program)
         if not denied:

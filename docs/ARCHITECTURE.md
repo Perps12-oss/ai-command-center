@@ -170,7 +170,7 @@ flowchart TB
 | Chat | `services/chat_handler_service.py`, `ui/views/chat_view.py` | [CHAT_MODERNIZATION_SPEC.md](architecture/CHAT_MODERNIZATION_SPEC.md) |
 | UI refurbishment | `ui/views/`, `ui/components/`, `ui/inspector/` | [UI_REFURBISHMENT_BACKLOG.md](architecture/UI_REFURBISHMENT_BACKLOG.md) |
 | Platform | `platform/`, `utils/hotkey.py` | [PLATFORM_STRATEGY.md](architecture/PLATFORM_STRATEGY.md), [PACKAGING_MSI_DESIGN.md](architecture/PACKAGING_MSI_DESIGN.md) |
-| EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — sync today; async dispatch design complete |
+| EventBus (R4) | `core/event_bus.py`, `core/events/dispatch_policy.py` | [ASYNC_EVENTBUS_POLICY.md](architecture/ASYNC_EVENTBUS_POLICY.md) — R4b single-queue async dispatch (`async_dispatch=True`); SYNC_CRITICAL topics remain inline |
 | Tools | `tools/`, `services/tool_executor_service.py` | Phase 4B flow below |
 | Settings | `repositories/settings_repository.py`, `services/settings_service.py` | Settings section below |
 | Plugins | `services/plugin_registry_service.py` | Plugin registry below |
@@ -314,7 +314,7 @@ Phase 4D adds `conversation_summary` compression and `graph_snippets` opt-in.
 ### Tool execution (4B)
 
 ```text
-command.routed (shell) → ShellToolService → tool.invoke → ToolExecutorService → tool.result
+command.routed (shell) → ExecutionOrchestratorService → tool.invoke → ToolExecutorService → tool.result
 ```
 
 ### Model routing (4F)

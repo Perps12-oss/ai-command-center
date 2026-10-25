@@ -54,8 +54,8 @@ jobs:
           python scripts/acc_provider_test.py provider test system_facts --certify
 
       - name: ARM64 binary scan (informational on x64 runners)
-        # Hosted runners are x64; this is a hard gate only on native ARM64
-        # (see arm64-gate.yml). Here it is informational so x64 does not block.
+        # Hosted runners are x64; two-tier scan still FAILs python.exe AMD64 here.
+        # Hard gate is arm64-gate.yml on windows-11-arm.
         continue-on-error: true
         run: python scripts/check_arm64_binaries.py
 

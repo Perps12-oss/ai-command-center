@@ -232,7 +232,7 @@ def test_stale_receipt_cannot_satisfy_current_run() -> None:
     orch = ExecutionOrchestratorService(bus)
     orch.start()
 
-    orch._receipted_ids.add("req-stale")
+    orch._remember_receipt_id("req-stale")
     plan = ExecutionPlan(
         goal="probe",
         steps=(PlanStep(step_id="s1", capability="shell", args={"command": "echo"}),),

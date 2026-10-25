@@ -16,6 +16,7 @@ from ai_command_center.core.events.topics import (
     LLM_STEP_REQUEST,
     ORCHESTRATION_RECEIPT,
     ORCHESTRATION_TRUTH_VALIDATED,
+    OLLAMA_STATUS,
     RUNTIME_ACTION_REQUEST,
     RUNTIME_WORLD_MODEL_APPLY_COMPLETED,
     TOOL_INVOKE,
@@ -198,6 +199,11 @@ def test_inv2_llm_request_only_from_llm_capability_step() -> None:
     assert not step_requests
 
     # Conversational text becomes an explicit llm PlanStep.
+    bus.publish(
+        OLLAMA_STATUS,
+        {"online": True, "detail": "", "url": "http://localhost:11434"},
+        source="test",
+    )
     bus.publish(UI_COMMAND, {"text": "explain decorators", "workspace_id": "ws-1"}, source="ui")
     assert step_requests
     assert step_requests[0]["capability"] == "llm"

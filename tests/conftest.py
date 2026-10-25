@@ -36,6 +36,9 @@ os.environ.setdefault(
 os.environ.setdefault("ACC_TELEMETRY_CLAUDE_MIRROR", "0")
 # Periodic in-session export is covered by a dedicated test; keep the suite idle.
 os.environ.setdefault("ACC_TELEMETRY_EXPORT_INTERVAL_S", "0")
+# Deterministic tool completion in unit tests; production leaves this unset so
+# ToolExecutorService offloads blocking work off the EventBus dispatch thread.
+os.environ.setdefault("ACC_TOOL_EXEC_INLINE", "1")
 
 
 def _module_available(name: str) -> bool:

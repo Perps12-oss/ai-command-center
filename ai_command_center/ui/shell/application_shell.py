@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import os
+import pathlib
 
 import customtkinter as ctk
 
@@ -190,10 +190,10 @@ class ApplicationShellMixin:
         path = str(event.payload.get("path", ""))
 
         def _open_file(p: str = path) -> None:
-            try:
-                os.startfile(p)  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            # UI isolation: open via receipted launch path, not os.startfile.
+            self._controller.publish_launch_resource(
+                {"resource_type": "folder", "path": str(pathlib.Path(p).parent), "label": "Open export folder"}
+            )
 
         self._ui_queue.enqueue(
             lambda: self._toast.show(

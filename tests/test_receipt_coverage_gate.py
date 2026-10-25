@@ -38,6 +38,8 @@ _BOUNDARY_MODULES: frozenset[str] = frozenset(
     {
         # The executor itself — runs shell tools dispatched via TOOL_INVOKE.
         "services/tool_executor_service.py",
+        # Shared sandboxed Popen used by tool executor + latent ShellProvider.
+        "core/sandboxed_shell.py",
         # Capability providers behind builtin tools.
         "orchestration/providers/shell_provider.py",
         "orchestration/providers/application_provider.py",
@@ -50,16 +52,10 @@ _BOUNDARY_MODULES: frozenset[str] = frozenset(
     }
 )
 
-# Known bypasses, deliberately NOT fixed in Phase A. Severity from the audit's
-# Runtime Bypass Register. Each entry is a standing debt, not an exemption for
-# new code: adding a module here is a deliberate, reviewable act.
+# Known bypasses. Severity from the audit Runtime Bypass Register.
 _ALLOWLISTED_BYPASSES: dict[str, str] = {
-    # Audit bypass #2 — chat export writes a file and may os.startfile it.
-    "ui/shell/application_shell.py": "MEDIUM — chat export open; out of Phase A scope",
-    # Audit bypass #3 — Runtime Inspector opens docs in a browser.
-    "ui/runtime_inspector.py": "LOW — inspector webbrowser.open; out of Phase A scope",
-    # Audit bypass #4 — QwenPaw sidecar process spawn.
-    "services/qwenpaw_sidecar_service.py": "MEDIUM — sidecar Popen; out of Phase A scope",
+    # Audit bypass — QwenPaw sidecar process spawn.
+    "services/qwenpaw_sidecar_service.py": "MEDIUM — sidecar Popen; lifecycle, not tool path",
     # G7 — external/mcp.* handlers, gated behind Goose Stage 3.
     "orchestration/providers/mcp_client.py": "MEDIUM — MCP stdio spawn; Goose Stage 3 gated",
     # Platform stub, Phase 11 backlog (not composed in the live runtime).

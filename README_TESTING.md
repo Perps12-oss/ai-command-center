@@ -70,9 +70,8 @@ Coverage (term + XML) is produced automatically via `pytest-cov` (configured in
 ### 1. Platform blind spots (ARM64 vs x64)
 
 * **`scripts/check_arm64_binaries.py`** walks the interpreter prefix + every
-  `site-packages` dir and reads the PE machine type of every `.exe`/`.dll`/`.pyd`
-  (via `pefile`, falling back to a raw header parse). Any non-`IMAGE_FILE_MACHINE_ARM64`
-  (`0xAA64`) binary is listed and the script exits non-zero.
+  `site-packages` dir and reads the PE machine type of every `.exe`/`.dll`/`.pyd`.
+  Non-ARM64 PE **FAIL** unless the path maps to `arm64_policy.ALLOWLIST_EMULATION`.
   ```powershell
   python scripts/check_arm64_binaries.py            # scan current env
   python scripts/check_arm64_binaries.py --json      # machine-readable
@@ -167,10 +166,8 @@ Added hooks: `arm64-binary-scan` (risk #1), `arch-lint` (risk #2), `bandit`
   `windows-latest` + `ubuntu-latest` (Python 3.11 & 3.12): arch lint, bandit
   (baseline), full `pytest` with coverage. The ARM64 binary scan runs
   *informational* here (x64 runners can't pass a hard gate).
-* **`.github/workflows/arm64-gate.yml`** — the **hard** native-ARM64 gate
-  (`runs-on: windows-11-arm` or a self-hosted ARM64 runner). Triggered via
-  `workflow_dispatch`; uncomment the `pull_request`/`push` triggers once an
-  ARM64 runner is available to gate every PR.
+* **`.github/workflows/arm64-gate.yml`** — two-tier native-ARM64 gate
+  (`runs-on: windows-11-arm`). `pull_request` + `push` to `main` + `workflow_dispatch`.
 
 ### Azure Pipelines
 

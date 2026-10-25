@@ -78,6 +78,74 @@ def test_allowlist_exempts_named_binary(tmp_path: Path) -> None:
     assert report["offenders"] == [], "allowlisted binary should not be reported"
 
 
+def test_two_tier_allowlist_passes_aiohttp_amd64(tmp_path: Path) -> None:
+    pkg = tmp_path / "site-packages" / "aiohttp"
+    pkg.mkdir(parents=True)
+    (pkg / "ext.pyd").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+    report = scanner.scan([tmp_path], allow=set())
+    assert report["offenders"] == []
+    assert report["allowlisted"]
+    rc = scanner.main([str(tmp_path)])
+    assert rc == 0
+
+
+def test_two_tier_allowlist_rejects_i386_in_aiohttp(tmp_path: Path) -> None:
+    pkg = tmp_path / "site-packages" / "aiohttp"
+    pkg.mkdir(parents=True)
+    (pkg / "ext.pyd").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_I386))
+    report = scanner.scan([tmp_path], allow=set())
+    assert [Path(o["path"]).name for o in report["offenders"]] == ["ext.pyd"]
+    assert report["allowlisted"] == []
+    assert scanner.main([str(tmp_path)]) == 1
+
+
+def test_toolchain_noise_is_skipped_but_core_and_wheels_still_gated(
+    tmp_path: Path,
+) -> None:
+    """CPython/pip vendor PE must not FAIL; python.exe and mystery wheels must."""
+    prefix = tmp_path / "Python" / "3.12.10" / "arm64"
+    prefix.mkdir(parents=True)
+    site_pkg = prefix / "Lib" / "site-packages"
+    distlib = site_pkg / "pip" / "_vendor" / "distlib"
+    distlib.mkdir(parents=True)
+    nmake = prefix / "tcl" / "nmake"
+    nmake.mkdir(parents=True)
+
+    (prefix / "python.exe").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_ARM64))
+    (prefix / "python-3.12.10-arm64.exe").write_bytes(
+        _make_pe(scanner.IMAGE_FILE_MACHINE_I386)
+    )
+    (prefix / "vcruntime140_1.dll").write_bytes(
+        _make_pe(scanner.IMAGE_FILE_MACHINE_AMD64)
+    )
+    (distlib / "t64.exe").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+    (nmake / "x86_64-w64-mingw32-nmakehlp.exe").write_bytes(
+        _make_pe(scanner.IMAGE_FILE_MACHINE_AMD64)
+    )
+    (site_pkg / "mystery.pyd").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+
+    report = scanner.scan([prefix], allow=set())
+    offending = sorted(Path(o["path"]).name for o in report["offenders"])
+    assert offending == ["mystery.pyd"]
+
+    (prefix / "python.exe").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+    report_exe = scanner.scan([prefix], allow=set())
+    names = {Path(o["path"]).name for o in report_exe["offenders"]}
+    assert "python.exe" in names
+    assert "mystery.pyd" in names
+    assert "t64.exe" not in names
+    assert "python-3.12.10-arm64.exe" not in names
+    assert "vcruntime140_1.dll" not in names
+
+
+def test_two_tier_still_fails_unknown_amd64(tmp_path: Path) -> None:
+    mystery = tmp_path / "mystery.pyd"
+    mystery.write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
+    report = scanner.scan([tmp_path], allow=set())
+    assert [Path(o["path"]).name for o in report["offenders"]] == ["mystery.pyd"]
+    assert scanner.main([str(tmp_path)]) == 1
+
+
 def test_cli_exits_nonzero_when_x64_present(tmp_path: Path) -> None:
     (tmp_path / "bad.dll").write_bytes(_make_pe(scanner.IMAGE_FILE_MACHINE_AMD64))
     rc = scanner.main([str(tmp_path)])
@@ -96,11 +164,7 @@ def test_cli_exits_zero_for_clean_tree(tmp_path: Path) -> None:
     sys.platform != "win32", reason="PE binaries only exist on Windows"
 )
 def test_live_environment_is_pure_arm64() -> None:
-    """The active interpreter + site-packages must contain no x64 binaries.
-
-    Skipped unless we are actually on native ARM64; on x64/emulated hosts this is
-    expected to fail (that is the whole point of the gate).
-    """
+    """The live env must not contain *non-allowlisted* x64 PE (two-tier contract)."""
     import sys
 
     from ai_command_center.platform.detector import get_pe_machine_type, is_arm64

@@ -18,6 +18,11 @@ from typing import Any
 
 import customtkinter as ctk
 
+from ai_command_center.core.events.topics import (
+    WORKFLOW_EXPORT_REQUEST,
+    WORKFLOW_IMPORT_REQUEST,
+    WORKFLOW_IMPORT_RESULT,
+)
 from ai_command_center.core.projectors.automation_workspace_projector import (
     AutomationWorkspaceProjector,
 )
@@ -85,9 +90,11 @@ class WorkflowGraphView(ctk.CTkFrame):
         on_edge_create: Callable[[str, str], None] | None = None,
         on_edge_delete: Callable[[GraphEdge], None] | None = None,
         on_import_result: Callable[[WorkflowDefinition], None] | None = None,
+        bus: Any | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, fg_color=T.BG_DEEP, **kwargs)
+        self._bus = bus
         self._on_run = on_run or (lambda _workflow_id, _steps: None)
         self._on_pause = on_pause or (lambda: None)
         self._on_resume = on_resume or (lambda: None)
@@ -103,6 +110,11 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._running = False
         self._paused = False
         self._shortcuts_overlay: ShortcutsOverlayManager | None = None
+        self._import_unsub: Callable[[], None] | None = None
+        if self._bus is not None:
+            self._import_unsub = self._bus.subscribe(
+                WORKFLOW_IMPORT_RESULT, self._on_workflow_import_result
+            )
         self._build()
 
     def _build(self) -> None:
@@ -284,7 +296,7 @@ class WorkflowGraphView(ctk.CTkFrame):
         self._on_edge_delete(edge)
 
     def _handle_export(self) -> None:
-        """Export workflow to YAML file."""
+        """Export workflow to YAML via WorkflowIoService (UI picks path only)."""
         if self._graph_state is None:
             return
 
@@ -297,7 +309,6 @@ class WorkflowGraphView(ctk.CTkFrame):
         )
         yaml_content = definition.to_yaml()
 
-        # Show save dialog
         filename = filedialog.asksaveasfilename(
             title="Export Workflow",
             defaultextension=".yaml",
@@ -305,35 +316,41 @@ class WorkflowGraphView(ctk.CTkFrame):
             initialfile=f"{workflow_name.lower().replace(' ', '_')}.yaml",
         )
 
-        if filename:
-            try:
-                with open(filename, "w", encoding="utf-8") as f:
-                    f.write(yaml_content)
-            except OSError:
-                # Log error but don't crash - UI should handle gracefully
-                pass
+        if not filename or self._bus is None:
+            return
+        self._bus.publish(
+            WORKFLOW_EXPORT_REQUEST,
+            {"path": filename, "yaml": yaml_content},
+            source="ui.workflow_graph",
+        )
 
     def _handle_import(self) -> None:
-        """Import workflow from YAML file."""
+        """Import workflow YAML via WorkflowIoService (UI picks path only)."""
         filename = filedialog.askopenfilename(
             title="Import Workflow",
             filetypes=[("YAML files", "*.yaml *.yml"), ("All files", "*.*")],
         )
 
-        if not filename:
+        if not filename or self._bus is None:
             return
+        self._bus.publish(
+            WORKFLOW_IMPORT_REQUEST,
+            {"path": filename},
+            source="ui.workflow_graph",
+        )
 
+    def _on_workflow_import_result(self, event: Any) -> None:
+        payload = event.payload if hasattr(event, "payload") else {}
+        if not isinstance(payload, dict):
+            return
+        yaml_content = str(payload.get("yaml") or "")
+        if not yaml_content:
+            return
         try:
-            with open(filename, "r", encoding="utf-8") as f:
-                yaml_content = f.read()
-
             definition = WorkflowDefinition.from_yaml(yaml_content)
-
-            # Notify parent about imported workflow
-            self._on_import_result(definition)
-        except (OSError, ValueError):
-            # Log error but don't crash - UI should handle gracefully
-            pass
+        except ValueError:
+            return
+        self._on_import_result(definition)
 
     def _graph_from_state(self, state: WorkflowGraphState) -> WorkflowGraph:
         return WorkflowGraphProjector.from_state_items(

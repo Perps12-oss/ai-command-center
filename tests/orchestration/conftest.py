@@ -9,7 +9,7 @@ import pytest
 
 from ai_command_center.core.context_manager import ContextManager
 from ai_command_center.core.event_bus import EventBus
-from ai_command_center.core.events.topics import UI_COMMAND, WORKSPACE_ACTIVE
+from ai_command_center.core.events.topics import OLLAMA_STATUS, UI_COMMAND, WORKSPACE_ACTIVE
 from ai_command_center.core.tools import ToolResult, ToolSpec
 from ai_command_center.core.world_model.world_model import WorldModel
 from ai_command_center.orchestration.providers.application_provider import ApplicationProvider
@@ -166,6 +166,13 @@ def start_runtime_stack(
     orchestration.start()
     chat.start()
     authority.start()
+    # Runtime integration tests expect the conversational llm path to be available
+    # unless a test explicitly overrides provider readiness.
+    bus.publish(
+        OLLAMA_STATUS,
+        {"online": True, "detail": "", "url": "http://localhost:11434"},
+        source="test",
+    )
     bus.publish(WORKSPACE_ACTIVE, {"workspace_id": "ws-orch", "title": "Orch"}, source="test")
     return orchestration, chat, authority
 

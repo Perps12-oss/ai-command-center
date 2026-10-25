@@ -306,6 +306,10 @@ def test_readonly_sandbox_rejects_interpreters() -> None:
         READONLY_COMMAND_SANDBOX.validate_command("git status")
     with pytest.raises(SecurityError):
         READONLY_COMMAND_SANDBOX.validate_command("python -m http.server")
+    with pytest.raises(SecurityError):
+        READONLY_COMMAND_SANDBOX.validate_command("cat /etc/passwd")
+    with pytest.raises(SecurityError):
+        READONLY_COMMAND_SANDBOX.validate_command(r"type C:\Windows\win.ini")
     assert READONLY_COMMAND_SANDBOX.validate_command("echo hi")
 
 

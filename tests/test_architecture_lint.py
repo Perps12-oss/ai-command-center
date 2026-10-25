@@ -135,6 +135,62 @@ def test_r5_flags_ui_tool_invoke_publish() -> None:
     assert "R5" in _rules("ai_command_center/ui/views/chat_view.py", src)
 
 
+# ── R6/R7: package boundary discipline (ADR-025 F1) ───────────────────────────
+def test_r6_flags_runtime_importing_ui() -> None:
+    src = "from ai_command_center.ui.views.home import HomeView\n"
+    assert "R6" in _rules("ai_command_center/runtime/provider_registry.py", src)
+
+
+def test_r6_flags_runtime_importing_services() -> None:
+    src = "from ai_command_center.services.chat_handler_service import ChatHandlerService\n"
+    assert "R6" in _rules("ai_command_center/runtime/providers/native_provider.py", src)
+
+
+def test_r6_allows_runtime_importing_domain() -> None:
+    src = "from ai_command_center.domain.runtime_capability import CapabilityKind\n"
+    assert "R6" not in _rules("ai_command_center/runtime/provider_registry.py", src)
+
+
+def test_r7_flags_domain_importing_services() -> None:
+    src = "from ai_command_center.services.base import BaseService\n"
+    assert "R7" in _rules("ai_command_center/domain/decision_record.py", src)
+
+
+def test_r7_flags_domain_importing_ui() -> None:
+    src = "from ai_command_center.ui.controller import UIController\n"
+    assert "R7" in _rules("ai_command_center/domain/goal.py", src)
+
+
+# ── R8: concrete runtime.providers allowlist (ADR-025 F2) ─────────────────────
+def test_r8_flags_ui_importing_concrete_provider() -> None:
+    src = "from ai_command_center.runtime.providers.native_provider import NativeRuntimeProvider\n"
+    assert "R8" in _rules("ai_command_center/ui/views/home_view.py", src)
+
+
+def test_r8_flags_unallowlisted_service_provider_import() -> None:
+    src = "from ai_command_center.runtime.providers.native_provider import NativeRuntimeProvider\n"
+    assert "R8" in _rules("ai_command_center/services/ollama_service.py", src)
+
+
+def test_r8_allows_wiring_service_provider_import() -> None:
+    src = "from ai_command_center.runtime.providers.native_provider import NativeRuntimeProvider\n"
+    assert "R8" not in _rules(
+        "ai_command_center/services/runtime_provider_registry_service.py", src
+    )
+
+
+def test_r8_allows_composition_root_provider_import() -> None:
+    src = "from ai_command_center.runtime.providers.qwenpaw_health import QwenPawSidecarHealthState\n"
+    assert "R8" not in _rules("ai_command_center/core/service_factory.py", src)
+
+
+def test_provider_sdk_not_imported_by_composition_roots() -> None:
+    """ADR-025 F2 — dormant provider_sdk must stay unwired."""
+    for rel in ("ai_command_center/application.py", "ai_command_center/core/service_factory.py"):
+        text = (_ROOT / rel).read_text(encoding="utf-8")
+        assert "provider_sdk" not in text, f"{rel} must not import provider_sdk"
+
+
 # ── repo ratchet ──────────────────────────────────────────────────────────────
 def test_no_new_architecture_violations_in_repo() -> None:
     baseline_path = _ROOT / "tests" / "arch_lint_baseline.json"

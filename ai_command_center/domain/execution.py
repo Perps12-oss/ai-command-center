@@ -68,11 +68,16 @@ class Execution:
 
     @classmethod
     def from_orchestration_payload(cls, payload: dict) -> "Execution":
+        success = payload.get("execution_success")
+        if success is False:
+            status = ExecutionStatus.FAILED
+        else:
+            status = ExecutionStatus.COMPLETED
         return cls(
             run_id=str(payload.get("request_id", "")),
             request_id=str(payload.get("request_id", "")),
             source="orchestration",
-            status=ExecutionStatus.COMPLETED,
+            status=status,
             query=str(payload.get("query", "")),
             intent=str(payload.get("intent", "")),
             provider_id=str(payload.get("provider_id", "")),
@@ -80,6 +85,7 @@ class Execution:
             response_source=str(payload.get("response_source", "")),
             truth_valid=bool(payload.get("truth_valid", False)),
             truth_detail=str(payload.get("truth_detail", "")),
+            error=str(payload.get("execution_error") or ""),
             trace_id=str(payload.get("trace_id", "")),
             span_id=str(payload.get("span_id", "")),
             receipt_id=str(payload.get("receipt_id", "")),

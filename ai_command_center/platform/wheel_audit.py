@@ -1,4 +1,4 @@
-"""Wheel architecture audit for Phase 0 preflight."""
+"""Wheel architecture audit for Phase 0 preflight (two-tier ARM64 contract)."""
 
 from __future__ import annotations
 
@@ -6,18 +6,13 @@ import importlib.metadata
 import sys
 from pathlib import Path
 
-from ai_command_center.platform.detector import get_pe_machine_type
-
-# Inference / AI / audio / vision — emulated x64 wheels are a hard fail.
-PERFORMANCE_CRITICAL_PACKAGES: frozenset[str] = frozenset(
-    {
-        "faster-whisper",
-        "whisper",
-        "openai-whisper",
-        "TTS",
-        "screenpipe",
-    }
+from ai_command_center.platform.arm64_policy import (
+    ALLOWLIST_EMULATION,
+    PERFORMANCE_CRITICAL_PACKAGES,
+    pip_allowlisted,
+    wheel_severity,
 )
+from ai_command_center.platform.detector import get_pe_machine_type
 
 # Phase 0 gate: must be importable before Phase 1.
 CRITICAL_PHASE0_DEPS: list[tuple[str, str, str]] = [
@@ -85,7 +80,10 @@ def audit_wheel_arch(pip_name: str) -> tuple[str, str]:
         name = next(n for k, n in findings if k == "native_arm64")
         return "native_arm64", f"ARM64 binary: {name}"
     emulated = [n for k, n in findings if k == "emulated_amd64"]
-    return "emulated_amd64", f"x64 binary (emulated on ARM): {emulated[0]}"
+    detail = f"x64 binary (emulated on ARM): {emulated[0]}"
+    if pip_allowlisted(pip_name):
+        detail += " [allowlist PASS]"
+    return "emulated_amd64", detail
 
 
 def audit_all_deps() -> list[dict[str, str]]:
@@ -95,16 +93,9 @@ def audit_all_deps() -> list[dict[str, str]]:
         arch, detail = audit_wheel_arch(pip_name)
         critical = pip_name.lower() in {p[2].lower() for p in CRITICAL_PHASE0_DEPS}
         perf_critical = pip_name.lower() in PERFORMANCE_CRITICAL_PACKAGES
-        if arch == "emulated_amd64" and perf_critical:
-            severity = "FAIL"
-        elif arch == "emulated_amd64":
-            severity = "WARN"
-        elif arch == "not_installed" and critical:
-            severity = "FAIL"
-        elif arch == "not_installed":
-            severity = "WARN"
-        else:
-            severity = "PASS"
+        severity = wheel_severity(
+            arch, pip_name, critical=critical, perf_critical=perf_critical
+        )
         rows.append(
             {
                 "package": label,
@@ -113,6 +104,17 @@ def audit_all_deps() -> list[dict[str, str]]:
                 "detail": detail,
                 "severity": severity,
                 "tier": "critical" if critical else "optional",
+                "allowlisted": str(pip_allowlisted(pip_name)).lower(),
             }
         )
     return rows
+
+
+__all__ = [
+    "ALLOWLIST_EMULATION",
+    "CRITICAL_PHASE0_DEPS",
+    "OPTIONAL_DEPS",
+    "PERFORMANCE_CRITICAL_PACKAGES",
+    "audit_all_deps",
+    "audit_wheel_arch",
+]

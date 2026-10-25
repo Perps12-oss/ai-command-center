@@ -7,6 +7,7 @@ from typing import Any, Callable
 from ai_command_center.core.event_bus import Event, EventBus
 from ai_command_center.core.events.topics import (
     SETTINGS_CHANGED,
+    SETTINGS_ERROR,
     SETTINGS_SET_REQUEST,
     SETTINGS_SNAPSHOT,
 )
@@ -16,7 +17,12 @@ from ai_command_center.domain.capability_provider_settings import (
     settings_key_for_kind,
 )
 from ai_command_center.domain.settings_snapshot import SettingsSnapshot
-from ai_command_center.platform.secret_store import store_openai_api_key
+from ai_command_center.platform.secret_store import (
+    SecretStoreError,
+    bus_value_for_secret_key,
+    store_openai_api_key,
+    store_qwenpaw_auth_token,
+)
 from ai_command_center.providers.defaults import default_model_for_provider
 from ai_command_center.repositories.settings_repository import SettingsRepository
 from ai_command_center.services.base import BaseService
@@ -88,24 +94,38 @@ class SettingsService(BaseService):
         # One logical change → one settings.snapshot (core publishes it).
         # Do not call _publish_snapshot again — that previously doubled fan-out
         # across 9 SYNC_CRITICAL subscribers (~190ms OpenAI handler).
-        if key == "openai_api_key":
-            value = store_openai_api_key(str(value))
-        if key == "provider":
-            provider = str(value).strip() or "ollama"
-            model = default_model_for_provider(provider)
-            self._core_settings.set_many(
-                {
-                    "provider": provider,
-                    "default_model": model,
-                    "summarize_model": model,
-                },
-                publish=True,
+        try:
+            if key == "openai_api_key":
+                value = store_openai_api_key(str(value))
+            elif key == "qwenpaw_auth_token":
+                value = store_qwenpaw_auth_token(str(value))
+        except SecretStoreError as exc:
+            self._bus.publish(
+                SETTINGS_ERROR,
+                {"key": key, "value": "", "error": str(exc), "default": ""},
+                source=self.name,
             )
-        else:
-            self._core_settings.set(key, value, publish=True)
+            return
+        try:
+            if key == "provider":
+                provider = str(value).strip() or "ollama"
+                model = default_model_for_provider(provider)
+                self._core_settings.set_many(
+                    {
+                        "provider": provider,
+                        "default_model": model,
+                        "summarize_model": model,
+                    },
+                    publish=True,
+                )
+            else:
+                self._core_settings.set(key, value, publish=True)
+        except (TypeError, ValueError):
+            # Core already published settings.error; do not claim acceptance.
+            return
         self._bus.publish(
             SETTINGS_CHANGED,
-            {"key": key, "value": value},
+            {"key": key, "value": bus_value_for_secret_key(key, value)},
             source=self.name,
         )
 

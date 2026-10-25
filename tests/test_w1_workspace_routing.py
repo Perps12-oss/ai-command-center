@@ -17,6 +17,7 @@ from ai_command_center.core.events.topics import (
     MEMORY_REMEMBER,
     MODEL_RESOLVE_REQUEST,
     MODEL_RESOLVE_RESULT,
+    OLLAMA_STATUS,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
     UI_COMMAND,
@@ -125,6 +126,11 @@ class W1ChatHandlerEntityTests(unittest.TestCase):
 
         handler = ChatHandlerService(bus, ContextManager(max_context_tokens=4096))
         handler.load()
+        bus.publish(
+            OLLAMA_STATUS,
+            {"online": True, "detail": "", "url": "http://localhost:11434"},
+            source="tests",
+        )
         bus.publish(
             LLM_STEP_REQUEST,
             {

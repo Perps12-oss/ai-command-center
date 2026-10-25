@@ -26,6 +26,7 @@ from typing import Any
 from ai_command_center.core.events.dispatch_policy import (
     DispatchTier,
     budget_exceedance_is_warning,
+    delivers_inline_during_shutdown,
     get_dispatch_tier,
     get_time_budget_ms,
 )
@@ -400,7 +401,11 @@ class EventBus:
         if topic == UI_NAVIGATE:
             self._note_navigate_publish_rate(source, event.payload)
         if self._shutdown.is_set() and get_dispatch_tier(topic) is DispatchTier.ASYNC_ELIGIBLE:
-            return replace(event, delivery="dropped")
+            if not delivers_inline_during_shutdown(topic):
+                return replace(event, delivery="dropped")
+            # Outcome evidence must not vanish while its receipt survives.
+            self._invoke_handlers(event)
+            return replace(event, delivery="delivered")
         if self._should_enqueue_topic(topic):
             if self._debug_mode:
                 logger.debug(
@@ -445,6 +450,9 @@ class EventBus:
             self._shutdown.is_set()
             and get_dispatch_tier(event.topic) is DispatchTier.ASYNC_ELIGIBLE
         ):
+            if not delivers_inline_during_shutdown(event.topic):
+                return
+            self._invoke_handlers(event)
             return
         if self._should_enqueue_topic(event.topic):
             self._enqueue(event)
@@ -572,16 +580,21 @@ class EventBus:
                 except Exception:
                     logger.debug("Failed to publish handler duration metric", exc_info=True)
 
-    def shutdown(self, *, timeout: float = 5.0) -> None:
+    def shutdown(self, *, timeout: float = 5.0) -> bool:
         """Stop accepting new async work, drain the dispatch queue, then join.
 
         Order (ASYNC_EVENTBUS_POLICY Shutdown):
         1. Set shutdown flag (``_should_enqueue_topic`` returns False).
         2. Wait for queued jobs to finish (bounded by ``timeout``).
         3. Send sentinel and join the dispatch thread.
+
+        Returns True when the queue drained and the worker exited. A False
+        return means dispatch work may still be running: callers owning
+        resources those handlers use (e.g. the SQLite handle) must treat it as
+        a lifecycle failure rather than a completed shutdown.
         """
         if self._dispatch_thread is None:
-            return
+            return True
         self._shutdown.set()
         assert self._dispatch_queue is not None
         deadline = time.monotonic() + max(0.1, timeout)
@@ -600,11 +613,13 @@ class EventBus:
                 )
         remaining = max(0.05, deadline - time.monotonic())
         self._dispatch_thread.join(timeout=remaining)
-        if self._dispatch_thread.is_alive() or self.dispatch_queue_depth > 0:
-            logger.warning(
+        clean = not self._dispatch_thread.is_alive() and self.dispatch_queue_depth == 0
+        if not clean:
+            logger.error(
                 "EventBus shutdown incomplete: thread_alive=%s depth=%d",
                 self._dispatch_thread.is_alive(),
                 self.dispatch_queue_depth,
             )
         self._dispatch_thread = None
         self._dispatch_queue = None
+        return clean

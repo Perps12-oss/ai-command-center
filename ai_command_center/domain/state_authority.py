@@ -26,6 +26,8 @@ class StateQuery:
     entity_types: tuple[str, ...] = ()
     include_memories: bool = True
     include_goals: bool = True
+    # Sync intake path: skip cold recover + heavy lookups (Perf Art IV).
+    light: bool = False
 
 
 @dataclass(frozen=True, slots=True)

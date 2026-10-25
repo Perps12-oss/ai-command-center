@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import statistics
 import time
 
@@ -28,11 +29,19 @@ from ai_command_center.platform.secret_store import (
 
 
 @pytest.fixture()
-def core():
+def core(tmp_path):
+    previous_appdata = os.environ.get("APPDATA")
+    os.environ["APPDATA"] = str(tmp_path)
     app = create_application()
     app.startup()
-    yield app
-    app.shutdown()
+    try:
+        yield app
+    finally:
+        app.shutdown()
+        if previous_appdata is None:
+            os.environ.pop("APPDATA", None)
+        else:
+            os.environ["APPDATA"] = previous_appdata
 
 
 def test_reducer_index_narrows_system_snapshot() -> None:
@@ -83,8 +92,8 @@ def test_appstate_reduce_under_budget(core) -> None:
             )()
         )
         times.append((time.perf_counter() - st) * 1000.0)
-    assert statistics.mean(times) < 2.0
-    assert max(times) < 10.0
+    assert statistics.mean(times) < 0.75
+    assert max(times) < 5.0
 
 
 def test_settings_single_snapshot(core) -> None:
@@ -98,7 +107,16 @@ def test_settings_single_snapshot(core) -> None:
         settings = reg.get("settings")
     assert settings is not None
     before = len(snaps)
-    settings.set("theme", core.state_store.snapshot.settings.theme)
+    for _ in range(20):
+        try:
+            settings.set("theme", core.state_store.snapshot.settings.theme)
+            break
+        except sqlite3.OperationalError as exc:
+            if "database is locked" not in str(exc).lower():
+                raise
+            time.sleep(0.05)
+    else:
+        raise AssertionError("settings write remained locked after retries")
     # Allow nested publishes to settle
     time.sleep(0.05)
     assert len(snaps) - before == 1
@@ -135,5 +153,6 @@ def test_ui_command_publish_budget(core) -> None:
         st = time.perf_counter()
         core.bus.publish(UI_COMMAND, {"text": f"ping {i}"}, source="ui")
         times.append((time.perf_counter() - st) * 1000.0)
-    # Deferred workspace path should stay well under interactive budget.
-    assert statistics.mean(times) < 16.0
+    # Art IV SYNC_CRITICAL target is <5 ms. Post-admit dispatch is ASYNC; CI
+    # uses a slightly looser mean floor for machine variance.
+    assert statistics.mean(times) < 8.0

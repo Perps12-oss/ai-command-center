@@ -34,6 +34,7 @@ SETTINGS_UPDATED = "settings.updated"
 SETTINGS_SNAPSHOT = "settings.snapshot"
 SETTINGS_CHANGED = "settings.changed"
 SETTINGS_SET_REQUEST = "settings.set_request"
+SETTINGS_ERROR = "settings.error"
 
 SERVICE_STARTED = "service.started"
 SERVICE_READY = "service.ready"
@@ -63,6 +64,7 @@ APP_WARNING = "app.warning"
 BUS_HANDLER_ERROR = "bus.handler_error"
 COMMAND_DEFERRED = "command.deferred"
 UI_COMMAND = "ui.command"
+UI_COMMAND_REPLAY = "ui.command.replay"
 UI_WORKSPACE_REQUIRED = "ui.workspace.required"
 UI_NAVIGATE = "ui.navigate"
 UI_PALETTE_OPEN = "ui.palette_open"
@@ -139,12 +141,23 @@ CHAT_REQUEST = "chat.request"
 CHAT_EXPORT_REQUEST = "chat.export_request"
 CHAT_EXPORT_RESULT = "chat.export_result"
 CHAT_EXPORT_ERROR = "chat.export_error"
+WORKFLOW_EXPORT_REQUEST = "workflow.export_request"
+WORKFLOW_EXPORT_RESULT = "workflow.export_result"
+WORKFLOW_EXPORT_ERROR = "workflow.export_error"
+WORKFLOW_IMPORT_REQUEST = "workflow.import_request"
+WORKFLOW_IMPORT_RESULT = "workflow.import_result"
+WORKFLOW_IMPORT_ERROR = "workflow.import_error"
 
 CLIPBOARD_REQUEST = "clipboard.request"
 CLIPBOARD_CONTENT = "clipboard.content"
 
 OLLAMA_STATUS = "ollama.status"
 OPENAI_STATUS = "openai.status"
+# Readiness reconciliation: consumers that hold a *projection* of provider
+# health (never the authority) ask the owning provider service to re-announce
+# its current status. Providers coalesce status publishes, so a late or
+# restarted consumer would otherwise never learn an unchanged healthy state.
+PROVIDER_STATUS_QUERY = "provider.status.query"
 OLLAMA_MODEL_LOADED = "ollama.model_loaded"
 OLLAMA_MODEL_UNLOADED = "ollama.model_unloaded"
 
@@ -263,9 +276,15 @@ PLAN_REPLAN_STUCK = "plan.replan.stuck"
 
 # Execution orchestrator (vNext L5 — approved plan execution with gates)
 EXECUTION_RUN_REQUEST = "execution.run.request"
+# Post-admit handoff from SYNC_CRITICAL UI_COMMAND (EA keeps intake/decision
+# sync; goal/plan submit runs ASYNC_ELIGIBLE so nested SQLite/cascade work does
+# not inflate the SYNC_CRITICAL budget).
+EXECUTION_DISPATCH_REQUEST = "execution.dispatch.request"
 EXECUTION_RUN_STARTED = "execution.run.started"
 EXECUTION_RUN_COMPLETE = "execution.run.complete"
 EXECUTION_RUN_FAILED = "execution.run.failed"
+# ADR-025 F3 — cancel an in-flight orchestration run by run_id (EventBus only)
+EXECUTION_RUN_CANCEL = "execution.run.cancel"
 EXECUTION_STEP_STARTED = "execution.step.started"
 EXECUTION_STEP_AWAITING_APPROVAL = "execution.step.awaiting_approval"
 EXECUTION_STEP_APPROVED = "execution.step.approved"
@@ -479,6 +498,7 @@ __all__ = [
     "SETTINGS_SNAPSHOT",
     "SETTINGS_CHANGED",
     "SETTINGS_SET_REQUEST",
+    "SETTINGS_ERROR",
     "SERVICE_STARTED",
     "SERVICE_READY",
     "SERVICE_STOPPED",
@@ -503,6 +523,7 @@ __all__ = [
     "BUS_HANDLER_ERROR",
     "COMMAND_DEFERRED",
     "UI_COMMAND",
+    "UI_COMMAND_REPLAY",
     "UI_WORKSPACE_REQUIRED",
     "UI_NAVIGATE",
     "UI_PALETTE_OPEN",
@@ -556,10 +577,17 @@ __all__ = [
     "CHAT_EXPORT_REQUEST",
     "CHAT_EXPORT_RESULT",
     "CHAT_EXPORT_ERROR",
+    "WORKFLOW_EXPORT_REQUEST",
+    "WORKFLOW_EXPORT_RESULT",
+    "WORKFLOW_EXPORT_ERROR",
+    "WORKFLOW_IMPORT_REQUEST",
+    "WORKFLOW_IMPORT_RESULT",
+    "WORKFLOW_IMPORT_ERROR",
     "CLIPBOARD_REQUEST",
     "CLIPBOARD_CONTENT",
     "OLLAMA_STATUS",
     "OPENAI_STATUS",
+    "PROVIDER_STATUS_QUERY",
     "OLLAMA_MODEL_LOADED",
     "OLLAMA_MODEL_UNLOADED",
     "MODEL_SELECTED",
@@ -653,9 +681,11 @@ __all__ = [
     "PLAN_REPLAN_RESULT",
     "PLAN_REPLAN_STUCK",
     "EXECUTION_RUN_REQUEST",
+    "EXECUTION_DISPATCH_REQUEST",
     "EXECUTION_RUN_STARTED",
     "EXECUTION_RUN_COMPLETE",
     "EXECUTION_RUN_FAILED",
+    "EXECUTION_RUN_CANCEL",
     "EXECUTION_STEP_STARTED",
     "EXECUTION_STEP_AWAITING_APPROVAL",
     "EXECUTION_STEP_APPROVED",

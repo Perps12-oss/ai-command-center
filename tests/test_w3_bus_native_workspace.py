@@ -26,6 +26,7 @@ from ai_command_center.core.events.topics import (
     ENTITY_CREATED,
     LLM_STEP_REQUEST,
     LLM_REQUEST,
+    OLLAMA_STATUS,
     SEARCH_RESULTS,
     UI_CREATE_CARD,
     UI_CREATE_WORKSPACE,
@@ -275,6 +276,11 @@ class W3ChatEntityContextTests(unittest.TestCase):
         self.chat.unload()
 
     def test_chat_uses_entity_context_bus_snippets(self) -> None:
+        self.bus.publish(
+            OLLAMA_STATUS,
+            {"online": True, "detail": "", "url": "http://localhost:11434"},
+            source="tests",
+        )
         card = self.entity_service.create(
             entity_type=ENTITY_TYPE_CARD,
             title="Chat Scoped Card",

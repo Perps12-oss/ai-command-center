@@ -213,10 +213,12 @@ This is owner-authorized. Do **not** invent extra tickets from historical invent
 
 | Wave | Work | Status |
 |------|------|--------|
-| 0 | Strategic Gap Matrix | Deliverable in [`docs/audits/STRATEGIC_GAP_MATRIX.md`](../audits/STRATEGIC_GAP_MATRIX.md). **COMPLETE only after merge to `main`.** |
-| 1 | Architecture closure (Gate 1–2) | Gate 2 decisions recorded 2026-08-14 — see [`WAVE_1_GATE_2_DECISIONS.md`](../architecture/proposals/WAVE_1_GATE_2_DECISIONS.md). A/B/C/E(read-only) ACCEPT; D/E(vectors) DEFER WITH CONDITION; F ACCEPT. **CLOSED only after merge to `main`.** **Still no code** — Gate 3 Section 9 plans are next, per stream. |
-| 2–5 | Runtime foundations → capability → Goose hardening → full-system verification | Gate 3 Section 9 plans unblocked for A, B, C, and E's read-only slice **once Wave 1 lands on `main`**. D stays at Stage 1 measurement. F stays parked until Wave 4. |
-| 6 | Cross-OS (Stream G) | **Not opened.** Only remaining strategic gate. |
+| 0 | Strategic Gap Matrix | [`docs/audits/STRATEGIC_GAP_MATRIX.md`](../audits/STRATEGIC_GAP_MATRIX.md). **COMPLETE** on `main`. |
+| 1 | Architecture closure (Gate 1–2) | [`WAVE_1_GATE_2_DECISIONS.md`](../architecture/proposals/WAVE_1_GATE_2_DECISIONS.md). **COMPLETE** on `main`. |
+| 2–3 | Runtime foundations + capability | Gate 4 code for A, B, C, E-M1, B5 on `main`. D isolation not unlocked. E vectors still deferred. |
+| 4 | Goose hardening (Stream F Adapt) | **COMPLETE when** [`WAVE_4_CLOSEOUT.md`](../audits/WAVE_4_CLOSEOUT.md) is on `main`. Gate 5: [`WAVE_4_GATE_5_VERIFICATION.md`](../audits/WAVE_4_GATE_5_VERIFICATION.md). |
+| 5 | Full-system verification | [`WAVE_5_FULL_SYSTEM_VERIFICATION.md`](../audits/WAVE_5_FULL_SYSTEM_VERIFICATION.md). **COMPLETE** on `main`. |
+| 6 | Cross-OS (Stream G) | **Unblocked** for Gate 1 planning after Wave 4 close-out on `main`. Implementation not started. |
 
 Streams A–F (explainability, autonomy, model strategy, EventBus, knowledge, Goose) move through: Integration Proposal → ADR Decision → Section 9 → Implementation → Verification → Close-out. “Gated” means a checkpoint, not indefinite parking.
 
@@ -248,7 +250,7 @@ Pattern registry, plugin marketplace, advanced runtime, new UI ideas. **Cross-OS
 
 1. **Stage 1 — Stabilization:** ✅ **COMPLETE** on `main` (#105). R1 P2 wire-or-retire **closed** (ADR-006/012/013/014).
 2. **Stage 2 — State Authority / R1 closeout:** ✅ **COMPLETE**. SA.mutate track CLOSED (`R1_UNGATED_STOP_LINE.md`). Predictive/Undo remain retired until an ADR superseding 014.
-3. **Strategic Runtime Program (current):** Wave 0–1 documentation; then Gates 2–3; then stream implementation in dependency order. Goose question remains *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"* Cross-OS stays last.
+3. **Strategic Runtime Program (current):** Waves 0–3 Gate-4 streams and Wave 5 verification are on `main`. Wave 4 Goose Adapt Gate 4–6 close-out: [`WAVE_4_CLOSEOUT.md`](../audits/WAVE_4_CLOSEOUT.md) (**COMPLETE only on `main`**). Next Queue 1: **Wave 6 / Stream G Gate 1** (Cross-OS planning) once Wave 4 is on `main`; Stream D isolation remains blocked; E embeddings deferred. Goose question remains *"Which patterns strengthen the architecture we now have?"* — never *"How do we make ACC more like Goose?"*
 
 ---
 

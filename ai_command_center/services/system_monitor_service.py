@@ -1,4 +1,8 @@
-"""System monitor — publishes system.snapshot and system.events (read-only)."""
+"""System monitor — publishes system.snapshot and system.events (read-only).
+
+Owns host metrics collection (psutil). UI must project SYSTEM_SNAPSHOT / AppState
+only — never call psutil directly (UI isolation).
+"""
 
 from __future__ import annotations
 
@@ -33,6 +37,9 @@ class SystemMonitorService(BaseService):
         self._events: deque[dict] = deque(maxlen=_HISTORY_LEN)
         self._prev_cpu = 0.0
         self._prev_ram = 0.0
+        self._prev_disk = None
+        self._prev_net = None
+        self._prev_ts: float | None = None
         self._command_count = 0
         self._unsubs: list[Callable[[], None]] = []
 
@@ -79,23 +86,13 @@ class SystemMonitorService(BaseService):
             self._record_event("command", text[:80])
 
     def _on_authority_decision(self, event: Event) -> None:
-        from ai_command_center.core.routing_authority import is_routing_authority
-
-        if not is_routing_authority(event.source):
-            return
-        capability = str(event.payload.get("capability", ""))
-        self._command_count += 1
-        self._record_event("decided", capability)
-        self._publish_history()
+        kind = str(event.payload.get("kind", "")).strip()
+        if kind:
+            self._record_event("authority", kind[:80])
 
     def _record_event(self, kind: str, detail: str) -> None:
-        self._events.append(
-            {
-                "kind": kind,
-                "detail": detail,
-                "ts": time.time(),
-            }
-        )
+        self._command_count += 1
+        self._events.append({"kind": kind, "detail": detail, "ts": time.time()})
         self._bus.publish(
             SYSTEM_EVENTS,
             {"kind": kind, "detail": detail, "ts": time.time()},
@@ -120,17 +117,88 @@ class SystemMonitorService(BaseService):
                 pass
             self._stop.wait(_POLL_INTERVAL_S)
 
-    def _publish_snapshot(self) -> None:
-        cpu = 0.0
-        ram = 0.0
+    def _sample_host(self) -> dict:
+        cpu = self._prev_cpu
+        ram = self._prev_ram
+        proc_mem_mb = 0.0
+        proc_cpu = 0.0
+        top: list[dict[str, object]] = []
+        disk_delta = (None, None)
+        net_delta = (None, None)
+        now = time.monotonic()
         try:
             import psutil
 
             cpu = float(psutil.cpu_percent(interval=None))
             ram = float(psutil.virtual_memory().percent)
+            try:
+                proc = psutil.Process()
+                proc_mem_mb = proc.memory_info().rss / 1024 / 1024
+                proc_cpu = float(proc.cpu_percent(interval=0))
+            except Exception:
+                pass
+            procs: list[tuple[int, float, float, str]] = []
+            for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
+                try:
+                    procs.append(
+                        (
+                            int(p.info["pid"]),
+                            float(p.info["cpu_percent"] or 0.0),
+                            float(p.info["memory_percent"] or 0.0),
+                            str(p.info["name"] or ""),
+                        )
+                    )
+                except Exception:
+                    continue
+            procs.sort(key=lambda row: row[1], reverse=True)
+            top = [
+                {
+                    "pid": pid,
+                    "cpu": round(cpu_p, 1),
+                    "mem": round(mem_p, 1),
+                    "name": name[:40],
+                }
+                for pid, cpu_p, mem_p, name in procs[:8]
+            ]
+            try:
+                dk = psutil.disk_io_counters()
+                if dk and self._prev_disk and self._prev_ts:
+                    dt = max(now - self._prev_ts, 0.001)
+                    disk_delta = (
+                        (dk.read_bytes - self._prev_disk.read_bytes) / dt,
+                        (dk.write_bytes - self._prev_disk.write_bytes) / dt,
+                    )
+                self._prev_disk = dk
+            except Exception:
+                pass
+            try:
+                nt = psutil.net_io_counters()
+                if nt and self._prev_net and self._prev_ts:
+                    dt = max(now - self._prev_ts, 0.001)
+                    net_delta = (
+                        (nt.bytes_recv - self._prev_net.bytes_recv) / dt,
+                        (nt.bytes_sent - self._prev_net.bytes_sent) / dt,
+                    )
+                self._prev_net = nt
+            except Exception:
+                pass
+            self._prev_ts = now
         except Exception:
-            cpu = self._prev_cpu
-            ram = self._prev_ram
+            pass
+        return {
+            "cpu": cpu,
+            "ram": ram,
+            "proc_mem_mb": proc_mem_mb,
+            "proc_cpu": proc_cpu,
+            "top": top,
+            "disk_delta": disk_delta,
+            "net_delta": net_delta,
+        }
+
+    def _publish_snapshot(self) -> None:
+        sample = self._sample_host()
+        cpu = float(sample["cpu"])
+        ram = float(sample["ram"])
 
         health = "healthy"
         if cpu > 90 or ram > 90:
@@ -139,6 +207,8 @@ class SystemMonitorService(BaseService):
             health = "degraded"
 
         model_load = min(100.0, cpu * 0.6 + (10.0 if self._ollama_online else 0.0))
+        disk_r, disk_w = sample["disk_delta"]
+        net_r, net_s = sample["net_delta"]
 
         self._bus.publish(
             SYSTEM_SNAPSHOT,
@@ -151,7 +221,16 @@ class SystemMonitorService(BaseService):
                 "ollama_online": self._ollama_online,
                 "cpu_delta": round(cpu - self._prev_cpu, 1),
                 "ram_delta": round(ram - self._prev_ram, 1),
-                "extra": {"openai_online": self._openai_online},
+                "extra": {
+                    "openai_online": self._openai_online,
+                    "proc_mem_mb": round(float(sample["proc_mem_mb"]), 1),
+                    "proc_cpu": round(float(sample["proc_cpu"]), 1),
+                    "top_processes": sample["top"],
+                    "disk_read_bps": disk_r,
+                    "disk_write_bps": disk_w,
+                    "net_recv_bps": net_r,
+                    "net_sent_bps": net_s,
+                },
                 "eventbus_topic_counts": self._bus.get_topic_counts(),
             },
             source=self.name,

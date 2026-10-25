@@ -28,6 +28,7 @@ from ai_command_center.core.events.topics import (
     LLM_REQUEST,
     MEMORY_LOOKUP_REQUEST,
     MEMORY_LOOKUP_RESULT,
+    OLLAMA_STATUS,
     SESSION_HISTORY_REQUEST,
     SESSION_HISTORY_RESULT,
     UI_SELECT_ENTITY,
@@ -224,6 +225,11 @@ class Phase3ChatIntegrationTests(unittest.TestCase):
             bus.subscribe(CONTEXT_COMPLETE, lambda e: completes.append(dict(e.payload)))
             bus.subscribe(LLM_REQUEST, lambda e: llm_requests.append(dict(e.payload)))
 
+            bus.publish(
+                OLLAMA_STATUS,
+                {"online": True, "detail": "", "url": "http://localhost:11434"},
+                source="tests",
+            )
             bus.publish(
                 UI_SELECT_ENTITY,
                 {

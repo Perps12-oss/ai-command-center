@@ -3247,7 +3247,7 @@ def _reduce_execution_library(state: AppState, event: Event) -> AppState:
                 source=str(r.get("source") or ""),
                 created_at=float(r.get("created_at") or 0),
                 summary=str(r.get("summary") or ""),
-                status="complete",
+                status=str(r.get("status") or "complete"),
             )
             for r in raw_runs
             if isinstance(r, dict) and r.get("run_id")

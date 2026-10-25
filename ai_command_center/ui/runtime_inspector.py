@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import time
-import webbrowser
 
 import customtkinter as ctk
 
@@ -14,6 +13,7 @@ from ai_command_center.core.events.topics import (
     CAPABILITY_PROVIDERS_READY,
     ORCHESTRATION_PROVIDER_HEALTH,
     ORCHESTRATION_RUN_SNAPSHOT,
+    UI_LAUNCH_RESOURCE,
 )
 from ai_command_center.domain.provider_health_snapshot import ProviderHealthSnapshot
 from ai_command_center.domain.orchestration_run_snapshot import OrchestrationRunSnapshot
@@ -305,7 +305,16 @@ class RuntimeInspector(ctk.CTkToplevel):
         return "\n".join(lines)
 
     def open_mcp_inspector(self) -> None:
-        webbrowser.open(_MCP_INSPECTOR_URL)
+        # UI isolation: publish launch intent; Workspace OS / EA receipt the open.
+        self._bus.publish(
+            UI_LAUNCH_RESOURCE,
+            {
+                "resource_type": "url",
+                "url": _MCP_INSPECTOR_URL,
+                "label": "MCP Inspector",
+            },
+            source="runtime_inspector",
+        )
 
     def _on_close(self) -> None:
         for unsub in self._unsubs:

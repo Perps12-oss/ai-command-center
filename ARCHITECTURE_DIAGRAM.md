@@ -167,10 +167,10 @@ User types command in UI
         │     │
         │     └─→ SessionService stores conversation
         │
-        ├─→ SHELL: ShellToolService
+        ├─→ SHELL: ExecutionOrchestratorService
         │     │
-        │     ├─→ Publish "tool.invoke" {tool: "shell", command}
-        │     ├─→ ToolExecutorService executes
+        │     ├─→ Publish "tool.invoke" {tool: "shell", command}  (sole publisher)
+        │     ├─→ ToolExecutorService executes (worker thread)
         │     └─→ Publish "tool.result" {output, exit_code}
         │
         ├─→ NOTE_SEARCH: ObsidianService
@@ -345,7 +345,7 @@ ContextManager responsibilities:
 | `chat.started` | ChatHandlerService | AppState, UI | Begin chat request |
 | `chat.chunk` | OllamaHttpService | UI | Streaming response |
 | `chat.complete` | ChatHandlerService | AppState, UI | Chat finished |
-| `tool.invoke` | ShellToolService | ToolExecutor | Execute tool |
+| `tool.invoke` | ExecutionOrchestratorService | ToolExecutorService | Execute tool |
 | `tool.result` | ToolExecutorService | UI, telemetry | Tool output |
 | `context.snapshot_created` | ContextManager | AppState | Context assembly complete |
 | `system.snapshot` | SystemSnapshotBuilder | AppState | System health snapshot |

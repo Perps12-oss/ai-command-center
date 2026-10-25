@@ -109,7 +109,11 @@ class QwenPawSidecarService(BaseService):
         self._base_url = str(payload.get("qwenpaw_url", _DEFAULT_URL)).strip() or _DEFAULT_URL
         self._agent_id = str(payload.get("qwenpaw_agent_id", "default")).strip() or "default"
         self._python_path = str(payload.get("qwenpaw_python", "")).strip()
-        self._auth_token = str(payload.get("qwenpaw_auth_token", "")).strip()
+        # Snapshot payloads redact secrets; resolve env/keyring off the sync path.
+        from ai_command_center.platform.secret_store import resolve_qwenpaw_auth_token
+
+        stored = str(payload.get("qwenpaw_auth_token", "")).strip()
+        self._auth_token = resolve_qwenpaw_auth_token(stored)
         self._health_state.update(
             enabled=self._enabled,
             auto_start=self._auto_start,

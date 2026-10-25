@@ -280,7 +280,7 @@ def test_b1_allowlisted_interpreters_reject_code_bearing_arguments(
 
 def test_b2_python_c_remains_blocked() -> None:
     """Regression guard for the #175 fix — must keep passing."""
-    sandbox = CommandSandbox()
+    sandbox = CommandSandbox(allowlist=frozenset({"python", "echo"}))
     with pytest.raises(SecurityError):
         sandbox.validate_command('python -c "import os"')
 
@@ -290,6 +290,19 @@ def test_b3_benign_allowlisted_commands_still_permitted() -> None:
     sandbox = CommandSandbox()
     assert sandbox.validate_command("git status")[0].lower().startswith("git")
     assert sandbox.validate_command("echo hello")[0].lower().startswith("echo")
+
+
+def test_b3b_git_config_and_python_script_rejected() -> None:
+    """Audit B8 — approved-looking commands must not grant deferred execution."""
+    sandbox = CommandSandbox()
+    with pytest.raises(SecurityError):
+        sandbox.validate_command("git config --global core.fsmonitor calc")
+    with pytest.raises(SecurityError):
+        sandbox.validate_command("git config alias.x !calc")
+    with pytest.raises(SecurityError):
+        sandbox.validate_command("python some_script.py")
+    with pytest.raises(SecurityError):
+        sandbox.validate_command("git -C /tmp status")
 
 
 # ---------------------------------------------------------------------------
