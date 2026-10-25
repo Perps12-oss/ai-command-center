@@ -43,6 +43,18 @@
 - No `tiered_dispatch_policy.py`, multi-pool dispatch, or any isolation code lands on `main`.
 - The abandoned branch `cursor/phase5-async-eventbus-744e` remains **not a merge candidate** regardless of any other pressure to revive it.
 
-**ADR numbering:** No ADR is issued now. This program's Wave 1 closure assigns ADR-024 to Stream E and ADR-025 to Stream F (see `docs/architecture/adr/README.md`); Stream D's isolation ADR, if the Stage 1 report justifies one, takes the next free number at that time (currently **ADR-026**, but re-check the ADR README before drafting since other streams may claim numbers first).
+**ADR numbering:** No ADR is issued at Gate 2. Stream D's isolation ADR, if a Stage 1 report justifies one, takes the next free number at that time (re-check `docs/architecture/adr/README.md` before drafting).
 
-**This is not a stall.** Stage 1 (instrumentation + load testing) is itself authorized, unblocked work — it requires no architecture decision, only measurement. It may start immediately; only Stage 2 (any actual isolation topology) remains gated on this DEFER.
+**This is not a stall.** Stage 1 (instrumentation + load testing) is authorized measurement. Stage 2 isolation remains gated on this DEFER until a report meets the unlock condition.
+
+---
+
+## 12. Stage 1 report (2026-08-16)
+
+**Report:** [`docs/audits/EVENTBUS_STAGE1_CONTENTION_REPORT.md`](../../audits/EVENTBUS_STAGE1_CONTENTION_REPORT.md)
+
+**Outcome:** Stage 1 **measurement complete**. Condition to reopen Gate 2 for isolation is **not met**. SYNC_CRITICAL (`UI_COMMAND`) p99 stayed well under 5 ms under slow-async and Gate 4 topic mix. Burst queue depth exceeded the paper &lt;100 target on the default unbounded queue; that is catch-up, not UI starvation.
+
+**Still blocked:** Stage 2 isolation topology; ADR-026; merging `cursor/phase5-async-eventbus-744e`.
+
+**Still required for GUI budgets:** Windows ARM64 soak (PERF Art. V). Headless Linux does not close UI-thread gates.
